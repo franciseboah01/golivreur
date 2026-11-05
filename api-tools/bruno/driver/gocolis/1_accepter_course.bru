@@ -1,0 +1,25 @@
+meta {
+  name: 1. Accepter une course GoColis
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/driver/parcels/{{parcel_id}}/accept
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_driver}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+docs {
+  Le livreur voit la TAILLE du colis avant d'accepter (v5).
+  Vérifiez le champ `size_label` dans la réponse de
+  driver/gocolis/0_voir_taille.bru avant cette requête.
+}

@@ -1,0 +1,31 @@
+meta {
+  name: 5. Refresh Token
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/auth/refresh
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_client}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+script:post-response {
+  if (res.body.succes) {
+    bru.setEnvVar("jwt_token_client", res.body.donnees.access_token);
+  }
+}
+
+tests {
+  test("Nouveau token reçu", function() {
+    expect(res.body.donnees.access_token).to.be.a("string");
+  });
+}

@@ -1,0 +1,55 @@
+meta {
+  name: 4. Valider le code expéditeur
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/parcels/{{parcel_id}}/verify-sender-code
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_driver}}
+}
+
+body:json {
+  {
+    "code": "{{sender_code_test}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("Statut passe à picked_up", function() {
+    expect(res.body.donnees.status).to.equal("picked_up");
+  });
+}
+
+docs {
+  # Code expéditeur — Synchronisé avec le mock Flutter
+
+  ⚠️ **IMPORTANT** : Le code `{{sender_code_test}}` (7291) ne fonctionne
+  QUE si vous testez contre le mock Flutter (`mock_gocolis_api.dart`).
+
+  Contre une vraie API (base de données réelle), le code est généré
+  aléatoirement à la création de l'expédition. Utilisez plutôt le
+  `sender_code_plain` retourné par `client/gocolis/1_creer_expedition.bru`.
+
+  ## Test du blocage après 3 erreurs
+
+  Code incorrect de test : "0000"
+  Après 3 tentatives avec "0000", la réponse doit être :
+  ```json
+  {
+    "succes": false,
+    "message": "Code incorrect. Expédition bloquée — le support a été alerté."
+  }
+  ```
+  Et `sender_code_locked` doit valoir `true` en base.
+}

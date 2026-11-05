@@ -1,0 +1,66 @@
+name: golivreur_business
+description: GoLivreur Business — Gestion des commandes et catalogue pour les commerces.
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  golivreur_core:
+    path: ../../packages/core
+
+  flutter_riverpod: 2.5.1
+  riverpod_annotation: 2.3.5
+  go_router: 13.2.0
+  dio: 5.4.3+1
+  flutter_secure_storage: 9.0.0
+
+  # Firebase (notifications commandes + Crashlytics)
+  firebase_core: 2.30.1
+  firebase_messaging: 14.9.1
+  firebase_crashlytics: 3.5.1
+
+  # Son d'alerte nouvelle commande
+  audioplayers: 6.0.0
+
+  # Gestion images catalogue
+  image_picker: 1.0.7
+  cached_network_image: 3.3.1
+
+  # Charts pour les statistiques de ventes
+  fl_chart: 0.67.0
+
+  shimmer: 3.0.0
+  intl: 0.19.0
+  equatable: 2.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: 2.4.9
+  riverpod_generator: 2.4.0
+  flutter_lints: 4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/sounds/
+      # new_order.mp3 — son d'alerte forte pour nouvelle commande
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700

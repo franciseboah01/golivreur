@@ -1,0 +1,47 @@
+meta {
+  name: 7. Valider le code destinataire
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{base_url}}/parcels/{{parcel_id}}/verify-recipient-code
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_driver}}
+}
+
+body:json {
+  {
+    "code": "{{recipient_code_test}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("Statut passe à delivered", function() {
+    expect(res.body.donnees.status).to.equal("delivered");
+  });
+
+  test("Le gain du livreur est crédité (75% des frais)", function() {
+    expect(res.body.donnees).to.have.property("gain");
+  });
+}
+
+docs {
+  # Code destinataire — Synchronisé avec le mock Flutter
+
+  Code `{{recipient_code_test}}` (3847) = valeur du mock Flutter
+  `mock_gocolis_api.dart`. Sur données réelles, le code est envoyé
+  par SMS au destinataire — consultez les logs Twilio/Laravel en dev local.
+
+  Cette requête termine le flux complet GoColis : double code validé,
+  2 photos uploadées, livreur crédité de 75% des frais d'expédition.
+}

@@ -1,0 +1,39 @@
+meta {
+  name: 4. Activer le Mode Urgence
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/admin/cities/{{city_id}}/emergency-mode
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_admin}}
+}
+
+body:json {
+  {
+    "activer": true,
+    "message": "Incident réseau majeur — opérations suspendues temporairement."
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("emergency_mode_active passe à true", function() {
+    expect(res.body.donnees.emergency_mode_active).to.equal(true);
+  });
+}
+
+docs {
+  ⚠️ Réservé à Super Admin et National DG uniquement (403 sinon).
+  Suspend toutes les nouvelles commandes/expéditions, bandeau rouge
+  dans les 3 apps. Désactivation manuelle uniquement par Super Admin.
+}

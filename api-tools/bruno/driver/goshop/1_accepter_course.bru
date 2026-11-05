@@ -1,0 +1,30 @@
+meta {
+  name: 1. Accepter une course GoShop
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/driver/orders/{{order_id}}/accept
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_driver}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("Statut passe à ready", function() {
+    expect(res.body.donnees.status).to.equal("ready");
+  });
+}
+
+docs {
+  Le livreur accepte la course. Doit être exécuté APRÈS que le commerce
+  ait accepté la commande (merchant/2_accepter_commande.bru).
+}

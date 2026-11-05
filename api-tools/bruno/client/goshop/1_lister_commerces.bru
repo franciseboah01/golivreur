@@ -1,0 +1,36 @@
+meta {
+  name: 1. Lister les commerces
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/client/merchants
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_client}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("Retourne une liste de commerces", function() {
+    expect(res.body.donnees.data).to.be.an("array");
+  });
+
+  test("Chaque commerce a un is_open", function() {
+    if (res.body.donnees.data.length > 0) {
+      expect(res.body.donnees.data[0]).to.have.property("is_open");
+    }
+  });
+}
+
+docs {
+  Liste les commerces actifs de la ville du client (filtré automatiquement
+  par city_id côté serveur). Les 5 commerces du seeder Daloa doivent apparaître.
+}

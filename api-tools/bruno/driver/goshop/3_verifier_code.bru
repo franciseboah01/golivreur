@@ -1,0 +1,63 @@
+meta {
+  name: 3. Valider le code de confirmation
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/orders/{{order_id}}/verify-code
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_driver}}
+}
+
+body:json {
+  {
+    "code": "REMPLACER_PAR_LE_CODE_DE_LA_COMMANDE"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("Statut passe à delivered", function() {
+    expect(res.body.donnees.status).to.equal("delivered");
+  });
+
+  test("Le gain du livreur est indiqué", function() {
+    expect(res.body.donnees).to.have.property("gain");
+  });
+}
+
+docs {
+  # Validation du code de confirmation GoShop
+
+  ⚠️ Remplacer "REMPLACER_PAR_LE_CODE_DE_LA_COMMANDE" par le
+  `confirmation_code` retourné dans la réponse de
+  `client/goshop/2_creer_commande.bru`.
+
+  ## Test du blocage après 3 erreurs
+
+  Pour tester le blocage, envoyez 3 fois un code incorrect (ex: "0000")
+  avant d'envoyer le bon code. La 3ème tentative incorrecte doit
+  retourner un statut 423 avec confirmation_locked = true.
+
+  Requête de test échec :
+  ```json
+  { "code": "0000" }
+  ```
+  Réponse attendue (1ère et 2ème tentative) :
+  ```json
+  { "succes": false, "message": "Code incorrect. X tentative(s) restante(s)." }
+  ```
+  Réponse attendue (3ème tentative) :
+  ```json
+  { "succes": false, "message": "Code incorrect. Livraison bloquée — le support a été alerté." }
+  ```
+}

@@ -1,0 +1,47 @@
+# GoLivreur — Docker Compose Staging
+# Usage : utilisé par GitHub Actions pour les tests CI uniquement
+# Le staging sur le VPS tourne en natif (pas Docker)
+#
+# Ce fichier est utilisé dans le pipeline CI pour :
+#   1. Démarrer une BDD PostgreSQL éphémère pour les tests Pest
+#   2. Démarrer un Redis éphémère pour les tests de queue
+#   3. Exécuter les tests dans un environnement propre et isolé
+
+services:
+
+  # PostgreSQL de test — données effacées après chaque pipeline CI
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: golivreur_postgres_test
+    environment:
+      POSTGRES_DB: golivreur_test
+      POSTGRES_USER: golivreur_user
+      POSTGRES_PASSWORD: secret_test
+    ports:
+      - "5433:5432"   # Port différent pour éviter les conflits
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U golivreur_user -d golivreur_test"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+    tmpfs:
+      # Stocker les données en RAM pour des tests ultra-rapides
+      - /var/lib/postgresql/data
+
+  # Redis de test
+  redis_test:
+    image: redis:7-alpine
+    container_name: golivreur_redis_test
+    ports:
+      - "6380:6379"   # Port différent pour éviter les conflits
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+    tmpfs:
+      - /data
+
+networks:
+  default:
+    name: golivreur_ci_network

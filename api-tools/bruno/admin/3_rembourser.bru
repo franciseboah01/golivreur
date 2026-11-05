@@ -1,0 +1,43 @@
+meta {
+  name: 3. Rembourser une commande (par plafond)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/admin/orders/{{order_id}}/refund
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_admin}}
+}
+
+body:json {
+  {
+    "montant": 1500,
+    "raison": "Commande non livrée — client a attendu plus d'1h30",
+    "owner_type": "client",
+    "owner_id": 1
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+docs {
+  # Remboursement par plafond — Délégation v5
+
+  | Montant | Qui peut valider |
+  |---|---|
+  | < 2 000 F CFA | City Support |
+  | 2 000 – 10 000 F CFA | City Finance |
+  | 10 000 – 50 000 F CFA | City Manager |
+  | > 50 000 F CFA | Super Admin |
+
+  Le montant 1500 dans cette requête nécessite au minimum un City Support.
+  Testez avec un token d'un rôle insuffisant pour vérifier le 403.
+}

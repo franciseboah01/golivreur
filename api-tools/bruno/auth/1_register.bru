@@ -1,0 +1,46 @@
+meta {
+  name: 1. Inscription - Demander OTP
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone": "0701999999"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("Le message contient le numéro masqué", function() {
+    expect(res.body.message).to.include("****");
+  });
+
+  test("Un OTP a été créé en base (vérifiable via Tinker)", function() {
+    expect(res.body.succes).to.equal(true);
+  });
+}
+
+docs {
+  # Inscription — Étape 1
+
+  Envoie un code OTP par SMS au numéro fourni.
+
+  **Pour récupérer le code OTP en développement local :**
+  ```bash
+  docker compose exec golivreur_app php artisan tinker
+  >>> App\Models\OtpCode::where('phone', '0701999999')->latest()->first()
+  ```
+
+  Utilisez ce code dans la requête suivante "2. Inscription - Vérifier OTP".
+}

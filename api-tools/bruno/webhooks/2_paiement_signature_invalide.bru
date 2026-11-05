@@ -1,0 +1,63 @@
+meta {
+  name: 2. Webhook paiement (signature INVALIDE)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/webhooks/payment
+  body: json
+  auth: none
+}
+
+headers {
+  X-Hub2-Signature: signature-totalement-fausse-0000000000
+}
+
+body:json {
+  {
+    "event": "payment.success",
+    "transaction_id": "{{order_id}}",
+    "status": "SUCCESS",
+    "amount": 999999,
+    "currency": "XOF"
+  }
+}
+
+assert {
+  res.status: eq 401
+  res.body.succes: eq false
+}
+
+tests {
+  test("Le webhook est rejeté (401)", function() {
+    expect(res.status).to.equal(401);
+  });
+
+  test("Aucun traitement n'a eu lieu", function() {
+    expect(res.body.succes).to.equal(false);
+  });
+}
+
+docs {
+  # Test de sécurité — Signature HMAC invalide
+
+  Cette requête simule une attaque : un faux webhook tentant de créditer
+  999 999 F CFA sans signature valide.
+
+  **Comportement attendu :**
+  1. Statut HTTP 401 retourné
+  2. AUCUN traitement de paiement (aucun wallet crédité)
+  3. Log `webhook_logs` avec `signature_valid = false`, `status = rejected`
+  4. Log `activity_logs` avec `severity = critical`
+  5. Email d'alerte envoyé à francis@golivreur.ci
+
+  **Vérification après exécution :**
+  ```bash
+  docker compose exec golivreur_app php artisan tinker
+  >>> App\Models\WebhookLog::latest()->first()->signature_valid
+  // Doit retourner: false
+  >>> App\Models\ActivityLog::where('action', 'invalid_webhook_signature')->latest()->first()
+  // Doit retourner un log avec severity: critical
+  ```
+}

@@ -1,0 +1,63 @@
+name: golivreur_core
+description: Package partagé GoLivreur — modèles, services API, providers Riverpod, widgets communs.
+version: 1.0.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: 2.5.1
+  riverpod_annotation: 2.3.5
+
+  # Navigation
+  go_router: 13.2.0
+
+  # HTTP client avec intercepteurs
+  dio: 5.4.3+1
+
+  # WebSocket (Laravel Reverb)
+  laravel_echo: 1.0.3
+  pusher_channels_flutter: 2.0.3
+
+  # Stockage sécurisé (tokens JWT)
+  flutter_secure_storage: 9.0.0
+
+  # Cartographie
+  google_maps_flutter: 2.6.0
+
+  # Firebase (FCM + Crashlytics)
+  firebase_core: 2.30.1
+  firebase_messaging: 14.9.1
+  firebase_crashlytics: 3.5.1
+
+  # Skeleton loaders
+  shimmer: 3.0.0
+
+  # Gestion des images
+  cached_network_image: 3.3.1
+  image_picker: 1.0.7
+
+  # Utilitaires
+  intl: 0.19.0
+  equatable: 2.0.5
+  freezed_annotation: 2.4.1
+  json_annotation: 4.9.0
+  connectivity_plus: 6.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: 2.4.9
+  freezed: 2.5.2
+  json_serializable: 6.8.0
+  riverpod_generator: 2.4.0
+  flutter_lints: 4.0.0
+
+flutter:
+  # Ce package n'a pas d'assets propres
+  # Les assets sont dans chaque app

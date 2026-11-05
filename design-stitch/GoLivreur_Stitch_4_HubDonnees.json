@@ -1,0 +1,259 @@
+{
+  "app": {
+    "nom": "GoLivreur",
+    "slogan": "Daloa bouge, on livre !",
+    "ville": "Daloa, Côte d'Ivoire",
+    "sousBrands": {
+      "client": "GoLivreur Client",
+      "business": "GoLivreur Business",
+      "driver": "GoLivreur Driver"
+    }
+  },
+
+  "libelles": {
+    "communs": {
+      "boutonSuivant": "Suivant",
+      "boutonPasser": "Passer",
+      "boutonRetour": "Retour",
+      "boutonAnnuler": "Annuler",
+      "boutonConfirmer": "Confirmer",
+      "boutonReessayer": "Réessayer",
+      "boutonEnregistrer": "Enregistrer",
+      "boutonModifier": "Modifier",
+      "boutonSupprimer": "Supprimer",
+      "connexionLente": "Connexion lente, veuillez patienter...",
+      "aucunResultat": "Aucun résultat trouvé",
+      "champObligatoire": "Ce champ est obligatoire"
+    },
+    "auth": {
+      "titreInscription": "Créer un compte",
+      "titreConnexion": "Se connecter",
+      "placeholderTelephone": "07 00 00 00 00",
+      "labelTelephone": "Numéro de téléphone",
+      "titreOtp": "Vérification du code",
+      "sousTitreOtp": "Entrez le code à 4 chiffres envoyé par SMS",
+      "lienRenvoyerCode": "Renvoyer le code",
+      "connexionGoogle": "Continuer avec Google",
+      "connexionApple": "Continuer avec Apple"
+    },
+    "goshop": {
+      "titreAccueil": "Que voulez-vous commander aujourd'hui ?",
+      "placeholderRecherche": "Rechercher un commerce, un produit...",
+      "labelCategories": "Catégories",
+      "labelPanier": "Mon panier",
+      "labelTotal": "Total",
+      "labelFraisLivraison": "Frais de livraison",
+      "labelSousTotal": "Sous-total",
+      "boutonAjouterPanier": "Ajouter au panier",
+      "boutonValiderCommande": "Valider la commande",
+      "labelInstructions": "Instructions pour le livreur",
+      "placeholderInstructions": "Ex : Appeler avant d'arriver, code portail 1234",
+      "titrePaiement": "Choisissez votre mode de paiement",
+      "optionOrangeMoney": "Orange Money",
+      "optionEspeces": "Espèces à la livraison",
+      "titreSuivi": "Suivi de votre commande",
+      "statutRecue": "Commande reçue",
+      "statutPreparation": "En préparation",
+      "statutRoute": "Livreur en route",
+      "statutLivree": "Livrée",
+      "labelCodeConfirmation": "Donnez ce code au livreur",
+      "titreEvaluation": "Comment s'est passée votre commande ?"
+    },
+    "gocolis": {
+      "titreAccueil": "Expédiez un colis à quelqu'un",
+      "boutonNouvelleExpedition": "Nouvelle expédition",
+      "labelNomDestinataire": "Nom du destinataire",
+      "labelTelephoneDestinataire": "Téléphone du destinataire",
+      "labelAdresseLivraison": "Adresse de livraison",
+      "labelDescriptionColis": "Description du colis",
+      "labelTailleColis": "Taille du colis",
+      "optionTaillePetit": "Petit (enveloppe, documents, clés)",
+      "optionTailleMoyen": "Moyen (boîte à chaussures, vêtements)",
+      "optionTailleGrand": "Grand (carton, petit électroménager)",
+      "labelValeurDeclaree": "Valeur déclarée (optionnel)",
+      "labelTarifCalcule": "Tarif de l'expédition",
+      "titreSuivi": "Suivi de votre expédition",
+      "statutRecherche": "Recherche d'un livreur en cours...",
+      "statutRamassage": "Livreur chez l'expéditeur",
+      "statutTransit": "En transit",
+      "notificationLivre": "Colis livré à {destinataire} à {heure}"
+    },
+    "business": {
+      "titreInscription": "Inscrire mon commerce",
+      "labelNomCommerce": "Nom du commerce",
+      "labelCategorieCommerce": "Catégorie",
+      "titreAttenteValidation": "Votre dossier est en cours de validation",
+      "sousTitreAttenteValidation": "Un agent GoLivreur vous contactera sous peu",
+      "titreNouvelleCommande": "Nouvelle commande !",
+      "labelTempsRestant": "Temps restant pour répondre",
+      "boutonAccepter": "Accepter",
+      "boutonRefuser": "Refuser",
+      "boutonCommandePrete": "Commande prête",
+      "titreCatalogue": "Mon catalogue",
+      "boutonAjouterProduit": "Ajouter un produit",
+      "titreRevenus": "Mes revenus",
+      "labelRevenusJour": "Aujourd'hui",
+      "labelRevenusSemaine": "Cette semaine",
+      "labelRevenusMois": "Ce mois-ci",
+      "labelStatutOuvert": "Ouvert",
+      "labelStatutFerme": "Fermé"
+    },
+    "driver": {
+      "titreInscription": "Devenir livreur GoLivreur",
+      "labelUploadCni": "Photo de la CNI (recto)",
+      "labelUploadCniVerso": "Photo de la CNI (verso)",
+      "labelUploadCarteGrise": "Carte grise de la moto",
+      "labelUploadSelfie": "Photo selfie",
+      "titreFormation": "Formation obligatoire",
+      "sousTitreFormation": "30 minutes en présentiel avant activation",
+      "labelSolde": "Solde de mon portefeuille",
+      "boutonEnLigne": "Passer en ligne",
+      "boutonHorsLigne": "Passer hors ligne",
+      "titreNouvelleAlerte": "Nouvelle course disponible",
+      "labelGainEstime": "Gain estimé",
+      "labelDistance": "Distance",
+      "boutonJeSuisAuCommerce": "Je suis au commerce",
+      "boutonCommandeRecuperee": "Commande récupérée",
+      "boutonJeSuisArrive": "Je suis arrivé",
+      "labelSaisirCode": "Entrez le code du client",
+      "labelSaisirCodeExpediteur": "Entrez le code de l'expéditeur",
+      "labelSaisirCodeDestinataire": "Entrez le code du destinataire",
+      "titreGains": "Mes gains",
+      "labelCoursesJour": "Courses aujourd'hui",
+      "labelGainSemaine": "Gain de la semaine",
+      "labelNoteMoyenne": "Note moyenne"
+    }
+  },
+
+  "donneesExemple": {
+    "commerces": [
+      {
+        "id": "mch_001",
+        "nom": "Restaurant Chez Adjoua",
+        "categorie": "Maquis",
+        "note": 4.6,
+        "tempsPreparation": "20-25 min",
+        "quartier": "Quartier Résidentiel, Daloa",
+        "fraisLivraison": 800
+      },
+      {
+        "id": "mch_002",
+        "nom": "Pharmacie du Marché",
+        "categorie": "Pharmacie",
+        "note": 4.8,
+        "tempsPreparation": "5-10 min",
+        "quartier": "Centre-ville, Daloa",
+        "fraisLivraison": 500
+      },
+      {
+        "id": "mch_003",
+        "nom": "Boutique Awa Mode",
+        "categorie": "Mode / Habillement",
+        "note": 4.3,
+        "tempsPreparation": "10-15 min",
+        "quartier": "Quartier Soleil, Daloa",
+        "fraisLivraison": 800
+      },
+      {
+        "id": "mch_004",
+        "nom": "Pâtisserie Le Délice",
+        "categorie": "Pâtisserie",
+        "note": 4.7,
+        "tempsPreparation": "10 min",
+        "quartier": "Quartier Habitat, Daloa",
+        "fraisLivraison": 500
+      },
+      {
+        "id": "mch_005",
+        "nom": "Superette Chez Koffi",
+        "categorie": "Boutique / Épicerie",
+        "note": 4.4,
+        "tempsPreparation": "10-15 min",
+        "quartier": "Quartier Marché, Daloa",
+        "fraisLivraison": 800
+      }
+    ],
+
+    "produits": [
+      { "id": "prd_001", "merchantId": "mch_001", "nom": "Poulet braisé + Attiéké", "prix": 3000, "categorie": "Plats" },
+      { "id": "prd_002", "merchantId": "mch_001", "nom": "Alloco + Poisson braisé", "prix": 2500, "categorie": "Plats" },
+      { "id": "prd_003", "merchantId": "mch_001", "nom": "Garba", "prix": 500, "categorie": "Plats" },
+      { "id": "prd_004", "merchantId": "mch_002", "nom": "Paracétamol 500mg (boîte)", "prix": 500, "categorie": "Médicaments" },
+      { "id": "prd_005", "merchantId": "mch_002", "nom": "Sirop toux adulte", "prix": 2500, "categorie": "Médicaments" },
+      { "id": "prd_006", "merchantId": "mch_003", "nom": "Robe wax femme", "prix": 12000, "categorie": "Vêtements" },
+      { "id": "prd_007", "merchantId": "mch_004", "nom": "Gâteau chocolat (part)", "prix": 1000, "categorie": "Pâtisserie" },
+      { "id": "prd_008", "merchantId": "mch_005", "nom": "Riz 5kg", "prix": 4500, "categorie": "Épicerie" }
+    ],
+
+    "clients": [
+      { "id": "usr_101", "nom": "Jean Kouassi", "telephone": "07 01 02 03 04", "quartier": "Quartier Résidentiel" },
+      { "id": "usr_102", "nom": "Aïcha Traoré", "telephone": "05 06 07 08 09", "quartier": "Quartier Soleil" },
+      { "id": "usr_103", "nom": "M. Koné", "telephone": "01 02 03 04 05", "quartier": "Quartier Habitat, derrière la pharmacie" }
+    ],
+
+    "livreurs": [
+      { "id": "drv_201", "nom": "Yao Michel", "note": 4.9, "vehicule": "Moto Sanili", "coursesTotal": 342, "badge": "Top Driver" },
+      { "id": "drv_202", "nom": "Fatou Diaby", "note": 4.7, "vehicule": "Moto Djakarta", "coursesTotal": 187, "badge": "Fiable" },
+      { "id": "drv_203", "nom": "Ibrahim Ouattara", "note": 4.8, "vehicule": "Moto Sanili", "coursesTotal": 256, "badge": "Rapide" }
+    ],
+
+    "commandesExemple": [
+      {
+        "id": "ord_5001",
+        "clientId": "usr_101",
+        "merchantId": "mch_002",
+        "courierId": "drv_201",
+        "produits": [{ "nom": "Sirop toux adulte", "quantite": 1, "prix": 2500 }],
+        "sousTotal": 2500,
+        "fraisLivraison": 500,
+        "total": 3000,
+        "statut": "in_transit",
+        "codeConfirmation": "4829",
+        "adresseLivraison": "Quartier Résidentiel, près du lycée moderne"
+      },
+      {
+        "id": "ord_5002",
+        "clientId": "usr_102",
+        "merchantId": "mch_001",
+        "courierId": "drv_203",
+        "produits": [{ "nom": "Poulet braisé + Attiéké", "quantite": 2, "prix": 3000 }],
+        "sousTotal": 6000,
+        "fraisLivraison": 800,
+        "total": 6800,
+        "statut": "delivered",
+        "codeConfirmation": "7156",
+        "adresseLivraison": "Quartier Soleil, immeuble bleu"
+      }
+    ],
+
+    "expeditionsExemple": [
+      {
+        "id": "prc_9001",
+        "expediteurId": "usr_101",
+        "nomDestinataire": "M. Koné",
+        "telephoneDestinataire": "01 02 03 04 05",
+        "adresseLivraison": "Quartier Habitat, derrière la pharmacie",
+        "description": "Documents administratifs",
+        "taille": "Petit",
+        "tarif": 1000,
+        "statut": "in_transit",
+        "codeExpediteur": "7391",
+        "codeDestinataire": "5820",
+        "courierId": "drv_202"
+      }
+    ],
+
+    "notifications": [
+      { "id": "notif_1", "type": "commande", "titre": "Commande en préparation", "corps": "Pharmacie du Marché prépare votre commande", "lu": false },
+      { "id": "notif_2", "type": "promotion", "titre": "Livraison gratuite ce week-end !", "corps": "Profitez de la livraison offerte sur toutes vos commandes GoShop", "lu": false },
+      { "id": "notif_3", "type": "expedition", "titre": "Colis livré", "corps": "Votre colis a été livré à M. Koné à 14:32", "lu": true }
+    ],
+
+    "categoriesGoShop": [
+      "Restaurants", "Maquis", "Fast-foods", "Pâtisseries", "Pharmacies",
+      "Boutiques / Épiceries", "Mode / Habillement", "High-tech / Accessoires",
+      "Maison / Décoration", "Cosmétiques / Beauté", "Cadeaux / Fleurs",
+      "Librairies / Papeterie", "Animalerie"
+    ]
+  }
+}

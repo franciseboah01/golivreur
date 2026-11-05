@@ -1,0 +1,88 @@
+name: golivreur_driver
+description: GoLivreur Driver — Courses GoShop et GoColis pour les livreurs à moto.
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Package partagé GoLivreur
+  golivreur_core:
+    path: ../../packages/core
+
+  # State management
+  flutter_riverpod: 2.5.1
+  riverpod_annotation: 2.3.5
+
+  # Navigation
+  go_router: 13.2.0
+
+  # HTTP
+  dio: 5.4.3+1
+
+  # Stockage sécurisé
+  flutter_secure_storage: 9.0.0
+
+  # Cartographie + GPS
+  google_maps_flutter: 2.6.0
+  geolocator: 11.0.0          # Accès GPS téléphone
+  geocoding: 3.0.0            # Conversion coordonnées → adresse
+
+  # Firebase
+  firebase_core: 2.30.1
+  firebase_messaging: 14.9.1
+  firebase_crashlytics: 3.5.1
+
+  # WebSocket (Reverb)
+  laravel_echo: 1.0.3
+  pusher_channels_flutter: 2.0.3
+
+  # ── SQLite offline (mode hors-ligne) ──────────────────────────────────────
+  # Stocke les positions GPS non envoyées quand le réseau est indisponible.
+  # Synchronise automatiquement au retour de la connexion.
+  sqflite: 2.3.3+1
+
+  # Surveillance connectivité réseau
+  connectivity_plus: 6.0.3
+
+  # Prise de photo obligatoire (preuve de ramassage/livraison GoColis)
+  image_picker: 1.0.7
+  camera: 0.10.5+9
+
+  # UI
+  shimmer: 3.0.0
+  flutter_rating_bar: 4.0.1
+
+  # Utilitaires
+  intl: 0.19.0
+  equatable: 2.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: 2.4.9
+  riverpod_generator: 2.4.0
+  flutter_lints: 4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/sounds/           # Sons d'alerte nouvelle course
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700

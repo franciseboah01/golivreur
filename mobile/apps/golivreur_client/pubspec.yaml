@@ -1,0 +1,78 @@
+name: golivreur_client
+description: GoLivreur Client — Achats GoShop et expéditions GoColis pour les clients.
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Package partagé GoLivreur
+  golivreur_core:
+    path: ../../packages/core
+
+  # State management
+  flutter_riverpod: 2.5.1
+  riverpod_annotation: 2.3.5
+
+  # Navigation
+  go_router: 13.2.0
+
+  # HTTP
+  dio: 5.4.3+1
+
+  # Stockage sécurisé (tokens JWT)
+  flutter_secure_storage: 9.0.0
+
+  # Cartographie — suivi GPS temps réel
+  google_maps_flutter: 2.6.0
+
+  # Firebase
+  firebase_core: 2.30.1
+  firebase_messaging: 14.9.1
+  firebase_crashlytics: 3.5.1
+
+  # WebSocket (Reverb — GPS temps réel)
+  laravel_echo: 1.0.3
+  pusher_channels_flutter: 2.0.3
+
+  # Images
+  cached_network_image: 3.3.1
+  image_picker: 1.0.7
+
+  # UI
+  shimmer: 3.0.0
+  flutter_rating_bar: 4.0.1
+
+  # Utilitaires
+  intl: 0.19.0
+  equatable: 2.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: 2.4.9
+  riverpod_generator: 2.4.0
+  flutter_lints: 4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700

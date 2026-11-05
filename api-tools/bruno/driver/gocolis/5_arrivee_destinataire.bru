@@ -1,0 +1,25 @@
+meta {
+  name: 5. Arrivée chez le destinataire
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/driver/parcels/{{parcel_id}}/at-recipient
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_driver}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("Statut passe à at_recipient", function() {
+    expect(res.body.donnees.status).to.equal("at_recipient");
+  });
+}

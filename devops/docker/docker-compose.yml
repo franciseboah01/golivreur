@@ -1,0 +1,159 @@
+# GoLivreur — Docker Compose Développement Local
+# Version : 5.0
+#
+# UTILISATION :
+#   Démarrer tous les services : docker compose up -d
+#   Arrêter :                    docker compose down
+#   Voir les logs :              docker compose logs -f golivreur_app
+#   Accéder au container PHP :   docker compose exec golivreur_app bash
+#
+# SERVICES DÉMARRÉS :
+#   golivreur_app   → PHP 8.3-FPM + Laravel 11  → localhost:8000
+#   golivreur_db    → PostgreSQL 16              → localhost:5432
+#   golivreur_redis → Redis 7                    → localhost:6379
+#   golivreur_nginx → Nginx                      → localhost:8000
+#
+# PRÉREQUIS :
+#   Docker Desktop installé et démarré
+#   Fichier .env créé depuis .env.example avec les valeurs remplies
+
+services:
+
+  # ── PHP 8.3-FPM + Laravel 11 ────────────────────────────────────────────────
+  golivreur_app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: golivreur_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      # Code source monté en live — les modifications sont immédiates
+      - .:/var/www/html
+      # Cache Composer partagé pour accélérer les rebuilds
+      - composer_cache:/root/.composer
+    environment:
+      # Variables d'environnement injectées depuis le .env local
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+    depends_on:
+      golivreur_db:
+        condition: service_healthy   # Attendre que PostgreSQL soit prêt
+      golivreur_redis:
+        condition: service_healthy   # Attendre que Redis soit prêt
+    networks:
+      - golivreur_network
+
+  # ── Nginx — Reverse proxy ────────────────────────────────────────────────────
+  golivreur_nginx:
+    image: nginx:1.25-alpine
+    container_name: golivreur_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"    # L'app est accessible sur http://localhost:8000
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - golivreur_app
+    networks:
+      - golivreur_network
+
+  # ── PostgreSQL 16 ────────────────────────────────────────────────────────────
+  golivreur_db:
+    image: postgres:16-alpine
+    container_name: golivreur_db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"   # Accessible depuis votre machine pour les outils DB (TablePlus, etc.)
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-golivreur_dev}
+      POSTGRES_USER: ${DB_USERNAME:-golivreur_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-golivreur_secret}
+      PGDATA: /data/postgres
+    volumes:
+      # Données persistantes — survivent aux redémarrages du container
+      - postgres_data:/data/postgres
+    healthcheck:
+      # Vérifie que PostgreSQL est prêt à accepter des connexions
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-golivreur_user} -d ${DB_DATABASE:-golivreur_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - golivreur_network
+
+  # ── Redis 7 — Cache + Queues + Sessions ──────────────────────────────────────
+  golivreur_redis:
+    image: redis:7-alpine
+    container_name: golivreur_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"   # Accessible depuis votre machine si besoin
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - golivreur_network
+
+  # ── Laravel Horizon — Supervision des queues ──────────────────────────────────
+  # Démarré séparément pour ne pas surcharger le container principal
+  golivreur_horizon:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: golivreur_horizon
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan horizon
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - golivreur_app
+      - golivreur_redis
+    networks:
+      - golivreur_network
+    profiles:
+      # Démarrer uniquement si besoin : docker compose --profile horizon up -d
+      - horizon
+
+  # ── Laravel Reverb — WebSocket GPS temps réel ─────────────────────────────────
+  golivreur_reverb:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: golivreur_reverb
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    ports:
+      - "8080:8080"   # WebSocket accessible sur ws://localhost:8080
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - golivreur_app
+      - golivreur_redis
+    networks:
+      - golivreur_network
+    profiles:
+      - reverb
+
+# ── Volumes persistants ────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    name: golivreur_postgres_data
+  redis_data:
+    name: golivreur_redis_data
+  composer_cache:
+    name: golivreur_composer_cache
+
+# ── Réseau interne ─────────────────────────────────────────────────────────────
+networks:
+  golivreur_network:
+    name: golivreur_network
+    driver: bridge

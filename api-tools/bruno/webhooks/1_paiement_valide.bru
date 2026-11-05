@@ -1,0 +1,50 @@
+meta {
+  name: 1. Webhook paiement (signature valide)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/webhooks/payment
+  body: json
+  auth: none
+}
+
+headers {
+  X-Hub2-Signature: {{hmac_signature_valide}}
+}
+
+body:json {
+  {
+    "event": "payment.success",
+    "transaction_id": "{{order_id}}",
+    "status": "SUCCESS",
+    "amount": 4800,
+    "currency": "XOF",
+    "timestamp": "2026-06-30T10:00:00Z"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+docs {
+  # Webhook paiement Hub2/CinetPay — Signature valide
+
+  ⚠️ **Calculer la signature HMAC avant d'exécuter cette requête :**
+
+  ```bash
+  # Dans le container Laravel
+  docker compose exec golivreur_app php artisan tinker
+  >>> $payload = '{"event":"payment.success","transaction_id":"1","status":"SUCCESS","amount":4800,"currency":"XOF","timestamp":"2026-06-30T10:00:00Z"}';
+  >>> hash_hmac('sha256', $payload, config('services.hub2.webhook_secret'));
+  ```
+
+  Copiez le résultat dans la variable d'environnement `hmac_signature_valide`,
+  et assurez-vous que le `body:json` ci-dessus correspond EXACTEMENT
+  (caractère pour caractère) au payload utilisé pour calculer le HMAC.
+
+  Le webhook est loggé dans `webhook_logs` AVANT toute validation.
+}

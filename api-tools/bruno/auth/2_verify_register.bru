@@ -1,0 +1,53 @@
+meta {
+  name: 2. Inscription - Vérifier OTP
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/auth/verify-register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone": "0701999999",
+    "otp": "REMPLACER_PAR_LE_CODE_RECU",
+    "name": "Client Test Bruno"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.succes: eq true
+  res.body.donnees.user.role: eq client
+}
+
+script:post-response {
+  // Sauvegarde automatique du token dans l'environnement
+  if (res.body.succes) {
+    bru.setEnvVar("jwt_token_client", res.body.donnees.access_token);
+  }
+}
+
+tests {
+  test("Un access_token est retourné", function() {
+    expect(res.body.donnees.access_token).to.be.a("string");
+  });
+
+  test("Un refresh_token est retourné", function() {
+    expect(res.body.donnees.refresh_token).to.be.a("string");
+  });
+
+  test("Le rôle créé est 'client'", function() {
+    expect(res.body.donnees.user.role).to.equal("client");
+  });
+}
+
+docs {
+  # Inscription — Étape 2
+
+  Valide le code OTP et crée le compte. Le token est automatiquement
+  sauvegardé dans la variable d'environnement `jwt_token_client`.
+}

@@ -1,0 +1,41 @@
+meta {
+  name: 4. Connexion - Vérifier OTP
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/auth/verify-login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone": "{{phone_client}}",
+    "otp": "REMPLACER_PAR_LE_CODE_RECU",
+    "device_token": "bruno-test-device-token"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+script:post-response {
+  if (res.body.succes) {
+    bru.setEnvVar("jwt_token_client", res.body.donnees.access_token);
+    console.log("✅ Token client sauvegardé dans l'environnement");
+  }
+}
+
+tests {
+  test("Token JWT reçu", function() {
+    expect(res.body.donnees.access_token).to.be.a("string");
+  });
+
+  test("Les infos user contiennent city_id", function() {
+    expect(res.body.donnees.user.city_id).to.equal(1);
+  });
+}

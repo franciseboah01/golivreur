@@ -1,0 +1,28 @@
+meta {
+  name: 1. Connexion Merchant
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone": "{{phone_merchant}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+docs {
+  Connexion avec le compte "Maquis Chez Tantie Adjoua" (0702010001).
+  Récupérez l'OTP via Tinker puis utilisez verify-login pour obtenir
+  le token, à sauvegarder manuellement dans jwt_token_merchant.
+}

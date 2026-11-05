@@ -1,0 +1,29 @@
+meta {
+  name: 6. Photo de remise (obligatoire)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/parcels/{{parcel_id}}/photo
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_driver}}
+}
+
+body:multipart-form {
+  type: delivery
+  photo: @file(./fixtures/photo_colis_test.jpg)
+}
+
+assert {
+  res.status: eq 201
+  res.body.succes: eq true
+}
+
+docs {
+  Photo OBLIGATOIRE avant de pouvoir valider le code destinataire.
+}

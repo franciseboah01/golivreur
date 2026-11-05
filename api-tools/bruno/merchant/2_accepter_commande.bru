@@ -1,0 +1,30 @@
+meta {
+  name: 2. Accepter une commande
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/merchant/orders/{{order_id}}/accept
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_merchant}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("Statut passe à accepted", function() {
+    expect(res.body.donnees.status).to.equal("accepted");
+  });
+}
+
+docs {
+  Accepte la commande {{order_id}} créée précédemment.
+  Déclenche automatiquement la recherche du livreur le plus proche.
+}

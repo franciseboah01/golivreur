@@ -1,0 +1,81 @@
+# FICHIER 1c — PLAN DIRECTEUR : GOLIVREUR DRIVER
+
+## Objectif principal de l'application
+Permettre à un livreur à moto de Daloa de recevoir et exécuter des courses GoShop et GoColis, de gérer son portefeuille virtuel, et de suivre ses gains — y compris en mode hors-ligne.
+
+## Convention de nommage des écrans
+`DRIVER-[MODULE]-[NomEcran]`
+
+---
+
+## MODULE : AUTH & INSCRIPTION (3 écrans)
+
+| ID Écran | Nom | Objectif | Composants clés (id / data-action) |
+|---|---|---|---|
+| DRIVER-AUTH-InscriptionLivreur | Inscription livreur | Numéro de téléphone, informations de base | `#input-telephone`, `#btn-envoyer-otp` (data-action="auth.sendOtp") |
+| DRIVER-AUTH-DocumentsUpload | Upload documents | Photo CNI recto/verso, carte grise moto, selfie | `#upload-cni-recto`, `#upload-cni-verso`, `#upload-carte-grise`, `#upload-selfie`, `#btn-soumettre-documents` (data-action="driver.submitDocuments") |
+| DRIVER-AUTH-FormationValidation | Formation et validation | Statut de la formation présentielle obligatoire (30 min) | `#statut-formation`, `#statut-validation-admin` |
+
+**Parcours clé :** InscriptionLivreur → DocumentsUpload → FormationValidation → (validation Admin Local) → PORTEFEUILLE-SoldePortefeuille
+
+---
+
+## MODULE : PORTEFEUILLE (4 écrans)
+
+| ID Écran | Nom | Objectif | Composants clés (id / data-action) |
+|---|---|---|---|
+| DRIVER-PORTEFEUILLE-SoldePortefeuille | Solde du portefeuille | Solde visible en permanence, bouton En ligne/Hors ligne | `#solde-affiche`, `#toggle-en-ligne` (data-action="driver.toggleOnline") |
+| DRIVER-PORTEFEUILLE-Rechargement | Rechargement | Par Mobile Money | `#input-montant-recharge`, `#btn-recharger` (data-action="wallet.recharge") |
+| DRIVER-PORTEFEUILLE-Retrait | Retrait | Vers Mobile Money, seuil minimum 2 000 F CFA | `#input-montant-retrait`, `#btn-retirer` (data-action="wallet.withdraw") |
+| DRIVER-PORTEFEUILLE-HistoriqueTransactions | Historique | Toutes les transactions du portefeuille | `#transaction-item-{id}` |
+
+**Parcours clé :** Accès permanent via tab bar → SoldePortefeuille → Rechargement / Retrait / HistoriqueTransactions
+
+---
+
+## MODULE : COURSES GOSHOP (3 écrans)
+
+| ID Écran | Nom | Objectif | Composants clés (id / data-action) |
+|---|---|---|---|
+| DRIVER-COURSESGOSHOP-AlerteCourse | Alerte nouvelle course | Commerce, adresses, distance, gain estimé — 30s pour accepter | `#compteur-30s`, `#gain-estime-affiche`, `#btn-accepter-course` (data-action="job.accept"), `#btn-refuser-course` (data-action="job.refuse") |
+| DRIVER-COURSESGOSHOP-NavigationCommerce | Navigation vers le commerce | Carte GPS + boutons d'étape | `#carte-navigation`, `#btn-je-suis-au-commerce` (data-action="job.arrivedAtMerchant"), `#btn-commande-recuperee` (data-action="job.pickedUp") |
+| DRIVER-COURSESGOSHOP-LivraisonCodeClient | Livraison au client | Saisie du code de confirmation 4 chiffres | `#carte-navigation`, `#btn-je-suis-arrive` (data-action="job.arrivedAtClient"), `#input-code-client`, `#btn-valider-code` (data-action="job.verifyClientCode") |
+
+**Parcours clé :** AlerteCourse → NavigationCommerce → LivraisonCodeClient → gain crédité
+
+---
+
+## MODULE : COURSES GOCOLIS (5 écrans)
+
+| ID Écran | Nom | Objectif | Composants clés (id / data-action) |
+|---|---|---|---|
+| DRIVER-COURSESGOCOLIS-AlerteCourse | Alerte nouvelle expédition | Expéditeur, destinataire, taille du colis visible, distance, gain | `#compteur-30s`, `#taille-colis-affichee`, `#btn-accepter-course`, `#btn-refuser-course` |
+| DRIVER-COURSESGOCOLIS-RamassagePhotoCode | Ramassage chez l'expéditeur | Photo obligatoire du colis + saisie code expéditeur | `#btn-je-suis-chez-expediteur` (data-action="parcel.arrivedAtSender"), `#camera-photo-colis` (data-action="parcel.capturePickupPhoto"), `#input-code-expediteur`, `#btn-valider-code-expediteur` (data-action="parcel.verifySenderCode") |
+| DRIVER-COURSESGOCOLIS-NavigationDestinataire | Navigation vers destinataire | Carte GPS vers l'adresse de livraison | `#carte-navigation`, `#btn-je-suis-chez-destinataire` (data-action="parcel.arrivedAtRecipient") |
+| DRIVER-COURSESGOCOLIS-LivraisonCodeDestinatairePhoto | Livraison au destinataire | Saisie code destinataire (reçu par SMS) + photo de remise | `#input-code-destinataire`, `#btn-valider-code-destinataire` (data-action="parcel.verifyRecipientCode"), `#camera-photo-remise` (data-action="parcel.captureDeliveryPhoto") |
+| DRIVER-COURSESGOCOLIS-BlocageCodeErreur | Blocage après 3 erreurs | Écran d'attente, invite à contacter le Support | `#message-blocage`, `#btn-appeler-support` (data-action="support.call") |
+
+**Parcours clé :** AlerteCourse → RamassagePhotoCode → NavigationDestinataire → LivraisonCodeDestinatairePhoto → gain crédité (ou → BlocageCodeErreur si 3 échecs)
+
+---
+
+## MODULE : GAINS ET OFFLINE (2 écrans)
+
+| ID Écran | Nom | Objectif | Composants clés (id / data-action) |
+|---|---|---|---|
+| DRIVER-GAINS-DashboardGains | Tableau de bord gains | Courses du jour, gain de la semaine, note moyenne, badges | `#gain-jour-affiche`, `#gain-semaine-affiche`, `#note-moyenne`, `#badge-{type}` |
+| DRIVER-GAINS-HistoriqueCourses | Historique complet | Toutes les courses passées (GoShop + GoColis) | `#course-item-{id}` |
+
+**Note mode hors-ligne :** Aucun écran dédié — un bandeau `#bandeau-mode-offline` apparaît en superposition sur les écrans COURSESGOSHOP/COURSESGOCOLIS quand la connexion est perdue, avec synchronisation automatique au retour du réseau.
+
+**Parcours clé :** Accès depuis tab bar → DashboardGains → HistoriqueCourses
+
+---
+
+## DÉCOUPAGE EN LOTS POUR GÉNÉRATION STITCH (3 lots)
+
+1. **Lot Auth + Gains** (5 écrans) — InscriptionLivreur, DocumentsUpload, FormationValidation, DashboardGains, HistoriqueCourses
+2. **Lot Portefeuille + Courses GoShop** (7 écrans) — SoldePortefeuille, Rechargement, Retrait, HistoriqueTransactions, AlerteCourse (GoShop), NavigationCommerce, LivraisonCodeClient
+3. **Lot Courses GoColis** (5 écrans) — AlerteCourse (GoColis), RamassagePhotoCode, NavigationDestinataire, LivraisonCodeDestinatairePhoto, BlocageCodeErreur
+
+**Total : 17 écrans**

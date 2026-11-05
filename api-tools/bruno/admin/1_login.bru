@@ -1,0 +1,23 @@
+meta {
+  name: 1. Connexion Admin
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone": "0700000000"
+  }
+}
+
+docs {
+  Connexion Super Admin (Francis EBOAH). Notez que les admins se
+  connectent normalement via /admin (Filament, email+password+2FA),
+  mais l'API expose aussi ce flux OTP pour les tests automatisés.
+}

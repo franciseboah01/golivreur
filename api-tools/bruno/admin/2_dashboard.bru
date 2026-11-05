@@ -1,0 +1,34 @@
+meta {
+  name: 2. Dashboard City Manager
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/admin/dashboard
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_admin}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("Contient les métriques attendues", function() {
+    expect(res.body.donnees).to.have.property("commandes_jour");
+    expect(res.body.donnees).to.have.property("livreurs_en_ligne");
+    expect(res.body.donnees).to.have.property("litiges_ouverts");
+  });
+}
+
+docs {
+  Retourne les 8 métriques du dashboard City Manager :
+  commandes du jour, CA, livreurs en ligne, commerces ouverts,
+  taux de succès, litiges ouverts, validations en attente,
+  temps moyen de livraison.
+}

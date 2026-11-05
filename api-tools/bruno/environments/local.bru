@@ -1,0 +1,29 @@
+vars {
+  base_url: http://localhost:8000/api/v1
+  reverb_host: localhost
+  reverb_port: 8080
+
+  # ── Tokens — remplis automatiquement après /auth/verify-login ────────────
+  jwt_token_client: 
+  jwt_token_merchant: 
+  jwt_token_driver: 
+  jwt_token_admin: 
+
+  # ── Comptes de test (depuis le seeder DaloaSeeder) ────────────────────────
+  phone_client: 0701000001
+  phone_merchant: 0702010001
+  phone_driver: 0703000001
+  email_admin: admin@golivreur.ci
+  password_admin: GoLivreur2026!
+
+  # ── IDs de référence (créés par le seeder) ────────────────────────────────
+  city_id: 1
+  merchant_id: 1
+  product_id: 1
+  order_id: 1
+  parcel_id: 1
+
+  # ── Codes de test GoColis (synchronisés avec le mock Flutter) ────────────
+  sender_code_test: 7291
+  recipient_code_test: 3847
+}

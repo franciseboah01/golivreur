@@ -1,0 +1,29 @@
+meta {
+  name: 3. Connexion Client (seeder)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone": "{{phone_client}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+docs {
+  # Connexion — Étape 1 (compte du seeder)
+
+  Utilise le client de test créé par DaloaSeeder (Ama Kouassi, 0701000001).
+  Récupérez l'OTP via Tinker puis utilisez "4. Connexion - Vérifier OTP".
+}
