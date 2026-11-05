@@ -56,6 +56,30 @@ Ces points ont été identifiés comme sources probables de bugs pendant la phas
 
 *(Claude Code : ajoute ici chaque erreur réelle rencontrée et résolue, au fur et à mesure des sprints. Ne supprime jamais une entrée. Si une même erreur revient une 2ème fois, c'est que la prévention n'a pas été appliquée — corrige la prévention, pas seulement le symptôme.)*
 
+### [2026-11-05] — [Sprint 1] Conflit de classe Parcel dupliquée dans Order.php
+**Statut :** Résolu
+**Symptôme :** `Call to undefined method App\Models\Parcel::factory()` malgré l'existence d'un `Parcel.php` avec `use HasFactory`.
+**Cause racine :** Le fichier d'archive initial `backend/app/Models/Order.php` contenait une deuxième classe `Parcel extends Model` en fin de fichier sans trait `HasFactory`. Lorsque `Order` était chargé en premier par Composer/PHP, il définissait la classe `Parcel` en mémoire avant le chargement de `Parcel.php`.
+**Solution appliquée :** Suppression de la classe `Parcel` en double dans `Order.php`, consolidation de tous les champs, relations et scopes dans `app/Models/Parcel.php` avec le trait `HasFactory`.
+**Prévention :** Respecter strictement la règle PSR-4 : 1 classe par fichier PHP, portant exactement le même nom que le fichier.
+**Fichiers concernés :** `backend/app/Models/Order.php`, `backend/app/Models/Parcel.php`.
+
+### [2026-11-05] — [Sprint 1] Incompatibilité CardTheme et withOpacity sous Flutter 3.47
+**Statut :** Résolu
+**Symptôme :** Erreurs d'analyse Dart dans `app_theme.dart` : `CardTheme can't be assigned to parameter type CardThemeData?` et avertissements de dépréciation sur `withOpacity`.
+**Cause racine :** Évolution de l'API Flutter 3.47 / Dart 3.10 : `ThemeData.cardTheme` attend un `CardThemeData`, et `Color.withOpacity` est déprécié au profit de `Color.withValues(alpha: ...)`.
+**Solution appliquée :** Remplacement de `CardTheme` par `CardThemeData` et migration de toutes les occurrences `withOpacity(x)` vers `withValues(alpha: x)`.
+**Prévention :** Vérification systématique par `flutter analyze` sur chaque package du monorepo.
+**Fichiers concernés :** `mobile/packages/core/lib/config/app_theme.dart`.
+
+### [2026-11-05] — [Sprint 1] Échec d'assertion sur WalletTransaction (integer vs float)
+**Statut :** Résolu
+**Symptôme :** `Failed asserting that 1500 is identical to 1500.0` dans `WalletServiceTest`.
+**Cause racine :** Le cast Eloquent de `WalletTransaction` forçait `amount` en `integer`, alors que Pest utilise `toBe()` (comparaison stricte `===`) sur un float (`1500.0`).
+**Solution appliquée :** Typage en `float` dans `$casts` pour `amount`, `balance_before` et `balance_after`.
+**Prévention :** Aligner les casts de modèles financiers sur `float` pour les calculs et comparaisons strictes.
+**Fichiers concernés :** `backend/app/Models/WalletTransaction.php`.
+
 <!-- Exemple de ce à quoi la prochaine entrée doit ressembler :
 
 ## [2026-XX-XX] — [Sprint X] Titre court

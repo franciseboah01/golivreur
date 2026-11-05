@@ -81,6 +81,33 @@ Ces décisions ont été validées par Francis pendant la phase de cadrage. Elle
 
 *(Claude Code : ajoute ici chaque nouvelle décision technique au fil des sprints, avec le format ci-dessus. Ne supprime jamais une entrée existante — si une décision est remplacée, ajoute une nouvelle entrée qui référence l'ancienne et explique pourquoi elle change.)*
 
+### [2026-11-05] — Environnement local : Services natifs Windows PostgreSQL 16 & Redis 7 (au lieu de Docker Desktop)
+
+**Contexte :** Docker Desktop n'est pas installé dans le PATH de l'environnement de développement local Windows, alors que PostgreSQL 16.15 et Redis 7 tournent déjà en tant que services système Windows natifs.
+**Options considérées :** Bloquer le projet en attendant l'installation de Docker Desktop / Utiliser les services natifs Windows existants.
+**Décision retenue :** Utiliser directement PostgreSQL 16 natif (port 5432, base `golivreur_dev`) et Redis natif (port 6379, testé `PONG`).
+**Raison :** Les versions et fonctionnalités correspondent parfaitement aux spécifications techniques de production du CDC v5.0 (PostgreSQL 16 + Redis 7). Cela permet de développer immédiatement sans blocage ni perte de performance.
+**Impact :** Fichier `backend/.env` configuré avec les accès locaux natifs. Aucun impact sur les scripts Docker de déploiement VPS en production (`docker-compose.prod.yml`).
+**Réversible ?** Oui, à tout moment en lançant `docker compose up -d` dès que Docker Desktop est installé.
+
+### [2026-11-05] — Compatibilité Laravel 12 & JWT : PHPOpenSourceSaver/JWTAuth avec alias Tymon
+
+**Contexte :** Le package legacy `tymon/jwt-auth` a été forké et modernisé sous `php-open-source-saver/jwt-auth` pour supporter PHP 8.2+ et Laravel 11/12. Certains contrôleurs et tests font référence à `Tymon\JWTAuth\Contracts\JWTSubject` et `Tymon\JWTAuth\Facades\JWTAuth`.
+**Options considérées :** Réécrire tous les modèles et tests pour utiliser le nouveau namespace / Créer un `class_alias` dans `AppServiceProvider`.
+**Décision retenue :** Enregistrer `class_alias(\PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject::class, 'Tymon\JWTAuth\Contracts\JWTSubject')` et `class_alias(\PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth::class, 'Tymon\JWTAuth\Facades\JWTAuth')`.
+**Raison :** Permet la compatibilité binaire immédiate avec tous les tests et codes préexistants du CDC sans refactorisation fragile.
+**Impact :** `AppServiceProvider.php` gère l'alias transparentement. Les tests Pest `AuthTest` et `WalletServiceTest` passent à 100%.
+**Réversible ?** Oui, par remplacement global du namespace si souhaité.
+
+### [2026-11-05] — Flutter 3.47+ : CardThemeData, withValues(alpha:) et dépendances temps-réel
+
+**Contexte :** Le SDK Flutter installé est Flutter 3.47.9 / Dart 3.10. `pusher_channels_flutter 2.0.3` n'existait pas sur pub.dev, `CardTheme` est devenu `CardThemeData`, et `withOpacity` est obsolète au profit de `withValues(alpha: ...)`.
+**Options considérées :** Forcer un downgrade global de Flutter / Adapter les types et dépendances à Flutter 3.47.
+**Décision retenue :** Utiliser `pusher_channels_flutter: ^2.2.0`, `laravel_echo: ^1.0.0-beta.1`, `CardThemeData` et `.withValues(alpha: ...)`.
+**Raison :** Assure la compatibilité à long terme avec les dernières versions d'Android 14+ et iOS 18+, tout en éliminant tous les avertissements du compilateur Dart.
+**Impact :** Les 4 projets Flutter (`mobile/packages/core`, `golivreur_client`, `golivreur_business`, `golivreur_driver`) compilent avec 0 erreur et 0 avertissement (`flutter analyze` 100% propre).
+**Réversible ?** Oui, rétrogradation triviale via `pubspec.yaml` si nécessaire.
+
 <!-- Exemple de ce à quoi la prochaine entrée doit ressembler :
 
 ## [2026-XX-XX] — Titre court

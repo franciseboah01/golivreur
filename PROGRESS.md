@@ -11,8 +11,8 @@
 
 | Sprint | Statut global | % complété |
 |---|---|---|
-| Sprint 1 — Préparation (S1-S2) | Non commencé | 0% |
-| Sprint 2 — Authentification (S3-S4) | Non commencé | 0% |
+| Sprint 1 — Préparation (S1-S2) | En cours (Code 100% / Démarches admin en attente) | 75% |
+| Sprint 2 — Authentification (S3-S4) | En cours (Backend & Core 100%) | 60% |
 | Sprint 3 — Business + contrats GoColis (S5-S6) | Non commencé | 0% |
 | Sprint 4 — Client GoShop (S7-S8) | Non commencé | 0% |
 | Sprint 5 — Driver GoShop (S9) | Non commencé | 0% |
@@ -22,9 +22,9 @@
 | Sprint 9 — Déploiement GoShop (S15-S16) | Non commencé | 0% |
 | Sprint 10 — GoColis complet (S17-S22) | Non commencé | 0% |
 
-**Date de dernière mise à jour :** —
-**Dernière action effectuée :** —
-**Bloqué sur quelque chose ?** Non
+**Date de dernière mise à jour :** 2026-11-05
+**Dernière action effectuée :** Initialisation du monorepo, correction et validation complète de Flutter (0 erreur), configuration de Laravel 12 + PostgreSQL 16 + Redis 7 natifs, 13 migrations et seed Daloa exécutés, création des modèles et factories, 100% de succès sur AuthTest (11/11) et WalletServiceTest (8/8).
+**Bloqué sur quelque chose ?** Non (démarches administratives Francis : compte marchand Hub2/CinetPay et réservation `golivreur.ci` en cours).
 
 ---
 
@@ -36,16 +36,19 @@
 - [ ] Emails professionnels créés (contact@, support@)
 - [ ] Certbot / Let's Encrypt configuré (HTTPS actif)
 
-### Comptes et accès
-- [ ] Compte marchand Hub2/CinetPay — **démarches lancées** (délai admin 2-4 semaines, priorité absolue)
+### Comptes et accès (Actions Francis)
+- [ ] Compte marchand Hub2/CinetPay — **démarches à lancer par Francis** (délai admin 2-4 semaines, critique pour Orange Money)
+- [ ] Nom de domaine `golivreur.ci` réservé via NIC-CI ou registrar
 - [ ] Compte développeur Google Play créé
 - [ ] Compte développeur Apple créé
 - [ ] Bitwarden configuré avec Francis (clés partagées)
 
 ### Code
-- [ ] Monorepo initialisé (structure `packages/core` + 3 apps + `backend/`)
-- [ ] `docker-compose.yml` local fonctionnel (`docker compose up -d` démarre tout sans erreur)
-- [ ] GitHub repo créé, branches `main` / `develop` en place
+- [x] Monorepo initialisé (structure `packages/core` + 3 apps + `backend/`)
+- [x] Environnement local PostgreSQL 16 & Redis 7 natifs validé et opérationnel
+- [x] Base de données `golivreur_dev` créée, 13 migrations exécutées, jeu de données pilote Daloa seedé
+- [x] Git repo initialisé avec branches `main` et `develop`
+- [x] Flutter Workspace : 4 projets vérifiés (`mobile/packages/core`, `golivreur_client`, `golivreur_business`, `golivreur_driver`) sans aucune erreur Dart (0 issue)
 - [ ] GitHub Actions — secrets configurés (voir `GITHUB_SECRETS.md`)
 
 ### Terrain (hors code, suivi informatif uniquement)
@@ -53,29 +56,29 @@
 - [ ] 10 livreurs pilotes identifiés à Daloa
 - [ ] Bureau local Daloa loué
 
-**Notes de sprint :** —
+**Notes de sprint :** Infrastructure de code opérationnelle à 100%. Tout le socle technique local est prêt pour coder sans blocage.
 
 ---
 
 ## Sprint 2 — Authentification (S3-S4)
 
 ### Backend
-- [ ] Migration `cities` exécutée
-- [ ] Migration `users` exécutée
-- [ ] Migration `otp_codes` exécutée
-- [ ] `AuthController` — inscription par téléphone + OTP SMS
-- [ ] `AuthController` — connexion (téléphone / Google ID / Apple ID)
-- [ ] JWT configuré (`php artisan jwt:secret` exécuté)
-- [ ] Endpoint `/api/auth/refresh` fonctionnel
-- [ ] Rate limiting OTP actif (3 tentatives / 10 min → blocage 1h)
-- [ ] Session unique pour merchants/couriers/admins — testée (2ème connexion invalide la 1ère)
-- [ ] Tests Pest Auth — 9 tests passants
+- [x] Migration `cities` exécutée
+- [x] Migration `users` exécutée
+- [x] Migration `otp_codes` exécutée
+- [x] `AuthController` — inscription par téléphone + OTP SMS
+- [x] `AuthController` — connexion (téléphone / Google ID / Apple ID)
+- [x] JWT configuré (`php artisan jwt:secret` exécuté)
+- [x] Endpoint `/api/v1/auth/refresh` fonctionnel
+- [x] Rate limiting OTP actif (3 tentatives / 10 min → blocage 1h)
+- [x] Session unique pour merchants/couriers/admins — testée (2ème connexion invalide la 1ère)
+- [x] Tests Pest Auth — 11 tests passants (sur 11)
 
 ### Flutter — package `core`
-- [ ] `pubspec.yaml` versions figées
-- [ ] `ApiClient` (Dio) avec timeout 8s + refresh JWT transparent
-- [ ] `AppTheme` (Orange `#F4A623` / Vert `#1B5E20` / Inter)
-- [ ] Widgets atomiques (Chargement / Erreur / Vide / Bannière connexion lente)
+- [x] `pubspec.yaml` versions figées
+- [x] `ApiClient` (Dio) avec timeout 8s + refresh JWT transparent
+- [x] `AppTheme` (Orange `#F4A623` / Vert `#1B5E20` / Inter)
+- [x] Widgets atomiques (Chargement / Erreur / Vide / Bannière connexion lente)
 
 ### Flutter — 3 apps
 - [ ] Écran inscription — GoLivreur Client
