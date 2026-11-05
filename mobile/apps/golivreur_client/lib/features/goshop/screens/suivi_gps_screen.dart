@@ -117,8 +117,8 @@ class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
   @override
   Widget build(BuildContext context) {
     // Écoute les mises à jour en temps réel (statut + position GPS via Reverb)
-    final trackingAsync = ref.watch(gpsTrackingProvider(widget.orderId));
-    final orderAsync    = ref.watch(orderDetailProvider(widget.orderId));
+    ref.watch(gpsTrackingProvider(widget.orderId));
+    final orderAsync = ref.watch(orderDetailProvider(widget.orderId));
 
     // Quand une nouvelle position GPS arrive, animer le déplacement
     ref.listen<AsyncValue<LatLng?>>(
@@ -283,7 +283,7 @@ class _PanneauInfosLivraison extends StatelessWidget {
                 // Photo du livreur
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor: GoLivreurTheme.primaire.withOpacity(0.1),
+                  backgroundColor: GoLivreurTheme.primaire.withValues(alpha: 0.1),
                   backgroundImage: order.courier!.photoUrl != null
                       ? NetworkImage(order.courier!.photoUrl!)
                       : null,
@@ -322,7 +322,7 @@ class _PanneauInfosLivraison extends StatelessWidget {
                 ),
                 // Bouton appel (placeholder — numéro masqué)
                 CircleAvatar(
-                  backgroundColor: GoLivreurTheme.secondaire.withOpacity(0.1),
+                  backgroundColor: GoLivreurTheme.secondaire.withValues(alpha: 0.1),
                   child: const Icon(Icons.phone, color: GoLivreurTheme.secondaire),
                 ),
               ],
@@ -349,7 +349,7 @@ class _PanneauInfosLivraison extends StatelessWidget {
                   width: 56,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: GoLivreurTheme.primaire.withOpacity(0.08),
+                    color: GoLivreurTheme.primaire.withValues(alpha: 0.08),
                     border: Border.all(color: GoLivreurTheme.primaire, width: 2),
                     borderRadius: BorderRadius.circular(GoLivreurTheme.rayonM),
                   ),
@@ -384,7 +384,7 @@ class _PanneauInfosLivraison extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(GoLivreurTheme.espacementM),
               decoration: BoxDecoration(
-                color: GoLivreurTheme.erreur.withOpacity(0.08),
+                color: GoLivreurTheme.erreur.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(GoLivreurTheme.rayonM),
               ),
               child: const Row(

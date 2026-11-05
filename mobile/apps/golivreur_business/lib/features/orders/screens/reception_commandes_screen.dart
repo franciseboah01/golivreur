@@ -249,7 +249,7 @@ class _CarteCommandeState extends ConsumerState<_CarteCommande> {
               Container(
                 padding: const EdgeInsets.all(GoLivreurTheme.espacementS),
                 decoration: BoxDecoration(
-                  color: GoLivreurTheme.avertissement.withOpacity(0.1),
+                  color: GoLivreurTheme.avertissement.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(GoLivreurTheme.rayonS),
                 ),
                 child: Row(
@@ -347,8 +347,8 @@ class _BoutonStatutCommerce extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: statut
-                ? GoLivreurTheme.succes.withOpacity(0.1)
-                : GoLivreurTheme.erreur.withOpacity(0.1),
+                ? GoLivreurTheme.succes.withValues(alpha: 0.1)
+                : GoLivreurTheme.erreur.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(GoLivreurTheme.rayonXL),
             border: Border.all(
               color: statut ? GoLivreurTheme.succes : GoLivreurTheme.erreur,
@@ -382,8 +382,16 @@ class _BoutonStatutCommerce extends ConsumerWidget {
 // Providers placeholder — à implémenter dans features/orders/providers/
 final commandesEnAttenteProvider =
     FutureProvider<List<OrderModel>>((ref) async => []);
+
+class _MerchantOrderActionsNotifier extends StateNotifier<AsyncValue<void>> {
+  _MerchantOrderActionsNotifier() : super(const AsyncValue.data(null));
+  Future<void> accepter(int orderId) async {}
+  Future<void> refuser(int orderId, [String? raison]) async {}
+}
+
 final merchantOrderActionsProvider =
-    StateNotifierProvider((ref) => throw UnimplementedError());
+    StateNotifierProvider<_MerchantOrderActionsNotifier, AsyncValue<void>>(
+        (ref) => _MerchantOrderActionsNotifier());
 final merchantStatutProvider =
     StateNotifierProvider<_StatutNotifier, bool>((_) => _StatutNotifier());
 

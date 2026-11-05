@@ -279,7 +279,8 @@ class DaloaSeeder extends Seeder
             ]);
         }
 
-        $this->command->info("✅ {$livreursData->count()} livreurs créés et en ligne");
+        $countLivreurs = count($livreursData);
+        $this->command->info("✅ {$countLivreurs} livreurs créés et en ligne");
 
         $this->command->newLine();
         $this->command->info('═══════════════════════════════════════════════════════');

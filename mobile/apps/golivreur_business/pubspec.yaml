@@ -1,6 +1,7 @@
 name: golivreur_business
 description: GoLivreur Business — Gestion des commandes et catalogue pour les commerces.
 version: 1.0.0+1
+publish_to: 'none'
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

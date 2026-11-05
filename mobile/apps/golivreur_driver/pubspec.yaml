@@ -1,6 +1,7 @@
 name: golivreur_driver
 description: GoLivreur Driver — Courses GoShop et GoColis pour les livreurs à moto.
 version: 1.0.0+1
+publish_to: 'none'
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -38,8 +39,8 @@ dependencies:
   firebase_crashlytics: 3.5.1
 
   # WebSocket (Reverb)
-  laravel_echo: 1.0.3
-  pusher_channels_flutter: 2.0.3
+  laravel_echo: ^1.0.0-beta.1
+  pusher_channels_flutter: ^2.2.0
 
   # ── SQLite offline (mode hors-ligne) ──────────────────────────────────────
   # Stocke les positions GPS non envoyées quand le réseau est indisponible.

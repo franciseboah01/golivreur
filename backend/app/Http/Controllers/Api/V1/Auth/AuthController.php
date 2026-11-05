@@ -162,7 +162,9 @@ class AuthController extends Controller
      */
     public function verifierOtpConnexion(VerifyOtpRequest $request): JsonResponse
     {
-        ['phone' => $phone, 'otp' => $otp, 'device_token' => $deviceToken] = $request->validated();
+        $phone       = $request->validated('phone');
+        $otp         = $request->validated('otp');
+        $deviceToken = $request->validated('device_token');
 
         $otpRecord = OtpCode::where('phone', $phone)
             ->where('purpose', 'login')
@@ -252,7 +254,13 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        JWTAuth::invalidate(JWTAuth::getToken());
+        try {
+            JWTAuth::invalidate(JWTAuth::getToken());
+            auth('api')->logout();
+        } catch (\Exception $e) {
+            // Token déjà invalidé ou expiré
+        }
+
         return response()->json([
             'succes'  => true,
             'message' => 'Déconnexion réussie.',

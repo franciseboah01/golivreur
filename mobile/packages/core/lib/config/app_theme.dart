@@ -15,16 +15,16 @@ import 'package:flutter/material.dart';
 class GoLivreurTheme {
   // ─── Couleurs officielles ──────────────────────────────────────────────────
 
-  static const Color primaire        = Color(0xFFF4A623); // Orange
-  static const Color secondaire      = Color(0xFF1B5E20); // Vert foncé
-  static const Color fond            = Color(0xFFFAFAFA); // Blanc cassé
-  static const Color textePrincipal  = Color(0xFF212121); // Gris très foncé
+  static const Color primaire = Color(0xFFF4A623); // Orange
+  static const Color secondaire = Color(0xFF1B5E20); // Vert foncé
+  static const Color fond = Color(0xFFFAFAFA); // Blanc cassé
+  static const Color textePrincipal = Color(0xFF212121); // Gris très foncé
   static const Color texteSecondaire = Color(0xFF757575); // Gris moyen
-  static const Color erreur          = Color(0xFFD32F2F); // Rouge
-  static const Color succes          = Color(0xFF4CAF50); // Vert succès
-  static const Color avertissement   = Color(0xFFFFC107); // Jaune
-  static const Color surface         = Color(0xFFFFFFFF); // Blanc pur (cartes)
-  static const Color bordure         = Color(0xFFE0E0E0); // Gris léger
+  static const Color erreur = Color(0xFFD32F2F); // Rouge
+  static const Color succes = Color(0xFF4CAF50); // Vert succès
+  static const Color avertissement = Color(0xFFFFC107); // Jaune
+  static const Color surface = Color(0xFFFFFFFF); // Blanc pur (cartes)
+  static const Color bordure = Color(0xFFE0E0E0); // Gris léger
 
   // ─── ThemeData complet ────────────────────────────────────────────────────
 
@@ -35,12 +35,10 @@ class GoLivreurTheme {
           primary: primaire,
           secondary: secondaire,
           surface: surface,
-          background: fond,
           error: erreur,
           onPrimary: Colors.white,
           onSecondary: Colors.white,
           onSurface: textePrincipal,
-          onBackground: textePrincipal,
           onError: Colors.white,
           brightness: Brightness.light,
         ),
@@ -110,7 +108,8 @@ class GoLivreurTheme {
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: surface,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: const BorderSide(color: bordure),
@@ -127,12 +126,14 @@ class GoLivreurTheme {
             borderRadius: BorderRadius.circular(10),
             borderSide: const BorderSide(color: erreur),
           ),
-          labelStyle: const TextStyle(color: texteSecondaire, fontFamily: 'Inter'),
-          hintStyle: const TextStyle(color: texteSecondaire, fontFamily: 'Inter'),
+          labelStyle:
+              const TextStyle(color: texteSecondaire, fontFamily: 'Inter'),
+          hintStyle:
+              const TextStyle(color: texteSecondaire, fontFamily: 'Inter'),
         ),
 
         // Cartes
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: surface,
           elevation: 1,
           shadowColor: Colors.black12,
@@ -154,7 +155,7 @@ class GoLivreurTheme {
         // Chips
         chipTheme: ChipThemeData(
           backgroundColor: fond,
-          selectedColor: primaire.withOpacity(0.15),
+          selectedColor: primaire.withValues(alpha: 0.15),
           labelStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13),
           side: const BorderSide(color: bordure),
           shape: RoundedRectangleBorder(
@@ -177,36 +178,52 @@ class GoLivreurTheme {
         // Typography
         textTheme: const TextTheme(
           headlineLarge: TextStyle(
-            fontFamily: 'Inter', fontSize: 28,
-            fontWeight: FontWeight.w700, color: textePrincipal,
+            fontFamily: 'Inter',
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            color: textePrincipal,
           ),
           headlineMedium: TextStyle(
-            fontFamily: 'Inter', fontSize: 22,
-            fontWeight: FontWeight.w600, color: textePrincipal,
+            fontFamily: 'Inter',
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            color: textePrincipal,
           ),
           titleLarge: TextStyle(
-            fontFamily: 'Inter', fontSize: 18,
-            fontWeight: FontWeight.w600, color: textePrincipal,
+            fontFamily: 'Inter',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textePrincipal,
           ),
           titleMedium: TextStyle(
-            fontFamily: 'Inter', fontSize: 16,
-            fontWeight: FontWeight.w500, color: textePrincipal,
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: textePrincipal,
           ),
           bodyLarge: TextStyle(
-            fontFamily: 'Inter', fontSize: 16,
-            fontWeight: FontWeight.w400, color: textePrincipal,
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: FontWeight.w400,
+            color: textePrincipal,
           ),
           bodyMedium: TextStyle(
-            fontFamily: 'Inter', fontSize: 14,
-            fontWeight: FontWeight.w400, color: textePrincipal,
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            color: textePrincipal,
           ),
           bodySmall: TextStyle(
-            fontFamily: 'Inter', fontSize: 12,
-            fontWeight: FontWeight.w400, color: texteSecondaire,
+            fontFamily: 'Inter',
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            color: texteSecondaire,
           ),
           labelLarge: TextStyle(
-            fontFamily: 'Inter', fontSize: 14,
-            fontWeight: FontWeight.w600, color: textePrincipal,
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: textePrincipal,
           ),
         ),
 
@@ -218,41 +235,41 @@ class GoLivreurTheme {
 
   static Color couleurStatutCommande(String statut) {
     return switch (statut) {
-      'pending'    => const Color(0xFFFFC107), // Jaune — en attente
-      'accepted'   => const Color(0xFF2196F3), // Bleu — accepté
-      'ready'      => const Color(0xFF9C27B0), // Violet — prêt
-      'picked_up'  => primaire,                // Orange — en route
-      'in_transit' => primaire,                // Orange — en transit
-      'delivered'  => succes,                  // Vert — livré
-      'refused'    => erreur,                  // Rouge — refusé
-      'cancelled'  => texteSecondaire,         // Gris — annulé
-      'waiting'    => const Color(0xFFFF5722), // Orange foncé — en attente livreur
-      _            => texteSecondaire,
+      'pending' => const Color(0xFFFFC107), // Jaune — en attente
+      'accepted' => const Color(0xFF2196F3), // Bleu — accepté
+      'ready' => const Color(0xFF9C27B0), // Violet — prêt
+      'picked_up' => primaire, // Orange — en route
+      'in_transit' => primaire, // Orange — en transit
+      'delivered' => succes, // Vert — livré
+      'refused' => erreur, // Rouge — refusé
+      'cancelled' => texteSecondaire, // Gris — annulé
+      'waiting' => const Color(0xFFFF5722), // Orange foncé — en attente livreur
+      _ => texteSecondaire,
     };
   }
 
   static Color couleurStatutPaiement(String statut) {
     return switch (statut) {
-      'paid'         => succes,
-      'pending'      => avertissement,
+      'paid' => succes,
+      'pending' => avertissement,
       'pending_cash' => avertissement,
-      'failed'       => erreur,
-      _              => texteSecondaire,
+      'failed' => erreur,
+      _ => texteSecondaire,
     };
   }
 
   // ─── Espacements standardisés ─────────────────────────────────────────────
 
   static const double espacementXS = 4.0;
-  static const double espacementS  = 8.0;
-  static const double espacementM  = 16.0;
-  static const double espacementL  = 24.0;
+  static const double espacementS = 8.0;
+  static const double espacementM = 16.0;
+  static const double espacementL = 24.0;
   static const double espacementXL = 32.0;
 
   // ─── Rayons de bordure standardisés ──────────────────────────────────────
 
-  static const double rayonS  = 6.0;
-  static const double rayonM  = 10.0;
-  static const double rayonL  = 12.0;
+  static const double rayonS = 6.0;
+  static const double rayonM = 10.0;
+  static const double rayonL = 12.0;
   static const double rayonXL = 20.0;
 }

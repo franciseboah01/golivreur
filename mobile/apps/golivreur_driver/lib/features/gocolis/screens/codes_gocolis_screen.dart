@@ -290,7 +290,7 @@ class _CodesGoColisScreenState extends ConsumerState<CodesGoColisScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: GoLivreurTheme.secondaire.withOpacity(0.1),
+                              color: GoLivreurTheme.secondaire.withValues(alpha: 0.1),
                               borderRadius:
                                   BorderRadius.circular(GoLivreurTheme.rayonXL),
                             ),
@@ -325,7 +325,7 @@ class _CodesGoColisScreenState extends ConsumerState<CodesGoColisScreen> {
                   _SectionCode(
                     titre: 'Étape 1 — Chez l\'expéditeur',
                     description: 'Demandez le code à 4 chiffres à l\'expéditeur.',
-                    estBloqueCoté: parcel.senderCodeLocked,
+                    estBloqueCote: parcel.senderCodeLocked,
                     photoRequise: true,
                     photoOk: _photoOk,
                     onPrendrePhoto: () => _prendrePhoto('pickup', parcel.id),
@@ -347,7 +347,7 @@ class _CodesGoColisScreenState extends ConsumerState<CodesGoColisScreen> {
                     titre: 'Étape 2 — Chez le destinataire',
                     description:
                         'Demandez le code SMS reçu par le destinataire.',
-                    estBloqueCoté: parcel.recipientCodeLocked,
+                    estBloqueCote: parcel.recipientCodeLocked,
                     photoRequise: true,
                     photoOk: _photoOk,
                     onPrendrePhoto: () => _prendrePhoto('delivery', parcel.id),
@@ -375,7 +375,7 @@ class _CodesGoColisScreenState extends ConsumerState<CodesGoColisScreen> {
 class _SectionCode extends StatelessWidget {
   final String titre;
   final String description;
-  final bool estBloqueCoté;
+  final bool estBloqueCote;
   final bool photoRequise;
   final bool photoOk;
   final VoidCallback onPrendrePhoto;
@@ -392,7 +392,7 @@ class _SectionCode extends StatelessWidget {
   const _SectionCode({
     required this.titre,
     required this.description,
-    required this.estBloqueCoté,
+    required this.estBloqueCote,
     required this.photoRequise,
     required this.photoOk,
     required this.onPrendrePhoto,
@@ -409,11 +409,11 @@ class _SectionCode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (estBloqueCoté) {
+    if (estBloqueCote) {
       return Container(
         padding: const EdgeInsets.all(GoLivreurTheme.espacementM),
         decoration: BoxDecoration(
-          color: GoLivreurTheme.erreur.withOpacity(0.08),
+          color: GoLivreurTheme.erreur.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(GoLivreurTheme.rayonL),
         ),
         child: const Column(
@@ -476,7 +476,7 @@ class _SectionCode extends StatelessWidget {
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 maxLength: 1,
-                enabled: photoOk && !estBloqueCoté,
+                enabled: photoOk && !estBloqueCote,
                 decoration: InputDecoration(
                   counterText: '',
                   filled: true,

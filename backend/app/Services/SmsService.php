@@ -15,9 +15,9 @@ class SmsService
     private const CACHE_KEY    = 'sms_count_mensuel';
 
     public function __construct(
-        private readonly \Twilio\Rest\Client $twilioClient,
-        private readonly string $twilioFrom,
-        private readonly string $alertEmail,
+        private readonly ?object $twilioClient = null,
+        private readonly string $twilioFrom = '',
+        private readonly string $alertEmail = '',
     ) {}
 
     /**
@@ -63,6 +63,14 @@ class SmsService
         try {
             // Normaliser le numéro ivoirien (+225 + numéro)
             $phoneInternational = $this->normaliserPhone($phone);
+
+            if (app()->environment('testing', 'local') || !$this->twilioClient) {
+                $this->incrementerCompteur();
+                Log::info("SMS simulé ({$type})", [
+                    'phone_masked' => substr($phone, 0, 2) . '****' . substr($phone, -3),
+                ]);
+                return true;
+            }
 
             $this->twilioClient->messages->create($phoneInternational, [
                 'from' => $this->twilioFrom,

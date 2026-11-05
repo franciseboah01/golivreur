@@ -95,9 +95,9 @@ class BadgeStatut extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: couleur.withOpacity(0.12),
+        color: couleur.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(GoLivreurTheme.rayonXL),
-        border: Border.all(color: couleur.withOpacity(0.4)),
+        border: Border.all(color: couleur.withValues(alpha: 0.4)),
       ),
       child: Text(
         label,
@@ -263,7 +263,7 @@ class EtatErreur extends StatelessWidget {
             Icon(
               estTimeout ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
               size: 64,
-              color: GoLivreurTheme.erreur.withOpacity(0.7),
+              color: GoLivreurTheme.erreur.withValues(alpha: 0.7),
             ),
             const SizedBox(height: GoLivreurTheme.espacementM),
             Text(
@@ -322,7 +322,7 @@ class EtatVide extends StatelessWidget {
             Icon(
               icone,
               size: 72,
-              color: GoLivreurTheme.texteSecondaire.withOpacity(0.4),
+              color: GoLivreurTheme.texteSecondaire.withValues(alpha: 0.4),
             ),
             const SizedBox(height: GoLivreurTheme.espacementM),
             Text(
@@ -367,7 +367,7 @@ class BanniereConnexionLente extends StatelessWidget {
         borderRadius: BorderRadius.circular(GoLivreurTheme.rayonL),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

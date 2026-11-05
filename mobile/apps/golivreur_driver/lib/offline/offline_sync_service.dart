@@ -82,11 +82,8 @@ class OfflineSyncService {
   void _demarrerSurveillanceReseau() {
     _abonnementConnectivite = Connectivity()
         .onConnectivityChanged
-        .listen((ConnectivityResult result) {
-      // ConnectivityResult.none = pas de réseau
-      // ConnectivityResult.mobile = 2G/3G/4G
-      // ConnectivityResult.wifi = WiFi
-      final maintenant = result != ConnectivityResult.none;
+        .listen((List<ConnectivityResult> results) {
+      final maintenant = results.isNotEmpty && !results.contains(ConnectivityResult.none);
 
       if (maintenant != _estEnLigne) {
         _estEnLigne = maintenant;
@@ -203,4 +200,9 @@ final offlineSyncProvider = Provider<OfflineSyncService>((ref) {
 });
 
 /// Provider placeholder du service de localisation.
-final locationServiceProvider = Provider((ref) => throw UnimplementedError());
+abstract class LocationService {
+  Future<void> envoyerPosition({required double lat, required double lng});
+}
+
+final locationServiceProvider =
+    Provider<LocationService>((ref) => throw UnimplementedError());
