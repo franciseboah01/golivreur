@@ -45,3 +45,4 @@ class ParcelFactory extends Factory
         ];
     }
 }
+

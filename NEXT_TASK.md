@@ -8,34 +8,28 @@
 
 ## 🎯 Tâche actuelle
 
-**Sprint :** 2 — Authentification (S3-S4)
+**Sprint :** 7 — Paiement et notifications (S11-S12)
 
-**Objectif de la tâche :** Implémenter et connecter les écrans d'authentification (Inscription téléphone + OTP SMS + Connexion) sur les 3 applications mobiles Flutter (`golivreur_client`, `golivreur_business`, `golivreur_driver`) avec le backend API (`/api/v1/auth/*`).
+**Objectif de la tâche :** Intégrer les paiements Mobile Money (Orange Money, Wave, MTN via Hub2/CinetPay) et les notifications en temps réel (WebSockets Reverb + Push FCM).
 
 **Actions précises à exécuter dans l'ordre :**
 
-1. **GoLivreur Client :**
-   - Implémenter l'écran d'inscription avec saisie numéro de téléphone ivoirien (`+225` / format 10 chiffres).
-   - Implémenter l'écran de validation du code OTP (4 chiffres) avec compte à rebours 60s et bouton de renvoi.
-   - Connecter avec `ApiClient` vers `POST /api/v1/auth/register` et `POST /api/v1/auth/verify-register`.
-   - Stocker les tokens JWT (`access_token`, `refresh_token`) via `flutter_secure_storage`.
-2. **GoLivreur Business :**
-   - Implémenter l'écran de connexion / inscription partenaire (nom du commerce, catégorie, adresse, contact).
-   - Valider la gestion de session unique (une nouvelle connexion invalide la précédente).
-3. **GoLivreur Driver :**
-   - Implémenter l'écran de connexion / inscription livreur (type de véhicule moto, numéro de pièce).
-   - Gérer l'état de validation en attente d'activation par l'agent de ville.
-4. **Validation de bout en bout :**
-   - Tester l'inscription et la connexion d'un client de bout en bout contre l'API backend locale.
-   - Valider `flutter analyze` sans aucune régression (0 erreur).
+1. **Agrégateurs de paiement Hub2 / CinetPay :**
+   - Configurer le client API de paiement sandbox (Orange Money / Wave / MTN).
+   - Valider le traitement idempotent des webhooks de paiement dans `ProcessPaymentWebhook`.
+   - Tester la vérification de signature HMAC sur `POST /api/v1/webhooks/payment`.
+2. **Notifications Push & Temps réel :**
+   - Configurer Firebase Cloud Messaging (FCM) avec `SendPushNotification`.
+   - Configurer Laravel Reverb / Pusher pour le suivi temps réel des positions de livreurs sur la carte.
+3. **Validation et tests de flux financiers complets :**
+   - Écrire et exécuter la suite de tests `PaymentWebhookTest` (paiement validé, échec, tentative frauduleuse sans HMAC).
 
 **Critère de succès (Definition of Done) :**
-- Les écrans de connexion et d'inscription sont fluides, conformes à la charte graphique Orange `#F4A623` / Vert `#1B5E20`.
-- Un nouvel utilisateur peut s'inscrire, recevoir son OTP simulé/réel, valider son compte et obtenir son JWT sécurisé.
-- `flutter analyze` rapporte 0 avertissement sur les 3 apps.
+- Un paiement sandbox Orange Money déclenche le webhook sécurisé, passe la commande en `paid` et crédite instantanément les portefeuilles sans double crédit.
+- 100% des tests Pest passent.
 
-**Bloqué sur quelque chose ?** Non.
+**Bloqué sur quelque chose ?** Non (les tests sandbox peuvent s'exécuter avec des mocks et HMAC locaux en attendant l'ouverture officielle du compte marchand par Francis).
 
 **Nécessite une action de Francis (non technique) ?**
-- ⚠️ Suivi de l'ouverture du compte marchand Hub2/CinetPay (démarche externe administrative).
+- ⚠️ Finalisation des démarches administratives pour l'ouverture du compte marchand Hub2/CinetPay.
 - Réservation du nom de domaine `golivreur.ci`.

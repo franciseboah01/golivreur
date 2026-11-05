@@ -21,3 +21,4 @@ class ParcelPhoto extends Model
         return $this->belongsTo(Parcel::class);
     }
 }
+

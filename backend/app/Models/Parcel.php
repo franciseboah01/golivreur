@@ -33,6 +33,11 @@ class Parcel extends Model
 
     protected $casts = [
         'has_insurance'         => 'boolean',
+        'insurance_amount'      => 'integer',
+        'declared_value'        => 'integer',
+        'shipping_fee'          => 'integer',
+        'platform_commission'   => 'integer',
+        'courier_amount'        => 'integer',
         'sender_code_locked'    => 'boolean',
         'recipient_code_locked' => 'boolean',
         'picked_up_at'          => 'datetime',

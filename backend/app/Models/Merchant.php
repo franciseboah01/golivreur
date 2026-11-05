@@ -60,3 +60,4 @@ class Merchant extends Model
         return $this->hasMany(Order::class);
     }
 }
+

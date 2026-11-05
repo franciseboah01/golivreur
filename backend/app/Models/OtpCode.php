@@ -24,3 +24,4 @@ class OtpCode extends Model
         'expires_at' => 'datetime',
     ];
 }
+

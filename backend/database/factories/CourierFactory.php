@@ -27,3 +27,4 @@ class CourierFactory extends Factory
         ];
     }
 }
+

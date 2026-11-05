@@ -57,3 +57,4 @@ class City extends Model
         return $this->hasMany(Parcel::class);
     }
 }
+

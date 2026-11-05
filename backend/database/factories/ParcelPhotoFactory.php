@@ -21,3 +21,4 @@ class ParcelPhotoFactory extends Factory
         ];
     }
 }
+

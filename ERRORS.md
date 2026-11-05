@@ -72,13 +72,21 @@ Ces points ont été identifiés comme sources probables de bugs pendant la phas
 **Prévention :** Vérification systématique par `flutter analyze` sur chaque package du monorepo.
 **Fichiers concernés :** `mobile/packages/core/lib/config/app_theme.dart`.
 
-### [2026-11-05] — [Sprint 1] Échec d'assertion sur WalletTransaction (integer vs float)
+### [2026-11-05] — [Sprint 3/5] Erreur PostgreSQL 42703 (alias distance dans HAVING)
 **Statut :** Résolu
-**Symptôme :** `Failed asserting that 1500 is identical to 1500.0` dans `WalletServiceTest`.
-**Cause racine :** Le cast Eloquent de `WalletTransaction` forçait `amount` en `integer`, alors que Pest utilise `toBe()` (comparaison stricte `===`) sur un float (`1500.0`).
-**Solution appliquée :** Typage en `float` dans `$casts` pour `amount`, `balance_before` et `balance_after`.
-**Prévention :** Aligner les casts de modèles financiers sur `float` pour les calculs et comparaisons strictes.
-**Fichiers concernés :** `backend/app/Models/WalletTransaction.php`.
+**Symptôme :** `SQLSTATE[42703]: Undefined column: 7 ERREUR: la colonne « distance » n'existe pas ... having "distance" < 10` lors de l'attribution d'un livreur GoColis ou GoShop.
+**Cause racine :** PostgreSQL n'autorise pas l'utilisation d'alias de colonnes créés dans le `SELECT` au sein de la clause `HAVING`.
+**Solution appliquée :** Utilisation de `whereRaw` avec l'expression complète de la distance haversine et protection `least(1.0, greatest(-1.0, ...))`.
+**Prévention :** Ne jamais utiliser d'alias calculé dans un `HAVING` sous PostgreSQL ; utiliser `whereRaw` ou des sous-requêtes.
+**Fichiers concernés :** `backend/app/Modules/GoShop/Services/AssignmentService.php`.
+
+### [2026-11-05] — [Sprint 4] Annulation intempestive de commande par le job de timeout en file synchrone
+**Statut :** Résolu
+**Symptôme :** Une commande fraîchement créée passait instantanément au statut `cancelled` lors de l'exécution des tests.
+**Cause racine :** Avec le driver de queue synchrone (`sync`), les jobs dispatchés avec `delay()` sont exécutés immédiatement par le processus PHP. Le job d'annulation à 45s s'exécutait donc immédiatement après la création.
+**Solution appliquée :** Ajout d'une vérification de l'âge réel de la commande (`created_at->diffInSeconds(now()) >= 40`) dans la méthode `handle()` de `AnnulerCommandeTimeout`.
+**Prévention :** Toujours valider les conditions temporelles au sein du `handle()` des jobs à délai pour immuniser contre l'exécution immédiate en mode synchrone ou lors des tests.
+**Fichiers concernés :** `backend/app/Jobs/AnnulerCommandeTimeout.php`.
 
 <!-- Exemple de ce à quoi la prochaine entrée doit ressembler :
 

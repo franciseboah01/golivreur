@@ -99,14 +99,32 @@ Ces décisions ont été validées par Francis pendant la phase de cadrage. Elle
 **Impact :** `AppServiceProvider.php` gère l'alias transparentement. Les tests Pest `AuthTest` et `WalletServiceTest` passent à 100%.
 **Réversible ?** Oui, par remplacement global du namespace si souhaité.
 
-### [2026-11-05] — Flutter 3.47+ : CardThemeData, withValues(alpha:) et dépendances temps-réel
+### [2026-11-05] — Formule Haversine sous PostgreSQL : whereRaw avec cosinus borné
 
-**Contexte :** Le SDK Flutter installé est Flutter 3.47.9 / Dart 3.10. `pusher_channels_flutter 2.0.3` n'existait pas sur pub.dev, `CardTheme` est devenu `CardThemeData`, et `withOpacity` est obsolète au profit de `withValues(alpha: ...)`.
-**Options considérées :** Forcer un downgrade global de Flutter / Adapter les types et dépendances à Flutter 3.47.
-**Décision retenue :** Utiliser `pusher_channels_flutter: ^2.2.0`, `laravel_echo: ^1.0.0-beta.1`, `CardThemeData` et `.withValues(alpha: ...)`.
-**Raison :** Assure la compatibilité à long terme avec les dernières versions d'Android 14+ et iOS 18+, tout en éliminant tous les avertissements du compilateur Dart.
-**Impact :** Les 4 projets Flutter (`mobile/packages/core`, `golivreur_client`, `golivreur_business`, `golivreur_driver`) compilent avec 0 erreur et 0 avertissement (`flutter analyze` 100% propre).
-**Réversible ?** Oui, rétrogradation triviale via `pubspec.yaml` si nécessaire.
+**Contexte :** Dans la recherche de coursiers géographiquement proches, PostgreSQL refuse l'alias `distance` dans la clause `HAVING` sans agrégation explicite ou sous-requête, provoquant une erreur SQL 42703.
+**Options considérées :** Réécrire avec une sous-requête SQL complexe / Remplacer `HAVING` par un `whereRaw` avec l'expression trigonométrique haversine et protection `least(1.0, greatest(-1.0, ...))`.
+**Décision retenue :** `whereRaw` avec cosinus borné à `[-1, 1]` pour éviter tout débordement de calcul dans `acos()`.
+**Raison :** Solution rapide, portable, ne dépendant pas d'extensions tierces (comme PostGIS) et immédiatement compatible avec la base PostgreSQL 16 locale et de production.
+**Impact :** `AssignmentService` attribue les coursiers sans aucune erreur SQL.
+**Réversible ?** Oui, passage éventuel à PostGIS en v2 si les volumes le justifient.
+
+### [2026-11-05] — Découplage AssignmentService et NotificationService
+
+**Contexte :** Le code initial contenait `AssignmentService` imbriqué dans le même fichier que `CommissionService.php`, en violation du standard PSR-4 et provoquant des conflits d'autoloading.
+**Options considérées :** Conserver la structure monolithique / Extraire `AssignmentService` et créer `NotificationService` comme services dédiés.
+**Décision retenue :** Extraction de `AssignmentService` dans `app/Modules/GoShop/Services/` et création de `NotificationService` dans `app/Services/`.
+**Raison :** Séparation des responsabilités (SRP) et conformité stricte PSR-4.
+**Impact :** Couverture de test complète sur les flux de commande et d'attribution.
+**Réversible ?** Non nécessaire.
+
+### [2026-11-05] — Flutter : GoLivreurTheme et package golivreur_core
+
+**Contexte :** Le package partagé est nommé `golivreur_core` dans les `pubspec.yaml`, et sa classe centrale de design est `GoLivreurTheme`.
+**Options considérées :** Renommer le package en `core` / Utiliser `package:golivreur_core` et `GoLivreurTheme`.
+**Décision retenue :** Aligner tous les imports sur `package:golivreur_core` et `GoLivreurTheme.theme`.
+**Raison :** Respecte l'architecture du monorepo sans casser les configurations existantes.
+**Impact :** Analyse Flutter à 100% propre (0 issue sur les 4 projets).
+**Réversible ?** Oui.
 
 <!-- Exemple de ce à quoi la prochaine entrée doit ressembler :
 

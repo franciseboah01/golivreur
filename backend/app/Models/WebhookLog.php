@@ -29,3 +29,4 @@ class WebhookLog extends Model
         'processed_at' => 'datetime',
     ];
 }
+
