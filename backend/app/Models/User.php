@@ -9,8 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 
-class User extends Authenticatable implements JWTSubject
+class User extends Authenticatable implements JWTSubject, FilamentUser
 {
     use HasFactory, SoftDeletes;
 
@@ -32,6 +34,21 @@ class User extends Authenticatable implements JWTSubject
         'phone_verified_at'   => 'datetime',
         'last_login_at'       => 'datetime',
     ];
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return in_array($this->role, [
+            'super_admin',
+            'dg_national',
+            'national_finance',
+            'national_tech',
+            'national_support',
+            'city_manager',
+            'city_finance',
+            'city_support',
+            'city_agent',
+        ]);
+    }
 
     // ─── JWT ──────────────────────────────────────────────────────────────────
 
