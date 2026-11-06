@@ -41,13 +41,23 @@ class CityResource extends Resource
                             ->label('Ville ouverte au service GoLivreur')
                             ->default(true),
                         Forms\Components\TextInput::make('center_lat')
-                            ->label('Latitude du centre')
+                            ->label('Latitude GPS du centre')
                             ->numeric()
-                            ->required(),
+                            ->minValue(-90.0)
+                            ->maxValue(90.0)
+                            ->step(0.000001)
+                            ->placeholder('Ex: 7.6900 pour Bouaké, 6.8774 pour Daloa')
+                            ->helperText('Coordonnée comprise entre -90.0 et +90.0 (en Côte d\'Ivoire : ~4.0 à ~11.0)')
+                            ->nullable(),
                         Forms\Components\TextInput::make('center_lng')
-                            ->label('Longitude du centre')
+                            ->label('Longitude GPS du centre')
                             ->numeric()
-                            ->required(),
+                            ->minValue(-180.0)
+                            ->maxValue(180.0)
+                            ->step(0.000001)
+                            ->placeholder('Ex: -5.0300 pour Bouaké, -6.4502 pour Daloa')
+                            ->helperText('Coordonnée comprise entre -180.0 et +180.0 (en Côte d\'Ivoire : ~-8.5 à ~-2.5)')
+                            ->nullable(),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Majorations & Sécurité Urbaine')
@@ -59,7 +69,7 @@ class CityResource extends Resource
                             ->label('Date/Heure déclenchement Mode Pluie'),
                         Forms\Components\Toggle::make('emergency_mode_active')
                             ->label('Activer le Mode Urgence (Interrompt les nouvelles commandes)'),
-                        Forms\Components\Textarea::make('emergency_message')
+                        Forms\Components\Textarea::make('emergency_mode_message')
                             ->label('Message diffusé aux clients et livreurs en cas d\'urgence')
                             ->placeholder('Ex: En raison des fortes inondations, les livraisons sont suspendues jusqu\'à nouvel ordre.')
                             ->columnSpanFull(),
@@ -104,7 +114,7 @@ class CityResource extends Resource
                     ->trueColor('danger')
                     ->falseColor('success'),
 
-                Tables\Columns\TextColumn::make('emergency_message')
+                Tables\Columns\TextColumn::make('emergency_mode_message')
                     ->label('Message d\'Alerte')
                     ->placeholder('Aucun')
                     ->limit(40),

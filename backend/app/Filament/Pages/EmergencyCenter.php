@@ -132,7 +132,7 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                     City::query()->update([
                         'emergency_mode_active' => true,
                         'emergency_mode_activated_at' => now(),
-                        'emergency_message' => $data['message'],
+                        'emergency_mode_message' => $data['message'],
                     ]);
 
                     Notification::make()
@@ -153,7 +153,7 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                     City::query()->update([
                         'emergency_mode_active' => false,
                         'emergency_mode_activated_at' => null,
-                        'emergency_message' => null,
+                        'emergency_mode_message' => null,
                     ]);
 
                     Notification::make()
@@ -199,7 +199,7 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                     ->formatStateUsing(fn (bool $state): string => $state ? 'Urgence Enclenchée' : 'Normal')
                     ->icon(fn (bool $state): string => $state ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-shield-check'),
 
-                Tables\Columns\TextColumn::make('emergency_message')
+                Tables\Columns\TextColumn::make('emergency_mode_message')
                     ->label('Alerte Urgence en cours')
                     ->placeholder('Aucune alerte')
                     ->limit(40),
@@ -240,7 +240,7 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                         $record->update([
                             'emergency_mode_active' => $newStatus,
                             'emergency_mode_activated_at' => $newStatus ? now() : null,
-                            'emergency_message' => $newStatus ? ($data['message'] ?? 'Service temporairement interrompu') : null,
+                            'emergency_mode_message' => $newStatus ? ($data['message'] ?? 'Service temporairement interrompu') : null,
                         ]);
                         Notification::make()
                             ->title("Mode Urgence {$record->name} : " . ($newStatus ? 'Enclenché' : 'Levé'))
