@@ -293,15 +293,15 @@ class OrderResource extends Resource
                         Forms\Components\DatePicker::make('created_from')->label('Commandé à partir du'),
                         Forms\Components\DatePicker::make('created_until')->label('Commandé jusqu\'au'),
                     ])
-                    ->query(function (Builder $query, array $data): Builder {
+                    ->query(function ($query, array $data) {
                         return $query
                             ->when(
                                 $data['created_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                                fn ($query, $date) => $query->whereDate('created_at', '>=', $date),
                             )
                             ->when(
                                 $data['created_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                                fn ($query, $date) => $query->whereDate('created_at', '<=', $date),
                             );
                     }),
             ])

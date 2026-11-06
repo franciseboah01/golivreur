@@ -125,6 +125,7 @@ class CityResource extends Resource
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'asc')
+            ->defaultKeySort(true)
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Statut Opérationnel')
@@ -146,15 +147,15 @@ class CityResource extends Resource
                         Forms\Components\DatePicker::make('created_from')->label('Ajoutée à partir du'),
                         Forms\Components\DatePicker::make('created_until')->label('Ajoutée jusqu\'au'),
                     ])
-                    ->query(function (Builder $query, array $data): Builder {
+                    ->query(function ($query, array $data) {
                         return $query
                             ->when(
                                 $data['created_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                                fn ($query, $date) => $query->whereDate('created_at', '>=', $date),
                             )
                             ->when(
                                 $data['created_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                                fn ($query, $date) => $query->whereDate('created_at', '<=', $date),
                             );
                     }),
             ])

@@ -269,15 +269,15 @@ class ParcelResource extends Resource
                         Forms\Components\DatePicker::make('created_from')->label('Expédié à partir du'),
                         Forms\Components\DatePicker::make('created_until')->label('Expédié jusqu\'au'),
                     ])
-                    ->query(function (Builder $query, array $data): Builder {
+                    ->query(function ($query, array $data) {
                         return $query
                             ->when(
                                 $data['created_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                                fn ($query, $date) => $query->whereDate('created_at', '>=', $date),
                             )
                             ->when(
                                 $data['created_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                                fn ($query, $date) => $query->whereDate('created_at', '<=', $date),
                             );
                     }),
             ])

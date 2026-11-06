@@ -110,6 +110,7 @@ class MerchantCategoryResource extends Resource
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'asc')
+            ->defaultKeySort(true)
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Statut')

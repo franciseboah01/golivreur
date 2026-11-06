@@ -154,6 +154,7 @@ class AdministratorResource extends Resource
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'asc')
+            ->defaultKeySort(true)
             ->filters([
                 Tables\Filters\SelectFilter::make('role')
                     ->label('Filtrer par Rôle')
