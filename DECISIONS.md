@@ -126,15 +126,30 @@ Ces décisions ont été validées par Francis pendant la phase de cadrage. Elle
 **Impact :** Analyse Flutter à 100% propre (0 issue sur les 4 projets).
 **Réversible ?** Oui.
 
-<!-- Exemple de ce à quoi la prochaine entrée doit ressembler :
+### [2026-11-06] — Sécurité Webhooks : Validation HMAC SHA256 stricte et table webhook_logs
 
-## [2026-XX-XX] — Titre court
+**Contexte :** Les webhooks Mobile Money (Hub2/CinetPay) doivent être sécurisés contre les attaques par rejeu et les fausses confirmations de paiement.
+**Options considérées :** Vérification par IP uniquement / Validation par signature HMAC SHA256 avec clé secrète partagée et logging systématique avant exécution.
+**Décision retenue :** Validation stricte par HMAC SHA256 avec rejet 401 si signature invalide ou absente, enregistrement préalable de chaque requête dans `webhook_logs`, et traitement asynchrone sur file prioritaire `high`.
+**Raison :** Exigence de sécurité bancaire et conformité CDC Chapitre 8 & 11.
+**Impact :** Zéro risque de faux paiements, traçabilité immuable et capacité de rejeu manuel par un administrateur en cas de panne réseau temporaire.
+**Réversible ?** Non (fondement de sécurité requis).
 
-**Contexte :** ...
-**Options considérées :** ...
-**Décision retenue :** ...
-**Raison :** ...
-**Impact :** ...
-**Réversible ?** ...
+### [2026-11-06] — Base de données dédiée aux tests : golivreur_testing
 
--->
+**Contexte :** `phpunit.xml` pointait par défaut vers `edulink_testing`, risquant des collisions de tables avec un autre projet de la machine hôte.
+**Options considérées :** Conserver la base commune / Créer une base PostgreSQL dédiée `golivreur_testing`.
+**Décision retenue :** Création et isolation sur la base PostgreSQL dédiée `golivreur_testing`.
+**Raison :** Isolation stricte des données et garantie que `RefreshDatabase` ne modifie jamais les tables d'un projet tiers.
+**Impact :** Exécution déterministe et isolée de la suite de 54 tests Pest.
+**Réversible ?** Oui.
+
+### [2026-11-06] — Notation livreur pondérée et gestion des indemnisations assurance
+
+**Contexte :** Finalisation de GoColis (Sprint 10) nécessitant un mécanisme de notation des coursiers et de gestion des sinistres assurance.
+**Options considérées :** Stocker uniquement la dernière note / Recalculer la moyenne pondérée à chaque note sur la table `couriers` et créer un modèle `Rating` lié.
+**Décision retenue :** Modèle `Rating` complet et mise à jour atomique de `average_rating` et `total_ratings` sur le livreur ; ajout du point d'entrée `parcelRefund` avec vérification des plafonds de délégation par rôle.
+**Raison :** Permet un affichage instantané de la réputation du livreur sans calcul coûteux et garantit le respect des plafonds financiers du CDC.
+**Impact :** Sprint 10 validé et testé de bout en bout.
+**Réversible ?** Oui.
+

@@ -8,28 +8,47 @@
 
 ## 🎯 Tâche actuelle
 
-**Sprint :** 7 — Paiement et notifications (S11-S12)
+**Étape :** Validation sur téléphone physique & Démonstration interactive
 
-**Objectif de la tâche :** Intégrer les paiements Mobile Money (Orange Money, Wave, MTN via Hub2/CinetPay) et les notifications en temps réel (WebSockets Reverb + Push FCM).
+**Objectif de la tâche :** Connecter le smartphone Android de Francis en USB (ou lancer l'émulateur Android) et tester chaque application GoLivreur en conditions réelles avec le backend en local.
 
 **Actions précises à exécuter dans l'ordre :**
 
-1. **Agrégateurs de paiement Hub2 / CinetPay :**
-   - Configurer le client API de paiement sandbox (Orange Money / Wave / MTN).
-   - Valider le traitement idempotent des webhooks de paiement dans `ProcessPaymentWebhook`.
-   - Tester la vérification de signature HMAC sur `POST /api/v1/webhooks/payment`.
-2. **Notifications Push & Temps réel :**
-   - Configurer Firebase Cloud Messaging (FCM) avec `SendPushNotification`.
-   - Configurer Laravel Reverb / Pusher pour le suivi temps réel des positions de livreurs sur la carte.
-3. **Validation et tests de flux financiers complets :**
-   - Écrire et exécuter la suite de tests `PaymentWebhookTest` (paiement validé, échec, tentative frauduleuse sans HMAC).
+1. **Connecter le smartphone Android en USB :**
+   - Activer le mode *Débogage USB* sur le smartphone Android (Paramètres > Options de développement > Débogage USB).
+   - Brancher le téléphone au PC avec un câble USB et autoriser la connexion sur l'écran du téléphone.
+   - Vérifier la détection avec la commande `flutter devices`.
+
+2. **Lancer et tester chaque application sur le téléphone :**
+   - **Application Client :**
+     ```powershell
+     cd C:\Projets\golivreur\mobile\apps\golivreur_client
+     flutter run
+     ```
+     *Tester l'inscription, la connexion OTP, la consultation des commerces de Daloa, la commande et le suivi GPS.*
+   
+   - **Application Commerce (Business) :**
+     ```powershell
+     cd C:\Projets\golivreur\mobile\apps\golivreur_business
+     flutter run
+     ```
+     *Tester la réception de commande avec compte à rebours 45s, l'acceptation et la mise à disposition.*
+
+   - **Application Livreur (Driver) :**
+     ```powershell
+     cd C:\Projets\golivreur\mobile\apps\golivreur_driver
+     flutter run
+     ```
+     *Tester la mise en ligne, la prise en charge avec photo et double validation par code 4 chiffres, et le portefeuille.*
+
+3. **Administration Web :**
+   - Accéder au back-office sur `http://localhost:8080/admin` (ou `http://<IP_PC>:8080/admin` depuis le navigateur mobile).
 
 **Critère de succès (Definition of Done) :**
-- Un paiement sandbox Orange Money déclenche le webhook sécurisé, passe la commande en `paid` et crédite instantanément les portefeuilles sans double crédit.
-- 100% des tests Pest passent.
+- Les applications se lancent avec fluidité sur le smartphone sans plantage.
+- Le cycle complet commande -> acceptation commerce -> assignation livreur -> livraison par code 4 chiffres fonctionne de bout en bout.
 
-**Bloqué sur quelque chose ?** Non (les tests sandbox peuvent s'exécuter avec des mocks et HMAC locaux en attendant l'ouverture officielle du compte marchand par Francis).
+**Bloqué sur quelque chose ?** Non
 
 **Nécessite une action de Francis (non technique) ?**
-- ⚠️ Finalisation des démarches administratives pour l'ouverture du compte marchand Hub2/CinetPay.
-- Réservation du nom de domaine `golivreur.ci`.
+- Brancher son smartphone Android en USB avec le débogage USB activé.
