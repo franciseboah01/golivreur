@@ -121,17 +121,7 @@ class SmsService
     {
         $mois = date('F Y');
         try {
-            Mail::raw(
-                "⚠️ ALERTE BUDGET SMS GoLivreur\n\n"
-                . "Le seuil de {$compteur} SMS/mois a été atteint ({$mois}).\n\n"
-                . "Action recommandée : vérifiez la consommation dans le tableau de bord Twilio "
-                . "et anticipez une augmentation du budget si nécessaire.\n\n"
-                . "Budget actuel : 65 000 F CFA/mois\n"
-                . "Budget recommandé à 6 mois : 120 000 F CFA/mois",
-                fn ($mail) => $mail
-                    ->to($this->alertEmail)
-                    ->subject("🚨 GoLivreur — Seuil SMS atteint ({$compteur} SMS)"),
-            );
+            Mail::to($this->alertEmail)->send(new \App\Mail\SmsBudgetAlertMail($compteur));
         } catch (\Exception $e) {
             Log::error("Impossible d'envoyer l'alerte budget SMS : {$e->getMessage()}");
         }

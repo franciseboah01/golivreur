@@ -95,5 +95,6 @@ Route::middleware('auth:api')->group(function () {
         Route::get('orders', [AdminController::class, 'orders']);
         Route::post('orders/{order}/refund', [AdminController::class, 'refund']);
         Route::post('cities/{city}/emergency-mode', [AdminController::class, 'emergencyMode']);
+        Route::post('webhooks/{id}/replay', [WebhookController::class, 'rejouer']);
     });
 });
