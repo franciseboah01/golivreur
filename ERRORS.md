@@ -88,15 +88,11 @@ Ces points ont été identifiés comme sources probables de bugs pendant la phas
 **Prévention :** Toujours valider les conditions temporelles au sein du `handle()` des jobs à délai pour immuniser contre l'exécution immédiate en mode synchrone ou lors des tests.
 **Fichiers concernés :** `backend/app/Jobs/AnnulerCommandeTimeout.php`.
 
-<!-- Exemple de ce à quoi la prochaine entrée doit ressembler :
-
-## [2026-XX-XX] — [Sprint X] Titre court
-
+### [2026-11-06] — [Sprint 6/Web Admin] Erreur SQLSTATE[42P01] (table cache manquante pour Livewire)
 **Statut :** Résolu
-**Symptôme :** ...
-**Cause racine :** ...
-**Solution appliquée :** ...
-**Prévention :** ...
-**Fichiers concernés :** ...
+**Symptôme :** `SQLSTATE[42P01]: Undefined table: 7 ERREUR: la relation « cache » n'existe pas LINE 1: select * from "cache" where "key" in (golivreur-cache-livewire-rate-limiter...)` lors de la tentative de connexion sur l'interface d'administration Filament.
+**Cause racine :** Sous Laravel 11/12, le store de cache configuré par défaut est `database`. Le rate limiter de Livewire (qui gère la protection anti-brute force sur le formulaire de login Filament) interroge donc la table PostgreSQL `cache`, qui n'avait pas encore été migrée.
+**Solution appliquée :** Génération et exécution de la migration de cache avec `php artisan cache:table` et `php artisan migrate`, créant les tables `cache` et `cache_locks`.
+**Prévention :** Toujours exécuter `php artisan cache:table` et `php artisan session:table` dès l'installation d'une interface Livewire / Filament lorsque le driver de base de données est actif.
+**Fichiers concernés :** `backend/database/migrations/2026_11_06_123840_create_cache_table.php`.
 
--->
