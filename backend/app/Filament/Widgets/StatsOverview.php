@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\City;
 use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\Order;
@@ -58,7 +59,11 @@ class StatsOverview extends BaseWidget
         $totalMerchants = Merchant::where('is_active', true)->count();
         $openMerchants = Merchant::where('is_open', true)->where('is_active', true)->count();
 
-        // 6. Taux de succès
+        // 6. Mode Pluie & Zones d'opération
+        $totalCities = City::count();
+        $rainActiveCities = City::where('rain_mode_active', true)->count();
+
+        // 7. Taux de succès
         $deliveredCount = Order::where('status', Order::STATUS_DELIVERED)->count()
             + Parcel::where('status', Parcel::STATUS_DELIVERED)->count();
         $cancelledCount = Order::where('status', Order::STATUS_CANCELLED)->count()
@@ -66,7 +71,7 @@ class StatsOverview extends BaseWidget
         $totalEnded = $deliveredCount + $cancelledCount;
         $successRate = $totalEnded > 0 ? round(($deliveredCount / $totalEnded) * 100, 1) : 100.0;
 
-        // 7. Alertes de sécurité (codes OTP bloqués)
+        // 8. Alertes de sécurité (codes OTP bloqués)
         $blockedOrders = Order::where('confirmation_locked', true)->count();
         $blockedParcels = Parcel::where('sender_code_locked', true)
             ->orWhere('recipient_code_locked', true)
@@ -103,6 +108,11 @@ class StatsOverview extends BaseWidget
                 ->description('Prêts à recevoir des commandes')
                 ->descriptionIcon('heroicon-m-building-storefront')
                 ->color('info'),
+
+            Stat::make('Mode Pluie', "{$rainActiveCities} / {$totalCities}")
+                ->description($rainActiveCities > 0 ? "{$rainActiveCities} zone(s) sous majoration (+20%)" : 'Météo normale sur toutes les zones')
+                ->descriptionIcon('heroicon-m-cloud')
+                ->color($rainActiveCities > 0 ? 'warning' : 'gray'),
 
             Stat::make('Taux de Livraison Réussie', "{$successRate} %")
                 ->description("{$deliveredCount} livrées · {$cancelledCount} annulations")
