@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\MerchantResource\Pages;
 use App\Models\Merchant;
+use App\Models\MerchantCategory;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -48,15 +49,31 @@ class MerchantResource extends Resource
                             ->required(),
                         Forms\Components\Select::make('category')
                             ->label('Catégorie d\'activité')
-                            ->options([
-                                'restaurant' => 'Restaurant / Fast-Food',
-                                'pharmacie' => 'Pharmacie & Parapharmacie',
-                                'supermarche' => 'Supermarché & Épicerie',
-                                'boulangerie' => 'Boulangerie & Pâtisserie',
-                                'boutique' => 'Mode & Accessoires',
-                                'autre' => 'Autre Commerce',
+                            ->options(fn () => MerchantCategory::where('is_active', true)->pluck('name', 'slug')->toArray())
+                            ->searchable()
+                            ->required()
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nom de la nouvelle catégorie')
+                                    ->required()
+                                    ->maxLength(100),
+                                Forms\Components\TextInput::make('slug')
+                                    ->label('Identifiant unique (slug)')
+                                    ->required()
+                                    ->maxLength(100),
+                                Forms\Components\Textarea::make('description')
+                                    ->label('Description'),
                             ])
-                            ->required(),
+                            ->createOptionUsing(function (array $data): string {
+                                $slug = \Illuminate\Support\Str::slug($data['slug'] ?? $data['name']);
+                                $cat = MerchantCategory::create([
+                                    'name' => $data['name'],
+                                    'slug' => $slug,
+                                    'description' => $data['description'] ?? null,
+                                    'is_active' => true,
+                                ]);
+                                return $cat->slug;
+                            }),
                         Forms\Components\Textarea::make('address')
                             ->label('Adresse physique')
                             ->required()
@@ -112,14 +129,7 @@ class MerchantResource extends Resource
                 Tables\Columns\TextColumn::make('category')
                     ->label('Catégorie')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'restaurant' => 'Restaurant',
-                        'pharmacie' => 'Pharmacie',
-                        'supermarche' => 'Supermarché',
-                        'boulangerie' => 'Boulangerie',
-                        'boutique' => 'Boutique',
-                        default => ucfirst($state),
-                    }),
+                    ->formatStateUsing(fn (string $state): string => MerchantCategory::where('slug', $state)->value('name') ?? ucfirst($state)),
 
                 Tables\Columns\IconColumn::make('is_open')
                     ->label('Ouvert')
@@ -173,13 +183,7 @@ class MerchantResource extends Resource
                     ->falseLabel('Commerces En Attente'),
                 Tables\Filters\SelectFilter::make('category')
                     ->label('Catégorie')
-                    ->options([
-                        'restaurant' => 'Restaurant / Fast-Food',
-                        'pharmacie' => 'Pharmacie & Parapharmacie',
-                        'supermarche' => 'Supermarché & Épicerie',
-                        'boulangerie' => 'Boulangerie & Pâtisserie',
-                        'boutique' => 'Mode & Accessoires',
-                    ]),
+                    ->options(fn () => MerchantCategory::pluck('name', 'slug')->toArray()),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
                     ->relationship('city', 'name'),

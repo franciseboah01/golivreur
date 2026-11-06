@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\CourierResource\Pages;
 use App\Models\Courier;
+use App\Models\VehicleType;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -25,7 +26,7 @@ class CourierResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Livreurs Partenaires';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {
@@ -44,12 +45,31 @@ class CourierResource extends Resource
                             ->required(),
                         Forms\Components\Select::make('vehicle_type')
                             ->label('Type de véhicule')
-                            ->options([
-                                'moto' => 'Moto / Scooter',
-                                'velo' => 'Vélo',
-                                'voiture' => 'Voiture',
+                            ->options(fn () => VehicleType::where('is_active', true)->pluck('name', 'slug')->toArray())
+                            ->searchable()
+                            ->required()
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nom du véhicule')
+                                    ->required()
+                                    ->maxLength(100),
+                                Forms\Components\TextInput::make('slug')
+                                    ->label('Identifiant unique (slug)')
+                                    ->required()
+                                    ->maxLength(50),
+                                Forms\Components\Textarea::make('description')
+                                    ->label('Description'),
                             ])
-                            ->required(),
+                            ->createOptionUsing(function (array $data): string {
+                                $slug = \Illuminate\Support\Str::slug($data['slug'] ?? $data['name']);
+                                $vt = VehicleType::create([
+                                    'name' => $data['name'],
+                                    'slug' => $slug,
+                                    'description' => $data['description'] ?? null,
+                                    'is_active' => true,
+                                ]);
+                                return $vt->slug;
+                            }),
                         Forms\Components\TextInput::make('vehicle_plate')
                             ->label('Numéro d\'immatriculation')
                             ->maxLength(30),
@@ -98,12 +118,7 @@ class CourierResource extends Resource
                 Tables\Columns\TextColumn::make('vehicle_type')
                     ->label('Véhicule')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'moto' => 'Moto',
-                        'velo' => 'Vélo',
-                        'voiture' => 'Voiture',
-                        default => ucfirst($state),
-                    }),
+                    ->formatStateUsing(fn (string $state): string => VehicleType::where('slug', $state)->value('name') ?? ucfirst($state)),
 
                 Tables\Columns\TextColumn::make('vehicle_plate')
                     ->label('Plaque')
@@ -158,11 +173,7 @@ class CourierResource extends Resource
                     ->falseLabel('Comptes En Attente'),
                 Tables\Filters\SelectFilter::make('vehicle_type')
                     ->label('Type de Véhicule')
-                    ->options([
-                        'moto' => 'Moto / Scooter',
-                        'velo' => 'Vélo',
-                        'voiture' => 'Voiture',
-                    ]),
+                    ->options(fn () => VehicleType::pluck('name', 'slug')->toArray()),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
                     ->relationship('city', 'name'),

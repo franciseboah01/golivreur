@@ -26,7 +26,7 @@ class AdministratorResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Comptes Administrateurs';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 8;
 
     public static function getEloquentQuery(): Builder
     {
