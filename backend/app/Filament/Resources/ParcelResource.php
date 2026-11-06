@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ParcelResource extends Resource
 {
@@ -52,12 +53,12 @@ class ParcelResource extends Resource
                             ->label('Téléphone du Destinataire')
                             ->tel()
                             ->required(),
-                        Forms\Components\Select::make('package_size')
+                        Forms\Components\Select::make('size')
                             ->label('Format du colis')
                             ->options([
-                                'small' => 'Petit (Plis, documents, clés)',
-                                'medium' => 'Moyen (Boîte à chaussures, vêtement)',
-                                'large' => 'Grand (Carton, colis volumineux)',
+                                'petit' => 'Petit (Plis, documents, clés)',
+                                'moyen' => 'Moyen (Boîte à chaussures, vêtement)',
+                                'grand' => 'Grand (Carton, colis volumineux)',
                             ])
                             ->required(),
                     ])->columns(2),
@@ -108,7 +109,7 @@ class ParcelResource extends Resource
                                 'in_transit' => 'Colis récupéré - En transit',
                                 'delivered' => 'Colis livré avec succès',
                                 'cancelled' => 'Annulé',
-                                'returned' => 'Retourné à l\'expéditeur',
+                                'refused' => 'Refusé',
                             ])
                             ->required(),
                         Forms\Components\Toggle::make('sender_code_locked')
@@ -153,14 +154,14 @@ class ParcelResource extends Resource
                     ->label('Ville')
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('package_size')
+                Tables\Columns\TextColumn::make('size')
                     ->label('Format')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'small' => 'Petit',
-                        'medium' => 'Moyen',
-                        'large' => 'Grand',
-                        default => $state,
+                        'petit', 'small' => 'Petit (Plis)',
+                        'moyen', 'medium' => 'Moyen',
+                        'grand', 'large' => 'Grand',
+                        default => ucfirst($state),
                     }),
 
                 Tables\Columns\TextColumn::make('status')
@@ -168,20 +169,19 @@ class ParcelResource extends Resource
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'pending' => 'gray',
-                        'assigned' => 'info',
-                        'in_transit' => 'warning',
+                        'assigned', 'accepted', 'at_sender' => 'info',
+                        'in_transit', 'picked_up' => 'warning',
                         'delivered' => 'success',
-                        'cancelled' => 'danger',
-                        'returned' => 'danger',
+                        'cancelled', 'refused' => 'danger',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'pending' => 'En attente',
-                        'assigned' => 'Assigné',
-                        'in_transit' => 'En transit',
+                        'assigned', 'accepted', 'at_sender' => 'Assigné',
+                        'in_transit', 'picked_up' => 'En transit',
                         'delivered' => 'Livré',
                         'cancelled' => 'Annulé',
-                        'returned' => 'Retourné',
+                        'refused' => 'Refusé',
                         default => $state,
                     })
                     ->sortable(),
@@ -193,12 +193,12 @@ class ParcelResource extends Resource
 
                 Tables\Columns\TextColumn::make('declared_value')
                     ->label('Valeur Déclarée')
-                    ->formatStateUsing(fn ($state) => $state ? number_format((float) $state, 0, ',', ' ') . ' F CFA' : '-')
+                    ->formatStateUsing(fn ($state) => (float) $state > 0 ? number_format((float) $state, 0, ',', ' ') . ' F CFA' : '-')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('insurance_amount')
                     ->label('Assurance')
-                    ->formatStateUsing(fn ($state) => $state ? number_format((float) $state, 0, ',', ' ') . ' F CFA' : 'Non assurée'),
+                    ->formatStateUsing(fn ($state) => (float) $state > 0 ? number_format((float) $state, 0, ',', ' ') . ' F CFA' : 'Non assurée'),
 
                 Tables\Columns\IconColumn::make('sender_code_locked')
                     ->label('Enlèv. Bloqué')
@@ -226,23 +226,60 @@ class ParcelResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Filtrer par Statut')
                     ->options([
-                        'pending' => 'En attente',
-                        'assigned' => 'Assigné',
+                        'pending' => 'En attente de livreur',
                         'in_transit' => 'En transit',
-                        'delivered' => 'Livré',
+                        'delivered' => 'Livré avec succès',
                         'cancelled' => 'Annulé',
-                        'returned' => 'Retourné',
+                        'refused' => 'Refusé',
                     ]),
-                Tables\Filters\SelectFilter::make('package_size')
-                    ->label('Filtrer par Format')
+
+                Tables\Filters\SelectFilter::make('size')
+                    ->label('Format du Colis')
                     ->options([
-                        'small' => 'Petit (Plis, doc)',
-                        'medium' => 'Moyen (Colis moyen)',
-                        'large' => 'Grand (Colis lourd/volumineux)',
+                        'petit' => 'Petit (Plis, doc)',
+                        'moyen' => 'Moyen (Colis standard)',
+                        'grand' => 'Grand (Colis volumineux)',
                     ]),
+
+                Tables\Filters\TernaryFilter::make('has_insurance')
+                    ->label('Assurance Colis')
+                    ->trueLabel('Colis Assurés')
+                    ->falseLabel('Sans Assurance'),
+
+                Tables\Filters\SelectFilter::make('payment_method')
+                    ->label('Mode de Règlement')
+                    ->options([
+                        'cash' => 'Espèces',
+                        'wave' => 'Wave',
+                        'orange' => 'Orange Money',
+                        'mtn' => 'MTN MoMo',
+                    ]),
+
+                Tables\Filters\TernaryFilter::make('sender_code_locked')
+                    ->label('Code Enlèvement Bloqué')
+                    ->trueLabel('Codes Bloqués')
+                    ->falseLabel('Codes Normaux'),
+
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
                     ->relationship('city', 'name'),
+
+                Tables\Filters\Filter::make('created_at')
+                    ->form([
+                        Forms\Components\DatePicker::make('created_from')->label('Expédié à partir du'),
+                        Forms\Components\DatePicker::make('created_until')->label('Expédié jusqu\'au'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    }),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('Modifier'),

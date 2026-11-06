@@ -10,6 +10,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class OrderResource extends Resource
 {
@@ -253,26 +254,56 @@ class OrderResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
-                    ->label('Filtrer par Statut')
+                    ->label('Statut de la Commande')
                     ->options([
                         'pending' => 'En attente',
                         'accepted' => 'Acceptée',
                         'preparing' => 'En préparation',
                         'ready' => 'Prête',
-                        'delivering' => 'En livraison',
+                        'delivering' => 'En cours de livraison',
                         'delivered' => 'Livrée',
                         'cancelled' => 'Annulée',
                     ]),
+                Tables\Filters\SelectFilter::make('payment_method')
+                    ->label('Mode de Règlement')
+                    ->options([
+                        'cash' => 'Espèces à la livraison',
+                        'wave' => 'Wave Mobile Money',
+                        'orange' => 'Orange Money',
+                        'mtn' => 'MTN Mobile Money',
+                        'moov' => 'Moov Money',
+                        'wallet' => 'Portefeuille GoLivreur',
+                    ]),
                 Tables\Filters\SelectFilter::make('payment_status')
-                    ->label('Filtrer par Paiement')
+                    ->label('État du Paiement')
                     ->options([
                         'paid' => 'Payé',
                         'pending' => 'En attente',
                         'failed' => 'Échoué',
                     ]),
+                Tables\Filters\TernaryFilter::make('confirmation_locked')
+                    ->label('Sécurité Code OTP')
+                    ->trueLabel('Codes Bloqués (Support requis)')
+                    ->falseLabel('Codes Normaux'),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
                     ->relationship('city', 'name'),
+                Tables\Filters\Filter::make('created_at')
+                    ->form([
+                        Forms\Components\DatePicker::make('created_from')->label('Commandé à partir du'),
+                        Forms\Components\DatePicker::make('created_until')->label('Commandé jusqu\'au'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    }),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('Modifier'),
