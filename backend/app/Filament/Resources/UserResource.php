@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class UserResource extends Resource
 {
@@ -68,9 +69,9 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
-                    ->label('N°')
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('rowIndex')
+                    ->rowIndex()
+                    ->label('N°'),
 
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nom & Prénom')
@@ -123,18 +124,36 @@ class UserResource extends Resource
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
             ])
-            ->defaultSort('created_at', 'desc')
+            ->defaultSort('created_at', 'asc')
             ->filters([
                 Tables\Filters\SelectFilter::make('role')
-                    ->label('Filtrer par Rôle')
+                    ->label('Type d\'Utilisateur / Rôle')
                     ->options([
-                        'admin' => 'Administrateur',
-                        'merchant' => 'Commerce',
-                        'courier' => 'Livreur',
-                        'client' => 'Client',
+                        'client' => 'Clients uniquement',
+                        'merchant' => 'Commerçants uniquement',
+                        'courier' => 'Livreurs uniquement',
+                        'admin' => 'Administrateurs',
                     ]),
+                Tables\Filters\Filter::make('created_at')
+                    ->form([
+                        Forms\Components\DatePicker::make('created_from')->label('Inscrit à partir du'),
+                        Forms\Components\DatePicker::make('created_until')->label('Inscrit jusqu\'au'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    }),
                 Tables\Filters\TernaryFilter::make('is_active')
-                    ->label('Statut du Compte'),
+                    ->label('Statut du Compte')
+                    ->trueLabel('Actifs uniquement')
+                    ->falseLabel('Suspendus / Inactifs'),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
                     ->relationship('city', 'name'),

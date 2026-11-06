@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class CourierResource extends Resource
 {
@@ -77,9 +78,9 @@ class CourierResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
-                    ->label('N°')
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('rowIndex')
+                    ->rowIndex()
+                    ->label('N°'),
 
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('Livreur')
@@ -145,22 +146,42 @@ class CourierResource extends Resource
                     ->dateTime('d/m/Y')
                     ->sortable(),
             ])
-            ->defaultSort('created_at', 'desc')
+            ->defaultSort('created_at', 'asc')
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_online')
-                    ->label('En Ligne / Hors-Ligne'),
+                    ->label('Disponibilité')
+                    ->trueLabel('Livreurs En Ligne')
+                    ->falseLabel('Livreurs Hors-Ligne'),
                 Tables\Filters\TernaryFilter::make('is_active')
-                    ->label('Statut Validation'),
+                    ->label('Statut Compte')
+                    ->trueLabel('Comptes Validés')
+                    ->falseLabel('Comptes En Attente'),
                 Tables\Filters\SelectFilter::make('vehicle_type')
-                    ->label('Type Véhicule')
+                    ->label('Type de Véhicule')
                     ->options([
-                        'moto' => 'Moto',
+                        'moto' => 'Moto / Scooter',
                         'velo' => 'Vélo',
                         'voiture' => 'Voiture',
                     ]),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
                     ->relationship('city', 'name'),
+                Tables\Filters\Filter::make('created_at')
+                    ->form([
+                        Forms\Components\DatePicker::make('created_from')->label('Inscrit à partir du'),
+                        Forms\Components\DatePicker::make('created_until')->label('Inscrit jusqu\'au'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    }),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('Modifier'),

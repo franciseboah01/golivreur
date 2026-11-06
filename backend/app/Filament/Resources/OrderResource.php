@@ -141,8 +141,12 @@ class OrderResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('rowIndex')
+                    ->rowIndex()
+                    ->label('N°'),
+
                 Tables\Columns\TextColumn::make('id')
-                    ->label('N°')
+                    ->label('Réf ID')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('client.name')
