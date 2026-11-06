@@ -2,17 +2,26 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\EmergencyStatsWidget;
 use App\Models\City;
 use App\Models\Order;
 use App\Models\Parcel;
 use Filament\Actions;
 use Filament\Forms;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Illuminate\Database\Eloquent\Collection;
+use Filament\Tables;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
 
-class EmergencyCenter extends Page
+class EmergencyCenter extends Page implements HasForms, HasTable
 {
+    use InteractsWithForms;
+    use InteractsWithTable;
+
     protected static ?string $navigationIcon = 'heroicon-o-bolt';
 
     protected static string $view = 'filament.pages.emergency-center';
@@ -25,21 +34,10 @@ class EmergencyCenter extends Page
 
     protected static ?int $navigationSort = 1;
 
-    public string $emergencyBroadcastMessage = 'En raison de circonstances exceptionnelles, les nouvelles commandes sont temporairement suspendues.';
-
-    public function getCitiesProperty(): Collection
-    {
-        return City::orderBy('name')->get();
-    }
-
-    public function getStatsProperty(): array
+    protected function getHeaderWidgets(): array
     {
         return [
-            'total_cities' => City::count(),
-            'rain_active' => City::where('rain_mode_active', true)->count(),
-            'emergency_active' => City::where('emergency_mode_active', true)->count(),
-            'locked_orders' => Order::where('confirmation_locked', true)->count(),
-            'locked_parcels' => Parcel::where('sender_code_locked', true)->orWhere('recipient_code_locked', true)->count(),
+            EmergencyStatsWidget::class,
         ];
     }
 
@@ -166,37 +164,90 @@ class EmergencyCenter extends Page
         ];
     }
 
-    public function toggleCityRain(int $cityId): void
+    public function table(Table $table): Table
     {
-        $city = City::findOrFail($cityId);
-        $newStatus = ! $city->rain_mode_active;
+        return $table
+            ->query(City::query())
+            ->heading('Pilotage Rapide par Ville & Zone')
+            ->description('Activez ou désactivez le Mode Pluie et le Mode Urgence zone par zone avec prise d\'effet immédiate.')
+            ->columns([
+                Tables\Columns\TextColumn::make('name')
+                    ->label('Ville / Zone')
+                    ->searchable()
+                    ->sortable()
+                    ->weight('bold'),
 
-        $city->update([
-            'rain_mode_active' => $newStatus,
-            'rain_mode_activated_at' => $newStatus ? now() : null,
-        ]);
+                Tables\Columns\IconColumn::make('is_active')
+                    ->label('Opérationnelle')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('danger'),
 
-        Notification::make()
-            ->title("Mode Pluie {$city->name} : " . ($newStatus ? 'Activé (+20%)' : 'Désactivé'))
-            ->color($newStatus ? 'warning' : 'success')
-            ->send();
-    }
+                Tables\Columns\TextColumn::make('rain_mode_active')
+                    ->label('Mode Pluie (+20%)')
+                    ->badge()
+                    ->color(fn (bool $state): string => $state ? 'warning' : 'gray')
+                    ->formatStateUsing(fn (bool $state): string => $state ? 'Actif (+20%)' : 'Désactivé')
+                    ->icon(fn (bool $state): string => $state ? 'heroicon-m-cloud' : 'heroicon-m-sun'),
 
-    public function toggleCityEmergency(int $cityId): void
-    {
-        $city = City::findOrFail($cityId);
-        $newStatus = ! $city->emergency_mode_active;
+                Tables\Columns\TextColumn::make('emergency_mode_active')
+                    ->label('Mode Urgence')
+                    ->badge()
+                    ->color(fn (bool $state): string => $state ? 'danger' : 'success')
+                    ->formatStateUsing(fn (bool $state): string => $state ? 'Urgence Enclenchée' : 'Normal')
+                    ->icon(fn (bool $state): string => $state ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-shield-check'),
 
-        $city->update([
-            'emergency_mode_active' => $newStatus,
-            'emergency_mode_activated_at' => $newStatus ? now() : null,
-            'emergency_message' => $newStatus ? $this->emergencyBroadcastMessage : null,
-        ]);
+                Tables\Columns\TextColumn::make('emergency_message')
+                    ->label('Alerte Urgence en cours')
+                    ->placeholder('Aucune alerte')
+                    ->limit(40),
+            ])
+            ->actions([
+                Tables\Actions\Action::make('toggleRain')
+                    ->label(fn (City $record): string => $record->rain_mode_active ? 'Couper Pluie' : 'Activer Pluie')
+                    ->icon(fn (City $record): string => $record->rain_mode_active ? 'heroicon-m-sun' : 'heroicon-m-cloud')
+                    ->color(fn (City $record): string => $record->rain_mode_active ? 'gray' : 'warning')
+                    ->button()
+                    ->action(function (City $record): void {
+                        $newStatus = ! $record->rain_mode_active;
+                        $record->update([
+                            'rain_mode_active' => $newStatus,
+                            'rain_mode_activated_at' => $newStatus ? now() : null,
+                        ]);
+                        Notification::make()
+                            ->title("Mode Pluie {$record->name} : " . ($newStatus ? 'Activé (+20%)' : 'Désactivé'))
+                            ->color($newStatus ? 'warning' : 'success')
+                            ->send();
+                    }),
 
-        Notification::make()
-            ->title("Mode Urgence {$city->name} : " . ($newStatus ? 'Enclenché' : 'Levé'))
-            ->color($newStatus ? 'danger' : 'success')
-            ->send();
+                Tables\Actions\Action::make('toggleEmergency')
+                    ->label(fn (City $record): string => $record->emergency_mode_active ? 'Lever Urgence' : 'Déclencher Urgence')
+                    ->icon(fn (City $record): string => $record->emergency_mode_active ? 'heroicon-m-shield-check' : 'heroicon-m-exclamation-triangle')
+                    ->color(fn (City $record): string => $record->emergency_mode_active ? 'success' : 'danger')
+                    ->button()
+                    ->form(fn (City $record): array => $record->emergency_mode_active ? [] : [
+                        Forms\Components\Textarea::make('message')
+                            ->label('Message d\'alerte diffusé aux clients et livreurs de cette ville')
+                            ->default('En raison d\'intempéries ou de circonstances exceptionnelles, les livraisons sont momentanément suspendues.')
+                            ->required(),
+                    ])
+                    ->modalHeading(fn (City $record): string => $record->emergency_mode_active ? "Lever l'urgence sur {$record->name}" : "Déclencher l'urgence sur {$record->name}")
+                    ->modalSubmitActionLabel(fn (City $record): string => $record->emergency_mode_active ? 'Confirmer la réouverture' : 'Confirmer l\'arrêt d\'urgence')
+                    ->action(function (City $record, array $data): void {
+                        $newStatus = ! $record->emergency_mode_active;
+                        $record->update([
+                            'emergency_mode_active' => $newStatus,
+                            'emergency_mode_activated_at' => $newStatus ? now() : null,
+                            'emergency_message' => $newStatus ? ($data['message'] ?? 'Service temporairement interrompu') : null,
+                        ]);
+                        Notification::make()
+                            ->title("Mode Urgence {$record->name} : " . ($newStatus ? 'Enclenché' : 'Levé'))
+                            ->color($newStatus ? 'danger' : 'success')
+                            ->send();
+                    }),
+            ])
+            ->paginated(false);
     }
 }
-
