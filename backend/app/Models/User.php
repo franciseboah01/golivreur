@@ -16,6 +16,26 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
 {
     use HasFactory, SoftDeletes;
 
+    public const ADMIN_ROLES = [
+        'super_admin',
+        'dg_national',
+        'national_finance',
+        'national_tech',
+        'national_support',
+        'city_manager',
+        'city_finance',
+        'city_support',
+        'city_agent',
+        'admin',
+    ];
+
+    public const USER_ROLES = [
+        'client',
+        'merchant',
+        'driver',
+        'courier',
+    ];
+
     protected $fillable = [
         'name', 'phone', 'role', 'city_id',
         'device_token', 'session_token', 'is_active',

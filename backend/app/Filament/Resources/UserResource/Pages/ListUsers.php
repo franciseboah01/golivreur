@@ -16,7 +16,7 @@ class ListUsers extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make()->label('Créer un utilisateur'),
+            Actions\CreateAction::make()->label('Nouvel Utilisateur'),
         ];
     }
 
@@ -24,7 +24,7 @@ class ListUsers extends ListRecords
     {
         return [
             'all' => Tab::make('Tous les Utilisateurs')
-                ->badge(User::count()),
+                ->badge(User::whereNotIn('role', User::ADMIN_ROLES)->count()),
             'clients' => Tab::make('Clients')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('role', 'client'))
                 ->badge(User::where('role', 'client')->count()),
@@ -32,11 +32,8 @@ class ListUsers extends ListRecords
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('role', 'merchant'))
                 ->badge(User::where('role', 'merchant')->count()),
             'couriers' => Tab::make('Livreurs')
-                ->modifyQueryUsing(fn (Builder $query) => $query->where('role', 'courier'))
-                ->badge(User::where('role', 'courier')->count()),
-            'admins' => Tab::make('Administrateurs')
-                ->modifyQueryUsing(fn (Builder $query) => $query->where('role', 'admin'))
-                ->badge(User::where('role', 'admin')->count()),
+                ->modifyQueryUsing(fn (Builder $query) => $query->whereIn('role', ['driver', 'courier']))
+                ->badge(User::whereIn('role', ['driver', 'courier'])->count()),
         ];
     }
 }

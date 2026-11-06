@@ -24,7 +24,7 @@ class CityResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Villes & Zones d\'Opération';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 8;
 
     public static function form(Form $form): Form
     {

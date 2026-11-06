@@ -23,9 +23,15 @@ class UserResource extends Resource
 
     protected static ?string $modelLabel = 'Utilisateur';
 
-    protected static ?string $pluralModelLabel = 'Utilisateurs';
+    protected static ?string $pluralModelLabel = 'Comptes Utilisateurs';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 7;
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->whereNotIn('role', User::ADMIN_ROLES);
+    }
 
     public static function form(Form $form): Form
     {
@@ -47,12 +53,11 @@ class UserResource extends Resource
                             ->email()
                             ->maxLength(255),
                         Forms\Components\Select::make('role')
-                            ->label('Rôle sur la plateforme')
+                            ->label('Type de compte')
                             ->options([
                                 'client' => 'Client Final',
-                                'courier' => 'Livreur Partenaire',
                                 'merchant' => 'Commerce Partenaire',
-                                'admin' => 'Administrateur Plateforme',
+                                'driver' => 'Livreur Partenaire',
                             ])
                             ->required(),
                         Forms\Components\Select::make('city_id')
@@ -88,19 +93,17 @@ class UserResource extends Resource
                     ->placeholder('-'),
 
                 Tables\Columns\TextColumn::make('role')
-                    ->label('Rôle')
+                    ->label('Type Utilisateur')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'admin' => 'danger',
                         'merchant' => 'warning',
-                        'courier' => 'info',
+                        'driver', 'courier' => 'info',
                         'client' => 'primary',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'admin' => 'Administrateur',
-                        'merchant' => 'Commerce',
-                        'courier' => 'Livreur',
+                        'merchant' => 'Commerçant',
+                        'driver', 'courier' => 'Livreur',
                         'client' => 'Client',
                         default => ucfirst($state),
                     })
@@ -127,12 +130,11 @@ class UserResource extends Resource
             ->defaultSort('created_at', 'asc')
             ->filters([
                 Tables\Filters\SelectFilter::make('role')
-                    ->label('Type d\'Utilisateur / Rôle')
+                    ->label('Filtrer par Catégorie')
                     ->options([
                         'client' => 'Clients uniquement',
                         'merchant' => 'Commerçants uniquement',
-                        'courier' => 'Livreurs uniquement',
-                        'admin' => 'Administrateurs',
+                        'driver' => 'Livreurs uniquement',
                     ]),
                 Tables\Filters\Filter::make('created_at')
                     ->form([
