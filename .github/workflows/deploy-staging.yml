@@ -1,0 +1,246 @@
+name: "CI + Déploiement Staging"
+
+# Déclenché sur chaque push sur la branche develop
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ develop ]
+
+# Annuler le pipeline en cours si un nouveau push arrive (économie de minutes)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ── Job 1 : Tests Laravel (Pest + Larastan) ──────────────────────────────────
+  tests-backend:
+    name: "Tests Backend Laravel"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    services:
+      # PostgreSQL pour les tests
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: golivreur_test
+          POSTGRES_USER: golivreur_user
+          POSTGRES_PASSWORD: secret_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      # Redis pour les tests de queue
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: "📥 Checkout du code"
+        uses: actions/checkout@v4
+
+      - name: "🐘 Setup PHP 8.3"
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo, pdo_pgsql, pgsql, redis, gd, intl, zip, bcmath, pcntl
+          coverage: xdebug
+          tools: composer:v2
+
+      - name: "📦 Cache Composer"
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: "📦 Installation des dépendances PHP"
+        run: composer install --no-interaction --prefer-dist --no-scripts
+
+      - name: "⚙️ Configuration de l'environnement de test"
+        run: |
+          cp .env.example .env.testing
+          # Surcharger avec les valeurs CI
+          echo "APP_ENV=testing"              >> .env.testing
+          echo "APP_KEY="                     >> .env.testing
+          echo "DB_CONNECTION=pgsql"          >> .env.testing
+          echo "DB_HOST=127.0.0.1"            >> .env.testing
+          echo "DB_PORT=5432"                 >> .env.testing
+          echo "DB_DATABASE=golivreur_test"   >> .env.testing
+          echo "DB_USERNAME=golivreur_user"   >> .env.testing
+          echo "DB_PASSWORD=secret_test"      >> .env.testing
+          echo "REDIS_HOST=127.0.0.1"         >> .env.testing
+          echo "REDIS_PORT=6379"              >> .env.testing
+          echo "QUEUE_CONNECTION=sync"        >> .env.testing
+          echo "CACHE_DRIVER=array"           >> .env.testing
+          echo "SESSION_DRIVER=array"         >> .env.testing
+          echo "MAIL_MAILER=array"            >> .env.testing
+          echo "JWT_SECRET=ci-test-secret-key-not-used-in-prod" >> .env.testing
+          php artisan key:generate --env=testing
+
+      - name: "🗃️ Migrations de test"
+        run: php artisan migrate --env=testing --force
+
+      - name: "🔍 Analyse statique Larastan (niveau 5)"
+        run: ./vendor/bin/phpstan analyse --level=5 --memory-limit=512M
+        # ⚠️ BLOQUANT : un échec ici arrête le pipeline
+
+      - name: "🧪 Tests Pest — couverture globale (min 70%)"
+        run: |
+          php artisan test \
+            --env=testing \
+            --parallel \
+            --coverage \
+            --min=70 \
+            --coverage-clover=coverage.xml
+        # ⚠️ BLOQUANT : un échec ici arrête le pipeline
+
+      - name: "🧪 Tests critiques — paiements + codes + permissions (min 90%)"
+        run: |
+          php artisan test \
+            --env=testing \
+            --filter="WalletServiceTest|PermissionsTest|GoColisTest|AuthTest" \
+            --coverage \
+            --min=90
+        # ⚠️ BLOQUANT : couverture 90% obligatoire sur les modules critiques
+
+      - name: "📊 Upload rapport de couverture"
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          file: coverage.xml
+          fail_ci_if_error: false
+
+  # ── Job 2 : Analyse Flutter (3 apps) ─────────────────────────────────────────
+  analyse-flutter:
+    name: "Analyse Flutter (3 apps)"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: "📥 Checkout du code"
+        uses: actions/checkout@v4
+
+      - name: "🐦 Setup Flutter 3.19.x"
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.19.6"
+          channel: "stable"
+          cache: true
+
+      - name: "📦 pub get — Package core"
+        working-directory: flutter/packages/core
+        run: flutter pub get
+
+      - name: "🔍 flutter analyze — Package core"
+        working-directory: flutter/packages/core
+        run: flutter analyze --fatal-infos
+        # ⚠️ BLOQUANT
+
+      - name: "📦 pub get — App Client"
+        working-directory: flutter/apps/golivreur_client
+        run: flutter pub get
+
+      - name: "🔍 flutter analyze — App Client"
+        working-directory: flutter/apps/golivreur_client
+        run: flutter analyze --fatal-infos
+        # ⚠️ BLOQUANT
+
+      - name: "📦 pub get — App Business"
+        working-directory: flutter/apps/golivreur_business
+        run: flutter pub get
+
+      - name: "🔍 flutter analyze — App Business"
+        working-directory: flutter/apps/golivreur_business
+        run: flutter analyze --fatal-infos
+        # ⚠️ BLOQUANT
+
+      - name: "📦 pub get — App Driver"
+        working-directory: flutter/apps/golivreur_driver
+        run: flutter pub get
+
+      - name: "🔍 flutter analyze — App Driver"
+        working-directory: flutter/apps/golivreur_driver
+        run: flutter analyze --fatal-infos
+        # ⚠️ BLOQUANT
+
+  # ── Job 3 : Déploiement Staging (seulement si tous les tests passent) ─────────
+  deploy-staging:
+    name: "Déploiement Staging"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    needs: [ tests-backend, analyse-flutter ]  # Dépend des deux jobs précédents
+    # Déployer uniquement sur les pushs (pas les PRs)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+
+    environment:
+      name: staging
+      url: https://staging.golivreur.ci
+
+    steps:
+      - name: "📥 Checkout du code"
+        uses: actions/checkout@v4
+
+      - name: "🔑 Setup clé SSH"
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+
+      - name: "🚀 Déploiement sur staging"
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+            set -e
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "  GoLivreur — Déploiement Staging"
+            echo "  $(date '+%d/%m/%Y %H:%M:%S')"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            cd /var/www/staging
+
+            # Récupérer le code
+            git fetch origin develop
+            git checkout develop
+            git pull origin develop
+
+            # Installer les dépendances PHP
+            composer install --no-interaction --no-dev --prefer-dist --optimize-autoloader
+
+            # Exécuter les migrations (forcé en staging)
+            php artisan migrate --force
+
+            # Vider et reconstruire les caches
+            php artisan optimize:clear
+            php artisan optimize
+
+            # Redémarrer les workers Horizon
+            php artisan queue:restart
+
+            echo "✅ Staging déployé avec succès"
+          ENDSSH
+
+      - name: "🔥 Test de smoke staging"
+        run: |
+          sleep 10  # Attendre que les services redémarrent
+          RESPONSE=$(curl -sf --max-time 10 https://staging.golivreur.ci/api/v1/health 2>&1)
+          echo "Réponse API : $RESPONSE"
+          echo "$RESPONSE" | grep -q '"status":"ok"' \
+            && echo "✅ API staging opérationnelle" \
+            || (echo "❌ API staging NE RÉPOND PAS" && exit 1)
+
+      - name: "📧 Notification succès"
+        if: success()
+        run: |
+          echo "Staging déployé avec succès le $(date)" \
+          | mail -s "✅ GoLivreur Staging — Déploiement OK" ${{ secrets.ADMIN_EMAIL }} || true

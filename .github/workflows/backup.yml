@@ -1,0 +1,39 @@
+name: "Backup PostgreSQL automatique"
+
+# Exécuter à 3h00 UTC (= 3h00 Abidjan, UTC+0)
+on:
+  schedule:
+    - cron: '0 3 * * *'   # Tous les jours à 3h00 UTC
+  # Permettre le déclenchement manuel depuis l'interface GitHub
+  workflow_dispatch:
+    inputs:
+      raison:
+        description: 'Raison du backup manuel'
+        required: false
+        default: 'Backup manuel déclenché depuis GitHub'
+
+jobs:
+  backup:
+    name: "Backup PostgreSQL → DO Spaces"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: "🔑 Setup clé SSH"
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+
+      - name: "💾 Exécuter le backup sur le VPS"
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
+             ADMIN_EMAIL='${{ secrets.ADMIN_EMAIL }}' \
+             bash /var/www/scripts/backup_bdd.sh"
+
+      - name: "📧 Notification si échec"
+        if: failure()
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "echo 'ERREUR : Backup automatique échoué le $(date)' \
+             | mail -s '🚨 GoLivreur — BACKUP ÉCHOUÉ' ${{ secrets.ADMIN_EMAIL }}" || true

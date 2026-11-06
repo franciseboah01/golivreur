@@ -24,6 +24,7 @@ class Courier extends Model
         'current_lng',
         'last_location_at',
         'average_rating',
+        'total_ratings',
         'completed_deliveries',
     ];
 
@@ -35,6 +36,7 @@ class Courier extends Model
         'current_lng'          => 'float',
         'last_location_at'     => 'datetime',
         'average_rating'       => 'float',
+        'total_ratings'        => 'integer',
         'completed_deliveries' => 'integer',
     ];
 

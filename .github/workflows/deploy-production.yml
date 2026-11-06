@@ -1,0 +1,285 @@
+name: "CI + Déploiement Production"
+
+# Déclenché sur les merges vers main
+# ⚠️ L'approbation manuelle de Francis EBOAH est requise avant le déploiement
+on:
+  push:
+    branches: [ main ]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false  # Ne jamais annuler un déploiement production en cours
+
+jobs:
+
+  # ── Job 1 : Tests complets (identiques au pipeline develop) ──────────────────
+  tests-backend:
+    name: "Tests Backend Laravel"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: golivreur_test
+          POSTGRES_USER: golivreur_user
+          POSTGRES_PASSWORD: secret_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo, pdo_pgsql, pgsql, redis, gd, intl, zip, bcmath, pcntl
+          coverage: xdebug
+          tools: composer:v2
+
+      - uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+
+      - run: composer install --no-interaction --prefer-dist --no-scripts
+
+      - name: "Configuration test"
+        run: |
+          cp .env.example .env.testing
+          echo "APP_ENV=testing"              >> .env.testing
+          echo "APP_KEY="                     >> .env.testing
+          echo "DB_CONNECTION=pgsql"          >> .env.testing
+          echo "DB_HOST=127.0.0.1"            >> .env.testing
+          echo "DB_PORT=5432"                 >> .env.testing
+          echo "DB_DATABASE=golivreur_test"   >> .env.testing
+          echo "DB_USERNAME=golivreur_user"   >> .env.testing
+          echo "DB_PASSWORD=secret_test"      >> .env.testing
+          echo "REDIS_HOST=127.0.0.1"         >> .env.testing
+          echo "QUEUE_CONNECTION=sync"        >> .env.testing
+          echo "CACHE_DRIVER=array"           >> .env.testing
+          echo "MAIL_MAILER=array"            >> .env.testing
+          echo "JWT_SECRET=ci-test-secret"    >> .env.testing
+          php artisan key:generate --env=testing
+
+      - run: php artisan migrate --env=testing --force
+      - run: ./vendor/bin/phpstan analyse --level=5 --memory-limit=512M
+      - run: |
+          php artisan test --env=testing --parallel --coverage --min=70
+          php artisan test --env=testing \
+            --filter="WalletServiceTest|PermissionsTest|GoColisTest|AuthTest" \
+            --coverage --min=90
+
+  # ── Job 2 : Analyse Flutter ──────────────────────────────────────────────────
+  analyse-flutter:
+    name: "Analyse Flutter (3 apps)"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.19.6"
+          channel: "stable"
+          cache: true
+      - run: |
+          cd flutter/packages/core && flutter pub get && flutter analyze --fatal-infos
+          cd ../../apps/golivreur_client && flutter pub get && flutter analyze --fatal-infos
+          cd ../golivreur_business && flutter pub get && flutter analyze --fatal-infos
+          cd ../golivreur_driver && flutter pub get && flutter analyze --fatal-infos
+
+  # ── Job 3 : Approbation manuelle de Francis EBOAH ─────────────────────────────
+  # ⚠️ CE JOB ATTEND VOTRE APPROBATION DANS L'INTERFACE GITHUB
+  # Vous recevrez une notification email/GitHub
+  # Allez sur : https://github.com/[org]/golivreur/actions
+  # Cliquez sur "Review deployments" → "Approve and deploy"
+  approbation-fondateur:
+    name: "⏳ Attente approbation — Francis EBOAH"
+    runs-on: ubuntu-22.04
+    needs: [ tests-backend, analyse-flutter ]
+    timeout-minutes: 60  # Expire après 1h sans approbation
+
+    # Environnement "production" avec protection d'approbation requise
+    # À configurer dans GitHub : Settings > Environments > production
+    # Ajouter "francis.eboah" comme reviewer requis
+    environment:
+      name: production
+      url: https://golivreur.ci
+
+    steps:
+      - name: "✅ Approbation reçue — Déploiement autorisé"
+        run: |
+          echo "Déploiement production approuvé par Francis EBOAH"
+          echo "Démarrage à $(date)"
+
+  # ── Job 4 : Déploiement production (à 3h du matin ou immédiat si hotfix) ─────
+  deploy-production:
+    name: "🚀 Déploiement Production"
+    runs-on: ubuntu-22.04
+    needs: [ approbation-fondateur ]
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "🔑 Setup clé SSH"
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+
+      - name: "⏰ Vérification heure de déploiement (3h du matin Abidjan)"
+        run: |
+          # Récupérer l'heure actuelle en UTC (Abidjan = UTC+0)
+          HEURE=$(TZ='Africa/Abidjan' date +%H)
+          echo "Heure actuelle à Abidjan : ${HEURE}h"
+
+          # Si l'heure n'est pas entre 3h et 4h, vérifier si c'est un hotfix
+          if [ "$HEURE" -lt "3" ] || [ "$HEURE" -gt "4" ]; then
+            # Vérifier si le message de commit contient [hotfix]
+            COMMIT_MSG="${{ github.event.head_commit.message }}"
+            if echo "$COMMIT_MSG" | grep -q "\[hotfix\]"; then
+              echo "⚡ Hotfix détecté — déploiement immédiat autorisé"
+            else
+              echo "⏰ Heure normale de déploiement : 3h-4h (Abidjan)"
+              echo "   Heure actuelle : ${HEURE}h — attente..."
+              # Calculer les secondes restantes jusqu'à 3h
+              SECONDES_VERS_3H=$(TZ='Africa/Abidjan' date -d "03:00 tomorrow" +%s)
+              MAINTENANT=$(date +%s)
+              ATTENTE=$((SECONDES_VERS_3H - MAINTENANT))
+              if [ $ATTENTE -gt 0 ] && [ $ATTENTE -lt 7200 ]; then
+                sleep $ATTENTE
+              fi
+            fi
+          else
+            echo "✅ Heure de déploiement OK (${HEURE}h)"
+          fi
+
+      - name: "🚀 Déploiement production"
+        id: deploy
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+            set -e
+            cd /var/www/production
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "  GoLivreur — DÉPLOIEMENT PRODUCTION"
+            echo "  $(date '+%d/%m/%Y %H:%M:%S')"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # ── 1. Sauvegarder le commit actuel pour rollback éventuel
+            COMMIT_AVANT=$(git rev-parse HEAD)
+            echo "Commit avant déploiement : $COMMIT_AVANT"
+            echo $COMMIT_AVANT > /tmp/golivreur_last_deploy_commit
+
+            # ── 2. Backup PostgreSQL OBLIGATOIRE avant tout changement
+            echo "📦 Backup pre-déploiement..."
+            BACKUP_FILE="/tmp/golivreur_pre_deploy_$(date +%Y%m%d_%H%M%S).sql.gz"
+            PGPASSWORD="$DB_PASSWORD" pg_dump \
+              -h 127.0.0.1 -U golivreur_user -d golivreur_prod \
+              | gzip > "$BACKUP_FILE"
+            rclone copy "$BACKUP_FILE" "spaces:golivreur/backups/pre-deploy/"
+            rm -f "$BACKUP_FILE"
+            echo "✅ Backup pre-déploiement OK"
+
+            # ── 3. Récupérer le nouveau code
+            git fetch origin main
+            git checkout main
+            git pull origin main
+
+            # ── 4. Installer les dépendances
+            composer install --no-interaction --no-dev --prefer-dist --optimize-autoloader
+
+            # ── 5. Mode maintenance (2-3 minutes max)
+            php artisan down --message="Mise à jour en cours — retour dans 2 minutes" --retry=60
+
+            # ── 6. Migrations
+            php artisan migrate --force
+
+            # ── 7. Reconstruire les caches
+            php artisan optimize:clear
+            php artisan optimize
+
+            # ── 8. Redémarrer les workers
+            php artisan queue:restart
+
+            # ── 9. Relancer l'application
+            php artisan up
+
+            echo "✅ Déploiement production terminé"
+            echo "Commit après déploiement : $(git rev-parse HEAD)"
+          ENDSSH
+
+      - name: "🔥 Tests de smoke production"
+        id: smoke_test
+        run: |
+          sleep 15  # Laisser les services redémarrer
+          set +e  # Ne pas arrêter immédiatement en cas d'erreur
+
+          ESSAIS=3
+          for i in $(seq 1 $ESSAIS); do
+            echo "Test $i/$ESSAIS..."
+            RESPONSE=$(curl -sf --max-time 15 https://golivreur.ci/api/v1/health 2>&1)
+            if echo "$RESPONSE" | grep -q '"status":"ok"'; then
+              echo "✅ API production opérationnelle"
+              echo "smoke_test_passed=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "❌ API production NE RÉPOND PAS après $ESSAIS tentatives"
+          echo "smoke_test_passed=false" >> $GITHUB_OUTPUT
+          exit 1
+
+      # ── Rollback automatique si les smoke tests échouent ───────────────────
+      - name: "⚠️ ROLLBACK AUTOMATIQUE (smoke tests échoués)"
+        if: failure() && steps.smoke_test.outputs.smoke_test_passed == 'false'
+        run: |
+          echo "🚨 ROLLBACK AUTOMATIQUE EN COURS..."
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+            set -e
+            cd /var/www/production
+
+            # Revenir au commit précédent
+            COMMIT_AVANT=$(cat /tmp/golivreur_last_deploy_commit 2>/dev/null || echo "")
+            if [ -n "$COMMIT_AVANT" ]; then
+              git checkout $COMMIT_AVANT
+              composer install --no-interaction --no-dev --prefer-dist --optimize-autoloader
+              php artisan optimize:clear
+              php artisan optimize
+              php artisan queue:restart
+              php artisan up 2>/dev/null || true
+              echo "✅ Rollback effectué — retour au commit $COMMIT_AVANT"
+            else
+              echo "❌ Impossible de rollback — commit précédent introuvable"
+            fi
+          ENDSSH
+
+      - name: "📧 Notification résultat déploiement"
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            SUJET="✅ GoLivreur Production — Déploiement OK"
+            CORPS="Déploiement production réussi le $(date). Commit : ${{ github.sha }}"
+          else
+            SUJET="🚨 GoLivreur Production — DÉPLOIEMENT ÉCHOUÉ + ROLLBACK"
+            CORPS="ÉCHEC du déploiement production le $(date).\nCommit : ${{ github.sha }}\nRollback automatique effectué.\nVérifiez immédiatement : https://golivreur.ci/horizon"
+          fi
+
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "echo '$CORPS' | mail -s '$SUJET' ${{ secrets.ADMIN_EMAIL }}" || true

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Client\ClientController;
 use App\Http\Controllers\Api\V1\Driver\DriverController;
 use App\Http\Controllers\Api\V1\GoColis\ParcelController;
 use App\Http\Controllers\Api\V1\Merchant\MerchantController;
+use App\Http\Controllers\Api\V1\RatingController;
 use App\Http\Controllers\Api\V1\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -56,6 +57,7 @@ Route::middleware('auth:api')->group(function () {
         Route::get('parcels/{parcel}', [ParcelController::class, 'showClient']);
         Route::get('notifications', [ClientController::class, 'notifications']);
         Route::put('notifications/{notification}/read', [ClientController::class, 'markNotificationRead']);
+        Route::post('ratings', [RatingController::class, 'store']);
     });
 
     // ─── Merchant (GoShop Business) ──────────────────────────────────────────
@@ -94,6 +96,7 @@ Route::middleware('auth:api')->group(function () {
         Route::get('dashboard', [AdminController::class, 'dashboard']);
         Route::get('orders', [AdminController::class, 'orders']);
         Route::post('orders/{order}/refund', [AdminController::class, 'refund']);
+        Route::post('parcels/{parcel}/refund', [AdminController::class, 'parcelRefund']);
         Route::post('cities/{city}/emergency-mode', [AdminController::class, 'emergencyMode']);
         Route::post('webhooks/{id}/replay', [WebhookController::class, 'rejouer']);
     });

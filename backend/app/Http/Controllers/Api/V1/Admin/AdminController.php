@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\{City, Courier, Merchant, Order, User};
+use App\Models\{City, Courier, Merchant, Order, Parcel, User};
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,6 +73,39 @@ class AdminController extends Controller
             'succes'  => true,
             'donnees' => $tx,
             'message' => 'Remboursement effectué avec succès.',
+        ]);
+    }
+
+    public function parcelRefund(Request $request, Parcel $parcel, WalletService $walletService): JsonResponse
+    {
+        $user = auth()->user();
+        $montant = (float) $request->input('montant', $parcel->declared_value);
+        $plafond = self::PLAFONDS_REMBOURSEMENT[$user->role] ?? 0;
+
+        if ($montant > $plafond || $plafond === 0) {
+            return response()->json([
+                'succes'  => false,
+                'message' => 'Plafond de remboursement insuffisant pour votre rôle.',
+            ], 403);
+        }
+
+        $ownerType = $request->input('owner_type', 'courier');
+        $ownerId = $request->input('owner_id', $parcel->courier_id ?? $parcel->sender_id);
+
+        $tx = $walletService->effectuerRemboursement(
+            ownerType: $ownerType,
+            ownerId: (int) $ownerId,
+            montant: $montant,
+            description: $request->input('raison', 'Indemnisation assurance GoColis #' . $parcel->id),
+            adminId: $user->id,
+        );
+
+        $parcel->update(['status' => 'refunded']);
+
+        return response()->json([
+            'succes'  => true,
+            'donnees' => $tx,
+            'message' => 'Indemnisation assurance effectuée avec succès.',
         ]);
     }
 
