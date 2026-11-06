@@ -88,11 +88,12 @@ Ces points ont été identifiés comme sources probables de bugs pendant la phas
 **Prévention :** Toujours valider les conditions temporelles au sein du `handle()` des jobs à délai pour immuniser contre l'exécution immédiate en mode synchrone ou lors des tests.
 **Fichiers concernés :** `backend/app/Jobs/AnnulerCommandeTimeout.php`.
 
-### [2026-11-06] — [Sprint 6/Web Admin] Erreur SQLSTATE[42P01] (table cache manquante pour Livewire)
+### [2026-11-06] — [Sprint 6/Web Admin] Erreur SQLSTATE[42703] (colonne remember_token manquante sur users)
 **Statut :** Résolu
-**Symptôme :** `SQLSTATE[42P01]: Undefined table: 7 ERREUR: la relation « cache » n'existe pas LINE 1: select * from "cache" where "key" in (golivreur-cache-livewire-rate-limiter...)` lors de la tentative de connexion sur l'interface d'administration Filament.
-**Cause racine :** Sous Laravel 11/12, le store de cache configuré par défaut est `database`. Le rate limiter de Livewire (qui gère la protection anti-brute force sur le formulaire de login Filament) interroge donc la table PostgreSQL `cache`, qui n'avait pas encore été migrée.
-**Solution appliquée :** Génération et exécution de la migration de cache avec `php artisan cache:table` et `php artisan migrate`, créant les tables `cache` et `cache_locks`.
-**Prévention :** Toujours exécuter `php artisan cache:table` et `php artisan session:table` dès l'installation d'une interface Livewire / Filament lorsque le driver de base de données est actif.
-**Fichiers concernés :** `backend/database/migrations/2026_11_06_123840_create_cache_table.php`.
+**Symptôme :** `SQLSTATE[42703]: Undefined column: 7 ERREUR: la colonne « remember_token » de la relation « users » n'existe pas LINE 1: update "users" set "remember_token" = ... where "id" = 1` lors de la connexion web sur Filament.
+**Cause racine :** L'authentification par session web de Laravel (avec ou sans l'option "Se souvenir de moi") tente de mettre à jour le jeton `remember_token` sur la table `users`. Cette colonne n'était pas présente dans la migration initiale `create_users_table.php`.
+**Solution appliquée :** Création et exécution de la migration `2026_11_06_124333_add_remember_token_to_users_table.php` ajoutant `$table->rememberToken()` sur `users`.
+**Prévention :** Toujours inclure `$table->rememberToken()` sur la table `users` dès lors qu'un système d'authentification web/session est utilisé conjointement aux tokens API JWT.
+**Fichiers concernés :** `backend/database/migrations/2026_11_06_124333_add_remember_token_to_users_table.php`.
+
 
