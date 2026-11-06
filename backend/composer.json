@@ -1,7 +1,7 @@
 {
     "name": "golivreur/backend",
     "type": "project",
-    "description": "GoLivreur v5.0 — Backend Laravel API & Administration Filament",
+    "description": "GoLivreur v5.0 \u2014 Backend Laravel API & Administration Filament",
     "keywords": [
         "laravel",
         "golivreur",
@@ -44,7 +44,8 @@
     "scripts": {
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi"
+            "@php artisan package:discover --ansi",
+            "@php artisan filament:upgrade"
         ],
         "test": "pest",
         "stan": "phpstan analyse"
@@ -66,4 +67,3 @@
     "minimum-stability": "stable",
     "prefer-stable": true
 }
-
