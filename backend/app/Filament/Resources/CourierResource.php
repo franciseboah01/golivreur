@@ -3,15 +3,12 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CourierResource\Pages;
-use App\Filament\Resources\CourierResource\RelationManagers;
 use App\Models\Courier;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CourierResource extends Resource
 {
@@ -21,9 +18,11 @@ class CourierResource extends Resource
 
     protected static ?string $navigationGroup = 'Partenaires';
 
-    protected static ?string $modelLabel = 'Livreur';
+    protected static ?string $navigationLabel = 'Livreurs Partenaires';
 
-    protected static ?string $pluralModelLabel = 'Livreurs';
+    protected static ?string $modelLabel = 'Livreur Partenaire';
+
+    protected static ?string $pluralModelLabel = 'Livreurs Partenaires';
 
     protected static ?int $navigationSort = 4;
 
@@ -31,49 +30,46 @@ class CourierResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Select::make('user_id')
-                    ->relationship('user', 'name')
-                    ->required(),
-                Forms\Components\Select::make('city_id')
-                    ->relationship('city', 'name')
-                    ->required(),
-                Forms\Components\Toggle::make('is_online')
-                    ->required(),
-                Forms\Components\TextInput::make('current_lat')
-                    ->numeric(),
-                Forms\Components\TextInput::make('current_lng')
-                    ->numeric(),
-                Forms\Components\DateTimePicker::make('location_updated_at'),
-                Forms\Components\TextInput::make('vehicle_type')
-                    ->required()
-                    ->maxLength(50)
-                    ->default('moto'),
-                Forms\Components\TextInput::make('vehicle_plate')
-                    ->maxLength(20),
-                Forms\Components\Toggle::make('is_active')
-                    ->required(),
-                Forms\Components\DateTimePicker::make('activated_at'),
-                Forms\Components\TextInput::make('activated_by')
-                    ->numeric(),
-                Forms\Components\TextInput::make('id_card_number')
-                    ->maxLength(50),
-                Forms\Components\TextInput::make('id_card_photo_url')
-                    ->maxLength(500),
-                Forms\Components\TextInput::make('photo_url')
-                    ->maxLength(500),
-                Forms\Components\TextInput::make('consecutive_refusals')
-                    ->required()
-                    ->numeric()
-                    ->default(0),
-                Forms\Components\DateTimePicker::make('penalty_until'),
-                Forms\Components\TextInput::make('average_rating')
-                    ->required()
-                    ->numeric()
-                    ->default(0),
-                Forms\Components\TextInput::make('total_ratings')
-                    ->required()
-                    ->numeric()
-                    ->default(0),
+                Forms\Components\Section::make('Identité & Profil')
+                    ->schema([
+                        Forms\Components\Select::make('user_id')
+                            ->label('Compte Utilisateur')
+                            ->relationship('user', 'name')
+                            ->searchable()
+                            ->required(),
+                        Forms\Components\Select::make('city_id')
+                            ->label('Ville d\'affectation')
+                            ->relationship('city', 'name')
+                            ->required(),
+                        Forms\Components\Select::make('vehicle_type')
+                            ->label('Type de véhicule')
+                            ->options([
+                                'moto' => 'Moto / Scooter',
+                                'velo' => 'Vélo',
+                                'voiture' => 'Voiture',
+                            ])
+                            ->required(),
+                        Forms\Components\TextInput::make('vehicle_plate')
+                            ->label('Numéro d\'immatriculation')
+                            ->maxLength(30),
+                        Forms\Components\TextInput::make('id_card_number')
+                            ->label('N° Pièce d\'identité (CNI / Passeport)')
+                            ->maxLength(50),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Statut & Disponibilité')
+                    ->schema([
+                        Forms\Components\Toggle::make('is_online')
+                            ->label('Actuellement en ligne et disponible'),
+                        Forms\Components\Toggle::make('is_active')
+                            ->label('Profil vérifié et validé par l\'administration'),
+                        Forms\Components\TextInput::make('consecutive_refusals')
+                            ->label('Refus consécutifs enregistrés')
+                            ->numeric()
+                            ->default(0),
+                        Forms\Components\DateTimePicker::make('penalty_until')
+                            ->label('Pénalité / Suspension temporaire jusqu\'au'),
+                    ])->columns(2),
             ]);
     }
 
@@ -81,84 +77,104 @@ class CourierResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('id')
+                    ->label('N°')
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('user.name')
-                    ->numeric()
+                    ->label('Livreur')
+                    ->searchable()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('user.phone')
+                    ->label('Téléphone')
+                    ->searchable(),
+
                 Tables\Columns\TextColumn::make('city.name')
-                    ->numeric()
+                    ->label('Ville')
                     ->sortable(),
-                Tables\Columns\IconColumn::make('is_online')
-                    ->boolean(),
-                Tables\Columns\TextColumn::make('current_lat')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('current_lng')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('location_updated_at')
-                    ->dateTime()
-                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('vehicle_type')
-                    ->searchable(),
+                    ->label('Véhicule')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'moto' => 'Moto',
+                        'velo' => 'Vélo',
+                        'voiture' => 'Voiture',
+                        default => ucfirst($state),
+                    }),
+
                 Tables\Columns\TextColumn::make('vehicle_plate')
-                    ->searchable(),
+                    ->label('Plaque')
+                    ->searchable()
+                    ->placeholder('-'),
+
+                Tables\Columns\IconColumn::make('is_online')
+                    ->label('En Ligne')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-signal')
+                    ->falseIcon('heroicon-o-no-symbol')
+                    ->trueColor('success')
+                    ->falseColor('gray'),
+
                 Tables\Columns\IconColumn::make('is_active')
-                    ->boolean(),
-                Tables\Columns\TextColumn::make('activated_at')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('activated_by')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('id_card_number')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('id_card_photo_url')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('photo_url')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('consecutive_refusals')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('penalty_until')
-                    ->dateTime()
-                    ->sortable(),
+                    ->label('Validé')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-badge')
+                    ->falseIcon('heroicon-o-clock')
+                    ->trueColor('success')
+                    ->falseColor('warning'),
+
                 Tables\Columns\TextColumn::make('average_rating')
-                    ->numeric()
+                    ->label('Note')
+                    ->formatStateUsing(fn ($state) => '★ ' . number_format((float) $state, 1))
                     ->sortable(),
+
                 Tables\Columns\TextColumn::make('total_ratings')
-                    ->numeric()
+                    ->label('Avis')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('deleted_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('consecutive_refusals')
+                    ->label('Refus')
+                    ->badge()
+                    ->color(fn ($state) => (int) $state >= 3 ? 'danger' : 'gray')
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->label('Date Inscription')
+                    ->dateTime('d/m/Y')
+                    ->sortable(),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
-                //
+                Tables\Filters\TernaryFilter::make('is_online')
+                    ->label('En Ligne / Hors-Ligne'),
+                Tables\Filters\TernaryFilter::make('is_active')
+                    ->label('Statut Validation'),
+                Tables\Filters\SelectFilter::make('vehicle_type')
+                    ->label('Type Véhicule')
+                    ->options([
+                        'moto' => 'Moto',
+                        'velo' => 'Vélo',
+                        'voiture' => 'Voiture',
+                    ]),
+                Tables\Filters\SelectFilter::make('city_id')
+                    ->label('Filtrer par Ville')
+                    ->relationship('city', 'name'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer la sélection'),
                 ]),
             ]);
     }
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

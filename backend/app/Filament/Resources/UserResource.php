@@ -3,15 +3,12 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
-use App\Filament\Resources\UserResource\RelationManagers;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class UserResource extends Resource
 {
@@ -21,9 +18,11 @@ class UserResource extends Resource
 
     protected static ?string $navigationGroup = 'Administration';
 
+    protected static ?string $navigationLabel = 'Comptes Utilisateurs';
+
     protected static ?string $modelLabel = 'Utilisateur';
 
-    protected static ?string $pluralModelLabel = 'Utilisateurs & Rôles';
+    protected static ?string $pluralModelLabel = 'Utilisateurs';
 
     protected static ?int $navigationSort = 6;
 
@@ -31,34 +30,37 @@ class UserResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('name')
-                    ->required()
-                    ->maxLength(150),
-                Forms\Components\TextInput::make('phone')
-                    ->tel()
-                    ->required()
-                    ->maxLength(20),
-                Forms\Components\TextInput::make('role')
-                    ->required()
-                    ->maxLength(50),
-                Forms\Components\Select::make('city_id')
-                    ->relationship('city', 'name'),
-                Forms\Components\Toggle::make('is_active')
-                    ->required(),
-                Forms\Components\DateTimePicker::make('phone_verified_at'),
-                Forms\Components\TextInput::make('avatar_url')
-                    ->maxLength(500),
-                Forms\Components\TextInput::make('email')
-                    ->email()
-                    ->maxLength(191),
-                Forms\Components\TextInput::make('password')
-                    ->password()
-                    ->maxLength(255),
-                Forms\Components\Toggle::make('two_factor_enabled')
-                    ->required(),
-                Forms\Components\TextInput::make('last_login_ip')
-                    ->maxLength(45),
-                Forms\Components\DateTimePicker::make('last_login_at'),
+                Forms\Components\Section::make('Identifiants & Contact')
+                    ->schema([
+                        Forms\Components\TextInput::make('name')
+                            ->label('Nom et Prénom')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('phone')
+                            ->label('Numéro de Téléphone (Identifiant principal)')
+                            ->tel()
+                            ->required()
+                            ->maxLength(20),
+                        Forms\Components\TextInput::make('email')
+                            ->label('Adresse Email (Optionnelle)')
+                            ->email()
+                            ->maxLength(255),
+                        Forms\Components\Select::make('role')
+                            ->label('Rôle sur la plateforme')
+                            ->options([
+                                'client' => 'Client Final',
+                                'courier' => 'Livreur Partenaire',
+                                'merchant' => 'Commerce Partenaire',
+                                'admin' => 'Administrateur Plateforme',
+                            ])
+                            ->required(),
+                        Forms\Components\Select::make('city_id')
+                            ->label('Ville de rattachement')
+                            ->relationship('city', 'name'),
+                        Forms\Components\Toggle::make('is_active')
+                            ->label('Compte autorisé et actif')
+                            ->default(true),
+                    ])->columns(2),
             ]);
     }
 
@@ -66,62 +68,90 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('id')
+                    ->label('N°')
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
+                    ->label('Nom & Prénom')
+                    ->searchable()
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('phone')
+                    ->label('Téléphone')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('role')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('city.name')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\IconColumn::make('is_active')
-                    ->boolean(),
-                Tables\Columns\TextColumn::make('phone_verified_at')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('avatar_url')
-                    ->searchable(),
+
                 Tables\Columns\TextColumn::make('email')
-                    ->searchable(),
-                Tables\Columns\IconColumn::make('two_factor_enabled')
-                    ->boolean(),
-                Tables\Columns\TextColumn::make('last_login_ip')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('last_login_at')
-                    ->dateTime()
+                    ->label('Email')
+                    ->searchable()
+                    ->placeholder('-'),
+
+                Tables\Columns\TextColumn::make('role')
+                    ->label('Rôle')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'admin' => 'danger',
+                        'merchant' => 'warning',
+                        'courier' => 'info',
+                        'client' => 'primary',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'admin' => 'Administrateur',
+                        'merchant' => 'Commerce',
+                        'courier' => 'Livreur',
+                        'client' => 'Client',
+                        default => ucfirst($state),
+                    })
                     ->sortable(),
-                Tables\Columns\TextColumn::make('deleted_at')
-                    ->dateTime()
+
+                Tables\Columns\TextColumn::make('city.name')
+                    ->label('Ville')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->placeholder('-'),
+
+                Tables\Columns\IconColumn::make('is_active')
+                    ->label('Actif')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('danger'),
+
                 Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->label('Inscrit le')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable(),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('role')
+                    ->label('Filtrer par Rôle')
+                    ->options([
+                        'admin' => 'Administrateur',
+                        'merchant' => 'Commerce',
+                        'courier' => 'Livreur',
+                        'client' => 'Client',
+                    ]),
+                Tables\Filters\TernaryFilter::make('is_active')
+                    ->label('Statut du Compte'),
+                Tables\Filters\SelectFilter::make('city_id')
+                    ->label('Filtrer par Ville')
+                    ->relationship('city', 'name'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer la sélection'),
                 ]),
             ]);
     }
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

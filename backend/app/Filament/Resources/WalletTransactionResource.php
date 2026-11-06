@@ -3,15 +3,12 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\WalletTransactionResource\Pages;
-use App\Filament\Resources\WalletTransactionResource\RelationManagers;
 use App\Models\WalletTransaction;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class WalletTransactionResource extends Resource
 {
@@ -21,9 +18,11 @@ class WalletTransactionResource extends Resource
 
     protected static ?string $navigationGroup = 'Finances';
 
-    protected static ?string $modelLabel = 'Transaction';
+    protected static ?string $navigationLabel = 'Transactions Portefeuille';
 
-    protected static ?string $pluralModelLabel = 'Transactions';
+    protected static ?string $modelLabel = 'Transaction Portefeuille';
+
+    protected static ?string $pluralModelLabel = 'Transactions Portefeuille';
 
     protected static ?int $navigationSort = 5;
 
@@ -31,36 +30,49 @@ class WalletTransactionResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Select::make('wallet_id')
-                    ->relationship('wallet', 'id')
-                    ->required(),
-                Forms\Components\TextInput::make('type')
-                    ->required()
-                    ->maxLength(50),
-                Forms\Components\TextInput::make('amount')
-                    ->required()
-                    ->numeric(),
-                Forms\Components\TextInput::make('balance_before')
-                    ->required()
-                    ->numeric(),
-                Forms\Components\TextInput::make('balance_after')
-                    ->required()
-                    ->numeric(),
-                Forms\Components\TextInput::make('reference')
-                    ->required()
-                    ->maxLength(100),
-                Forms\Components\Textarea::make('description')
-                    ->columnSpanFull(),
-                Forms\Components\TextInput::make('status')
-                    ->required()
-                    ->maxLength(30)
-                    ->default('completed'),
-                Forms\Components\TextInput::make('order_id')
-                    ->numeric(),
-                Forms\Components\TextInput::make('parcel_id')
-                    ->numeric(),
-                Forms\Components\TextInput::make('processed_by')
-                    ->numeric(),
+                Forms\Components\Section::make('Détails de l\'Opération Financière')
+                    ->schema([
+                        Forms\Components\TextInput::make('reference')
+                            ->label('Référence unique')
+                            ->required()
+                            ->maxLength(100),
+                        Forms\Components\Select::make('type')
+                            ->label('Nature de la transaction')
+                            ->options([
+                                'deposit' => 'Rechargement / Dépôt Mobile Money',
+                                'withdrawal' => 'Demande de Retrait vers Mobile Money',
+                                'order_payment' => 'Paiement commande GoShop',
+                                'parcel_payment' => 'Paiement course GoColis',
+                                'delivery_fee' => 'Rémunération course livreur',
+                                'commission' => 'Prélèvement commission plateforme',
+                                'refund' => 'Remboursement client / indemnisation',
+                                'adjustment' => 'Ajustement manuel admin',
+                            ])
+                            ->required(),
+                        Forms\Components\TextInput::make('amount')
+                            ->label('Montant (F CFA)')
+                            ->numeric()
+                            ->required(),
+                        Forms\Components\TextInput::make('balance_before')
+                            ->label('Solde initial (F CFA)')
+                            ->numeric()
+                            ->required(),
+                        Forms\Components\TextInput::make('balance_after')
+                            ->label('Nouveau solde (F CFA)')
+                            ->numeric()
+                            ->required(),
+                        Forms\Components\Select::make('status')
+                            ->label('Statut du transfert')
+                            ->options([
+                                'completed' => 'Validé avec succès',
+                                'pending' => 'En cours de traitement',
+                                'failed' => 'Échoué / Rejeté',
+                            ])
+                            ->required(),
+                        Forms\Components\Textarea::make('description')
+                            ->label('Motif / Libellé de l\'opération')
+                            ->columnSpanFull(),
+                    ])->columns(2),
             ]);
     }
 
@@ -68,60 +80,100 @@ class WalletTransactionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('wallet.id')
-                    ->numeric()
+                Tables\Columns\TextColumn::make('id')
+                    ->label('N°')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('type')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('amount')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('balance_before')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('balance_after')
-                    ->numeric()
-                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('reference')
-                    ->searchable(),
+                    ->label('Référence')
+                    ->searchable()
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('wallet_id')
+                    ->label('Portefeuille N°')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('type')
+                    ->label('Type')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'deposit' => 'Dépôt',
+                        'withdrawal' => 'Retrait',
+                        'order_payment' => 'Paiement Commande',
+                        'parcel_payment' => 'Paiement Course',
+                        'delivery_fee' => 'Course Livreur',
+                        'commission' => 'Commission',
+                        'refund' => 'Remboursement',
+                        'adjustment' => 'Ajustement',
+                        default => ucfirst($state),
+                    }),
+
+                Tables\Columns\TextColumn::make('amount')
+                    ->label('Montant')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
+                    ->color(fn ($state) => (float) $state >= 0 ? 'success' : 'danger')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('balance_after')
+                    ->label('Nouveau Solde')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('status')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('order_id')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('parcel_id')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('processed_by')
-                    ->numeric()
-                    ->sortable(),
+                    ->label('Statut')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'completed' => 'success',
+                        'pending' => 'warning',
+                        'failed' => 'danger',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'completed' => 'Validé',
+                        'pending' => 'En attente',
+                        'failed' => 'Échoué',
+                        default => $state,
+                    }),
+
                 Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->label('Date')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable(),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('type')
+                    ->label('Filtrer par Type')
+                    ->options([
+                        'deposit' => 'Dépôt',
+                        'withdrawal' => 'Retrait',
+                        'order_payment' => 'Paiement Commande',
+                        'parcel_payment' => 'Paiement Course',
+                        'delivery_fee' => 'Course Livreur',
+                        'commission' => 'Commission',
+                        'refund' => 'Remboursement',
+                    ]),
+                Tables\Filters\SelectFilter::make('status')
+                    ->label('Filtrer par Statut')
+                    ->options([
+                        'completed' => 'Validé',
+                        'pending' => 'En attente',
+                        'failed' => 'Échoué',
+                    ]),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer la sélection'),
                 ]),
             ]);
     }
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

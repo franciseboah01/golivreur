@@ -30,3 +30,4 @@ class SmsBudgetAlertMail extends Mailable
         );
     }
 }
+

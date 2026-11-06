@@ -3,15 +3,13 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\OrderResource\Pages;
-use App\Filament\Resources\OrderResource\RelationManagers;
+use App\Models\City;
 use App\Models\Order;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class OrderResource extends Resource
 {
@@ -20,6 +18,8 @@ class OrderResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
 
     protected static ?string $navigationGroup = 'Opérations GoShop';
+
+    protected static ?string $navigationLabel = 'Commandes GoShop';
 
     protected static ?string $modelLabel = 'Commande GoShop';
 
@@ -31,81 +31,109 @@ class OrderResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Select::make('client_id')
-                    ->relationship('client', 'name')
-                    ->required(),
-                Forms\Components\Select::make('merchant_id')
-                    ->relationship('merchant', 'name')
-                    ->required(),
-                Forms\Components\Select::make('courier_id')
-                    ->relationship('courier', 'id'),
-                Forms\Components\Select::make('city_id')
-                    ->relationship('city', 'name')
-                    ->required(),
-                Forms\Components\TextInput::make('status')
-                    ->required()
-                    ->maxLength(30)
-                    ->default('pending'),
-                Forms\Components\TextInput::make('products_total')
-                    ->required()
-                    ->numeric(),
-                Forms\Components\TextInput::make('delivery_fee')
-                    ->required()
-                    ->numeric(),
-                Forms\Components\TextInput::make('platform_commission')
-                    ->required()
-                    ->numeric(),
-                Forms\Components\TextInput::make('merchant_amount')
-                    ->required()
-                    ->numeric(),
-                Forms\Components\TextInput::make('courier_amount')
-                    ->required()
-                    ->numeric(),
-                Forms\Components\Toggle::make('rain_mode_applied')
-                    ->required(),
-                Forms\Components\Toggle::make('peak_hours_applied')
-                    ->required(),
-                Forms\Components\TextInput::make('payment_method')
-                    ->required()
-                    ->maxLength(30)
-                    ->default('cash'),
-                Forms\Components\TextInput::make('payment_status')
-                    ->required()
-                    ->maxLength(30)
-                    ->default('pending'),
-                Forms\Components\TextInput::make('payment_reference')
-                    ->maxLength(100),
-                Forms\Components\TextInput::make('confirmation_code')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('confirmation_attempts')
-                    ->required()
-                    ->numeric()
-                    ->default(0),
-                Forms\Components\Toggle::make('confirmation_locked')
-                    ->required(),
-                Forms\Components\TextInput::make('confirmation_unlocked_by')
-                    ->numeric(),
-                Forms\Components\Textarea::make('delivery_address')
-                    ->required()
-                    ->columnSpanFull(),
-                Forms\Components\TextInput::make('delivery_lat')
-                    ->numeric(),
-                Forms\Components\TextInput::make('delivery_lng')
-                    ->numeric(),
-                Forms\Components\TextInput::make('pickup_lat')
-                    ->numeric(),
-                Forms\Components\TextInput::make('pickup_lng')
-                    ->numeric(),
-                Forms\Components\Textarea::make('special_instructions')
-                    ->columnSpanFull(),
-                Forms\Components\DateTimePicker::make('accepted_at'),
-                Forms\Components\DateTimePicker::make('ready_at'),
-                Forms\Components\DateTimePicker::make('picked_up_at'),
-                Forms\Components\DateTimePicker::make('delivered_at'),
-                Forms\Components\DateTimePicker::make('cancelled_at'),
-                Forms\Components\TextInput::make('cancel_reason')
-                    ->maxLength(255),
+                Forms\Components\Section::make('Informations Générales')
+                    ->description('Détails de la commande et intervenants')
+                    ->schema([
+                        Forms\Components\Select::make('client_id')
+                            ->label('Client')
+                            ->relationship('client', 'name')
+                            ->searchable()
+                            ->required(),
+                        Forms\Components\Select::make('merchant_id')
+                            ->label('Commerce')
+                            ->relationship('merchant', 'name')
+                            ->searchable()
+                            ->required(),
+                        Forms\Components\Select::make('courier_id')
+                            ->label('Livreur')
+                            ->relationship('courier', 'id')
+                            ->searchable(),
+                        Forms\Components\Select::make('city_id')
+                            ->label('Ville')
+                            ->relationship('city', 'name')
+                            ->required(),
+                        Forms\Components\Select::make('status')
+                            ->label('Statut de la commande')
+                            ->options([
+                                'pending' => 'En attente',
+                                'accepted' => 'Acceptée',
+                                'preparing' => 'En préparation',
+                                'ready' => 'Prête',
+                                'delivering' => 'En cours de livraison',
+                                'delivered' => 'Livrée',
+                                'cancelled' => 'Annulée',
+                            ])
+                            ->required()
+                            ->default('pending'),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Détails Financiers (F CFA)')
+                    ->schema([
+                        Forms\Components\TextInput::make('products_total')
+                            ->label('Total articles (F CFA)')
+                            ->numeric()
+                            ->required(),
+                        Forms\Components\TextInput::make('delivery_fee')
+                            ->label('Frais de livraison (F CFA)')
+                            ->numeric()
+                            ->required(),
+                        Forms\Components\TextInput::make('platform_commission')
+                            ->label('Commission plateforme (F CFA)')
+                            ->numeric()
+                            ->required(),
+                        Forms\Components\TextInput::make('merchant_amount')
+                            ->label('Montant reversé au commerce (F CFA)')
+                            ->numeric()
+                            ->required(),
+                        Forms\Components\TextInput::make('courier_amount')
+                            ->label('Rémunération livreur (F CFA)')
+                            ->numeric()
+                            ->required(),
+                        Forms\Components\Select::make('payment_method')
+                            ->label('Mode de règlement')
+                            ->options([
+                                'cash' => 'Espèces à la livraison',
+                                'wallet' => 'Portefeuille GoLivreur',
+                                'wave' => 'Wave Mobile Money',
+                                'orange' => 'Orange Money',
+                                'mtn' => 'MTN Mobile Money',
+                                'moov' => 'Moov Money',
+                            ])
+                            ->required(),
+                        Forms\Components\Select::make('payment_status')
+                            ->label('Statut du paiement')
+                            ->options([
+                                'pending' => 'En attente',
+                                'paid' => 'Payé',
+                                'failed' => 'Échoué',
+                            ])
+                            ->required(),
+                        Forms\Components\TextInput::make('payment_reference')
+                            ->label('Référence de paiement'),
+                    ])->columns(3),
+
+                Forms\Components\Section::make('Sécurité & Livraison')
+                    ->schema([
+                        Forms\Components\Textarea::make('delivery_address')
+                            ->label('Adresse complète de livraison')
+                            ->required()
+                            ->columnSpanFull(),
+                        Forms\Components\TextInput::make('confirmation_code')
+                            ->label('Code OTP de confirmation (4 chiffres)')
+                            ->maxLength(10),
+                        Forms\Components\Toggle::make('confirmation_locked')
+                            ->label('Code bloqué après 3 tentatives erronées'),
+                        Forms\Components\Toggle::make('rain_mode_applied')
+                            ->label('Tarif Mode Pluie appliqué (+20%)'),
+                        Forms\Components\Toggle::make('peak_hours_applied')
+                            ->label('Tarif Heures de Pointe appliqué (+15%)'),
+                        Forms\Components\Textarea::make('special_instructions')
+                            ->label('Instructions spéciales')
+                            ->columnSpanFull(),
+                        Forms\Components\TextInput::make('cancel_reason')
+                            ->label('Motif d\'annulation en cas d\'échec')
+                            ->columnSpanFull(),
+                    ])->columns(3),
             ]);
     }
 
@@ -113,111 +141,148 @@ class OrderResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('id')
+                    ->label('N°')
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('client.name')
-                    ->numeric()
+                    ->label('Client')
+                    ->searchable()
                     ->sortable(),
+
                 Tables\Columns\TextColumn::make('merchant.name')
-                    ->numeric()
+                    ->label('Commerce')
+                    ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('courier.id')
-                    ->numeric()
+
+                Tables\Columns\TextColumn::make('courier.user.name')
+                    ->label('Livreur')
+                    ->placeholder('Non assigné')
                     ->sortable(),
+
                 Tables\Columns\TextColumn::make('city.name')
-                    ->numeric()
+                    ->label('Ville')
                     ->sortable(),
+
                 Tables\Columns\TextColumn::make('status')
-                    ->searchable(),
+                    ->label('Statut')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'pending' => 'gray',
+                        'accepted' => 'info',
+                        'preparing' => 'warning',
+                        'ready' => 'primary',
+                        'delivering' => 'info',
+                        'delivered' => 'success',
+                        'cancelled' => 'danger',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'pending' => 'En attente',
+                        'accepted' => 'Acceptée',
+                        'preparing' => 'En préparation',
+                        'ready' => 'Prête',
+                        'delivering' => 'En livraison',
+                        'delivered' => 'Livrée',
+                        'cancelled' => 'Annulée',
+                        default => $state,
+                    })
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('products_total')
-                    ->numeric()
+                    ->label('Articles')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
                     ->sortable(),
+
                 Tables\Columns\TextColumn::make('delivery_fee')
-                    ->numeric()
+                    ->label('Livraison')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
                     ->sortable(),
+
                 Tables\Columns\TextColumn::make('platform_commission')
-                    ->numeric()
+                    ->label('Commission')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('merchant_amount')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('courier_amount')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\IconColumn::make('rain_mode_applied')
-                    ->boolean(),
-                Tables\Columns\IconColumn::make('peak_hours_applied')
-                    ->boolean(),
+
                 Tables\Columns\TextColumn::make('payment_method')
-                    ->searchable(),
+                    ->label('Paiement')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'cash' => 'Espèces',
+                        'wallet' => 'Portefeuille',
+                        'wave' => 'Wave',
+                        'orange' => 'Orange',
+                        'mtn' => 'MTN',
+                        'moov' => 'Moov',
+                        default => $state,
+                    }),
+
                 Tables\Columns\TextColumn::make('payment_status')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('payment_reference')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('confirmation_code')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('confirmation_attempts')
-                    ->numeric()
-                    ->sortable(),
+                    ->label('État Paiement')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'paid' => 'success',
+                        'pending' => 'warning',
+                        'failed' => 'danger',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'paid' => 'Payé',
+                        'pending' => 'En attente',
+                        'failed' => 'Échoué',
+                        default => $state,
+                    }),
+
                 Tables\Columns\IconColumn::make('confirmation_locked')
-                    ->boolean(),
-                Tables\Columns\TextColumn::make('confirmation_unlocked_by')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('delivery_lat')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('delivery_lng')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('pickup_lat')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('pickup_lng')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('accepted_at')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('ready_at')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('picked_up_at')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('delivered_at')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('cancelled_at')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('cancel_reason')
-                    ->searchable(),
+                    ->label('Code Bloqué')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-lock-closed')
+                    ->falseIcon('heroicon-o-lock-open')
+                    ->trueColor('danger')
+                    ->falseColor('gray'),
+
                 Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->label('Date')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable(),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('status')
+                    ->label('Filtrer par Statut')
+                    ->options([
+                        'pending' => 'En attente',
+                        'accepted' => 'Acceptée',
+                        'preparing' => 'En préparation',
+                        'ready' => 'Prête',
+                        'delivering' => 'En livraison',
+                        'delivered' => 'Livrée',
+                        'cancelled' => 'Annulée',
+                    ]),
+                Tables\Filters\SelectFilter::make('payment_status')
+                    ->label('Filtrer par Paiement')
+                    ->options([
+                        'paid' => 'Payé',
+                        'pending' => 'En attente',
+                        'failed' => 'Échoué',
+                    ]),
+                Tables\Filters\SelectFilter::make('city_id')
+                    ->label('Filtrer par Ville')
+                    ->relationship('city', 'name'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer la sélection'),
                 ]),
             ]);
     }
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array
