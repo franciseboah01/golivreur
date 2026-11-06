@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use App\Http\Middleware\CityContextMiddleware;
 use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\SecurityHeadersMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -23,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission'   => PermissionMiddleware::class,
             'city_context' => CityContextMiddleware::class,
         ]);
+
+        $middleware->append(SecurityHeadersMiddleware::class);
 
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
