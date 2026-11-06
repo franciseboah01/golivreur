@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class CityResource extends Resource
 {
@@ -109,18 +110,43 @@ class CityResource extends Resource
                     ->limit(40),
 
                 Tables\Columns\TextColumn::make('created_at')
-                    ->label('Date Ajout')
-                    ->dateTime('d/m/Y')
+                    ->label('Date d\'Ajout')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable(),
             ])
-            ->defaultSort('name', 'asc')
+            ->defaultSort('created_at', 'asc')
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')
-                    ->label('Statut Opérationnel'),
+                    ->label('Statut Opérationnel')
+                    ->trueLabel('Villes Ouvertes / Actives')
+                    ->falseLabel('Villes Suspendues / Inactives'),
+
                 Tables\Filters\TernaryFilter::make('rain_mode_active')
-                    ->label('Mode Pluie'),
+                    ->label('Mode Pluie (+20%)')
+                    ->trueLabel('Mode Pluie Enclenché')
+                    ->falseLabel('Météo Normale'),
+
                 Tables\Filters\TernaryFilter::make('emergency_mode_active')
-                    ->label('Mode Urgence'),
+                    ->label('Mode Urgence')
+                    ->trueLabel('Mode Urgence Enclenché')
+                    ->falseLabel('Opérations Normales'),
+
+                Tables\Filters\Filter::make('created_at')
+                    ->form([
+                        Forms\Components\DatePicker::make('created_from')->label('Ajoutée à partir du'),
+                        Forms\Components\DatePicker::make('created_until')->label('Ajoutée jusqu\'au'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    }),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('Modifier'),
