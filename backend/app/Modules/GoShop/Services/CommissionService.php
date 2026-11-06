@@ -81,7 +81,8 @@ class CommissionService
                 return $tranche;
             }
         }
-        return end(self::BAREME);
+        $bareme = self::BAREME;
+        return end($bareme);
     }
 
     // ─── GoColis ──────────────────────────────────────────────────────────────

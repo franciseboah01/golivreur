@@ -99,7 +99,7 @@ class WalletService
             ->where('owner_id', $ownerId)
             ->first();
 
-        return $wallet?->balance ?? 0;
+        return $wallet ? (float) $wallet->balance : 0.0;
     }
 
     // ─── Méthodes privées ─────────────────────────────────────────────────────

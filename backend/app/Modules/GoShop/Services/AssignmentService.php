@@ -14,8 +14,7 @@ use Illuminate\Support\Facades\DB;
  */
 class AssignmentService
 {
-    // Rayon de recherche initial en km, étendu si aucun livreur trouvé
-    private const RAYON_INITIAL_KM = 5;
+    public const RAYON_INITIAL_KM = 5;
     private const RAYON_ETENDU_KM  = 10;
     private const MAX_TENTATIVES   = 3;
     // Délai d'acceptation en secondes
@@ -24,7 +23,6 @@ class AssignmentService
 
     public function __construct(
         private readonly NotificationService $notificationService,
-        private readonly ActivityLogService  $activityLogService,
     ) {}
 
     /**

@@ -76,6 +76,7 @@ class OrderService
 
             // Créer les lignes de commande avec snapshot des prix
             foreach ($donnees['items'] as $item) {
+                /** @var \App\Models\Product $product */
                 $product = $merchant->products()->findOrFail($item['product_id']);
                 OrderItem::create([
                     'order_id'             => $order->id,
@@ -118,7 +119,7 @@ class OrderService
             ]);
         }
 
-        return DB::transaction(function () use ($order, $merchant) {
+        return DB::transaction(function () use ($order) {
             $order->update([
                 'status'      => Order::STATUS_ACCEPTED,
                 'accepted_at' => now(),
@@ -160,7 +161,7 @@ class OrderService
     /**
      * Le livreur saisit le code de confirmation — valide la livraison.
      */
-    public function validerCodeConfirmation(Order $order, string $codeSaisi, User $admin = null): Order
+    public function validerCodeConfirmation(Order $order, string $codeSaisi, ?User $admin = null): Order
     {
         if ($order->confirmation_locked) {
             throw ValidationException::withMessages([

@@ -74,7 +74,9 @@ class ProcessPaymentWebhook implements ShouldQueue
                     if ($order) {
                         if ($order->payment_status !== 'paid') {
                             $order->update(['payment_status' => 'paid']);
-                            $notificationService->notifierPaiementConfirme($order->client, $order);
+                            if ($order->client instanceof \App\Models\User) {
+                                $notificationService->notifierPaiementConfirme($order->client, $order);
+                            }
                             $activityLogService->log(
                                 userId: null,
                                 action: 'payment_confirmed',
@@ -86,7 +88,9 @@ class ProcessPaymentWebhook implements ShouldQueue
                     } elseif ($parcel) {
                         if ($parcel->payment_status !== 'paid') {
                             $parcel->update(['payment_status' => 'paid']);
-                            $notificationService->notifierPaiementConfirme($parcel->sender, null, $parcel);
+                            if ($parcel->sender instanceof \App\Models\User) {
+                                $notificationService->notifierPaiementConfirme($parcel->sender, null, $parcel);
+                            }
                         }
                     }
                 } elseif ($statut === 'FAILED' || $statut === 'CANCELLED') {
@@ -98,7 +102,9 @@ class ProcessPaymentWebhook implements ShouldQueue
                             'cancel_reason'  => 'Paiement Mobile Money échoué.',
                             'cancelled_at'   => now(),
                         ]);
-                        $notificationService->notifierPaiementEchoue($order->client, $order);
+                        if ($order->client instanceof \App\Models\User) {
+                            $notificationService->notifierPaiementEchoue($order->client, $order);
+                        }
                     } elseif ($parcel) {
                         $parcel->update([
                             'payment_status' => 'failed',

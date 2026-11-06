@@ -120,8 +120,12 @@ class NotificationService
         );
     }
 
-    public function notifierPaiementConfirme(User $user, ?Order $order = null, ?Parcel $parcel = null): void
+    public function notifierPaiementConfirme(?User $user, ?Order $order = null, ?Parcel $parcel = null): void
     {
+        if (!$user) {
+            return;
+        }
+
         $this->createNotification(
             userId: $user->id,
             type: 'payment_success',
@@ -131,8 +135,12 @@ class NotificationService
         );
     }
 
-    public function notifierPaiementEchoue(User $user, ?Order $order = null, ?Parcel $parcel = null): void
+    public function notifierPaiementEchoue(?User $user, ?Order $order = null, ?Parcel $parcel = null): void
     {
+        if (!$user) {
+            return;
+        }
+
         $this->createNotification(
             userId: $user->id,
             type: 'payment_failed',
