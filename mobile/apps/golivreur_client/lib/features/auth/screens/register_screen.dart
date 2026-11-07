@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
+import 'package:golivreur_core/widgets/golivreur_logo.dart';
 import '../providers/auth_provider.dart';
 import 'otp_verification_screen.dart';
 import 'login_screen.dart';
@@ -64,37 +65,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 24),
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: GoLivreurTheme.primaire.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.delivery_dining,
-                      size: 64,
-                      color: GoLivreurTheme.primaire,
-                    ),
+                const SizedBox(height: 16),
+                const Center(
+                  child: GoLivreurLogo(
+                    type: GoLivreurAppType.client,
+                    size: 84,
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Bienvenue sur GoLivreur',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: GoLivreurTheme.textePrincipal,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
+                const SizedBox(height: 10),
+                const Text(
                   'Créez votre compte pour commander à Daloa',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: GoLivreurTheme.texteSecondaire,
-                      ),
+                  style: TextStyle(
+                    color: GoLivreurTheme.texteSecondaire,
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 if (authState.errorMessage != null) ...[

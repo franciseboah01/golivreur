@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
+import 'package:golivreur_core/widgets/golivreur_logo.dart';
 import '../../navigation/screens/business_main_navigation_screen.dart';
 
 class BusinessLoginScreen extends StatefulWidget {
@@ -46,35 +47,30 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 32),
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: GoLivreurTheme.primaire.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.store_mall_directory_outlined,
-                    size: 64,
-                    color: GoLivreurTheme.primaire,
-                  ),
+              const SizedBox(height: 24),
+              const Center(
+                child: GoLivreurLogo(
+                  type: GoLivreurAppType.business,
+                  size: 92,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Text(
                 'GoLivreur Business',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: GoLivreurTheme.textePrincipal,
                     ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               const Text(
                 'Espace Commerces & Restaurants partenaires',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: GoLivreurTheme.texteSecondaire),
+                style: TextStyle(
+                  color: GoLivreurTheme.texteSecondaire,
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(height: 24),
               TextFormField(

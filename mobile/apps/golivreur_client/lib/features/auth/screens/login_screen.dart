@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
+import 'package:golivreur_core/widgets/golivreur_logo.dart';
 import '../providers/auth_provider.dart';
 import 'otp_verification_screen.dart';
 import 'register_screen.dart';
@@ -55,35 +56,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 32),
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: GoLivreurTheme.secondaire.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.lock_outline,
-                      size: 64,
-                      color: GoLivreurTheme.secondaire,
-                    ),
+                const SizedBox(height: 24),
+                const Center(
+                  child: GoLivreurLogo(
+                    type: GoLivreurAppType.client,
+                    size: 92,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Text(
                   'Connexion GoLivreur',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: GoLivreurTheme.textePrincipal,
                       ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 const Text(
                   'Saisissez votre numéro pour recevoir un code de connexion',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: GoLivreurTheme.texteSecondaire),
+                  style: TextStyle(
+                    color: GoLivreurTheme.texteSecondaire,
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 if (authState.errorMessage != null) ...[
