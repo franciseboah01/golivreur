@@ -190,31 +190,45 @@ class OrderService
             ]);
         }
 
+        if ($order->status === Order::STATUS_DELIVERED) {
+            throw ValidationException::withMessages([
+                'code' => ['Cette commande a déjà été livrée et validée.'],
+            ]);
+        }
+
         return DB::transaction(function () use ($order) {
-            $order->update([
+            $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
+
+            if ($lockedOrder->status === Order::STATUS_DELIVERED) {
+                throw ValidationException::withMessages([
+                    'code' => ['Cette commande a déjà été livrée et validée.'],
+                ]);
+            }
+
+            $lockedOrder->update([
                 'status'       => Order::STATUS_DELIVERED,
                 'delivered_at' => now(),
             ]);
 
             // Créditer les wallets
-            $this->walletService->crediterLivreur($order);
-            $this->walletService->crediterMerchant($order);
+            $this->walletService->crediterLivreur($lockedOrder);
+            $this->walletService->crediterMerchant($lockedOrder);
 
             // Notifier le client
-            $this->notificationService->notifierCommandeLivree($order);
+            $this->notificationService->notifierCommandeLivree($lockedOrder);
 
             $this->activityLogService->log(
-                userId: $order->courier->user_id,
+                userId: $lockedOrder->courier->user_id,
                 action: 'order_delivered',
                 entityType: 'order',
-                entityId: $order->id,
+                entityId: $lockedOrder->id,
                 properties: [
-                    'courier_amount'  => $order->courier_amount,
-                    'merchant_amount' => $order->merchant_amount,
+                    'courier_amount'  => $lockedOrder->courier_amount,
+                    'merchant_amount' => $lockedOrder->merchant_amount,
                 ],
             );
 
-            return $order->fresh(['client', 'merchant', 'courier']);
+            return $lockedOrder->fresh(['client', 'merchant', 'courier']);
         });
     }
 

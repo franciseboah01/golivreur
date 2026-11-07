@@ -45,6 +45,17 @@ class ParcelController extends Controller
 
     public function verifySenderCode(Request $request, Parcel $parcel, ParcelService $service): JsonResponse
     {
+        $user = auth()->user();
+        $courier = $user->courier;
+
+        if (!$courier && !in_array($user->role, ['super_admin', 'dg_national'])) {
+            return response()->json(['succes' => false, 'message' => 'Accès réservé aux livreurs.'], 403);
+        }
+
+        if ($courier && $parcel->courier_id !== null && $parcel->courier_id !== $courier->id) {
+            return response()->json(['succes' => false, 'message' => 'Ce colis est assigné à un autre livreur.'], 403);
+        }
+
         $request->validate([
             'code' => 'required|string|size:4',
         ]);
@@ -60,6 +71,17 @@ class ParcelController extends Controller
 
     public function verifyRecipientCode(Request $request, Parcel $parcel, ParcelService $service): JsonResponse
     {
+        $user = auth()->user();
+        $courier = $user->courier;
+
+        if (!$courier && !in_array($user->role, ['super_admin', 'dg_national'])) {
+            return response()->json(['succes' => false, 'message' => 'Accès réservé aux livreurs.'], 403);
+        }
+
+        if ($courier && $parcel->courier_id !== null && $parcel->courier_id !== $courier->id) {
+            return response()->json(['succes' => false, 'message' => 'Ce colis est assigné à un autre livreur.'], 403);
+        }
+
         $request->validate([
             'code' => 'required|string|size:4',
         ]);
@@ -75,6 +97,17 @@ class ParcelController extends Controller
 
     public function showDriver(Parcel $parcel): JsonResponse
     {
+        $user = auth()->user();
+        $courier = $user->courier;
+
+        if (!$courier && !in_array($user->role, ['super_admin', 'dg_national', 'city_manager'])) {
+            return response()->json(['succes' => false, 'message' => 'Accès réservé aux livreurs.'], 403);
+        }
+
+        if ($courier && $parcel->courier_id !== null && $parcel->courier_id !== $courier->id && !in_array($user->role, ['super_admin', 'dg_national', 'city_manager'])) {
+            return response()->json(['succes' => false, 'message' => 'Ce colis est assigné à un autre livreur.'], 403);
+        }
+
         return response()->json([
             'succes'  => true,
             'donnees' => [
@@ -99,6 +132,16 @@ class ParcelController extends Controller
 
     public function showClient(Parcel $parcel): JsonResponse
     {
+        $user = auth()->user();
+
+        if ($parcel->sender_id !== $user->id && !in_array($user->role, ['super_admin', 'dg_national', 'city_manager'])) {
+            return response()->json(['succes' => false, 'message' => 'Accès refusé à cette expédition.'], 403);
+        }
+
+        if ($user->role === 'city_manager' && $parcel->city_id !== $user->city_id) {
+            return response()->json(['succes' => false, 'message' => 'Accès refusé pour cette zone.'], 403);
+        }
+
         return response()->json([
             'succes'  => true,
             'donnees' => $parcel,

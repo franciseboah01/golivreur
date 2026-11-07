@@ -84,8 +84,14 @@ class ClientController extends Controller
 
     public function showOrder(Order $order): JsonResponse
     {
-        if ($order->client_id !== auth()->id() && !in_array(auth()->user()->role, ['super_admin', 'city_manager'])) {
+        $user = auth()->user();
+
+        if ($order->client_id !== $user->id && !in_array($user->role, ['super_admin', 'dg_national', 'city_manager'])) {
             return response()->json(['succes' => false, 'message' => 'Accès refusé.'], 403);
+        }
+
+        if ($user->role === 'city_manager' && $order->city_id !== $user->city_id) {
+            return response()->json(['succes' => false, 'message' => 'Accès refusé pour cette zone.'], 403);
         }
 
         $order->load(['merchant', 'courier.user', 'items.product']);

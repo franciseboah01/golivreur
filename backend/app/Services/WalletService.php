@@ -130,10 +130,14 @@ class WalletService
             $orderId, $parcelId, $processedBy
         ) {
             // Verrouillage pessimiste pour éviter les race conditions
-            $wallet = Wallet::lockForUpdate()->find($wallet->id);
+            $wallet = Wallet::lockForUpdate()->findOrFail($wallet->id);
 
-            $balanceAvant = $wallet->balance;
+            $balanceAvant = (float) $wallet->balance;
             $balanceApres = $balanceAvant + $montant;
+
+            if ($type === 'withdrawal' && $balanceApres < 0) {
+                throw new \InvalidArgumentException('Solde insuffisant pour effectuer ce retrait.');
+            }
 
             // Mise à jour du wallet
             $wallet->update([

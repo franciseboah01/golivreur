@@ -95,20 +95,28 @@ class DriverController extends Controller
     {
         $courier = $this->getCourier();
 
-        if ($order->courier_id && $order->courier_id !== $courier->id) {
-            return response()->json(['succes' => false, 'message' => 'Course déjà assignée.'], 409);
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($order, $courier) {
+            $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
 
-        $order->update([
-            'courier_id' => $courier->id,
-            'status'     => Order::STATUS_ACCEPTED,
-        ]);
+            if ($lockedOrder->courier_id && $lockedOrder->courier_id !== $courier->id) {
+                return response()->json(['succes' => false, 'message' => 'Course déjà assignée.'], 409);
+            }
 
-        return response()->json([
-            'succes'  => true,
-            'donnees' => $order,
-            'message' => 'Course acceptée.',
-        ]);
+            if ($lockedOrder->status === Order::STATUS_DELIVERED || $lockedOrder->status === Order::STATUS_CANCELLED) {
+                return response()->json(['succes' => false, 'message' => 'Cette course ne peut plus être acceptée.'], 422);
+            }
+
+            $lockedOrder->update([
+                'courier_id' => $courier->id,
+                'status'     => Order::STATUS_ACCEPTED,
+            ]);
+
+            return response()->json([
+                'succes'  => true,
+                'donnees' => $lockedOrder,
+                'message' => 'Course acceptée.',
+            ]);
+        });
     }
 
     public function confirmPickup(Order $order): JsonResponse

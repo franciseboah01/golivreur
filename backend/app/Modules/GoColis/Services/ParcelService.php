@@ -162,16 +162,30 @@ class ParcelService
             ]);
         }
 
+        if ($parcel->status === Parcel::STATUS_PICKED_UP || $parcel->status === Parcel::STATUS_DELIVERED) {
+            throw ValidationException::withMessages([
+                'code' => ['Ce colis a déjà été pris en charge.'],
+            ]);
+        }
+
         // Code correct — ramassage validé
         return DB::transaction(function () use ($parcel) {
-            $parcel->update([
+            $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
+
+            if ($lockedParcel->status === Parcel::STATUS_PICKED_UP || $lockedParcel->status === Parcel::STATUS_DELIVERED) {
+                throw ValidationException::withMessages([
+                    'code' => ['Ce colis a déjà été pris en charge.'],
+                ]);
+            }
+
+            $lockedParcel->update([
                 'status'       => Parcel::STATUS_PICKED_UP,
                 'picked_up_at' => now(),
             ]);
 
-            $this->notificationService->notifierColisRamasse($parcel);
+            $this->notificationService->notifierColisRamasse($lockedParcel);
 
-            return $parcel->fresh(['sender', 'courier']);
+            return $lockedParcel->fresh(['sender', 'courier']);
         });
     }
 
@@ -213,28 +227,42 @@ class ParcelService
             ]);
         }
 
+        if ($parcel->status === Parcel::STATUS_DELIVERED) {
+            throw ValidationException::withMessages([
+                'code' => ['Ce colis a déjà été livré et validé.'],
+            ]);
+        }
+
         // Code correct — livraison confirmée
         return DB::transaction(function () use ($parcel) {
-            $parcel->update([
+            $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
+
+            if ($lockedParcel->status === Parcel::STATUS_DELIVERED) {
+                throw ValidationException::withMessages([
+                    'code' => ['Ce colis a déjà été livré et validé.'],
+                ]);
+            }
+
+            $lockedParcel->update([
                 'status'       => Parcel::STATUS_DELIVERED,
                 'delivered_at' => now(),
             ]);
 
             // Créditer le wallet du livreur (75% des frais)
-            $this->walletService->crediterLivreurGoColis($parcel);
+            $this->walletService->crediterLivreurGoColis($lockedParcel);
 
             // Notifier l'expéditeur
-            $this->notificationService->notifierColisLivre($parcel);
+            $this->notificationService->notifierColisLivre($lockedParcel);
 
             $this->activityLogService->log(
-                userId: $parcel->courier->user_id,
+                userId: $lockedParcel->courier->user_id,
                 action: 'parcel_delivered',
                 entityType: 'parcel',
-                entityId: $parcel->id,
-                properties: ['courier_amount' => $parcel->courier_amount],
+                entityId: $lockedParcel->id,
+                properties: ['courier_amount' => $lockedParcel->courier_amount],
             );
 
-            return $parcel->fresh(['sender', 'courier', 'photos']);
+            return $lockedParcel->fresh(['sender', 'courier', 'photos']);
         });
     }
 
