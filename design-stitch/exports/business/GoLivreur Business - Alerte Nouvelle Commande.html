@@ -1,0 +1,198 @@
+﻿<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_blank" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "feedback-error": "#D32F2F", "gray-100": "#F2F2F2", "tertiary-fixed-dim": "#9ecaff", "border-default": "#E0E0E0", "secondary-fixed-dim": "#91d78a", "surface-bright": "#fcf9f8", "surface-dim": "#dcd9d9", "feedback-warning": "#F9A825", "surface-container-lowest": "#ffffff", "surface-variant": "#e5e2e1", "error": "#ba1a1a", "background": "#fcf9f8", "on-tertiary-container": "#00497d", "gray-700": "#595959", "surface-container": "#f0eded", "surface-bg": "#FAFAFA", "error-container": "#ffdad6", "gray-500": "#9E9E9E", "surface": "#fcf9f8", "on-tertiary-fixed-variant": "#00497c", "inverse-on-surface": "#f3f0ef", "surface-container-high": "#eae7e7", "on-secondary": "#ffffff", "inverse-primary": "#ffb953", "surface-tint": "#835500", "primary-container": "#f4a623", "on-secondary-fixed-variant": "#0c5216", "on-error-container": "#93000a", "on-secondary-fixed": "#002203", "secondary": "#2a6b2c", "gray-900": "#212121", "text-secondary": "#595959", "surface-card": "#FFFFFF", "on-primary-fixed": "#291800", "outline-variant": "#d7c3ae", "gray-300": "#E0E0E0", "on-error": "#ffffff", "on-surface": "#1b1c1c", "tertiary-fixed": "#d1e4ff", "text-primary": "#212121", "primary": "#835500", "surface-container-low": "#f6f3f2", "inverse-surface": "#303030", "on-background": "#1b1c1c", "tertiary": "#0b61a1", "on-secondary-container": "#307231", "on-tertiary": "#ffffff", "on-primary-fixed-variant": "#633f00", "feedback-success": "#4CAF50", "text-disabled": "#9E9E9E", "on-surface-variant": "#524534", "primary-fixed-dim": "#ffb953", "surface-container-highest": "#e5e2e1", "on-tertiary-fixed": "#001d36", "on-primary-container": "#644000", "secondary-fixed": "#acf4a4", "feedback-info": "#2E75B6", "on-primary": "#ffffff", "outline": "#847462", "gray-50": "#FAFAFA", "secondary-container": "#acf4a4", "tertiary-container": "#7cbaff", "primary-fixed": "#ffddb4" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "gutter": "16px", "space-2xl": "48px", "space-lg": "24px", "space-md": "16px", "space-xl": "32px", "space-sm": "8px", "space-xs": "4px", "margin": "16px" }, fontFamily: { "headline-md": ["Inter"], "caption-sm": ["Inter"], "headline-sm": ["Inter"], "body-md-emphasis": ["Inter"], "label-md": ["Inter"], "headline-lg": ["Inter"], "body-md": ["Inter"] }, fontSize: { "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "700" }], "caption-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "body-md-emphasis": ["16px", { "lineHeight": "22px", "fontWeight": "500" }], "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "34px", "fontWeight": "700" }], "body-md": ["16px", { "lineHeight": "22px", "fontWeight": "400" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;min-height:100vh;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased flex flex-col min-h-screen"><main class="flex flex-col relative w-full bg-surface flex-1 min-h-screen pt-safe pb-safe"><div class="flex flex-col w-full relative pb-safe select-none">
+<!-- Audio Alert Ambient Banner with Pulsing Effect -->
+<div class="w-full bg-primary-container px-space-md py-space-sm flex items-center justify-between shadow-sm animate-pulse">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="relative flex items-center justify-center w-8 h-8 rounded-full bg-surface-container-lowest text-primary shadow-sm flex-shrink-0">
+<span class="material-symbols-outlined text-[20px] animate-bounce" style="font-variation-settings: 'FILL' 1;">volume_up</span>
+<span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-feedback-error rounded-full animate-ping"></span>
+</div>
+<p class="font-caption-sm text-caption-sm text-on-primary-container font-semibold truncate">
+        Sonnerie forte active — Dépêchez-vous de répondre
+      </p>
+</div>
+<span class="font-caption-sm text-caption-sm bg-surface-container-lowest/80 text-on-primary-container px-2 py-0.5 rounded-full font-bold flex-shrink-0">
+      URGENT
+    </span>
+</div>
+<div class="px-space-md pt-space-md pb-space-lg flex flex-col gap-space-md">
+<!-- Merchant Context & Order ID Pill -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2 min-w-0">
+<span class="w-3 h-3 rounded-full bg-feedback-warning animate-ping"></span>
+<div class="truncate">
+<p class="font-caption-sm text-caption-sm text-text-secondary truncate">Chez Adjoua Daloa</p>
+<h2 class="font-headline-sm text-headline-sm text-text-primary tracking-tight">Commande #ORD-5002</h2>
+</div>
+</div>
+<span class="bg-surface-container text-text-secondary font-caption-sm text-caption-sm px-2.5 py-1 rounded-full flex-shrink-0">
+        À l'instant
+      </span>
+</div>
+<!-- Countdown Timer Card (Tactile, Vibrant, SVG Circular Ring) -->
+<div class="bg-surface-card rounded-2xl p-space-md shadow-md flex items-center justify-between relative overflow-hidden" id="compteur-45s">
+<div class="absolute -right-4 -bottom-4 w-28 h-28 bg-feedback-warning/10 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex flex-col">
+<span class="font-caption-sm text-caption-sm text-feedback-warning font-semibold uppercase tracking-wider">
+          Temps de réponse
+        </span>
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary mt-0.5">
+          Décision obligatoire
+        </p>
+<span class="font-caption-sm text-caption-sm text-text-secondary">
+          Expiration automatique à 0s
+        </span>
+</div>
+<div class="relative w-20 h-20 flex items-center justify-center flex-shrink-0">
+<svg class="w-full h-full -rotate-90 transform" viewbox="0 0 72 72">
+<circle cx="36" cy="36" fill="transparent" r="30" stroke="#f0eded" stroke-width="6"></circle>
+<circle class="transition-all duration-1000 ease-linear" cx="36" cy="36" fill="transparent" id="countdown-circle" r="30" stroke="#F9A825" stroke-dasharray="188.4" stroke-dashoffset="31.4" stroke-linecap="round" stroke-width="6"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-headline-md text-headline-md text-text-primary leading-none" id="countdown-val">38</span>
+<span class="font-caption-sm text-[10px] text-text-secondary uppercase">sec</span>
+</div>
+</div>
+</div>
+<!-- Customer & Logistics Highlights -->
+<div class="bg-surface-card rounded-2xl p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-text-primary font-bold flex-shrink-0">
+<span class="material-symbols-outlined text-[20px]">person</span>
+</div>
+<div class="min-w-0 flex-1">
+<h3 class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate">Aïcha Traoré</h3>
+<p class="font-caption-sm text-caption-sm text-text-secondary truncate flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">location_on</span>
+            Quartier Soleil, Daloa
+          </p>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs bg-surface-container-low px-space-sm py-2 rounded-xl">
+<div class="flex items-center gap-1.5 text-text-secondary">
+<span class="material-symbols-outlined text-[18px]">skillet</span>
+<span class="font-caption-sm text-caption-sm">Préparation requise</span>
+</div>
+<span class="font-body-md-emphasis text-body-md-emphasis text-text-primary">
+          20 – 25 min
+        </span>
+</div>
+</div>
+<!-- Order Items Specification -->
+<div class="bg-surface-card rounded-2xl p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between pb-1">
+<span class="font-caption-sm text-caption-sm text-text-secondary font-medium tracking-wide uppercase">Détail des articles</span>
+<span class="font-caption-sm text-caption-sm bg-surface-container text-text-secondary px-2 py-0.5 rounded-full">2 références</span>
+</div>
+<!-- Item 1 -->
+<div class="flex gap-space-sm items-start py-1">
+<img class="w-14 h-14 rounded-xl object-cover flex-shrink-0 bg-surface-container" data-alt="Assiette ivoirienne de poulet braise dore avec attieke frais piment doux et condiments sur nappe ensoleillee restaurant Daloa ambiance chaude" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDElpgKvqUHvyiXZcV1nK43YCd5taIVAggqeqqisTalI0QYJooCQBLmcDhDD_4QHsdYjL4Kg-gGn4KG8LV40LVMP_DmchoqqCkBeV9WgP6ctaNjr3SiijifQXVh68dtsVPXlpJSW7a9iNG548rwYg1nnxgEkvLpaUy4SBRmL3_KhANJwPQ38NpwxnbeiJ2Zc4g7RrjmVhLd3tc0yQfF0tVdUMw1gWYRgluhuJsHiGY"/>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline gap-2">
+<h4 class="font-body-md-emphasis text-body-md-emphasis text-text-primary">2x Poulet braisé + Attiéké</h4>
+<span class="font-body-md-emphasis text-body-md-emphasis text-text-primary flex-shrink-0">6 000 F</span>
+</div>
+<p class="font-caption-sm text-caption-sm text-text-secondary mt-0.5">Cuisson bien dorée • Piment moyen</p>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex gap-space-sm items-start py-1">
+<img class="w-14 h-14 rounded-xl object-cover flex-shrink-0 bg-surface-container" data-alt="Portion genereuse dalloco bananes plantains frites bien caramelisees dorees croustillantes servies dans coupelle artisanale ivoirienne" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFAvCSme1xrXt9M9BY5C1ep2j6Ouy3y6i6KaTVDfCJyqoxA0tTqWywyQfr0gU8FYIUU1_Te7SOuhb0k-pDyuDrOiaipmCjDlBXeG2MEO3At2doh7-bwE4i4bts2gcj5uDExwSrjDZHJQKemRb4utmmmbTSif_GSPJl-besKnWsp7pK40j3dukObSQjIdfBIbbecXVumN3SRlgo22pz1aT3eWYLDK9y65SdBd_i_mM"/>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline gap-2">
+<h4 class="font-body-md-emphasis text-body-md-emphasis text-text-primary">1x Portion Alloco supplémentaire</h4>
+<span class="font-body-md-emphasis text-body-md-emphasis text-text-primary flex-shrink-0">500 F</span>
+</div>
+<p class="font-caption-sm text-caption-sm text-text-secondary mt-0.5">Portion individuelle</p>
+</div>
+</div>
+<!-- Financial Recap -->
+<div class="bg-surface-container-low rounded-xl p-space-sm mt-space-xs flex flex-col gap-1">
+<div class="flex justify-between items-center text-text-secondary font-caption-sm text-caption-sm">
+<span>Montant payé par le client</span>
+<span>6 500 F CFA</span>
+</div>
+<div class="flex justify-between items-center font-body-md-emphasis text-body-md-emphasis text-text-primary pt-0.5">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-secondary text-[18px]">account_balance_wallet</span>
+            Revenu net boutique
+          </span>
+<span class="text-secondary font-bold text-[18px]">5 850 F CFA</span>
+</div>
+</div>
+</div>
+<!-- Non-dismissable Action Buttons with Large Touch Targets (Min 52px) -->
+<div class="flex flex-col gap-space-sm pt-space-xs">
+<button class="w-full min-h-[56px] h-14 bg-primary-container active:scale-[0.98] transition-all rounded-xl px-space-md flex items-center justify-between text-on-surface shadow-md" data-action="order.accept" id="btn-accepter">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[24px]">check_circle</span>
+<span class="font-label-md text-label-md tracking-tight">Accepter la commande</span>
+</div>
+<span class="font-label-md text-label-md bg-surface-container-lowest/80 px-3 py-1 rounded-lg">
+          5 850 F
+        </span>
+</button>
+<button class="w-full min-h-[52px] h-[52px] bg-surface-container text-feedback-error active:bg-error-container/40 transition-all rounded-xl px-space-md flex items-center justify-center gap-2" data-action="order.refuse" id="btn-refuser">
+<span class="material-symbols-outlined text-[20px]">cancel</span>
+<span class="font-label-md text-label-md font-semibold">Refuser la commande</span>
+</button>
+</div>
+<div class="text-center pt-space-xs">
+<p class="font-caption-sm text-[12px] text-text-disabled">
+        Interaction requise • Alerte verrouillée jusqu'à validation
+      </p>
+</div>
+</div>
+<script>
+    (function() {
+      let secondsRemaining = 38;
+      const totalSeconds = 45;
+      const circumference = 188.4;
+      const label = document.getElementById('countdown-val');
+      const circle = document.getElementById('countdown-circle');
+      const btnAccept = document.getElementById('btn-accepter');
+      const btnRefuse = document.getElementById('btn-refuser');
+
+      const interval = setInterval(() => {
+        if (secondsRemaining > 0) {
+          secondsRemaining--;
+          if (label) label.textContent = secondsRemaining;
+          if (circle) {
+            const offset = circumference - (secondsRemaining / totalSeconds) * circumference;
+            circle.style.strokeDashoffset = offset;
+            if (secondsRemaining <= 15) {
+              circle.setAttribute('stroke', '#ba1a1a');
+            }
+          }
+        } else {
+          clearInterval(interval);
+          if (label) label.textContent = '0';
+        }
+      }, 1000);
+
+      if (btnAccept) {
+        btnAccept.addEventListener('click', () => {
+          clearInterval(interval);
+          btnAccept.classList.add('opacity-75');
+          btnAccept.innerHTML = '<span class="material-symbols-outlined animate-spin text-[22px]">progress_activity</span><span class="font-label-md text-label-md">Confirmation en cours...</span>';
+        });
+      }
+
+      if (btnRefuse) {
+        btnRefuse.addEventListener('click', () => {
+          clearInterval(interval);
+          btnRefuse.classList.add('opacity-75');
+          btnRefuse.innerHTML = '<span class="font-label-md text-label-md">Commande refusée</span>';
+        });
+      }
+    })();
+  </script>
+</div></main></body></html>

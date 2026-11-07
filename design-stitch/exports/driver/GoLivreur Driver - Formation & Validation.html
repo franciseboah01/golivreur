@@ -1,0 +1,268 @@
+﻿<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: 'class', theme: { extend: { 'colors': { 'feedback-success': '#4CAF50', 'secondary-container': '#acf4a4', 'surface-variant': '#e5e2e1', 'on-primary': '#ffffff', 'on-tertiary-fixed-variant': '#00497c', 'text-disabled': '#9E9E9E', 'inverse-surface': '#303030', 'surface-dim': '#dcd9d9', 'text-primary': '#212121', 'inverse-primary': '#ffb953', 'on-background': '#1b1c1c', 'on-tertiary': '#ffffff', 'on-surface-variant': '#524534', 'background': '#fcf9f8', 'surface-card': '#FFFFFF', 'tertiary': '#0b61a1', 'gray-100': '#F2F2F2', 'secondary-fixed-dim': '#91d78a', 'on-error-container': '#93000a', 'on-secondary-container': '#307231', 'primary-container': '#f4a623', 'on-error': '#ffffff', 'surface': '#fcf9f8', 'on-primary-container': '#644000', 'outline': '#847462', 'text-secondary': '#595959', 'surface-container-high': '#eae7e7', 'surface-container': '#f0eded', 'surface-container-lowest': '#ffffff', 'on-surface': '#1b1c1c', 'on-secondary-fixed': '#002203', 'on-primary-fixed-variant': '#633f00', 'gray-900': '#212121', 'tertiary-fixed-dim': '#9ecaff', 'surface-bright': '#fcf9f8', 'on-secondary-fixed-variant': '#0c5216', 'surface-tint': '#835500', 'error': '#ba1a1a', 'on-primary-fixed': '#291800', 'surface-container-low': '#f6f3f2', 'on-secondary': '#ffffff', 'feedback-warning': '#F9A825', 'primary-fixed-dim': '#ffb953', 'inverse-on-surface': '#f3f0ef', 'error-container': '#ffdad6', 'on-tertiary-container': '#00497d', 'surface-bg': '#FAFAFA', 'outline-variant': '#d7c3ae', 'feedback-info': '#2E75B6', 'feedback-error': '#D32F2F', 'gray-300': '#E0E0E0', 'secondary-fixed': '#acf4a4', 'secondary': '#2a6b2c', 'tertiary-container': '#7cbaff', 'primary-fixed': '#ffddb4', 'primary': '#835500', 'tertiary-fixed': '#d1e4ff', 'on-tertiary-fixed': '#001d36', 'gray-500': '#9E9E9E', 'surface-container-highest': '#e5e2e1', 'gray-50': '#FAFAFA', 'border-default': '#E0E0E0', 'gray-700': '#595959' }, 'borderRadius': { 'DEFAULT': '0.25rem', 'lg': '0.5rem', 'xl': '0.75rem', 'full': '9999px' }, 'spacing': { 'space-lg': '24px', 'space-sm': '8px', 'space-2xl': '48px', 'space-xl': '32px', 'space-xs': '4px', 'gutter': '16px', 'margin': '16px', 'space-md': '16px' }, 'fontFamily': { 'headline-lg': ['Inter'], 'headline-sm': ['Inter'], 'body-md': ['Inter'], 'headline-md': ['Inter'], 'label-md': ['Inter'], 'body-md-emphasis': ['Inter'], 'caption-sm': ['Inter'] }, 'fontSize': { 'headline-lg': ['28px', { 'lineHeight': '34px', 'fontWeight': '700' }], 'headline-sm': ['18px', { 'lineHeight': '24px', 'fontWeight': '600' }], 'body-md': ['16px', { 'lineHeight': '22px', 'fontWeight': '400' }], 'headline-md': ['22px', { 'lineHeight': '28px', 'fontWeight': '700' }], 'label-md': ['16px', { 'lineHeight': '20px', 'fontWeight': '600' }], 'body-md-emphasis': ['16px', { 'lineHeight': '22px', 'fontWeight': '500' }], 'caption-sm': ['13px', { 'lineHeight': '18px', 'fontWeight': '400' }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-xs"><button aria-label="Retour" class="min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface hover:text-secondary" onclick="history.back()"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><img alt="Vibrant friendly delivery mascot character logo mark for GoLivreur Client in Daloa Côte d'Ivoire. A cheerful, friendly stylized cartoon delivery courier guy (bonhomme livreur souriant) wearing an orange motorcycle helmet with a visor and a courier vest/cap, waving or zooming forward with a courier delivery parcel box, energetic, modern flat vector logo icon, rounded friendly geometry, clean vector emblem style, primary warm orange #F4A623 with dark green #1B5E20 accents and clean white details, on a pure solid isolated background, emblem badge suitable for mobile app logo. Design context: - Primary color: #f4a623
+- Font: inter
+- Mode: light
+- Roundness: rounded-md
+. The logo should be visually consistent with these brand tokens." class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/ALJJyrDnb2VJIGL648lkt0uwKxbW3l2Jh1MPgdUuqbV2nOp842vVJ6xDHx6u--Xywk2fMHbxZaaqGlqHuT50hyblHAVH04609rzbOfF6Yz1SVUlGUdHH4EOPy4eFlM5ahQPtaEcdajXw7PSYO1uCXD_gUGGd0VK2LPJRJXXCRfa1Ho9jieUpkEbWDYD_iWH8rsPv5o6oRxQgim2zjyxGNhxMr32PQimtm1uZggDHUZ_3x4vY"/><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight ml-space-xs">Driver Auth Formationvalidation</span></div><div class="flex items-center gap-space-sm"><button aria-label="Assistance audio" class="min-w-[44px] min-h-[44px] flex items-center justify-center text-secondary hover:text-secondary-fixed-dim"><span class="material-symbols-outlined text-[24px]">volume_up</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-safe bg-surface"><div class="flex flex-col w-full px-margin pb-space-2xl space-y-space-md">
+<!-- Bannière d'avancement du dossier -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between mb-space-xs">
+<span class="font-caption-sm text-caption-sm text-text-secondary uppercase tracking-wider font-semibold">Parcours d'admission</span>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary-container/20 text-on-primary-container font-caption-sm text-caption-sm font-semibold">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+        En attente
+      </span>
+</div>
+<p class="font-headline-sm text-headline-sm text-on-surface mb-2">Étape 3 sur 3 : Validation &amp; Formation</p>
+<div class="w-full bg-surface-container-highest h-2 rounded-full overflow-hidden flex">
+<div class="bg-feedback-success h-full w-2/3"></div>
+<div class="bg-primary-container h-full w-1/3"></div>
+</div>
+<div class="flex justify-between items-center mt-1.5 font-caption-sm text-caption-sm text-text-secondary">
+<span>Dossier soumis</span>
+<span>Vérification pièces</span>
+<span class="text-primary font-semibold">Formation Daloa</span>
+</div>
+</div>
+<!-- Carte d'appel / Statut Formation -->
+<div class="relative bg-surface-container-lowest rounded-xl p-space-md shadow-sm overflow-hidden">
+<div class="flex items-start gap-3">
+<div class="w-12 h-12 rounded-xl bg-primary-container/20 flex items-center justify-center shrink-0 text-primary">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">school</span>
+</div>
+<div class="flex-1 min-w-0">
+<span class="inline-block px-2 py-0.5 rounded bg-feedback-warning/15 text-feedback-warning font-caption-sm text-caption-sm font-semibold mb-1">
+          Dernière formalité
+        </span>
+<h1 class="font-headline-md text-headline-md text-on-surface leading-snug" id="statut-formation">
+          Formation obligatoire en présentiel
+        </h1>
+<p class="font-body-md text-body-md text-text-secondary mt-1">
+          30 minutes à l'antenne locale de Daloa avant activation de votre compte moto.
+        </p>
+</div>
+</div>
+<!-- Visuel de convivialité / Matériel remis -->
+<div class="mt-space-md rounded-xl overflow-hidden relative shadow-sm">
+<img class="w-full h-36 object-cover" data-alt="A smiling young Ivorian motorcycle courier wearing an orange safety vest and helmet standing proudly with a branded insulated delivery box outside a bright modern logistics hub in Daloa Ivory Coast sunny daytime photography vibrant warm tones modern clean atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBcU9IrLpBFhrqUppebgyG9P7381d0uUmRnHmfozlKimCPwjPjw2fAJnVDs8kYBaAqEDPcEl4iQTrFYQ2pD8F6ddq8JcVXduhk7DgcpjlsluGSm6A1rb676eCRK4tn9Nln2i_RPqj7OewAAwCGZPydXWb44lgH-RC16fNX0_KFCquTVy-KWboBZdBJRPHwj69odg_-HKwDv13DO8nVqR5QQQeIS-7q_SNAc4QNeZn8"/>
+<div class="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-gray-900/20 to-transparent flex items-end p-3">
+<div class="flex items-center gap-2 text-on-primary font-caption-sm text-caption-sm">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span>Équipements GoLivreur certifiés remis gratuitement sur place</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Détails du Rendez-vous / Session -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">event_available</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Votre Session à Daloa</h2>
+</div>
+<span class="font-caption-sm text-caption-sm px-2 py-1 bg-secondary-container text-on-secondary-container rounded-md font-semibold">
+        30 min chrono
+      </span>
+</div>
+<!-- Date et Lieu -->
+<div class="space-y-space-sm bg-surface-container-low p-space-md rounded-xl">
+<div class="flex items-start gap-3">
+<div class="w-9 h-9 rounded-lg bg-surface-container-lowest flex items-center justify-center shrink-0 text-primary">
+<span class="material-symbols-outlined text-[20px]">calendar_today</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="font-caption-sm text-caption-sm text-text-secondary">Date &amp; Heure retenue</div>
+<div class="font-body-md-emphasis text-body-md-emphasis text-on-surface">Demain à 10h00</div>
+<div class="font-caption-sm text-caption-sm text-text-secondary">(Session alternative : Vendredi 15h00)</div>
+</div>
+</div>
+<div class="h-px bg-surface-variant w-full my-1"></div>
+<div class="flex items-start gap-3">
+<div class="w-9 h-9 rounded-lg bg-surface-container-lowest flex items-center justify-center shrink-0 text-secondary">
+<span class="material-symbols-outlined text-[20px]">location_on</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="font-caption-sm text-caption-sm text-text-secondary">Lieu de formation</div>
+<div class="font-body-md-emphasis text-body-md-emphasis text-on-surface">Hub Opérationnel GoLivreur Daloa</div>
+<div class="font-caption-sm text-caption-sm text-text-secondary">Quartier Commerce, face Pharmacie Centrale</div>
+</div>
+</div>
+</div>
+<!-- Mini carte de repérage -->
+<div class="w-full h-28 rounded-xl bg-cover bg-center overflow-hidden relative shadow-sm" data-location="Daloa, Côte d'Ivoire, Quartier Commerce" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAnbfxTepdFGPXg4ncYRSSAU9Ct4G6k2Q-HRrrQlRwRwffBmMFd0rMu90qKQKGmw0sfbXnoL7r_4X48r4VOfUf5pBpP7tCqHPpVghVI2ghMAm7_pNIalsKpBcPp8scGt88WTrhRVaI-RxtDugaJk7pEDF6SV597rrOHpe4o7JVDXQblVW2U1uFZZJNHd23gS4zmE5oEGddf4nUfJwQqowg-vXDTc28ZxlaPjK7GUWY')">
+<div class="absolute inset-0 bg-gray-900/10"></div>
+<div class="absolute bottom-2 left-2 px-2.5 py-1 bg-surface-container-lowest/90 backdrop-blur-md rounded-lg shadow-sm flex items-center gap-1.5 font-caption-sm text-caption-sm font-semibold text-text-primary">
+<span class="material-symbols-outlined text-[16px] text-feedback-error">pin_drop</span>
+<span>Face Pharmacie Centrale</span>
+</div>
+</div>
+<!-- Dotation / Kit livreur -->
+<div class="pt-1">
+<div class="font-label-md text-label-md text-on-surface mb-space-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">inventory_2</span>
+        Ce qui vous sera remis :
+      </div>
+<div class="grid grid-cols-1 gap-2">
+<div class="flex items-center gap-2.5 p-2 rounded-lg bg-surface-container-low">
+<span class="material-symbols-outlined text-feedback-success text-[20px]">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface">Gilet haute visibilité GoLivreur</span>
+</div>
+<div class="flex items-center gap-2.5 p-2 rounded-lg bg-surface-container-low">
+<span class="material-symbols-outlined text-feedback-success text-[20px]">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface">Casque de moto homologué</span>
+</div>
+<div class="flex items-center gap-2.5 p-2 rounded-lg bg-surface-container-low">
+<span class="material-symbols-outlined text-feedback-success text-[20px]">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface">Sac isotherme renforcé (repas &amp; colis)</span>
+</div>
+<div class="flex items-center gap-2.5 p-2 rounded-lg bg-surface-container-low">
+<span class="material-symbols-outlined text-feedback-success text-[20px]">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface">Support smartphone étanche pour guidon</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Audit des documents administratifs -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-md" id="statut-validation-admin">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Audit de vos pièces</h2>
+<span class="font-caption-sm text-caption-sm text-text-secondary">2 / 3 validées</span>
+</div>
+<div class="space-y-space-sm">
+<!-- CNI -->
+<div class="p-3 rounded-xl bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-feedback-success/10 text-feedback-success flex items-center justify-center">
+<span class="material-symbols-outlined text-[22px]">badge</span>
+</div>
+<div>
+<div class="font-body-md-emphasis text-body-md-emphasis text-on-surface">CNI Recto / Verso</div>
+<div class="font-caption-sm text-caption-sm text-text-secondary">Validée par l'administrateur</div>
+</div>
+</div>
+<span class="w-7 h-7 rounded-full bg-feedback-success text-on-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</span>
+</div>
+<!-- Carte Grise Moto -->
+<div class="p-3 rounded-xl bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-feedback-warning/10 text-feedback-warning flex items-center justify-center">
+<span class="material-symbols-outlined text-[22px]">two_wheeler</span>
+</div>
+<div>
+<div class="font-body-md-emphasis text-body-md-emphasis text-on-surface">Carte grise de la moto</div>
+<div class="font-caption-sm text-caption-sm text-feedback-warning font-semibold">En cours de vérification</div>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-md bg-feedback-warning/20 text-text-primary font-caption-sm text-caption-sm font-semibold">
+          En revue
+        </span>
+</div>
+<!-- Numéro Wave / Orange Money -->
+<div class="p-3 rounded-xl bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-feedback-success/10 text-feedback-success flex items-center justify-center">
+<span class="material-symbols-outlined text-[22px]">account_balance_wallet</span>
+</div>
+<div>
+<div class="font-body-md-emphasis text-body-md-emphasis text-on-surface">Wave / Orange Money</div>
+<div class="font-caption-sm text-caption-sm text-text-secondary">Certifié pour réceptions des gains</div>
+</div>
+</div>
+<span class="w-7 h-7 rounded-full bg-feedback-success text-on-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</span>
+</div>
+</div>
+<div class="bg-surface-variant/40 p-2.5 rounded-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-text-secondary text-[18px]">info</span>
+<p class="font-caption-sm text-caption-sm text-text-secondary">
+        La validation de la carte grise se finalise sur place lors du contrôle visuel de votre moto.
+      </p>
+</div>
+</div>
+<!-- Actions Principales -->
+<div class="space-y-space-sm pt-space-xs">
+<!-- Bouton principal 52px -->
+<button class="w-full min-h-[52px] bg-primary-container text-gray-900 rounded-xl font-label-md text-label-md flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-sm" id="btn-confirmer-presence" onclick="handleConfirmPresence()">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">how_to_reg</span>
+<span>Confirmer ma présence à la session</span>
+</button>
+<!-- Bouton Contact WhatsApp / Appel -->
+<a class="w-full min-h-[52px] bg-surface-container-lowest text-text-primary rounded-xl font-label-md text-label-md flex items-center justify-center gap-2 shadow-sm active:bg-surface-container-high transition-colors" href="tel:+2250700000000">
+<span class="material-symbols-outlined text-secondary text-[22px]">phone_in_talk</span>
+<span>Contacter l'équipe GoLivreur Daloa</span>
+</a>
+<!-- Lien Guide bonnes pratiques -->
+<div class="text-center pt-2">
+<button class="inline-flex items-center gap-1 font-body-md text-body-md text-secondary underline hover:text-secondary-container transition-colors" onclick="openGuideModal()">
+<span class="material-symbols-outlined text-[18px]">menu_book</span>
+<span>Consulter le guide des bonnes pratiques du coursier GoLivreur</span>
+</button>
+</div>
+</div>
+</div>
+<script>
+  function handleConfirmPresence() {
+    const btn = document.getElementById('btn-confirmer-presence');
+    if (!btn) return;
+    
+    btn.innerHTML = `
+      <span class="material-symbols-outlined text-[22px] text-feedback-success">check_circle</span>
+      <span class="text-gray-900 font-semibold">Présence confirmée pour 10h00</span>
+    `;
+    btn.classList.remove('bg-primary-container');
+    btn.classList.add('bg-secondary-container');
+    
+    // Notification visuelle
+    const banner = document.createElement('div');
+    banner.className = 'fixed bottom-4 left-4 right-4 bg-gray-900 text-on-primary p-3 rounded-xl flex items-center justify-between shadow-xl z-50 animate-bounce';
+    banner.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary-container">done_all</span>
+        <span class="font-caption-sm text-caption-sm">Rendez-vous réservé ! Un SMS de rappel vous a été envoyé.</span>
+      </div>
+      <button onclick="this.parentElement.remove()" class="text-on-primary font-bold ml-2">×</button>
+    `;
+    document.body.appendChild(banner);
+    setTimeout(() => {
+      if (banner && banner.parentElement) banner.remove();
+    }, 4500);
+  }
+
+  function openGuideModal() {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 z-50 bg-inverse-surface/40 backdrop-blur-sm flex items-end justify-center';
+    modal.innerHTML = `
+      <div class="bg-surface-container-lowest rounded-t-2xl w-full max-h-[707px] overflow-y-auto p-space-md space-y-space-md shadow-2xl">
+        <div class="w-12 h-1 bg-surface-variant rounded-full mx-auto"></div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-secondary">verified_user</span>
+            <h3 class="font-headline-sm text-headline-sm text-on-surface">Guide du Coursier Daloa</h3>
+          </div>
+          <button onclick="this.closest('.fixed').remove()" class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+        <div class="space-y-space-sm font-body-md text-body-md text-text-secondary">
+          <p><strong>1. Sécurité routière :</strong> Le port du casque GoLivreur est obligatoire à chaque instant sur les boulevards et pistes de Daloa.</p>
+          <p><strong>2. Hygiène :</strong> Nettoyez l'intérieur du caisson isotherme avant chaque service de restauration rapide (Alloco, Garba, Pizza).</p>
+          <p><strong>3. Ponctualité :</strong> Respectez le créneau de prise en charge au restaurant et signalez tout retard via l'application.</p>
+        </div>
+        <button onclick="this.closest('.fixed').remove()" class="w-full min-h-[52px] bg-primary-container text-gray-900 rounded-xl font-label-md text-label-md">
+          J'ai compris
+        </button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+</script></main></body></html>

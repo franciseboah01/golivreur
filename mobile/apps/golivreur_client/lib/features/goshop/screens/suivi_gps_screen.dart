@@ -330,6 +330,33 @@ class _PanneauInfosLivraison extends StatelessWidget {
             const Divider(height: GoLivreurTheme.espacementXL),
           ],
 
+          // Encadré rassurant Mode Pluie Daloa
+          Container(
+            margin: const EdgeInsets.only(bottom: GoLivreurTheme.espacementM),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F1F8),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF2E75B6).withValues(alpha: 0.3)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.shield_outlined, color: Color(0xFF2E75B6), size: 18),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '🌧️ Mode Pluie actif : Vitesse réduite pour la sécurité du livreur. Votre commande est protégée au sec !',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF1B4D7E),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Code de confirmation
           if (order.confirmationCode != null && !order.confirmationLocked) ...[
             const Text(

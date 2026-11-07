@@ -1,0 +1,430 @@
+﻿<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "feedback-error": "#D32F2F", "gray-100": "#F2F2F2", "tertiary-fixed-dim": "#9ecaff", "border-default": "#E0E0E0", "secondary-fixed-dim": "#91d78a", "surface-bright": "#fcf9f8", "surface-dim": "#dcd9d9", "feedback-warning": "#F9A825", "surface-container-lowest": "#ffffff", "surface-variant": "#e5e2e1", "error": "#ba1a1a", "background": "#fcf9f8", "on-tertiary-container": "#00497d", "gray-700": "#595959", "surface-container": "#f0eded", "surface-bg": "#FAFAFA", "error-container": "#ffdad6", "gray-500": "#9E9E9E", "surface": "#fcf9f8", "on-tertiary-fixed-variant": "#00497c", "inverse-on-surface": "#f3f0ef", "surface-container-high": "#eae7e7", "on-secondary": "#ffffff", "inverse-primary": "#ffb953", "surface-tint": "#835500", "primary-container": "#f4a623", "on-secondary-fixed-variant": "#0c5216", "on-error-container": "#93000a", "on-secondary-fixed": "#002203", "secondary": "#2a6b2c", "gray-900": "#212121", "text-secondary": "#595959", "surface-card": "#FFFFFF", "on-primary-fixed": "#291800", "outline-variant": "#d7c3ae", "gray-300": "#E0E0E0", "on-error": "#ffffff", "on-surface": "#1b1c1c", "tertiary-fixed": "#d1e4ff", "text-primary": "#212121", "primary": "#835500", "surface-container-low": "#f6f3f2", "inverse-surface": "#303030", "on-background": "#1b1c1c", "tertiary": "#0b61a1", "on-secondary-container": "#307231", "on-tertiary": "#ffffff", "on-primary-fixed-variant": "#633f00", "feedback-success": "#4CAF50", "text-disabled": "#9E9E9E", "on-surface-variant": "#524534", "primary-fixed-dim": "#ffb953", "surface-container-highest": "#e5e2e1", "on-tertiary-fixed": "#001d36", "on-primary-container": "#644000", "secondary-fixed": "#acf4a4", "feedback-info": "#2E75B6", "on-primary": "#ffffff", "outline": "#847462", "gray-50": "#FAFAFA", "secondary-container": "#acf4a4", "tertiary-container": "#7cbaff", "primary-fixed": "#ffddb4" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "gutter": "16px", "space-2xl": "48px", "space-lg": "24px", "space-md": "16px", "space-xl": "32px", "space-sm": "8px", "space-xs": "4px", "margin": "16px" }, fontFamily: { "headline-md": ["Inter"], "caption-sm": ["Inter"], "headline-sm": ["Inter"], "body-md-emphasis": ["Inter"], "label-md": ["Inter"], "headline-lg": ["Inter"], "body-md": ["Inter"] }, fontSize: { "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "700" }], "caption-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "body-md-emphasis": ["16px", { "lineHeight": "22px", "fontWeight": "500" }], "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "34px", "fontWeight": "700" }], "body-md": ["16px", { "lineHeight": "22px", "fontWeight": "400" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;min-height:100vh;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe"><div class="h-16 px-space-md flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><img alt="Vibrant friendly delivery mascot character logo mark for GoLivreur Client in Daloa Côte d'Ivoire. A cheerful, friendly stylized cartoon delivery courier guy (bonhomme livreur souriant) wearing an orange motorcycle helmet with a visor and a courier vest/cap, waving or zooming forward with a courier delivery parcel box, energetic, modern flat vector logo icon, rounded friendly geometry, clean vector emblem style, primary warm orange #F4A623 with dark green #1B5E20 accents and clean white details, on a pure solid isolated background, emblem badge suitable for mobile app logo. Design context: - Primary color: #f4a623
+- Font: inter
+- Mode: light
+- Roundness: rounded-md
+. The logo should be visually consistent with these brand tokens." class="h-8 w-auto object-contain shrink-0" src="https://lh3.googleusercontent.com/aida/ALJJyrDnb2VJIGL648lkt0uwKxbW3l2Jh1MPgdUuqbV2nOp842vVJ6xDHx6u--Xywk2fMHbxZaaqGlqHuT50hyblHAVH04609rzbOfF6Yz1SVUlGUdHH4EOPy4eFlM5ahQPtaEcdajXw7PSYO1uCXD_gUGGd0VK2LPJRJXXCRfa1Ho9jieUpkEbWDYD_iWH8rsPv5o6oRxQgim2zjyxGNhxMr32PQimtm1uZggDHUZ_3x4vY"/><div class="flex flex-col min-w-0"><div class="flex items-center gap-space-xs"><span class="font-label-md text-label-md text-text-primary truncate">GoLivreur Business</span><span class="inline-flex items-center px-space-xs py-0.5 rounded-full text-[11px] font-semibold bg-tertiary-fixed text-on-tertiary-container shrink-0">Daloa</span></div><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-secondary shrink-0 animate-pulse"></span><span class="font-caption-sm text-caption-sm text-text-secondary truncate">Chez Adjoua • Ouvert</span></div></div></div><div class="flex items-center gap-space-xs shrink-0"><button aria-label="Statut boutique" class="w-11 h-11 flex items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container active:scale-95 transition-all" type="button"><span class="material-symbols-outlined text-[24px]">storefront</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-20 bg-surface flex-1 min-h-screen"><div class="flex flex-col w-full pb-6">
+<!-- Store Status & Daily Revenue Summary Banner -->
+<div class="px-space-md pt-2 pb-space-sm">
+<div class="bg-surface-container rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between gap-space-sm mb-space-md">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-xl bg-secondary/15 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary text-[22px]">storefront</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary shrink-0 animate-ping" id="store-pulse"></span>
+<span class="font-headline-sm text-headline-sm text-text-primary truncate" id="store-status-title">Ouvert aux commandes</span>
+</div>
+<p class="font-caption-sm text-caption-sm text-text-secondary truncate">Chez Adjoua Daloa • En service direct</p>
+</div>
+</div>
+<!-- Custom Tactile Switch -->
+<button aria-label="Basculer statut restaurant" class="w-14 h-8 bg-secondary rounded-full p-1 transition-all duration-300 relative shrink-0 shadow-inner" id="toggle-store-btn" type="button">
+<div class="w-6 h-6 rounded-full bg-surface-container-lowest shadow-md transform translate-x-6 transition-transform duration-300 flex items-center justify-center" id="switch-thumb">
+<span class="material-symbols-outlined text-[14px] text-secondary">check</span>
+</div>
+</button>
+</div>
+<!-- Bento-style Daily Stats Highlight -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex items-center justify-between gap-space-sm">
+<div class="flex flex-col">
+<span class="font-caption-sm text-caption-sm text-text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-primary">payments</span>
+            Ventes nettes du jour
+          </span>
+<span class="font-headline-lg text-headline-lg text-text-primary font-bold mt-0.5 tracking-tight">42 500 <span class="font-label-md text-label-md text-primary">F CFA</span></span>
+</div>
+<div class="flex flex-col items-end shrink-0">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-label-md text-[12px] font-semibold">
+            +18% vs hier
+          </span>
+<span class="font-caption-sm text-caption-sm text-text-secondary mt-1">12 commandes reçues</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Search Bar with Big Touch Target (52px) -->
+<div class="px-space-md mb-space-sm">
+<div class="relative flex items-center w-full bg-surface-container-lowest rounded-xl shadow-sm">
+<span class="material-symbols-outlined absolute left-4 text-[22px] text-text-secondary pointer-events-none">search</span>
+<input class="w-full h-[52px] pl-12 pr-11 bg-transparent rounded-xl font-body-md text-body-md text-text-primary placeholder:text-text-disabled outline-none" id="search-commandes" placeholder="Rechercher par #ORD ou client..." type="text"/>
+<button aria-label="Effacer recherche" class="hidden absolute right-3 w-8 h-8 rounded-full bg-surface-container items-center justify-center text-text-secondary hover:text-text-primary" id="clear-search-btn" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+</div>
+<!-- Status Category Filters (#filtre-statut) -->
+<div class="flex items-center gap-space-xs px-space-md py-1 overflow-x-auto no-scrollbar scroll-smooth" id="filtre-statut">
+<button class="filter-tab active-filter shrink-0 h-10 px-4 rounded-full bg-text-primary text-surface-container-lowest font-label-md text-[13px] font-semibold shadow-sm transition-all" data-filter="all">
+      Toutes <span class="ml-1 opacity-80">(12)</span>
+</button>
+<button class="filter-tab shrink-0 h-10 px-4 rounded-full bg-surface-container-lowest text-text-secondary font-label-md text-[13px] font-semibold shadow-sm transition-all hover:bg-surface-container" data-filter="encours">
+      En cours <span class="ml-1 px-1.5 py-0.5 rounded-full bg-feedback-warning/20 text-feedback-warning text-[11px]">2</span>
+</button>
+<button class="filter-tab shrink-0 h-10 px-4 rounded-full bg-surface-container-lowest text-text-secondary font-label-md text-[13px] font-semibold shadow-sm transition-all hover:bg-surface-container" data-filter="livrees">
+      Livrées <span class="ml-1 opacity-70">(10)</span>
+</button>
+<button class="filter-tab shrink-0 h-10 px-4 rounded-full bg-surface-container-lowest text-text-secondary font-label-md text-[13px] font-semibold shadow-sm transition-all hover:bg-surface-container" data-filter="annulees">
+      Annulées <span class="ml-1 opacity-70">(0)</span>
+</button>
+</div>
+<!-- Orders List Feed -->
+<div class="px-space-md mt-space-md flex flex-col gap-space-md" id="orders-container">
+<!-- Order Item 1: #ORD-5002 (In Transit) -->
+<article class="order-card bg-surface-container-lowest rounded-xl p-space-md shadow-sm relative overflow-hidden active:scale-[0.99] transition-all" data-status="encours" id="commande-item-5002">
+<div class="flex items-start justify-between gap-space-sm pb-space-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-12 h-12 rounded-xl bg-tertiary-container/30 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-tertiary text-[24px]">moped</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-text-primary truncate">#ORD-5002</span>
+<span class="w-1.5 h-1.5 rounded-full bg-text-disabled"></span>
+<span class="font-caption-sm text-caption-sm text-text-secondary">Reçue à 13:15</span>
+</div>
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate mt-0.5">Aïcha Traoré</p>
+</div>
+</div>
+<!-- Status Badge: En route livreur -->
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-container font-label-md text-[12px] font-semibold shrink-0">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+          En route livreur
+        </span>
+</div>
+<!-- Content Details with Imagery -->
+<div class="flex items-center gap-space-md py-space-sm bg-surface-container-low rounded-xl px-space-md my-1">
+<img class="w-14 h-14 rounded-lg object-cover shrink-0 shadow-sm" data-alt="Traditional delicious Ivorian braised chicken served with golden fried alloco plantains and fresh spicy pepper sauce, top-down culinary food photography warm lighting Daloa cuisine" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDXPpoEgxRwHM2zcmC6VIV2ir-w5xNoBBLDu8expXaEOY-5nfTBROeD8LIUo9wud9UWTgsE_TDlWApK8coE5CMJh9qxU6lOiyg7BAuRD9vSGygpcZBprzn_fjANlE0x4x89u9Mz7Dnb7arAZZx6Ic6rSTFMtejvQIJpZkz2huzjTvwWDig8Zq6gjYD5lcazcZyGN3BmFRhaJ_9yg_wCg_ATAgiutyAIsx15xqZWIF4"/>
+<div class="flex flex-col min-w-0 flex-1">
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate">2x Poulet braisé + Alloco</p>
+<div class="flex items-center gap-1 text-text-secondary font-caption-sm text-caption-sm mt-0.5">
+<span class="material-symbols-outlined text-[15px] text-primary">location_on</span>
+<span class="truncate">Quartier Soleil • Daloa</span>
+</div>
+</div>
+<div class="text-right shrink-0">
+<p class="font-headline-sm text-headline-sm text-text-primary font-bold">6 500</p>
+<span class="font-caption-sm text-[11px] text-text-secondary">F CFA</span>
+</div>
+</div>
+<!-- Action Footer with 52px Touch-friendly buttons -->
+<div class="pt-space-sm flex items-center justify-between gap-space-sm">
+<div class="flex items-center gap-1.5 font-caption-sm text-caption-sm text-text-secondary">
+<span class="material-symbols-outlined text-[16px] text-secondary">verified</span>
+          Livreur: <span class="font-semibold text-text-primary">Moussa D.</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button aria-label="Contacter livreur" class="h-10 px-3 rounded-lg bg-surface-container hover:bg-surface-container-high text-text-primary font-label-md text-[13px] flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">call</span>
+            Appeler
+          </button>
+<button aria-label="Détails commande #ORD-5002" class="h-10 px-3 rounded-lg bg-primary-container text-on-primary-container font-label-md text-[13px] font-semibold flex items-center gap-1 active:scale-95 transition-all" type="button">
+            Suivi
+            <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Order Item 2: #ORD-5001 (Delivered, Orange Money) -->
+<article class="order-card bg-surface-container-lowest rounded-xl p-space-md shadow-sm relative overflow-hidden active:scale-[0.99] transition-all" data-status="livrees" id="commande-item-5001">
+<div class="flex items-start justify-between gap-space-sm pb-space-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-12 h-12 rounded-xl bg-secondary-fixed/50 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary text-[24px]">task_alt</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-text-primary truncate">#ORD-5001</span>
+<span class="w-1.5 h-1.5 rounded-full bg-text-disabled"></span>
+<span class="font-caption-sm text-caption-sm text-text-secondary">Payé Orange Money</span>
+</div>
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate mt-0.5">Jean Kouassi</p>
+</div>
+</div>
+<!-- Badge Livrée à 12:45 -->
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-label-md text-[12px] font-semibold shrink-0">
+<span class="material-symbols-outlined text-[14px]">check</span>
+          Livrée à 12:45
+        </span>
+</div>
+<div class="flex items-center gap-space-md py-space-sm bg-surface-container-low rounded-xl px-space-md my-1">
+<img class="w-14 h-14 rounded-lg object-cover shrink-0 shadow-sm" data-alt="Generous portion of golden roast braised chicken on artisanal clay plate with side onion relish, restaurant quality presentation, warm vibrant ambiance" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBzwaJcdKgX9R9aCandt9G4vzpguz3kWdYiB-7NdRSr3del3pqzEsPbmLzSJgmeEkgAhtH0rBOLFI0xl9KZTzSBJD7O6wzpkLQ40vS3i_n7WPS6ngLmFosZZ8iT0ateEP3InZJP4na58x8k7QyaY0BzSNWkNZErsfmR4iTkQBPmDMQcCbTywgBhej4hL2SzW-9VKzy2qJGDrTofhSaZUpPmcogZqh-orNLfyu8go8"/>
+<div class="flex flex-col min-w-0 flex-1">
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate">1x Poulet braisé grand</p>
+<div class="flex items-center gap-1 text-text-secondary font-caption-sm text-caption-sm mt-0.5">
+<span class="material-symbols-outlined text-[15px] text-primary">location_on</span>
+<span class="truncate">Quartier Résidentiel • Daloa</span>
+</div>
+</div>
+<div class="text-right shrink-0">
+<p class="font-headline-sm text-headline-sm text-text-primary font-bold">3 000</p>
+<span class="font-caption-sm text-[11px] text-text-secondary">F CFA</span>
+</div>
+</div>
+<div class="pt-space-sm flex items-center justify-between text-caption-sm text-text-secondary">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-feedback-success">credit_score</span>
+          Transaction validée (OM-8831)
+        </span>
+<button class="font-label-md text-label-md text-primary hover:underline flex items-center gap-0.5" type="button">
+          Reçu
+          <span class="material-symbols-outlined text-[16px]">receipt</span>
+</button>
+</div>
+</article>
+<!-- Order Item 3: #ORD-4998 (Delivered, Cash) -->
+<article class="order-card bg-surface-container-lowest rounded-xl p-space-md shadow-sm relative overflow-hidden active:scale-[0.99] transition-all" data-status="livrees" id="commande-item-4998">
+<div class="flex items-start justify-between gap-space-sm pb-space-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-12 h-12 rounded-xl bg-secondary-fixed/50 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary text-[24px]">task_alt</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-text-primary truncate">#ORD-4998</span>
+<span class="w-1.5 h-1.5 rounded-full bg-text-disabled"></span>
+<span class="font-caption-sm text-caption-sm text-text-secondary">Payé Cash</span>
+</div>
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate mt-0.5">M. Koné</p>
+</div>
+</div>
+<!-- Badge Livrée à 12:10 -->
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-label-md text-[12px] font-semibold shrink-0">
+<span class="material-symbols-outlined text-[14px]">check</span>
+          Livrée à 12:10
+        </span>
+</div>
+<div class="flex items-center gap-space-md py-space-sm bg-surface-container-low rounded-xl px-space-md my-1">
+<div class="w-14 h-14 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[28px]">lunch_dining</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate">3x Garba classique + poisson</p>
+<div class="flex items-center gap-1 text-text-secondary font-caption-sm text-caption-sm mt-0.5">
+<span class="material-symbols-outlined text-[15px] text-primary">location_on</span>
+<span class="truncate">Quartier Habitat • Daloa</span>
+</div>
+</div>
+<div class="text-right shrink-0">
+<p class="font-headline-sm text-headline-sm text-text-primary font-bold">1 500</p>
+<span class="font-caption-sm text-[11px] text-text-secondary">F CFA</span>
+</div>
+</div>
+<div class="pt-space-sm flex items-center justify-between text-caption-sm text-text-secondary">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary">local_atm</span>
+          Espèces encaissées par livreur
+        </span>
+<button class="font-label-md text-label-md text-primary hover:underline flex items-center gap-0.5" type="button">
+          Reçu
+          <span class="material-symbols-outlined text-[16px]">receipt</span>
+</button>
+</div>
+</article>
+<!-- Order Item 4: #ORD-4995 (Delivered) -->
+<article class="order-card bg-surface-container-lowest rounded-xl p-space-md shadow-sm relative overflow-hidden active:scale-[0.99] transition-all" data-status="livrees" id="commande-item-4995">
+<div class="flex items-start justify-between gap-space-sm pb-space-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-12 h-12 rounded-xl bg-secondary-fixed/50 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary text-[24px]">task_alt</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-text-primary truncate">#ORD-4995</span>
+<span class="w-1.5 h-1.5 rounded-full bg-text-disabled"></span>
+<span class="font-caption-sm text-caption-sm text-text-secondary">Payé Wave</span>
+</div>
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate mt-0.5">Brou Kouamé</p>
+</div>
+</div>
+<!-- Badge Livrée à 11:30 -->
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-label-md text-[12px] font-semibold shrink-0">
+<span class="material-symbols-outlined text-[14px]">check</span>
+          Livrée à 11:30
+        </span>
+</div>
+<div class="flex items-center gap-space-md py-space-sm bg-surface-container-low rounded-xl px-space-md my-1">
+<img class="w-14 h-14 rounded-lg object-cover shrink-0 shadow-sm" data-alt="Traditional West African spicy chicken kedjenou stew served hot inside a traditional terracotta pot with aromatic vegetables and chili peppers, vivid vibrant colors, studio dish capture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDavqqoGWHOS2HzMx664K3w3HF7nl3uTSlXF2f_QTdhtciBeRcGJiWLS3cy6cE8m8qmgT_n-Bsk-Xb5Fde4Y2wfgh1c14091Ej74QaYMdCDQ_jfYQDUs4cD9seg3Q_5U6--4AwbuPaai3xb7Ow4whwsZdliQyjHByv1jNbup-CwnLX-rEABDy6bBrzezF0kN3hfZVhCZLO8hKeA_C0Agjdzm6XkOOCs40YX3fZF-aA"/>
+<div class="flex flex-col min-w-0 flex-1">
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate">2x Kédjénou de poulet</p>
+<div class="flex items-center gap-1 text-text-secondary font-caption-sm text-caption-sm mt-0.5">
+<span class="material-symbols-outlined text-[15px] text-primary">location_on</span>
+<span class="truncate">Centre-ville • Daloa</span>
+</div>
+</div>
+<div class="text-right shrink-0">
+<p class="font-headline-sm text-headline-sm text-text-primary font-bold">8 000</p>
+<span class="font-caption-sm text-[11px] text-text-secondary">F CFA</span>
+</div>
+</div>
+<div class="pt-space-sm flex items-center justify-between text-caption-sm text-text-secondary">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-feedback-info">account_balance_wallet</span>
+          Transfert direct validé
+        </span>
+<button class="font-label-md text-label-md text-primary hover:underline flex items-center gap-0.5" type="button">
+          Reçu
+          <span class="material-symbols-outlined text-[16px]">receipt</span>
+</button>
+</div>
+</article>
+</div>
+<!-- Empty state container for filtered views -->
+<div class="hidden px-space-md py-space-2xl text-center flex-col items-center justify-center" id="empty-state">
+<div class="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mb-space-sm text-text-disabled">
+<span class="material-symbols-outlined text-[32px]">inventory_2</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-text-primary font-bold">Aucune commande trouvée</h3>
+<p class="font-caption-sm text-caption-sm text-text-secondary mt-1 max-w-[240px]">Aucune commande ne correspond à ce filtre ou critère de recherche.</p>
+</div>
+<!-- Quick Action Tactile Floating Refresh Indicator -->
+<div class="px-space-md mt-space-lg flex justify-center">
+<button class="h-11 px-4 rounded-full bg-surface-container-high text-text-secondary hover:text-text-primary flex items-center gap-2 font-label-md text-[13px] active:scale-95 transition-all" id="refresh-feed-btn" type="button">
+<span class="material-symbols-outlined text-[18px]">cached</span>
+      Actualiser les commandes
+    </button>
+</div>
+</div>
+<script>
+  (() => {
+    // 1. Navigation Active State Pairing
+    const navItems = document.querySelectorAll('nav a[data-path]');
+    navItems.forEach(item => {
+      if (item.getAttribute('data-path') === 'commandes') {
+        item.classList.add('text-tertiary', 'font-semibold');
+        item.classList.remove('text-text-secondary');
+        const icon = item.querySelector('.material-symbols-outlined');
+        if (icon) {
+          icon.style.fontVariationSettings = "'FILL' 1";
+        }
+      }
+    });
+
+    // 2. Interactive Store Availability Switch
+    const storeBtn = document.getElementById('toggle-store-btn');
+    const switchThumb = document.getElementById('switch-thumb');
+    const storeStatusTitle = document.getElementById('store-status-title');
+    const storePulse = document.getElementById('store-pulse');
+    let isOpen = true;
+
+    if (storeBtn) {
+      storeBtn.addEventListener('click', () => {
+        isOpen = !isOpen;
+        if (isOpen) {
+          storeBtn.className = 'w-14 h-8 bg-secondary rounded-full p-1 transition-all duration-300 relative shrink-0 shadow-inner';
+          switchThumb.className = 'w-6 h-6 rounded-full bg-surface-container-lowest shadow-md transform translate-x-6 transition-transform duration-300 flex items-center justify-center';
+          switchThumb.innerHTML = '<span class="material-symbols-outlined text-[14px] text-secondary">check</span>';
+          storeStatusTitle.textContent = 'Ouvert aux commandes';
+          storePulse.className = 'w-2.5 h-2.5 rounded-full bg-secondary shrink-0 animate-ping';
+        } else {
+          storeBtn.className = 'w-14 h-8 bg-surface-variant rounded-full p-1 transition-all duration-300 relative shrink-0 shadow-inner';
+          switchThumb.className = 'w-6 h-6 rounded-full bg-surface-container-lowest shadow-md transform translate-x-0 transition-transform duration-300 flex items-center justify-center';
+          switchThumb.innerHTML = '<span class="material-symbols-outlined text-[14px] text-gray-500">close</span>';
+          storeStatusTitle.textContent = 'Fermé temporairement';
+          storePulse.className = 'w-2.5 h-2.5 rounded-full bg-feedback-error shrink-0';
+        }
+      });
+    }
+
+    // 3. Status Tabs Filtering
+    const filterTabs = document.querySelectorAll('.filter-tab');
+    const orderCards = document.querySelectorAll('.order-card');
+    const emptyState = document.getElementById('empty-state');
+    const searchInput = document.getElementById('search-commandes');
+    const clearBtn = document.getElementById('clear-search-btn');
+
+    let currentFilter = 'all';
+
+    function applyFilters() {
+      const query = (searchInput?.value || '').toLowerCase().trim();
+      let visibleCount = 0;
+
+      orderCards.forEach(card => {
+        const cardStatus = card.getAttribute('data-status');
+        const textContent = card.innerText.toLowerCase();
+
+        const matchesStatus = (currentFilter === 'all') || (cardStatus === currentFilter);
+        const matchesQuery = !query || textContent.includes(query);
+
+        if (matchesStatus && matchesQuery) {
+          card.classList.remove('hidden');
+          visibleCount++;
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+
+      if (emptyState) {
+        if (visibleCount === 0) {
+          emptyState.classList.remove('hidden');
+          emptyState.classList.add('flex');
+        } else {
+          emptyState.classList.add('hidden');
+          emptyState.classList.remove('flex');
+        }
+      }
+    }
+
+    filterTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        filterTabs.forEach(t => {
+          t.className = 'filter-tab shrink-0 h-10 px-4 rounded-full bg-surface-container-lowest text-text-secondary font-label-md text-[13px] font-semibold shadow-sm transition-all hover:bg-surface-container';
+        });
+
+        tab.className = 'filter-tab active-filter shrink-0 h-10 px-4 rounded-full bg-text-primary text-surface-container-lowest font-label-md text-[13px] font-semibold shadow-sm transition-all';
+        currentFilter = tab.getAttribute('data-filter') || 'all';
+        applyFilters();
+      });
+    });
+
+    // 4. Live Search Interaction
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        if (searchInput.value.length > 0) {
+          clearBtn?.classList.remove('hidden');
+          clearBtn?.classList.add('flex');
+        } else {
+          clearBtn?.classList.add('hidden');
+          clearBtn?.classList.remove('flex');
+        }
+        applyFilters();
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (searchInput) {
+          searchInput.value = '';
+          clearBtn.classList.add('hidden');
+          clearBtn.classList.remove('flex');
+          applyFilters();
+          searchInput.focus();
+        }
+      });
+    }
+
+    // 5. Tactile Refresh micro-interaction
+    const refreshBtn = document.getElementById('refresh-feed-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        const icon = refreshBtn.querySelector('.material-symbols-outlined');
+        if (icon) {
+          icon.classList.add('animate-spin');
+          setTimeout(() => {
+            icon.classList.remove('animate-spin');
+          }, 800);
+        }
+      });
+    }
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-1px_8px_rgba(0,0,0,0.04)]" data-active-classes="text-tertiary bg-tertiary-container/30 font-semibold"><div class="flex justify-around items-center h-16 px-space-sm"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[72px] h-12 rounded-xl transition-all text-tertiary bg-tertiary-container/30 font-semibold" data-path="commandes" href="#"><span class="material-symbols-outlined text-[24px]">receipt_long</span><span class="font-caption-sm text-caption-sm mt-0.5">Commandes</span></a><a class="flex flex-col items-center justify-center min-w-[72px] h-12 rounded-xl text-text-secondary hover:text-on-surface transition-all" data-path="catalogue" href="#"><span class="material-symbols-outlined text-[24px]">menu_book</span><span class="font-caption-sm text-caption-sm mt-0.5">Catalogue</span></a><a class="flex flex-col items-center justify-center min-w-[72px] h-12 rounded-xl text-text-secondary hover:text-on-surface transition-all" data-path="revenus" href="#"><span class="material-symbols-outlined text-[24px]">payments</span><span class="font-caption-sm text-caption-sm mt-0.5">Revenus</span></a></div></nav></body></html>

@@ -1,0 +1,232 @@
+﻿<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-tertiary-container": "#00497d", "primary-fixed-dim": "#ffb953", "gray-300": "#E0E0E0", "primary-container": "#f4a623", "on-surface": "#1b1c1c", "on-primary-fixed": "#291800", "secondary-container": "#acf4a4", "primary-fixed": "#ffddb4", "on-secondary-container": "#307231", "feedback-success": "#4CAF50", "on-primary": "#ffffff", "surface-bright": "#fcf9f8", "text-primary": "#212121", "on-surface-variant": "#524534", "feedback-error": "#D32F2F", "gray-500": "#9E9E9E", "on-tertiary-fixed-variant": "#00497c", "surface-container-low": "#f6f3f2", "on-secondary-fixed-variant": "#0c5216", "on-primary-fixed-variant": "#633f00", "feedback-info": "#2E75B6", "on-tertiary-fixed": "#001d36", "inverse-surface": "#303030", "surface-dim": "#dcd9d9", "surface-container-highest": "#e5e2e1", "surface-container": "#f0eded", "on-error": "#ffffff", "feedback-warning": "#F9A825", "outline": "#847462", "on-secondary-fixed": "#002203", "secondary": "#2a6b2c", "text-disabled": "#9E9E9E", "on-error-container": "#93000a", "surface-tint": "#835500", "background": "#fcf9f8", "on-secondary": "#ffffff", "error": "#ba1a1a", "text-secondary": "#595959", "on-tertiary": "#ffffff", "outline-variant": "#d7c3ae", "inverse-on-surface": "#f3f0ef", "on-background": "#1b1c1c", "inverse-primary": "#ffb953", "tertiary-container": "#7cbaff", "gray-700": "#595959", "surface-card": "#FFFFFF", "primary": "#835500", "tertiary": "#0b61a1", "tertiary-fixed-dim": "#9ecaff", "tertiary-fixed": "#d1e4ff", "gray-100": "#F2F2F2", "on-primary-container": "#644000", "secondary-fixed": "#acf4a4", "surface": "#fcf9f8", "border-default": "#E0E0E0", "surface-bg": "#FAFAFA", "surface-variant": "#e5e2e1", "surface-container-high": "#eae7e7", "surface-container-lowest": "#ffffff", "secondary-fixed-dim": "#91d78a", "gray-900": "#212121", "error-container": "#ffdad6", "gray-50": "#FAFAFA" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-md": "16px", "space-xl": "32px", "margin": "16px", "gutter": "16px", "space-lg": "24px", "space-2xl": "48px", "space-xs": "4px", "space-sm": "8px" }, fontFamily: { "label-md": ["Inter"], "caption-sm": ["Inter"], "body-md": ["Inter"], "body-md-emphasis": ["Inter"], "headline-lg": ["Inter"], "headline-md": ["Inter"], "headline-sm": ["Inter"] }, fontSize: { "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "600" }], "caption-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "body-md": ["16px", { "lineHeight": "22px", "fontWeight": "400" }], "body-md-emphasis": ["16px", { "lineHeight": "22px", "fontWeight": "500" }], "headline-lg": ["28px", { "lineHeight": "34px", "fontWeight": "700" }], "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "700" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center min-w-[44px]"><button class="w-11 h-11 flex items-center justify-center text-on-surface rounded-full hover:bg-surface-variant/40 transition-colors" onclick="history.back()" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button></div><h1 class="font-headline-sm text-headline-sm text-on-surface text-center truncate px-space-xs flex-1">Confirmation Livraison</h1><div class="flex items-center gap-space-xs justify-end min-w-[44px]"><button class="w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-on-surface rounded-full hover:bg-surface-variant/40 transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">help_outline</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 ml-space-xs"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-safe bg-surface min-h-screen"><div class="flex flex-col w-full pb-space-2xl px-margin space-y-space-lg">
+<!-- 1. Grande icône de succès et félicitations -->
+<div class="flex flex-col items-center text-center pt-space-md">
+<div class="relative flex items-center justify-center w-20 h-20 rounded-full bg-secondary-container text-on-secondary-container shadow-md mb-space-md">
+<span class="material-symbols-outlined text-[48px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<div class="absolute -bottom-1 -right-1 w-7 h-7 bg-primary-container text-on-primary-container rounded-full flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+</div>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Colis livré avec succès !</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-space-xs max-w-sm">
+      Votre expédition <span class="font-body-md-emphasis text-on-surface">#prc_9001</span> a été remise en main propre à <span class="font-body-md-emphasis text-on-surface">M. Koné</span> à 14:32.
+    </p>
+</div>
+<!-- 2. Preuve de livraison en photo -->
+<div class="flex flex-col bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden" id="photo-remise">
+<div class="relative w-full h-56 bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="Photographie de preuve de livraison prise sur le vif en lumière naturelle extérieure à Daloa. Une coursière ivoirienne souriante vêtue d'un gilet haute visibilité remet une pochette de documents scellée à un homme devant un portail de quartier résidentiel. Cliché documentaire net, franc, aux tons chaleureux ambrés et verts végétaux." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8K83F9a0JDxLf2MiE574QYXE1_P7o5MUKU59mFoEsRhK-YE3ZJ_-MqLP1lDnGsUvTF74WonN831sy2raD7GU7iUYRCVMfyJSVpzIK0e4O6hoMnBkFs2o165Zj2wDFtfKcU11xUr_CYzFgCHvjEd21p3V4l1zmR8X8GhN4mZhbk73xpfJ280tj_j9jUL6OHwbOhRaeCYlq31BWiJxqlBp0P8lRwUWAFtfxhufM3P8"/>
+<div class="absolute top-space-sm left-space-sm bg-secondary text-on-secondary font-caption-sm text-caption-sm px-space-sm py-space-xs rounded-lg flex items-center gap-space-xs shadow">
+<span class="material-symbols-outlined text-[16px]">sms</span>
+<span>Remise validée par code SMS (5820)</span>
+</div>
+<div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-inverse-surface/80 via-inverse-surface/30 to-transparent p-space-sm">
+<div class="flex items-center gap-space-xs text-on-secondary">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+<span class="font-caption-sm text-caption-sm">Aujourd'hui à 14:32 • Daloa Quartier Habitat</span>
+</div>
+</div>
+</div>
+<div class="p-space-md flex items-center justify-between bg-surface-container-low">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-feedback-success text-[20px]">task_alt</span>
+<span class="font-body-md-emphasis text-body-md text-on-surface">Preuve certifiée par géolocalisation</span>
+</div>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant font-medium">GPS: 6.877° N, 6.450° W</span>
+</div>
+</div>
+<!-- 3. Fiche récapitulative de la course terminée -->
+<div class="flex flex-col bg-surface-container-lowest rounded-xl shadow-sm p-space-md space-y-space-md">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface">Détails de la course</span>
+<span class="bg-secondary-container text-on-secondary-container font-caption-sm text-caption-sm px-space-sm py-space-xs rounded-full font-medium">Terminée</span>
+</div>
+<!-- Trajet Expéditeur / Destinataire -->
+<div class="flex flex-col space-y-space-sm bg-surface-container-low p-space-md rounded-lg">
+<div class="flex items-start gap-space-sm">
+<div class="w-6 h-6 rounded-full bg-primary-fixed flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-on-primary-fixed text-[14px]">trip_origin</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Expéditeur</span>
+<span class="font-body-md-emphasis text-body-md text-on-surface truncate">Jean Kouassi</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Quartier Résidentiel, Daloa</span>
+</div>
+</div>
+<div class="ml-3 w-0.5 h-3 bg-outline-variant"></div>
+<div class="flex items-start gap-space-sm">
+<div class="w-6 h-6 rounded-full bg-secondary-fixed flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-on-secondary-fixed text-[14px]">location_on</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Destinataire</span>
+<span class="font-body-md-emphasis text-body-md text-on-surface truncate">M. Koné</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Quartier Habitat, Daloa</span>
+</div>
+</div>
+</div>
+<!-- Meta Colis & Coursière -->
+<div class="grid grid-cols-2 gap-space-sm">
+<div class="flex flex-col bg-surface-container-low p-space-md rounded-lg">
+<div class="flex items-center gap-space-xs text-on-surface-variant mb-space-xs">
+<span class="material-symbols-outlined text-[18px]">inventory_2</span>
+<span class="font-caption-sm text-caption-sm">Type de colis</span>
+</div>
+<span class="font-body-md-emphasis text-body-md text-on-surface leading-tight">Petit format</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant mt-0.5">Docs administratifs</span>
+</div>
+<div class="flex flex-col bg-surface-container-low p-space-md rounded-lg">
+<div class="flex items-center gap-space-xs text-on-surface-variant mb-space-xs">
+<span class="material-symbols-outlined text-[18px]">two_wheeler</span>
+<span class="font-caption-sm text-caption-sm">Coursière</span>
+</div>
+<span class="font-body-md-emphasis text-body-md text-on-surface leading-tight">Fatou Diaby</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant mt-0.5">Moto Djakarta</span>
+</div>
+</div>
+<!-- Règlement -->
+<div class="flex items-center justify-between bg-primary-fixed/30 p-space-md rounded-lg">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-md-emphasis text-body-md text-on-surface">1 000 F CFA</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Orange Money • Reçu dispo</span>
+</div>
+</div>
+<span class="bg-secondary-container text-on-secondary-container font-caption-sm text-caption-sm px-space-sm py-1 rounded-md font-semibold">Payé</span>
+</div>
+</div>
+<!-- 4. Section Évaluation du service GoColis -->
+<div class="flex flex-col bg-surface-container-lowest rounded-xl shadow-sm p-space-md space-y-space-md">
+<div class="flex flex-col text-center items-center">
+<span class="font-caption-sm text-caption-sm text-primary font-bold uppercase tracking-wider mb-space-xs">Votre avis compte</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Notez la prestation de Fatou Diaby</h3>
+<p class="font-caption-sm text-caption-sm text-on-surface-variant mt-1">Aidez-nous à valoriser nos meilleurs livreurs</p>
+</div>
+<!-- 5 Étoiles interactives -->
+<div class="flex items-center justify-center gap-space-sm py-space-xs" id="rating-stars">
+<button class="star-btn text-primary-container hover:scale-110 active:scale-95 transition-transform" data-val="1" type="button">
+<span class="material-symbols-outlined text-[36px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button class="star-btn text-primary-container hover:scale-110 active:scale-95 transition-transform" data-val="2" type="button">
+<span class="material-symbols-outlined text-[36px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button class="star-btn text-primary-container hover:scale-110 active:scale-95 transition-transform" data-val="3" type="button">
+<span class="material-symbols-outlined text-[36px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button class="star-btn text-primary-container hover:scale-110 active:scale-95 transition-transform" data-val="4" type="button">
+<span class="material-symbols-outlined text-[36px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button class="star-btn text-primary-container hover:scale-110 active:scale-95 transition-transform" data-val="5" type="button">
+<span class="material-symbols-outlined text-[36px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+</div>
+<!-- Tags de retour rapide -->
+<div class="flex flex-wrap gap-space-xs justify-center pt-space-xs" id="feedback-chips">
+<button class="chip-btn px-space-md py-space-xs rounded-full bg-surface-container-high text-on-surface text-caption-sm font-caption-sm font-medium transition-colors" type="button">
+        Ponctuelle
+      </button>
+<button class="chip-btn px-space-md py-space-xs rounded-full bg-surface-container-high text-on-surface text-caption-sm font-caption-sm font-medium transition-colors" type="button">
+        Souriante
+      </button>
+<button class="chip-btn px-space-md py-space-xs rounded-full bg-surface-container-high text-on-surface text-caption-sm font-caption-sm font-medium transition-colors" type="button">
+        Colis intact
+      </button>
+<button class="chip-btn px-space-md py-space-xs rounded-full bg-surface-container-high text-on-surface text-caption-sm font-caption-sm font-medium transition-colors" type="button">
+        Communication parfaite
+      </button>
+</div>
+<!-- Pourboire optionnel -->
+<div class="flex flex-col bg-surface-container-low p-space-md rounded-lg space-y-space-sm mt-space-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary-container text-[20px]">volunteer_activism</span>
+<span class="font-body-md-emphasis text-body-md text-on-surface">Ajouter un pourboire</span>
+</div>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">100% pour Fatou</span>
+</div>
+<div class="grid grid-cols-3 gap-space-sm" id="tip-selector">
+<button class="tip-btn h-11 rounded-lg bg-surface-container text-on-surface font-body-md-emphasis text-body-md flex items-center justify-center transition-colors" data-tip="0" type="button">
+          Aucun
+        </button>
+<button class="tip-btn h-11 rounded-lg bg-surface-container text-on-surface font-body-md-emphasis text-body-md flex items-center justify-center transition-colors" data-tip="200" type="button">
+          +200 F
+        </button>
+<button class="tip-btn h-11 rounded-lg bg-surface-container text-on-surface font-body-md-emphasis text-body-md flex items-center justify-center transition-colors" data-tip="500" type="button">
+          +500 F
+        </button>
+</div>
+</div>
+</div>
+<!-- 5. Boutons d'action -->
+<div class="flex flex-col space-y-space-sm pt-space-xs">
+<!-- Bouton Principal : Télécharger le reçu (Orange #F4A623, 52px min) -->
+<button class="h-[52px] w-full rounded-xl bg-primary-container text-on-surface font-label-md text-label-md flex items-center justify-center gap-space-sm shadow-md active:bg-primary-fixed-dim transition-colors" type="button">
+<span class="material-symbols-outlined text-[22px]">receipt_long</span>
+<span>Télécharger le reçu de livraison</span>
+</button>
+<!-- Bouton Secondaire : Retour à l'accueil GoColis (52px min) -->
+<button class="h-[52px] w-full rounded-xl bg-surface-container-high text-on-surface font-label-md text-label-md flex items-center justify-center gap-space-sm hover:bg-surface-container-highest active:bg-surface-dim transition-colors" data-action="gocolis.closeConfirmation" id="btn-fermer" type="button">
+<span class="material-symbols-outlined text-[22px]">home</span>
+<span>Retour à l'accueil GoColis</span>
+</button>
+</div>
+</div>
+<script>
+  (function() {
+    // Étoiles de notation
+    const stars = document.querySelectorAll('#rating-stars .star-btn');
+    stars.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = parseInt(btn.getAttribute('data-val') || '5', 10);
+        stars.forEach((s, idx) => {
+          const icon = s.querySelector('.material-symbols-outlined');
+          if (idx < val) {
+            s.classList.remove('text-surface-container-highest');
+            s.classList.add('text-primary-container');
+            icon.style.fontVariationSettings = "'FILL' 1";
+          } else {
+            s.classList.remove('text-primary-container');
+            s.classList.add('text-surface-container-highest');
+            icon.style.fontVariationSettings = "'FILL' 0";
+          }
+        });
+      });
+    });
+
+    // Chips de retour rapide
+    const chips = document.querySelectorAll('#feedback-chips .chip-btn');
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chip.classList.toggle('bg-primary-container');
+        chip.classList.toggle('text-on-surface');
+        chip.classList.toggle('bg-surface-container-high');
+        chip.classList.toggle('shadow-sm');
+      });
+    });
+
+    // Sélecteur de pourboire
+    const tipBtns = document.querySelectorAll('#tip-selector .tip-btn');
+    tipBtns.forEach(tBtn => {
+      tBtn.addEventListener('click', () => {
+        tipBtns.forEach(b => {
+          b.classList.remove('bg-secondary-container', 'text-on-secondary-container', 'shadow-sm');
+          b.classList.add('bg-surface-container', 'text-on-surface');
+        });
+        tBtn.classList.remove('bg-surface-container', 'text-on-surface');
+        tBtn.classList.add('bg-secondary-container', 'text-on-secondary-container', 'shadow-sm');
+      });
+    });
+  })();
+</script></main></body></html>

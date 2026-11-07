@@ -1,30 +1,45 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_client/main.dart';
+import 'package:golivreur_client/features/auth/screens/login_screen.dart';
+import 'package:golivreur_client/features/navigation/screens/main_navigation_screen.dart';
+import 'package:golivreur_client/features/goshop/providers/goshop_provider.dart';
+import 'package:golivreur_client/features/goshop/providers/order_provider.dart';
+import 'package:golivreur_client/features/gocolis/providers/gocolis_provider.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const ProviderScope(child: GoLivreurClientApp()));
+  testWidgets('GoLivreur Client - affiche LoginScreen par défaut', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: GoLivreurClientApp(),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.text('Connexion GoLivreur'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  testWidgets('MainNavigationScreen - affiche la barre avec 4 onglets', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          merchantsListProvider.overrideWith((ref) => Future.value([])),
+          ordersHistoryProvider.overrideWith((ref) => Future.value([])),
+          parcelsHistoryProvider.overrideWith((ref) => Future.value([])),
+        ],
+        child: const MaterialApp(
+          home: MainNavigationScreen(),
+        ),
+      ),
+    );
+
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Vérifie la présence des 4 onglets définis dans Stitch
+    expect(find.text('Accueil'), findsOneWidget);
+    expect(find.text('GoColis'), findsOneWidget);
+    expect(find.text('Commandes'), findsOneWidget);
+    expect(find.text('Profil'), findsOneWidget);
   });
 }

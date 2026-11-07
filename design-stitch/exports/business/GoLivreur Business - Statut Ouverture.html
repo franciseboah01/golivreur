@@ -1,0 +1,322 @@
+﻿<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "feedback-error": "#D32F2F", "gray-100": "#F2F2F2", "tertiary-fixed-dim": "#9ecaff", "border-default": "#E0E0E0", "secondary-fixed-dim": "#91d78a", "surface-bright": "#fcf9f8", "surface-dim": "#dcd9d9", "feedback-warning": "#F9A825", "surface-container-lowest": "#ffffff", "surface-variant": "#e5e2e1", "error": "#ba1a1a", "background": "#fcf9f8", "on-tertiary-container": "#00497d", "gray-700": "#595959", "surface-container": "#f0eded", "surface-bg": "#FAFAFA", "error-container": "#ffdad6", "gray-500": "#9E9E9E", "surface": "#fcf9f8", "on-tertiary-fixed-variant": "#00497c", "inverse-on-surface": "#f3f0ef", "surface-container-high": "#eae7e7", "on-secondary": "#ffffff", "inverse-primary": "#ffb953", "surface-tint": "#835500", "primary-container": "#f4a623", "on-secondary-fixed-variant": "#0c5216", "on-error-container": "#93000a", "on-secondary-fixed": "#002203", "secondary": "#2a6b2c", "gray-900": "#212121", "text-secondary": "#595959", "surface-card": "#FFFFFF", "on-primary-fixed": "#291800", "outline-variant": "#d7c3ae", "gray-300": "#E0E0E0", "on-error": "#ffffff", "on-surface": "#1b1c1c", "tertiary-fixed": "#d1e4ff", "text-primary": "#212121", "primary": "#835500", "surface-container-low": "#f6f3f2", "inverse-surface": "#303030", "on-background": "#1b1c1c", "tertiary": "#0b61a1", "on-secondary-container": "#307231", "on-tertiary": "#ffffff", "on-primary-fixed-variant": "#633f00", "feedback-success": "#4CAF50", "text-disabled": "#9E9E9E", "on-surface-variant": "#524534", "primary-fixed-dim": "#ffb953", "surface-container-highest": "#e5e2e1", "on-tertiary-fixed": "#001d36", "on-primary-container": "#644000", "secondary-fixed": "#acf4a4", "feedback-info": "#2E75B6", "on-primary": "#ffffff", "outline": "#847462", "gray-50": "#FAFAFA", "secondary-container": "#acf4a4", "tertiary-container": "#7cbaff", "primary-fixed": "#ffddb4" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "gutter": "16px", "space-2xl": "48px", "space-lg": "24px", "space-md": "16px", "space-xl": "32px", "space-sm": "8px", "space-xs": "4px", "margin": "16px" }, fontFamily: { "headline-md": ["Inter"], "caption-sm": ["Inter"], "headline-sm": ["Inter"], "body-md-emphasis": ["Inter"], "label-md": ["Inter"], "headline-lg": ["Inter"], "body-md": ["Inter"] }, fontSize: { "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "700" }], "caption-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "body-md-emphasis": ["16px", { "lineHeight": "22px", "fontWeight": "500" }], "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "34px", "fontWeight": "700" }], "body-md": ["16px", { "lineHeight": "22px", "fontWeight": "400" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;min-height:100vh;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe"><div class="h-16 px-space-md flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-xs shrink-0"><button aria-label="Retour" class="w-11 h-11 flex items-center justify-center rounded-xl text-on-surface hover:bg-surface-container active:scale-95 transition-all" onclick="history.back()" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><img alt="Vibrant friendly delivery mascot character logo mark for GoLivreur Client in Daloa Côte d'Ivoire. A cheerful, friendly stylized cartoon delivery courier guy (bonhomme livreur souriant) wearing an orange motorcycle helmet with a visor and a courier vest/cap, waving or zooming forward with a courier delivery parcel box, energetic, modern flat vector logo icon, rounded friendly geometry, clean vector emblem style, primary warm orange #F4A623 with dark green #1B5E20 accents and clean white details, on a pure solid isolated background, emblem badge suitable for mobile app logo. Design context: - Primary color: #f4a623
+- Font: inter
+- Mode: light
+- Roundness: rounded-md
+. The logo should be visually consistent with these brand tokens." class="h-8 w-auto object-contain hidden sm:block" src="https://lh3.googleusercontent.com/aida/ALJJyrDnb2VJIGL648lkt0uwKxbW3l2Jh1MPgdUuqbV2nOp842vVJ6xDHx6u--Xywk2fMHbxZaaqGlqHuT50hyblHAVH04609rzbOfF6Yz1SVUlGUdHH4EOPy4eFlM5ahQPtaEcdajXw7PSYO1uCXD_gUGGd0VK2LPJRJXXCRfa1Ho9jieUpkEbWDYD_iWH8rsPv5o6oRxQgim2zjyxGNhxMr32PQimtm1uZggDHUZ_3x4vY"/></div><h1 class="font-headline-sm text-headline-sm text-text-primary text-center truncate flex-1 px-space-xs">Statut Ouverture</h1><div class="flex items-center gap-space-xs shrink-0"><button aria-label="Assistance Daloa" class="w-11 h-11 flex items-center justify-center rounded-xl text-tertiary hover:bg-surface-container active:scale-95 transition-all" type="button"><span class="material-symbols-outlined text-[24px]">headset_mic</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 bg-surface flex-1 min-h-screen"><div class="flex flex-col w-full px-space-md pb-space-2xl gap-space-lg">
+<!-- Visual Banner Card with Store Context -->
+<div class="w-full rounded-xl bg-surface-container p-space-md flex items-center gap-space-md shadow-sm">
+<div class="relative w-14 h-14 rounded-xl overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="Warm welcoming portrait of an Ivorian restaurant owner named Adjoua in Daloa smiling proudly in her kitchen restaurant, soft golden hour sunlight, vibrant African culinary vibe, warm terracotta and orange tones #F4A623." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEhBoT_MoT6CzQVkPdHEMPv9yp68celzaOao7KmGhKU3YKXb1m_0smww9ZVYGW-4NbfcjxLwNBkv-7AXccWIYA0LQP8xxIkxXNrD8MX9zZ0kctcRVExmgrKhqirQkzWsz7CNpnUmUHoliioj3L_Y9Nhlo1QK_TQQVm5XPIAIaEKsTgu2-SOt5xPO0HGijabksC84jwe0MnUUGYQN_pw9sm1e8zAFKDzqcs6hUB4qg"/>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface truncate">Chez Adjoua</span>
+<span class="inline-flex items-center px-space-xs py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-caption-sm text-caption-sm">
+          Partenaire Certifié
+        </span>
+</div>
+<p class="font-caption-sm text-caption-sm text-on-surface-variant truncate">Quartier Commerce, Daloa • GoShop</p>
+</div>
+</div>
+<!-- Primary Interactive Master Toggle Card -->
+<section class="w-full rounded-xl bg-surface-container-lowest p-space-lg shadow-sm flex flex-col gap-space-md transition-all duration-300" id="main-status-card">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<!-- Live status pulse beacon -->
+<span class="relative flex h-4 w-4">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-feedback-success opacity-75" id="status-pulse-ring"></span>
+<span class="relative inline-flex rounded-full h-4 w-4 bg-feedback-success" id="status-pulse-dot"></span>
+</span>
+<span class="font-caption-sm text-caption-sm text-secondary font-semibold uppercase tracking-wider" id="status-badge-text">
+          En Service Direct
+        </span>
+</div>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Synchro 1-clic</span>
+</div>
+<div class="flex flex-col gap-space-xs">
+<h2 class="font-headline-md text-headline-md text-on-surface" id="status-title">
+        Boutique Ouverte (Commandes activées)
+      </h2>
+<p class="font-body-md text-body-md text-on-surface-variant" id="status-desc">
+        Votre établissement <strong class="font-body-md-emphasis text-on-surface">Chez Adjoua</strong> est actuellement visible sur GoShop Daloa. Les clients peuvent passer commande.
+      </p>
+</div>
+<!-- 52px Touch Master Switch Container -->
+<button aria-pressed="true" class="w-full min-h-[52px] h-[52px] rounded-xl bg-secondary-container text-on-secondary-container px-space-md flex items-center justify-between shadow-sm active:scale-[0.98] transition-all select-none" data-action="settings.toggleOpen" id="toggle-statut-ouvert" type="button">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[26px]" id="status-icon">storefront</span>
+<span class="font-label-md text-label-md" id="toggle-button-label">Ouvert aux commandes</span>
+</div>
+<div class="w-12 h-7 bg-secondary rounded-full p-0.5 flex items-center justify-end transition-all" id="switch-track">
+<div class="w-6 h-6 bg-surface-container-lowest rounded-full shadow-md transform transition-transform" id="switch-thumb"></div>
+</div>
+</button>
+</section>
+<!-- Instant Awareness Info Box -->
+<div class="w-full rounded-xl bg-surface-container-high p-space-md flex gap-space-md items-start shadow-sm">
+<div class="w-10 h-10 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[22px]">format_image_left</span>
+</div>
+<div class="flex flex-col min-w-0">
+<h3 class="font-body-md-emphasis text-body-md-emphasis text-on-surface">Protection réputation client</h3>
+<p class="font-caption-sm text-caption-sm text-on-surface-variant mt-0.5">
+        Lorsque vous fermez, vos plats sont immédiatement marqués indisponibles pour éviter les refus et déceptions clients à Daloa.
+      </p>
+</div>
+</div>
+<!-- Quick Pause Options (Coup de feu / Pause cuisine) -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between px-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface">Pause service temporaire</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Reprise auto</span>
+</div>
+<div class="flex flex-col gap-space-sm" id="pause-options-group">
+<!-- Pause Option 1 -->
+<button class="pause-option-btn w-full min-h-[52px] rounded-xl bg-surface-container-lowest p-space-md flex items-center justify-between text-left shadow-sm active:bg-surface-container transition-all" data-duration="30" onclick="selectPauseDuration(this, 30)" type="button">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-9 h-9 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center shrink-0 pause-icon-box">
+<span class="material-symbols-outlined text-[20px]">local_fire_department</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-emphasis text-body-md-emphasis text-on-surface truncate">Mettre en pause pour 30 minutes</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant truncate">Coup de feu en cuisine (Rush)</span>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full bg-surface-container flex items-center justify-center pause-radio-mark shrink-0">
+<span class="material-symbols-outlined text-[16px] text-surface-container-lowest opacity-0">check</span>
+</div>
+</button>
+<!-- Pause Option 2 -->
+<button class="pause-option-btn w-full min-h-[52px] rounded-xl bg-surface-container-lowest p-space-md flex items-center justify-between text-left shadow-sm active:bg-surface-container transition-all" data-duration="60" onclick="selectPauseDuration(this, 60)" type="button">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-9 h-9 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center shrink-0 pause-icon-box">
+<span class="material-symbols-outlined text-[20px]">timelapse</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-emphasis text-body-md-emphasis text-on-surface truncate">Mettre en pause pour 1 heure</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant truncate">Réapprovisionnement marché</span>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full bg-surface-container flex items-center justify-center pause-radio-mark shrink-0">
+<span class="material-symbols-outlined text-[16px] text-surface-container-lowest opacity-0">check</span>
+</div>
+</button>
+<!-- Pause Option 3 -->
+<button class="pause-option-btn w-full min-h-[52px] rounded-xl bg-surface-container-lowest p-space-md flex items-center justify-between text-left shadow-sm active:bg-surface-container transition-all" data-duration="rest_of_day" onclick="selectPauseDuration(this, 'rest_of_day')" type="button">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-9 h-9 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center shrink-0 pause-icon-box">
+<span class="material-symbols-outlined text-[20px]">nightlight</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-emphasis text-body-md-emphasis text-on-surface truncate">Fermer pour le reste de la journée</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant truncate">Réouverture demain matin</span>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full bg-surface-container flex items-center justify-center pause-radio-mark shrink-0">
+<span class="material-symbols-outlined text-[16px] text-surface-container-lowest opacity-0">check</span>
+</div>
+</button>
+</div>
+</section>
+<!-- Audio Alert Settings -->
+<section class="flex flex-col gap-space-sm">
+<span class="font-headline-sm text-headline-sm text-on-surface px-space-xs">Alertes sonores en cuisine</span>
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col gap-space-md">
+<!-- Volume setting -->
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-start gap-space-md min-w-0">
+<div class="w-10 h-10 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[22px]">volume_up</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-emphasis text-body-md-emphasis text-on-surface">Volume sonnerie d'urgence</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Maximum (recommandé dans le bruit de la cuisine)</span>
+</div>
+</div>
+<div class="px-space-sm py-1 rounded-lg bg-surface-container font-label-md text-label-md text-on-surface font-semibold shrink-0">
+          100%
+        </div>
+</div>
+<!-- Repeat reminder toggle -->
+<div class="flex items-center justify-between pt-space-sm gap-space-sm">
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-emphasis text-body-md-emphasis text-on-surface">Répétition active</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Répéter la sonnerie toutes les 10 secondes jusqu'à acceptation</span>
+</div>
+<button aria-pressed="true" class="min-h-[44px] min-w-[56px] h-8 w-14 rounded-full bg-secondary p-1 flex items-center justify-end shrink-0 transition-colors" id="toggle-repeat-sound" onclick="toggleSoundReminder(this)" type="button">
+<div class="w-6 h-6 bg-surface-container-lowest rounded-full shadow-md transform transition-transform" id="repeat-switch-thumb"></div>
+</button>
+</div>
+</div>
+</section>
+<!-- Direct Store Insights Micro Tile -->
+<div class="w-full rounded-xl bg-surface-container p-space-md flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-tertiary text-[24px]">motorcycle</span>
+<span class="font-caption-sm text-caption-sm text-on-surface">Livreurs GoLivreur en patrouille à Daloa :</span>
+</div>
+<span class="font-label-md text-label-md text-secondary font-bold">8 disponibles</span>
+</div>
+<!-- Primary Save CTA Button (52px minimum height) -->
+<div class="w-full pt-space-xs">
+<button class="w-full min-h-[52px] h-[52px] rounded-xl bg-primary-container text-on-primary-fixed font-label-md text-label-md flex items-center justify-center gap-space-xs shadow-md active:scale-[0.98] transition-all" id="btn-save-status" onclick="handleSaveStatus()" type="button">
+<span class="material-symbols-outlined text-[22px]">check_circle</span>
+<span>Enregistrer l'état de la boutique</span>
+</button>
+</div>
+<!-- Dynamic Toast Feedback -->
+<div class="fixed bottom-6 left-space-md right-space-md rounded-xl bg-inverse-surface text-inverse-on-surface px-space-md py-space-sm shadow-xl flex items-center justify-between opacity-0 pointer-events-none transition-all duration-300 transform translate-y-4 z-50" id="toast-feedback">
+<div class="flex items-center gap-space-sm min-w-0">
+<span class="material-symbols-outlined text-feedback-success text-[20px]" id="toast-icon">verified</span>
+<span class="font-body-md text-body-md truncate" id="toast-message">État de la boutique actualisé !</span>
+</div>
+<span class="font-caption-sm text-caption-sm text-surface-dim font-bold">Daloa GoShop</span>
+</div>
+</div>
+<script>
+  let isOpen = true;
+  let activePause = null;
+  let soundRepeatActive = true;
+
+  const toggleBtn = document.getElementById('toggle-statut-ouvert');
+  const statusTitle = document.getElementById('status-title');
+  const statusDesc = document.getElementById('status-desc');
+  const statusIcon = document.getElementById('status-icon');
+  const toggleBtnLabel = document.getElementById('toggle-button-label');
+  const switchTrack = document.getElementById('switch-track');
+  const pulseRing = document.getElementById('status-pulse-ring');
+  const pulseDot = document.getElementById('status-pulse-dot');
+  const statusBadgeText = document.getElementById('status-badge-text');
+
+  toggleBtn.addEventListener('click', () => {
+    isOpen = !isOpen;
+    updateUIState();
+  });
+
+  function updateUIState() {
+    if (isOpen) {
+      statusTitle.textContent = "Boutique Ouverte (Commandes activées)";
+      statusDesc.innerHTML = 'Votre établissement <strong class="font-body-md-emphasis text-on-surface">Chez Adjoua</strong> est actuellement visible sur GoShop Daloa. Les clients peuvent passer commande.';
+      toggleBtnLabel.textContent = "Ouvert aux commandes";
+      statusIcon.textContent = "storefront";
+      
+      toggleBtn.className = "w-full min-h-[52px] h-[52px] rounded-xl bg-secondary-container text-on-secondary-container px-space-md flex items-center justify-between shadow-sm active:scale-[0.98] transition-all select-none";
+      switchTrack.className = "w-12 h-7 bg-secondary rounded-full p-0.5 flex items-center justify-end transition-all";
+      
+      pulseRing.className = "animate-ping absolute inline-flex h-full w-full rounded-full bg-feedback-success opacity-75";
+      pulseDot.className = "relative inline-flex rounded-full h-4 w-4 bg-feedback-success";
+      statusBadgeText.className = "font-caption-sm text-caption-sm text-secondary font-semibold uppercase tracking-wider";
+      statusBadgeText.textContent = "En Service Direct";
+      
+      // Clear selected pause options
+      clearPauseSelection();
+    } else {
+      statusTitle.textContent = "Boutique Fermée (Commandes suspendues)";
+      statusDesc.innerHTML = 'Votre établissement <strong class="font-body-md-emphasis text-on-surface">Chez Adjoua</strong> est temporairement masqué. Vos plats sont marqués indisponibles.';
+      toggleBtnLabel.textContent = "Actuellement Fermé";
+      statusIcon.textContent = "store";
+      
+      toggleBtn.className = "w-full min-h-[52px] h-[52px] rounded-xl bg-surface-container text-on-surface-variant px-space-md flex items-center justify-between shadow-sm active:scale-[0.98] transition-all select-none";
+      switchTrack.className = "w-12 h-7 bg-gray-500 rounded-full p-0.5 flex items-center justify-start transition-all";
+      
+      pulseRing.className = "hidden";
+      pulseDot.className = "relative inline-flex rounded-full h-4 w-4 bg-feedback-error";
+      statusBadgeText.className = "font-caption-sm text-caption-sm text-feedback-error font-semibold uppercase tracking-wider";
+      statusBadgeText.textContent = "Commandes Suspendues";
+    }
+  }
+
+  function selectPauseDuration(buttonEl, duration) {
+    const allPauseButtons = document.querySelectorAll('.pause-option-btn');
+    
+    // Toggle active state
+    if (activePause === duration) {
+      clearPauseSelection();
+      return;
+    }
+
+    activePause = duration;
+    allPauseButtons.forEach(btn => {
+      const radioBox = btn.querySelector('.pause-radio-mark');
+      const radioIcon = radioBox.querySelector('span');
+      const iconBox = btn.querySelector('.pause-icon-box');
+
+      if (btn === buttonEl) {
+        btn.classList.add('bg-primary-fixed');
+        radioBox.className = "w-6 h-6 rounded-full bg-primary flex items-center justify-center pause-radio-mark shrink-0";
+        radioIcon.classList.remove('opacity-0');
+        radioIcon.classList.add('opacity-100');
+        iconBox.className = "w-9 h-9 rounded-lg bg-surface-container-lowest text-primary flex items-center justify-center shrink-0 pause-icon-box";
+      } else {
+        btn.classList.remove('bg-primary-fixed');
+        radioBox.className = "w-6 h-6 rounded-full bg-surface-container flex items-center justify-center pause-radio-mark shrink-0";
+        radioIcon.classList.add('opacity-0');
+        radioIcon.classList.remove('opacity-100');
+        iconBox.className = "w-9 h-9 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center shrink-0 pause-icon-box";
+      }
+    });
+
+    // Automatically set status to closed for this pause
+    if (isOpen) {
+      isOpen = false;
+      updateUIState();
+    }
+  }
+
+  function clearPauseSelection() {
+    activePause = null;
+    const allPauseButtons = document.querySelectorAll('.pause-option-btn');
+    allPauseButtons.forEach(btn => {
+      btn.classList.remove('bg-primary-fixed');
+      const radioBox = btn.querySelector('.pause-radio-mark');
+      const radioIcon = radioBox.querySelector('span');
+      const iconBox = btn.querySelector('.pause-icon-box');
+      radioBox.className = "w-6 h-6 rounded-full bg-surface-container flex items-center justify-center pause-radio-mark shrink-0";
+      radioIcon.classList.add('opacity-0');
+      radioIcon.classList.remove('opacity-100');
+      iconBox.className = "w-9 h-9 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center shrink-0 pause-icon-box";
+    });
+  }
+
+  function toggleSoundReminder(btn) {
+    soundRepeatActive = !soundRepeatActive;
+    const thumb = document.getElementById('repeat-switch-thumb');
+    btn.setAttribute('aria-pressed', soundRepeatActive);
+    
+    if (soundRepeatActive) {
+      btn.className = "min-h-[44px] min-w-[56px] h-8 w-14 rounded-full bg-secondary p-1 flex items-center justify-end shrink-0 transition-colors";
+    } else {
+      btn.className = "min-h-[44px] min-w-[56px] h-8 w-14 rounded-full bg-surface-container-highest p-1 flex items-center justify-start shrink-0 transition-colors";
+    }
+  }
+
+  function handleSaveStatus() {
+    const toast = document.getElementById('toast-feedback');
+    const toastMsg = document.getElementById('toast-message');
+
+    let msg = isOpen ? "Chez Adjoua est Ouvert aux commandes !" : "Fermeture enregistrée. Catalogue en pause.";
+    if (!isOpen && activePause) {
+      if (activePause === 30) msg = "Pause de 30 min activée pour la cuisine.";
+      if (activePause === 60) msg = "Pause de 1h activée sur GoShop.";
+      if (activePause === 'rest_of_day') msg = "Boutique fermée jusqu'à demain.";
+    }
+
+    toastMsg.textContent = msg;
+    toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+    toast.classList.add('opacity-100', 'translate-y-0');
+
+    setTimeout(() => {
+      toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
+      toast.classList.remove('opacity-100', 'translate-y-0');
+    }, 2800);
+  }
+</script></main></body></html>

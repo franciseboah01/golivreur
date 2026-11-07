@@ -25,7 +25,7 @@ class ParcelController extends Controller
             'weight_kg'        => 'nullable|numeric',
             'declared_value'   => 'nullable|numeric|min:0',
             'description'      => 'nullable|string',
-            'payment_method'   => 'required|string|in:cash,orange_money,wave,mtn',
+            'payment_method'   => 'required|string|in:cash,orange_money,wave,mtn,moov',
             'distance_km'      => 'required|numeric|min:0.1',
         ]);
 

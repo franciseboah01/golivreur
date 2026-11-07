@@ -1,0 +1,235 @@
+﻿<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "secondary-fixed-dim": "#91d78a", "surface-container-low": "#f6f3f2", "surface-container-highest": "#e5e2e1", "surface-bg": "#FAFAFA", "on-tertiary-container": "#00497d", "on-error": "#ffffff", "tertiary-container": "#7cbaff", "on-tertiary-fixed": "#001d36", "error-container": "#ffdad6", "feedback-success": "#4CAF50", "tertiary": "#0b61a1", "gray-100": "#F2F2F2", "text-disabled": "#9E9E9E", "on-background": "#1b1c1c", "on-primary-container": "#644000", "inverse-on-surface": "#f3f0ef", "surface-container-lowest": "#ffffff", "on-secondary": "#ffffff", "on-primary-fixed-variant": "#633f00", "secondary-fixed": "#acf4a4", "outline-variant": "#d7c3ae", "secondary": "#2a6b2c", "on-surface": "#1b1c1c", "surface-tint": "#835500", "outline": "#847462", "surface": "#fcf9f8", "tertiary-fixed-dim": "#9ecaff", "secondary-container": "#acf4a4", "on-secondary-fixed": "#002203", "primary-fixed-dim": "#ffb953", "text-secondary": "#595959", "gray-700": "#595959", "on-secondary-container": "#307231", "surface-variant": "#e5e2e1", "gray-500": "#9E9E9E", "feedback-warning": "#F9A825", "surface-bright": "#fcf9f8", "background": "#fcf9f8", "surface-container-high": "#eae7e7", "on-secondary-fixed-variant": "#0c5216", "on-error-container": "#93000a", "gray-300": "#E0E0E0", "inverse-primary": "#ffb953", "primary-container": "#f4a623", "inverse-surface": "#303030", "surface-container": "#f0eded", "on-tertiary": "#ffffff", "on-primary-fixed": "#291800", "on-surface-variant": "#524534", "surface-card": "#FFFFFF", "feedback-info": "#2E75B6", "on-primary": "#ffffff", "feedback-error": "#D32F2F", "text-primary": "#212121", "error": "#ba1a1a", "surface-dim": "#dcd9d9", "gray-50": "#FAFAFA", "primary-fixed": "#ffddb4", "gray-900": "#212121", "tertiary-fixed": "#d1e4ff", "border-default": "#E0E0E0", "primary": "#835500", "on-tertiary-fixed-variant": "#00497c" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "gutter": "16px", "margin": "16px", "space-md": "16px", "space-xs": "4px", "space-xl": "32px", "space-2xl": "48px", "space-lg": "24px", "space-sm": "8px" }, fontFamily: { "headline-lg": ["Inter"], "body-md": ["Inter"], "headline-sm": ["Inter"], "label-md": ["Inter"], "headline-md": ["Inter"], "body-md-emphasis": ["Inter"], "caption-sm": ["Inter"] }, fontSize: { "headline-lg": ["28px", { "lineHeight": "34px", "fontWeight": "700" }], "body-md": ["16px", { "lineHeight": "22px", "fontWeight": "400" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "600" }], "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "700" }], "body-md-emphasis": ["16px", { "lineHeight": "22px", "fontWeight": "500" }], "caption-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;font-family:'Inter',sans-serif;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface-bg min-h-screen flex flex-col text-on-surface"><header class="fixed top-0 inset-x-0 z-50 bg-surface/90 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-gutter flex items-center justify-between"><div class="flex items-center gap-space-sm"><div class="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center"><span class="material-symbols-outlined text-on-secondary text-[20px]">two_wheeler</span></div><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-secondary leading-none">GoLivreur</span><div class="flex items-center gap-space-xs"><span class="w-1.5 h-1.5 rounded-full bg-secondary"></span><span class="font-caption-sm text-caption-sm text-text-secondary">Daloa</span></div></div></div><div class="flex items-center gap-space-sm"><button aria-label="Support conducteur" class="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-secondary hover:bg-secondary-container/30 transition-colors"><span class="material-symbols-outlined text-[24px]">support_agent</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-20 bg-surface-bg"><div class="flex flex-col w-full pb-6 px-gutter">
+<!-- Driver Identity & Online State -->
+<section class="mt- space-y-space-md pt-space-sm">
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary text-[28px]">sports_motorsports</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-headline-sm text-text-primary truncate">Ibrahim Ouattara</span>
+<div class="flex items-center gap-space-xs text-text-secondary">
+<span class="material-symbols-outlined text-[16px]">two_wheeler</span>
+<span class="font-caption-sm text-caption-sm truncate">Moto Sanili • Daloa Centre</span>
+</div>
+</div>
+</div>
+<div class="flex items-center bg-surface-container-low px-space-xs py-1 rounded-full shrink-0">
+<span class="w-2.5 h-2.5 rounded-full bg-feedback-success animate-pulse mr-1.5"></span>
+<span class="font-caption-sm text-caption-sm font-semibold text-secondary">GPS Actif</span>
+</div>
+</div>
+<!-- Action Toggle Switch -->
+<button class="w-full h-[52px] bg-secondary text-on-secondary rounded-xl font-label-md text-label-md flex items-center justify-between px-space-md shadow-sm transition-all active:scale-[0.99]" data-action="driver.toggleOnline" id="toggle-en-ligne">
+<div class="flex items-center gap-space-sm">
+<span class="w-3.5 h-3.5 rounded-full bg-secondary-fixed"></span>
+<span class="tracking-wide">EN LIGNE (Prêt pour courses)</span>
+</div>
+<span class="material-symbols-outlined text-[24px]">power_settings_new</span>
+</button>
+</div>
+<!-- Network Connectivity Info Banner -->
+<div class="bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between text-text-secondary">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[18px] text-feedback-success">signal_cellular_4_bar</span>
+<span class="font-caption-sm text-caption-sm text-on-surface">Réseau Daloa 4G actif • Mode hors-ligne prêt</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-text-secondary">cloud_done</span>
+</div>
+</section>
+<!-- Central Virtual Wallet Card -->
+<section class="mt-space-md">
+<div class="relative overflow-hidden bg-gradient-to-br from-secondary to-secondary-container rounded-xl p-space-md text-on-secondary shadow-md">
+<!-- Decorative Backdrop Geometry -->
+<div class="absolute -right-8 -top-8 w-36 h-36 bg-secondary-fixed/20 rounded-full blur-2xl pointer-events-none"></div>
+<div class="absolute -right-4 -bottom-4 w-28 h-28 bg-on-secondary/10 rounded-full pointer-events-none"></div>
+<div class="relative z-10 flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[20px] text-secondary-fixed">account_balance_wallet</span>
+<span class="font-body-md-emphasis text-body-md-emphasis text-on-secondary/90">Portefeuille Virtuel</span>
+</div>
+<span class="bg-on-secondary/20 backdrop-blur-md px-2.5 py-1 rounded-full font-caption-sm text-caption-sm text-on-secondary font-medium">
+            Opérationnel
+          </span>
+</div>
+<div class="mt-1">
+<span class="font-caption-sm text-caption-sm text-on-secondary/80">Solde disponible</span>
+<div class="font-headline-lg text-[34px] leading-tight font-bold tracking-tight text-on-secondary mt-0.5" id="solde-affiche">
+            24 800 F CFA
+          </div>
+</div>
+<!-- Operational Status & Explanation -->
+<div class="mt-space-xs bg-surface-container-lowest/15 backdrop-blur-sm rounded-lg p-space-sm flex flex-col gap-1 text-on-secondary">
+<div class="flex items-center gap-1.5 font-caption-sm text-caption-sm font-semibold text-secondary-fixed">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+<span>Caution minimale 5 000 F respectée</span>
+</div>
+<p class="font-caption-sm text-caption-sm text-on-secondary/85 leading-relaxed">
+            Ce solde vous permet d'accepter les courses en espèces et de régler les commissions automatiquement en toute fluidité.
+          </p>
+</div>
+</div>
+</div>
+</section>
+<!-- Primary Financial Actions (52px targets) -->
+<section class="mt-space-md grid grid-cols-2 gap-space-sm">
+<button class="h-[52px] bg-primary-container text-gray-900 rounded-xl font-label-md text-label-md flex items-center justify-center gap-space-xs shadow-sm active:scale-95 transition-transform" id="btn-recharger-nav">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+<span>Recharger</span>
+</button>
+<button class="h-[52px] bg-surface-container-lowest text-text-primary rounded-xl font-label-md text-label-md flex items-center justify-center gap-space-xs shadow-sm active:scale-95 transition-transform" id="btn-retirer-nav">
+<span class="material-symbols-outlined text-[22px] text-tertiary">payments</span>
+<span>Retirer gains</span>
+</button>
+</section>
+<!-- Operator Channels Pill Badges -->
+<div class="mt-space-sm flex items-center justify-center gap-space-md py-1 text-text-secondary">
+<span class="font-caption-sm text-caption-sm flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-feedback-info"></span> Wave Côte d'Ivoire
+    </span>
+<span class="font-caption-sm text-caption-sm flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-feedback-warning"></span> Orange Money
+    </span>
+<span class="font-caption-sm text-caption-sm flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-feedback-success"></span> MTN MoMo
+    </span>
+</div>
+<!-- Recent Transactions Section -->
+<section class="mt-space-lg flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-text-secondary text-[20px]">receipt_long</span>
+<span class="font-headline-sm text-headline-sm text-text-primary">Dernières opérations</span>
+</div>
+<a class="font-caption-sm text-caption-sm font-semibold text-secondary flex items-center" href="#" id="btn-voir-historique">
+        Tout voir
+        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</a>
+</div>
+<!-- Transaction Stream -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm divide-y-0 overflow-hidden flex flex-col">
+<!-- Item 1: Course Earnings -->
+<div class="p-space-md flex items-center justify-between hover:bg-surface-container-low/50 transition-colors">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-secondary-fixed/50 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary text-[22px]">two_wheeler</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate">Gain course #ORD-5002</span>
+<span class="font-caption-sm text-caption-sm text-text-secondary">Aujourd'hui, 13h42 • Tazibouo</span>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0 pl-2">
+<span class="font-label-md text-label-md text-feedback-success">+1 200 F</span>
+<span class="font-caption-sm text-[11px] text-text-secondary">Espèces perçues</span>
+</div>
+</div>
+<!-- Item 2: Platform Commission -->
+<div class="p-space-md flex items-center justify-between bg-surface-container-low/30 hover:bg-surface-container-low/50 transition-colors">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-error-container/60 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-error-container text-[20px]">percent</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate">Commission course #ORD-5002</span>
+<span class="font-caption-sm text-caption-sm text-text-secondary">Aujourd'hui, 13h42 • Déduction auto</span>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0 pl-2">
+<span class="font-label-md text-label-md text-error">-120 F</span>
+<span class="font-caption-sm text-[11px] text-text-secondary">Frais GoLivreur</span>
+</div>
+</div>
+<!-- Item 3: Package Run -->
+<div class="p-space-md flex items-center justify-between hover:bg-surface-container-low/50 transition-colors">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-secondary-fixed/50 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary text-[22px]">inventory_2</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate">Gain course #PRC-9001</span>
+<span class="font-caption-sm text-caption-sm text-text-secondary">Aujourd'hui, 11h15 • Grand Marché</span>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0 pl-2">
+<span class="font-label-md text-label-md text-feedback-success">+1 000 F</span>
+<span class="font-caption-sm text-[11px] text-text-secondary">Solde client</span>
+</div>
+</div>
+<!-- Item 4: Top-up via Wave -->
+<div class="p-space-md flex items-center justify-between bg-surface-container-low/30 hover:bg-surface-container-low/50 transition-colors">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-tertiary text-[22px]">account_balance</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate">Rechargement Wave</span>
+<span class="font-caption-sm text-caption-sm text-text-secondary">Hier, 18h30 • Réf: WV-9831</span>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0 pl-2">
+<span class="font-label-md text-label-md text-tertiary font-bold">+10 000 F</span>
+<span class="font-caption-sm text-[11px] text-feedback-success">Validé</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Local Support & Emergency Assist -->
+<section class="mt-space-lg mb-space-md">
+<div class="bg-surface-container-high rounded-xl p-space-md flex items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-error text-[24px]">headset_mic</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-emphasis text-body-md-emphasis text-text-primary truncate">Centre Relais Daloa</span>
+<span class="font-caption-sm text-caption-sm text-text-secondary">Assistance livreurs 24/7 locale</span>
+</div>
+</div>
+<button class="h-[44px] px-space-md rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-caption-sm flex items-center gap-1 shadow-sm active:scale-95 shrink-0">
+<span class="material-symbols-outlined text-[18px] text-feedback-info">call</span>
+<span>Appeler</span>
+</button>
+</div>
+</section>
+</div>
+<script>
+  (function() {
+    const toggleBtn = document.getElementById('toggle-en-ligne');
+    if (toggleBtn) {
+      let isOnline = true;
+      toggleBtn.addEventListener('click', () => {
+        isOnline = !isOnline;
+        if (isOnline) {
+          toggleBtn.className = "w-full h-[52px] bg-secondary text-on-secondary rounded-xl font-label-md text-label-md flex items-center justify-between px-space-md shadow-sm transition-all active:scale-[0.99]";
+          toggleBtn.innerHTML = `
+            <div class="flex items-center gap-space-sm">
+              <span class="w-3.5 h-3.5 rounded-full bg-secondary-fixed"></span>
+              <span class="tracking-wide">EN LIGNE (Prêt pour courses)</span>
+            </div>
+            <span class="material-symbols-outlined text-[24px]">power_settings_new</span>
+          `;
+        } else {
+          toggleBtn.className = "w-full h-[52px] bg-surface-container-highest text-text-disabled rounded-xl font-label-md text-label-md flex items-center justify-between px-space-md shadow-sm transition-all active:scale-[0.99]";
+          toggleBtn.innerHTML = `
+            <div class="flex items-center gap-space-sm">
+              <span class="w-3.5 h-3.5 rounded-full bg-text-disabled"></span>
+              <span class="tracking-wide text-text-secondary">HORS LIGNE (En pause)</span>
+            </div>
+            <span class="material-symbols-outlined text-[24px]">toggle_off</span>
+          `;
+        }
+      });
+    }
+  })();
+</script></main><nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface/95 backdrop-blur-xl shadow-[0_-2px_10px_rgba(0,0,0,0.05)]" data-active-classes="text-secondary font-body-md-emphasis"><div class="flex justify-around items-center h-20 px-gutter"><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] gap-space-xs text-text-disabled transition-colors" data-path="driver-coursesgoshop-navigationcommerce" href="#"><span class="material-symbols-outlined text-[24px]">two_wheeler</span><span class="font-caption-sm text-caption-sm">Courses</span></a><a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] gap-space-xs transition-colors text-secondary font-body-md-emphasis" data-path="driver-portefeuille-soldeportefeuille" href="#"><span class="material-symbols-outlined text-[24px]">account_balance_wallet</span><span class="font-caption-sm text-caption-sm">Portefeuille</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] gap-space-xs text-text-disabled transition-colors" data-path="driver-portefeuille-historiquetransactions" href="#"><span class="material-symbols-outlined text-[24px]">trending_up</span><span class="font-caption-sm text-caption-sm">Gains</span></a></div></nav></body></html>

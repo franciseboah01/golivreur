@@ -1,0 +1,259 @@
+﻿<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_stack" name="shell-type"><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-tertiary-container": "#00497d", "primary-fixed-dim": "#ffb953", "gray-300": "#E0E0E0", "primary-container": "#f4a623", "on-surface": "#1b1c1c", "on-primary-fixed": "#291800", "secondary-container": "#acf4a4", "primary-fixed": "#ffddb4", "on-secondary-container": "#307231", "feedback-success": "#4CAF50", "on-primary": "#ffffff", "surface-bright": "#fcf9f8", "text-primary": "#212121", "on-surface-variant": "#524534", "feedback-error": "#D32F2F", "gray-500": "#9E9E9E", "on-tertiary-fixed-variant": "#00497c", "surface-container-low": "#f6f3f2", "on-secondary-fixed-variant": "#0c5216", "on-primary-fixed-variant": "#633f00", "feedback-info": "#2E75B6", "on-tertiary-fixed": "#001d36", "inverse-surface": "#303030", "surface-dim": "#dcd9d9", "surface-container-highest": "#e5e2e1", "surface-container": "#f0eded", "on-error": "#ffffff", "feedback-warning": "#F9A825", "outline": "#847462", "on-secondary-fixed": "#002203", "secondary": "#2a6b2c", "text-disabled": "#9E9E9E", "on-error-container": "#93000a", "surface-tint": "#835500", "background": "#fcf9f8", "on-secondary": "#ffffff", "error": "#ba1a1a", "text-secondary": "#595959", "on-tertiary": "#ffffff", "outline-variant": "#d7c3ae", "inverse-on-surface": "#f3f0ef", "on-background": "#1b1c1c", "inverse-primary": "#ffb953", "tertiary-container": "#7cbaff", "gray-700": "#595959", "surface-card": "#FFFFFF", "primary": "#835500", "tertiary": "#0b61a1", "tertiary-fixed-dim": "#9ecaff", "tertiary-fixed": "#d1e4ff", "gray-100": "#F2F2F2", "on-primary-container": "#644000", "secondary-fixed": "#acf4a4", "surface": "#fcf9f8", "border-default": "#E0E0E0", "surface-bg": "#FAFAFA", "surface-variant": "#e5e2e1", "surface-container-high": "#eae7e7", "surface-container-lowest": "#ffffff", "secondary-fixed-dim": "#91d78a", "gray-900": "#212121", "error-container": "#ffdad6", "gray-50": "#FAFAFA" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-md": "16px", "space-xl": "32px", "margin": "16px", "gutter": "16px", "space-lg": "24px", "space-2xl": "48px", "space-xs": "4px", "space-sm": "8px" }, fontFamily: { "label-md": ["Inter"], "caption-sm": ["Inter"], "body-md": ["Inter"], "body-md-emphasis": ["Inter"], "headline-lg": ["Inter"], "headline-md": ["Inter"], "headline-sm": ["Inter"] }, fontSize: { "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "600" }], "caption-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "body-md": ["16px", { "lineHeight": "22px", "fontWeight": "400" }], "body-md-emphasis": ["16px", { "lineHeight": "22px", "fontWeight": "500" }], "headline-lg": ["28px", { "lineHeight": "34px", "fontWeight": "700" }], "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "700" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center min-w-[44px]"><button class="w-11 h-11 flex items-center justify-center text-on-surface rounded-full hover:bg-surface-variant/40 transition-colors" onclick="history.back()" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button></div><h1 class="font-headline-sm text-headline-sm text-on-surface text-center truncate px-space-xs flex-1">Suivi Expedition</h1><div class="flex items-center gap-space-xs justify-end min-w-[44px]"><button class="w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-on-surface rounded-full hover:bg-surface-variant/40 transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">help_outline</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 ml-space-xs"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-safe bg-surface min-h-screen"><div class="flex flex-col w-full pb-space-2xl">
+<!-- Statut dynamique & Alerte de progression -->
+<section class="px-margin pt-space-md">
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary-container text-on-secondary-container font-label-md text-caption-sm">
+<span class="relative flex h-2.5 w-2.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-secondary"></span>
+</span>
+<span class="">En transit • En route</span>
+</div>
+<span class="font-caption-sm text-caption-sm text-text-secondary bg-surface-container px-2.5 py-1 rounded">Réf: prc_9001</span>
+</div>
+<div class="flex items-baseline justify-between mt-space-xs">
+<div>
+<h2 class="font-headline-md text-headline-md text-text-primary tracking-tight">Arrivée dans ~18 min</h2>
+<p class="font-caption-sm text-caption-sm text-text-secondary mt-0.5">Boulevard Principal, Daloa</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed shrink-0">
+<span class="material-symbols-outlined text-[24px]">two_wheeler</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Stepper de progression -->
+<section class="px-margin mt-space-md">
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm">
+<h3 class="font-label-md text-label-md text-text-primary mb-space-md flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">timeline</span>
+        Progression du colis
+      </h3>
+<div class="space-y-space-md relative">
+<!-- Étape 1 : Validée -->
+<div class="flex items-start gap-3">
+<div class="flex flex-col items-center">
+<div class="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-on-secondary shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</div>
+<div class="w-0.5 h-7 bg-secondary my-1"></div>
+</div>
+<div class="min-w-0 pt-0.5">
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary">Coursier affecté</p>
+<p class="font-caption-sm text-caption-sm text-text-secondary">Accepté par Fatou Diaby à 14:02</p>
+</div>
+</div>
+<!-- Étape 2 : Validée -->
+<div class="flex items-start gap-3">
+<div class="flex flex-col items-center">
+<div class="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-on-secondary shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">photo_camera</span>
+</div>
+<div class="w-0.5 h-7 bg-secondary my-1"></div>
+</div>
+<div class="min-w-0 pt-0.5">
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary">Ramassage &amp; Photo validés</p>
+<p class="font-caption-sm text-caption-sm text-text-secondary">Quartier Résidentiel • 14:15</p>
+</div>
+</div>
+<!-- Étape 3 : Active (En transit) -->
+<div class="flex items-start gap-3">
+<div class="flex flex-col items-center">
+<div class="w-7 h-7 rounded-full bg-feedback-info flex items-center justify-center text-on-tertiary shrink-0 shadow-sm animate-pulse">
+<span class="material-symbols-outlined text-[18px]">navigation</span>
+</div>
+<div class="w-0.5 h-7 bg-gray-300 my-1"></div>
+</div>
+<div class="min-w-0 pt-0.5">
+<div class="flex items-center gap-2">
+<p class="font-body-md-emphasis text-body-md-emphasis text-text-primary font-bold">En transit vers Quartier Habitat</p>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed font-caption-sm text-[11px] px-2 py-0.5 rounded-full font-semibold">En cours</span>
+</div>
+<p class="font-caption-sm text-caption-sm text-text-secondary">En approche sur le Boulevard de Daloa</p>
+</div>
+</div>
+<!-- Étape 4 : Future -->
+<div class="flex items-start gap-3">
+<div class="flex flex-col items-center">
+<div class="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-gray-500 shrink-0">
+<span class="material-symbols-outlined text-[18px]">inventory</span>
+</div>
+</div>
+<div class="min-w-0 pt-0.5">
+<p class="font-body-md-emphasis text-body-md-emphasis text-gray-500">Remise finale au destinataire</p>
+<p class="font-caption-sm text-caption-sm text-gray-500">Validation via code SMS sécurisé</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Carte GPS interactive Daloa -->
+<section class="px-margin mt-space-md" id="carte-gps">
+<div class="relative w-full h-72 rounded-xl overflow-hidden shadow-sm bg-surface-container">
+<!-- Image carte Daloa via pipeline data-location -->
+<div class="w-full h-full bg-cover bg-center" data-location="Daloa, Cote d'Ivoire" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBQc5FOrILuqFyW3iVaEFRJv9CYpgbFJnd2Fi2VawXeMYmyhDj0ItKl1RPUxYIkSfd0BhL01bVaF1VSZY0cLPbJB1ngBK5eUWzfoYMRwDfaOGOrVOUeF1cDEITAto00DFwkHjW6TFqzQR08lNwBSzCIv_Yl9IT0kGCEbdQXUSx3vetVF9Ktc5-ii_uQ5ki60I9yPANX9PPPHpynjSxJsiicPzaPHxISlzieABp7Jew')"></div>
+<!-- Scrim dégradé léger pour lisibilité des repères -->
+<div class="absolute inset-0 bg-gradient-to-t from-gray-900/60 via-transparent to-gray-900/20 pointer-events-none"></div>
+<!-- Badge Départ : Quartier Résidentiel -->
+<div class="absolute top-4 left-4 bg-surface-card/95 backdrop-blur-sm px-2.5 py-1.5 rounded-lg shadow flex items-center gap-1.5 max-w-[190px]">
+<span class="material-symbols-outlined text-secondary text-[18px] shrink-0">trip_origin</span>
+<div class="truncate">
+<p class="font-caption-sm text-[10px] text-text-secondary leading-tight uppercase font-semibold">Départ (Jean K.)</p>
+<p class="font-caption-sm text-caption-sm text-text-primary font-medium truncate">Quartier Résidentiel</p>
+</div>
+</div>
+<!-- Marqueur coursier moto animé au centre -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+<div class="relative flex items-center justify-center">
+<span class="absolute w-12 h-12 bg-primary-container/40 rounded-full animate-ping"></span>
+<div class="relative w-11 h-11 bg-primary-container text-gray-900 rounded-full shadow-lg flex items-center justify-center border-2 border-white">
+<span class="material-symbols-outlined text-[24px]">motorcycle</span>
+</div>
+</div>
+<div class="mt-1 bg-gray-900/90 text-white font-caption-sm text-[11px] px-2 py-0.5 rounded shadow-sm flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-feedback-success animate-pulse"></span>
+<span class="">Fatou • 35 km/h</span>
+</div>
+</div>
+<!-- Badge Arrivée : Quartier Habitat -->
+<div class="absolute bottom-4 left-4 bg-surface-card/95 backdrop-blur-sm px-2.5 py-1.5 rounded-lg shadow flex items-center gap-1.5 max-w-[190px]">
+<span class="material-symbols-outlined text-error text-[18px] shrink-0">pin_drop</span>
+<div class="truncate">
+<p class="font-caption-sm text-[10px] text-text-secondary leading-tight uppercase font-semibold">Arrivée (M. Koné)</p>
+<p class="font-caption-sm text-caption-sm text-text-primary font-medium truncate">Quartier Habitat</p>
+</div>
+</div>
+<!-- Bouton flottant recentrer -->
+<button aria-label="Centrer sur le coursier" class="absolute bottom-4 right-4 w-12 h-12 bg-surface-card active:bg-gray-100 text-gray-900 rounded-xl shadow-md flex items-center justify-center transition-transform active:scale-95" id="btn-recenter" type="button">
+<span class="material-symbols-outlined text-[24px]">my_location</span>
+</button>
+</div>
+</section><section class="px-margin mt-space-md"><div id="banner-mode-pluie-gocolis" class="rounded-xl border border-blue-200 bg-blue-50/70 p-4 flex items-start gap-3 shadow-xs"><div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0 text-blue-600"><span class="material-symbols-outlined text-[22px]">rainy</span></div><div class="flex-1"><div class="flex items-center gap-2 mb-1"><span class="font-bold text-[15px] text-gray-900">🌧️ Mode Pluie actif à Daloa</span><span class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-200/70 text-blue-800">Sécurité</span></div><p class="text-[13px] text-gray-700 leading-snug">Livraison ralentie par la pluie : votre coursier roule prudemment pour livrer votre colis en toute sécurité.</p></div></div></section>
+<!-- Profil du coursier moto GoLivreur -->
+<section class="px-margin mt-space-md">
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm">
+<div class="flex items-start gap-3">
+<div class="relative">
+<img class="w-16 h-16 rounded-xl object-cover shadow-sm bg-surface-container" data-alt="Portrait photographique net d'une femme ivoirienne coursière professionnelle souriante portant un polo orange de livraison GoLivreur et un casque de moto jaune sécurisé, lumière naturelle extérieure vive à Daloa" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxNWw_SHaQFYCJl7g6aFw5XphwGGNetlaenqUWHEmZgl_8sxybIg9iavdp-Qq3PePxUlfnVSW0ssdPlkqekLoaf641RpP8zNwdKkDhIdMgNaxINwuJ2qoK2NSosSll9C-DqIdZu_QNEzeM69HZl6RehRLkR1XnRuRPOxho0NTmN7CebJf5xVeUAgZ4sEglKizNdVtBDxTYB-TZeieusmXGsHfQoo692vroZicINAE">
+<div class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-secondary flex items-center justify-center text-white text-[12px] shadow">
+<span class="material-symbols-outlined text-[13px]">verified</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-1.5 flex-wrap">
+<h4 class="font-label-md text-label-md text-text-primary truncate">Fatou Diaby</h4>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-caption-sm text-[11px] font-semibold">
+<span class="material-symbols-outlined text-[12px]">shield</span> Fiable
+            </span>
+</div>
+<p class="font-caption-sm text-caption-sm text-text-secondary mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-feedback-warning">star</span>
+<span class="font-medium text-text-primary">4.7</span>
+<span class="">(187 courses réussies)</span>
+</p>
+<div class="mt-1 flex items-center gap-1 text-text-secondary font-caption-sm text-[12px]">
+<span class="material-symbols-outlined text-[14px]">two_wheeler</span>
+<span class="">Moto Djakarta rouge • Immat. 4521-DL</span>
+</div>
+</div>
+</div>
+<!-- Action d'appel & Contact -->
+<div class="mt-space-md flex gap-2">
+<a class="flex-1 h-[52px] bg-primary-container text-text-primary font-label-md text-label-md rounded-xl flex items-center justify-center gap-2 active:brightness-95 transition-all shadow-sm" data-action="tracking.callCourier" href="tel:+22501020304">
+<span class="material-symbols-outlined text-[22px]">phone</span>
+<span class="">Appeler le livreur</span>
+</a>
+<button aria-label="Message SMS direct" class="w-[52px] h-[52px] bg-surface-container active:bg-surface-variant text-text-primary rounded-xl flex items-center justify-center shrink-0 transition-colors" type="button">
+<span class="material-symbols-outlined text-[22px]">chat</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Cartouche de sécurité - Code expéditeur -->
+<section class="px-margin mt-space-md" id="code-expediteur-affiche">
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm border-l-4 border-primary-container">
+<div class="flex items-center gap-2 mb-space-xs">
+<span class="material-symbols-outlined text-primary-container text-[22px]">lock</span>
+<h4 class="font-label-md text-label-md text-text-primary">Votre code secret d'expéditeur</h4>
+</div>
+<p class="font-caption-sm text-caption-sm text-text-secondary mb-space-sm">
+        Code validé pour la prise en charge de l'envoi :
+      </p>
+<!-- Grand affichage 4 chiffres OTP design -->
+<div class="flex items-center justify-center gap-3 my-space-sm">
+<div class="w-14 h-14 rounded-xl bg-surface-container-low flex items-center justify-center font-headline-lg text-headline-lg text-text-primary font-bold shadow-inner">7</div>
+<div class="w-14 h-14 rounded-xl bg-surface-container-low flex items-center justify-center font-headline-lg text-headline-lg text-text-primary font-bold shadow-inner">3</div>
+<div class="w-14 h-14 rounded-xl bg-surface-container-low flex items-center justify-center font-headline-lg text-headline-lg text-text-primary font-bold shadow-inner">9</div>
+<div class="w-14 h-14 rounded-xl bg-surface-container-low flex items-center justify-center font-headline-lg text-headline-lg text-text-primary font-bold shadow-inner">1</div>
+</div>
+<div class="bg-surface-container rounded-lg p-2.5 mt-space-sm flex items-start gap-2 text-on-surface-variant font-caption-sm text-caption-sm">
+<span class="material-symbols-outlined text-[18px] text-feedback-warning shrink-0 mt-0.5">verified_user</span>
+<span class="">Ne donnez ce code à <strong>Fatou Diaby</strong> QUE lorsqu'elle a pris votre colis en main propre et pris la photo de contrôle.</span>
+</div>
+</div>
+</section>
+<!-- Photo de prise en charge (Preuve de collecte) -->
+<section class="px-margin mt-space-md" id="photo-ramassage">
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-[20px]">task_alt</span>
+<h4 class="font-label-md text-label-md text-text-primary">Photo de prise en charge</h4>
+</div>
+<span class="bg-secondary-container text-on-secondary-container font-caption-sm text-[11px] px-2 py-0.5 rounded font-semibold">Conforme</span>
+</div>
+<div class="flex items-center gap-3 bg-surface-container rounded-xl p-2.5">
+<img class="w-20 h-20 rounded-lg object-cover bg-surface-variant shrink-0" data-alt="Gros plan sur un paquet pli cartonné scellé avec ruban adhésif de sécurité GoLivreur jaune et étiquette avec QR code visible tenu dans les mains gantées d'une livreuse devant une porte de maison à Daloa" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDLm7YLhiNzDl0oC7bHDaqbWxVYQEP72ldziGne6aj8t5GAJGj_uX1D0opAc_gRDhvrX7NGzsyEfxqzekRhM1WWvICsy6wxV_gfmXOlzp1FdhEjcX8nOsuIvRGju5y5J0_er-NT8aHeh6ZAxNJeEOguttdnzMwqRwle3JX7-hBEfqPyUgijSDv7AIaP9EZHgJLAgwO5pI7F37m6tS4mPDJVipFupuyI5gCEJc25OQ">
+<div class="min-w-0 flex-1">
+<p class="font-body-md-emphasis text-caption-sm text-text-primary font-semibold truncate">Colis scellé #prc_9001</p>
+<p class="font-caption-sm text-[12px] text-text-secondary mt-0.5">Collecté à 14:15 par Fatou Diaby</p>
+<div class="inline-flex items-center gap-1 text-secondary font-caption-sm text-[11px] font-medium mt-1">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span class="">Intégrité emballage vérifiée</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Destinataire & Sécurité finale -->
+<section class="px-margin mt-space-md">
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm">
+<div class="flex items-center gap-2 mb-space-sm">
+<span class="material-symbols-outlined text-feedback-info text-[20px]">person_pin</span>
+<h4 class="font-label-md text-label-md text-text-primary">Destinataire final</h4>
+</div>
+<div class="p-3 bg-surface-container-low rounded-xl">
+<div class="flex justify-between items-start">
+<div>
+<p class="font-body-md-emphasis text-body-md text-text-primary font-bold">M. Koné</p>
+<p class="font-caption-sm text-caption-sm text-text-secondary">Quartier Habitat, Villa 42, Daloa</p>
+</div>
+<span class="material-symbols-outlined text-text-secondary text-[20px]">home</span>
+</div>
+<div class="mt-3 pt-2.5 border-t border-gray-300 flex items-start gap-2 font-caption-sm text-[12px] text-text-secondary">
+<span class="material-symbols-outlined text-feedback-info text-[16px] shrink-0 mt-0.5">sms</span>
+<span class="">Code de remise de 4 chiffres envoyé automatiquement par SMS sur son <strong class="text-text-primary">01 02 03 04 05</strong>.</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<script>
+  // Micro-interaction de recentrage carte
+  document.getElementById('btn-recenter')?.addEventListener('click', function() {
+    this.classList.add('rotate-45');
+    setTimeout(() => {
+      this.classList.remove('rotate-45');
+    }, 400);
+  });
+</script></main>
+
+</body></html>

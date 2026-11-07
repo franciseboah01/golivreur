@@ -1,0 +1,168 @@
+﻿<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_blank" name="shell-type"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "secondary": "#2a6b2c", "feedback-warning": "#F9A825", "on-secondary-fixed-variant": "#0c5216", "feedback-success": "#4CAF50", "primary-fixed": "#ffddb4", "gray-300": "#E0E0E0", "on-primary": "#ffffff", "gray-700": "#595959", "surface-bg": "#FAFAFA", "gray-900": "#212121", "surface-container-lowest": "#ffffff", "error-container": "#ffdad6", "surface-bright": "#fcf9f8", "on-primary-container": "#644000", "surface-container": "#f0eded", "surface-dim": "#dcd9d9", "surface-container-highest": "#e5e2e1", "on-tertiary-fixed": "#001d36", "background": "#fcf9f8", "inverse-on-surface": "#f3f0ef", "surface-tint": "#835500", "gray-100": "#F2F2F2", "outline": "#847462", "on-background": "#1b1c1c", "text-secondary": "#595959", "on-secondary-fixed": "#002203", "on-primary-fixed": "#291800", "on-secondary": "#ffffff", "primary": "#835500", "secondary-container": "#acf4a4", "on-error": "#ffffff", "surface-container-low": "#f6f3f2", "inverse-primary": "#ffb953", "on-secondary-container": "#307231", "on-surface": "#1b1c1c", "on-tertiary": "#ffffff", "on-tertiary-fixed-variant": "#00497c", "feedback-info": "#2E75B6", "tertiary": "#0b61a1", "border-default": "#E0E0E0", "tertiary-fixed-dim": "#9ecaff", "primary-fixed-dim": "#ffb953", "outline-variant": "#d7c3ae", "surface-container-high": "#eae7e7", "tertiary-fixed": "#d1e4ff", "secondary-fixed-dim": "#91d78a", "text-disabled": "#9E9E9E", "primary-container": "#f4a623", "on-tertiary-container": "#00497d", "feedback-error": "#D32F2F", "tertiary-container": "#7cbaff", "surface": "#fcf9f8", "surface-variant": "#e5e2e1", "error": "#ba1a1a", "on-surface-variant": "#524534", "on-error-container": "#93000a", "gray-500": "#9E9E9E", "text-primary": "#212121", "secondary-fixed": "#acf4a4", "on-primary-fixed-variant": "#633f00", "gray-50": "#FAFAFA", "inverse-surface": "#303030", "surface-card": "#FFFFFF" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-2xl": "48px", "gutter": "16px", "margin": "16px", "space-sm": "8px", "space-xl": "32px", "space-md": "16px", "space-lg": "24px", "space-xs": "4px" }, fontFamily: { "headline-sm": ["Inter"], "caption-sm": ["Inter"], "body-md-emphasis": ["Inter"], "headline-md": ["Inter"], "label-md": ["Inter"], "body-md": ["Inter"], "headline-lg": ["Inter"] }, fontSize: { "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "caption-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "body-md-emphasis": ["16px", { "lineHeight": "22px", "fontWeight": "500" }], "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "700" }], "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "600" }], "body-md": ["16px", { "lineHeight": "22px", "fontWeight": "400" }], "headline-lg": ["28px", { "lineHeight": "34px", "fontWeight": "700" }] } } } };</script><style>@layer base{html,body{width:100%;margin:0;padding:0;background-color:#FAFAFA;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}</style></head><body class="bg-surface-bg text-on-surface font-body-md"><main class="w-full min-h-screen pt-safe pb-safe bg-surface flex flex-col"><div class="flex flex-col w-full" id="CLIENT-AUTH-Onboarding">
+<!-- Top Bar: Navigation & Action Passer -->
+<div class="flex items-center justify-between px-margin pt-space-md pb-space-sm w-full">
+<div class="flex items-center gap-space-xs">
+<div class="w-8 h-8 rounded-lg overflow-hidden shadow-sm flex items-center justify-center bg-primary-container"><img src="https://lh3.googleusercontent.com/aida/ALJJyrDI_RTiea8ic70jJexCGpxjpcMERpwJUavqbFRQSZcJGezW7BOvU97Ql-0mgVV7W1L8jlI0y8g7tjR4Jgc00lVkI08MnInTLFVsRLv66TAyJ8G9EXTDsnMZSYaf4E83yAHT1N5aBI4jw6vn0bn6NPKs-USchI4Kgn2IQgvF8ZMqz19PivbielmFlSQ6B_owXLhpsAKPq9hxfKyrjJc_FAnDs7_HzCKtZsDkdRQGBDJY" alt="Logo Mascotte GoLivreur" class="w-full h-full object-cover"></div>
+<span class="font-headline-sm text-headline-sm text-gray-900 tracking-tight">GoLivreur</span>
+</div>
+<button class="text-text-secondary font-body-md-emphasis text-body-md-emphasis py-space-xs px-space-sm active:opacity-60 transition-opacity focus:outline-none" data-action="onboarding.skip" id="btn-passer">
+      Passer
+    </button>
+</div>
+<!-- Central Dynamic Slides Carousel -->
+<div class="relative w-full overflow-hidden mt-space-sm">
+<div class="flex w-full transition-transform duration-300 ease-out" id="slides-viewport">
+<!-- Slide 1: GoShop & GoColis réunis à Daloa (Active initialement) -->
+<div class="min-w-full flex flex-col items-center px-margin text-center">
+<!-- Visual Illustration Container -->
+<div class="relative w-full max-w-xs h-64 bg-surface-container rounded-xl overflow-hidden flex flex-col items-center justify-center shadow-sm p-space-md"><div class="absolute inset-0 bg-gradient-to-b from-primary-fixed/30 to-surface-container pointer-events-none"></div><img class="w-full h-full object-cover rounded-lg opacity-90" data-alt="Rues animées de Daloa avec livreur" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAW96iWXhiGjITQ3TMupArZM7-e1Rotcmol7Ldn_4g7Swm5eBMopvoAbKWPVuUvnPPQWf1tIwEnwT_Cv9FtN7afQDezTh4tOuti6kXIgQdLH96R7AeKHERkMMybmRLNSzd7pmLf7spbW4Tc4JfdVQyfLGJ6mHZIHumIgnSo_uS-jiyiQIQCTaHVraYbL5KQY96Csm-xiFYQiEWHMLX1Cx_lf2KExWGo4gq0G4l6LO8"><div class="absolute inset-0 flex items-center justify-center pointer-events-none"><div class="w-24 h-24 rounded-full overflow-hidden shadow-lg p-0.5 bg-surface-container-lowest/95 backdrop-blur"><img class="w-full h-full object-cover rounded-full" src="https://lh3.googleusercontent.com/aida/ALJJyrDI_RTiea8ic70jJexCGpxjpcMERpwJUavqbFRQSZcJGezW7BOvU97Ql-0mgVV7W1L8jlI0y8g7tjR4Jgc00lVkI08MnInTLFVsRLv66TAyJ8G9EXTDsnMZSYaf4E83yAHT1N5aBI4jw6vn0bn6NPKs-USchI4Kgn2IQgvF8ZMqz19PivbielmFlSQ6B_owXLhpsAKPq9hxfKyrjJc_FAnDs7_HzCKtZsDkdRQGBDJY" alt="Mascotte GoLivreur Daloa"></div></div><div class="absolute bottom-space-md left-space-md bg-surface-container-lowest/95 backdrop-blur shadow-sm rounded-lg px-space-sm py-space-xs flex items-center gap-space-xs text-gray-900"><span class="material-symbols-outlined text-feedback-warning" style="font-variation-settings: 'FILL' 1;">storefront</span><span class="font-headline-sm text-caption-sm">GoShop</span></div><div class="absolute top-space-md right-space-md bg-secondary text-on-secondary shadow-sm rounded-lg px-space-sm py-space-xs flex items-center gap-space-xs"><span class="material-symbols-outlined text-caption-sm" style="font-variation-settings: 'FILL' 1;">package_2</span><span class="font-body-md-emphasis text-caption-sm">GoColis</span></div></div>
+<!-- Typography Content -->
+<div class="mt-space-lg flex flex-col items-center">
+<h1 class="font-headline-md text-headline-md text-text-primary tracking-tight max-w-xs leading-snug">
+            Tout Daloa livré chez vous en un clic
+          </h1>
+<p class="font-body-md text-body-md text-text-secondary mt-space-sm max-w-sm leading-relaxed">
+            Commandez dans vos maquis, restaurants et pharmacies préférés avec GoShop, ou faites livrer vos colis partout en ville avec GoColis.
+          </p>
+</div>
+</div>
+<!-- Slide 2: Rapidité & Suivi en Direct -->
+<div class="min-w-full flex flex-col items-center px-margin text-center">
+<div class="relative w-full max-w-xs h-64 bg-surface-container rounded-xl overflow-hidden flex flex-col items-center justify-center shadow-sm p-space-md">
+<div class="absolute inset-0 bg-gradient-to-b from-tertiary-fixed/30 to-surface-container pointer-events-none"></div>
+<img class="w-full h-full object-cover rounded-lg" data-alt="Digital illustration showing a GPS live tracking mobile map interface overlay over tropical streets of Daloa Ivory Coast with a courier scooter moving toward a pin location, warm bright sunlight, cheerful modern aesthetic with crisp amber and blue status badges" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8NuyKQsLqCepwMzrpMsExLXkjfp5YPZTcU98txhTmusQZPbb9AgR5OMKVUqi6ja0QPhRiQ50TPE50XCCNKRkV_Z6xnww68zmgMxJ7xkes-iPeJE3TCnmABY-fYxsB1BDn0LwN_DnI7jwxjZMje5XTt9qrWZX-VSjthCywlxS9-uBlx18U9MFiaq6D8Ju-cBNQ7Cimk-tmrYE-zqAhUADilQAFUGdEEDwzI5cIEl8">
+<div class="absolute bottom-space-md left-space-md bg-surface-container-lowest/95 backdrop-blur shadow-sm rounded-lg px-space-sm py-space-xs flex items-center gap-space-xs text-gray-900">
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: 'FILL' 1;">near_me</span>
+<span class="font-headline-sm text-caption-sm">GPS Direct</span>
+</div>
+</div>
+<div class="mt-space-lg flex flex-col items-center">
+<h2 class="font-headline-md text-headline-md text-text-primary tracking-tight max-w-xs leading-snug">
+            Suivi ultra-précis en temps réel
+          </h2>
+<p class="font-body-md text-body-md text-text-secondary mt-space-sm max-w-sm leading-relaxed">
+            Visualisez le trajet de votre livreur minute par minute du ramassage jusqu’au seuil de votre maison.
+          </p>
+</div>
+</div>
+<!-- Slide 3: Paiement Sécurisé & Facile -->
+<div class="min-w-full flex flex-col items-center px-margin text-center">
+<div class="relative w-full max-w-xs h-64 bg-surface-container rounded-xl overflow-hidden flex flex-col items-center justify-center shadow-sm p-space-md">
+<div class="absolute inset-0 bg-gradient-to-b from-secondary-fixed/40 to-surface-container pointer-events-none"></div>
+<img class="w-full h-full object-cover rounded-lg" data-alt="Vibrant clean vector style illustration depicting safe Mobile Money digital transaction in Ivory Coast with Orange Money Wave and cash on delivery icons, smiling African consumer receiving package comfortably, bright daylight, high contrast graphics" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQWK_1ckRkWnm83Xh-bbaKtUou5pzZBGjhDCGlC10G1YDmRYRpmhHK_8FP84hPxiLk1DR955qsWnS92nnIXjpNHcmqswZKgaoe_EXGKftPdOTcxFX05dWok9DUR7WdI7qdtrPk6d-tueLV1gohEZATWMQ5BGrpAeB713LbTPls9zwLkexc4-Pq3emkYa7CX8rb7RvNZ_H0R7AyDT-vZjaDBuRR5oT47kjy4moyRag">
+<div class="absolute bottom-space-md left-space-md bg-surface-container-lowest/95 backdrop-blur shadow-sm rounded-lg px-space-sm py-space-xs flex items-center gap-space-xs text-gray-900">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span class="font-headline-sm text-caption-sm">Wave &amp; Cash</span>
+</div>
+</div>
+<div class="mt-space-lg flex flex-col items-center">
+<h2 class="font-headline-md text-headline-md text-text-primary tracking-tight max-w-xs leading-snug">
+            Payez simplement en toute sécurité
+          </h2>
+<p class="font-body-md text-body-md text-text-secondary mt-space-sm max-w-sm leading-relaxed">
+            Réglez à la livraison en espèces ou par Mobile Money selon vos habitudes, sans frais cachés.
+          </p>
+</div>
+</div>
+</div>
+</div>
+<!-- Pagination Dots (Indicateur 3 pastilles) -->
+<div aria-label="Progression de présentation" class="flex items-center justify-center gap-2 mt-space-lg" id="carousel-dots" role="tablist">
+<div aria-label="Slide 1 active" class="h-2.5 rounded-full transition-all duration-300 w-8 bg-primary-container shadow-sm" id="dot-0"></div>
+<div aria-label="Slide 2" class="h-2.5 rounded-full transition-all duration-300 w-2.5 bg-gray-300" id="dot-1"></div>
+<div aria-label="Slide 3" class="h-2.5 rounded-full transition-all duration-300 w-2.5 bg-gray-300" id="dot-2"></div>
+</div>
+<!-- Bottom Interactive Actions Zone -->
+<div class="w-full px-margin mt-space-xl pb-space-lg flex flex-col items-center gap-space-md">
+<!-- Primary CTA: Suivant -->
+<button class="w-full h-[52px] bg-primary-container text-on-primary font-label-md text-label-md rounded-xl flex items-center justify-center gap-space-xs shadow-sm active:opacity-90 active:scale-[0.99] transition-all focus:outline-none" data-action="onboarding.next" id="btn-suivant">
+<span id="btn-text" class="">Suivant</span>
+<span class="material-symbols-outlined text-headline-sm">arrow_forward</span>
+</button>
+<!-- Secondary Direct Link: Se Connecter -->
+<button class="text-body-md-emphasis font-body-md-emphasis text-primary-container py-space-xs px-space-md active:opacity-75 transition-opacity focus:outline-none flex items-center gap-1" data-action="auth.goToLogin" id="btn-deja-compte">
+<span class="">Déjà un compte ?</span>
+<span class="underline underline-offset-2">Se connecter</span>
+</button>
+</div>
+</div>
+<script>
+  (function() {
+    let currentSlide = 0;
+    const totalSlides = 3;
+    const viewport = document.getElementById('slides-viewport');
+    const dots = [
+      document.getElementById('dot-0'),
+      document.getElementById('dot-1'),
+      document.getElementById('dot-2')
+    ];
+    const btnSuivant = document.getElementById('btn-suivant');
+    const btnText = document.getElementById('btn-text');
+    const btnPasser = document.getElementById('btn-passer');
+    const btnDejaCompte = document.getElementById('btn-deja-compte');
+
+    function updateCarousel(index) {
+      currentSlide = index;
+      if (viewport) {
+        viewport.style.transform = `translateX(-${currentSlide * 100}%)`;
+      }
+      dots.forEach((dot, i) => {
+        if (!dot) return;
+        if (i === currentSlide) {
+          dot.className = 'h-2.5 rounded-full transition-all duration-300 w-8 bg-primary-container shadow-sm';
+        } else {
+          dot.className = 'h-2.5 rounded-full transition-all duration-300 w-2.5 bg-gray-300';
+        }
+      });
+      if (btnText) {
+        btnText.textContent = (currentSlide === totalSlides - 1) ? 'Commencer' : 'Suivant';
+      }
+    }
+
+    if (btnSuivant) {
+      btnSuivant.addEventListener('click', function() {
+        if (currentSlide < totalSlides - 1) {
+          updateCarousel(currentSlide + 1);
+        } else {
+          console.log('[GoLivreur] Onboarding completed -> Vers inscription / accueil');
+        }
+      });
+    }
+
+    if (btnPasser) {
+      btnPasser.addEventListener('click', function() {
+        updateCarousel(totalSlides - 1);
+      });
+    }
+
+    if (btnDejaCompte) {
+      btnDejaCompte.addEventListener('click', function() {
+        console.log('[GoLivreur] Navigation vers connexion client');
+      });
+    }
+
+    // Touch swipe support for smooth mobile feel
+    let touchStartX = 0;
+    let touchEndX = 0;
+    if (viewport) {
+      viewport.addEventListener('touchstart', function(e) {
+        touchStartX = e.changedTouches[0].screenX;
+      }, { passive: true });
+
+      viewport.addEventListener('touchend', function(e) {
+        touchEndX = e.changedTouches[0].screenX;
+        const diff = touchStartX - touchEndX;
+        if (Math.abs(diff) > 40) {
+          if (diff > 0 && currentSlide < totalSlides - 1) {
+            updateCarousel(currentSlide + 1);
+          } else if (diff < 0 && currentSlide > 0) {
+            updateCarousel(currentSlide - 1);
+          }
+        }
+      }, { passive: true });
+    }
+  })();
+</script></main>
+
+</body></html>

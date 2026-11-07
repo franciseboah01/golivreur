@@ -55,7 +55,7 @@ class ClientController extends Controller
             'delivery_address'     => 'required|string',
             'delivery_lat'         => 'nullable|numeric',
             'delivery_lng'         => 'nullable|numeric',
-            'payment_method'       => 'required|in:cash,orange_money,wave,mtn',
+            'payment_method'       => 'required|in:cash,orange_money,wave,mtn,moov',
             'distance_km'          => 'required|numeric|min:0.1',
             'special_instructions' => 'nullable|string',
         ]);
