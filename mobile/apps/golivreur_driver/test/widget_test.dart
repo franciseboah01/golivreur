@@ -5,12 +5,14 @@ import 'package:golivreur_driver/main.dart';
 import 'package:golivreur_driver/features/navigation/screens/driver_main_navigation_screen.dart';
 
 void main() {
-  testWidgets('GoLivreur Driver smoke test - démarrage application', (WidgetTester tester) async {
+  testWidgets('GoLivreur Driver smoke test - démarrage application',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const ProviderScope(child: GoLivreurDriverApp()));
     expect(find.text('GoLivreur Driver'), findsOneWidget);
   });
 
-  testWidgets('DriverMainNavigationScreen - affiche les 3 onglets Stitch', (WidgetTester tester) async {
+  testWidgets('DriverMainNavigationScreen - affiche les 3 onglets Stitch',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
