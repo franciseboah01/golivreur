@@ -6,6 +6,13 @@ backend/.env
 backend/.env.backup
 backend/.env.production
 
+# MCP config & local keys
+mcp_config.json
+*.keystore
+*.jks
+**/android/key.properties
+**/android/local.properties
+
 # Backend / Composer
 backend/vendor/
 backend/storage/app/public/
