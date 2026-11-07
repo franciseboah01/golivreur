@@ -99,3 +99,4 @@ final singleParcelProvider = FutureProvider.family<ParcelModel, int>((ref, parce
     createdAt: DateTime.now().subtract(const Duration(minutes: 25)),
   );
 });
+

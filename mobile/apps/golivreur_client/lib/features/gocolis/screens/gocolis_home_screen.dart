@@ -285,3 +285,4 @@ class GoColisHomeScreen extends ConsumerWidget {
     );
   }
 }
+

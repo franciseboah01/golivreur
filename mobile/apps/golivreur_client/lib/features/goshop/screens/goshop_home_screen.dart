@@ -925,3 +925,4 @@ class GoShopHomeScreen extends ConsumerWidget {
     );
   }
 }
+

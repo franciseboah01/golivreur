@@ -540,3 +540,4 @@ class _MerchantDetailScreenState extends ConsumerState<MerchantDetailScreen> {
     );
   }
 }
+
