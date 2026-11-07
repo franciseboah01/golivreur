@@ -98,6 +98,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiClient.post('/auth/verify-register', data: {
         'phone': phone,
         'code': code,
+        'otp': code,
       });
 
       if (res.statusCode == 200 || res.statusCode == 201) {
@@ -157,6 +158,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiClient.post('/auth/verify-login', data: {
         'phone': phone,
         'code': code,
+        'otp': code,
       });
 
       if (res.statusCode == 200) {

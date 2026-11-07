@@ -15,7 +15,7 @@ class Env {
   /// Local iOS : http://localhost:8000/api/v1
   /// Staging   : https://staging.golivreur.ci/api/v1
   /// Production: https://golivreur.ci/api/v1
-  static const String apiBaseUrl = 'CHANGE_ME'; // Ex: https://golivreur.ci/api/v1
+  static const String apiBaseUrl = 'http://localhost:8080/api/v1'; // Local dev API
 
   // ── WebSocket Reverb (GPS temps réel) ──────────────────────────────────────
   /// Même hôte que l'API, port 8080.

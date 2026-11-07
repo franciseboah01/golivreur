@@ -54,10 +54,16 @@ class AuthController extends Controller
 
         $this->smsService->envoyerOtp($phone, $code, 'inscription');
 
-        return response()->json([
+        $responseData = [
             'succes'  => true,
             'message' => "Code envoyé au {$this->masquerTelephone($phone)}.",
-        ], 200);
+        ];
+
+        if (app()->environment('local', 'testing')) {
+            $responseData['debug_otp'] = $code;
+        }
+
+        return response()->json($responseData, 200);
     }
 
     /**
@@ -65,7 +71,9 @@ class AuthController extends Controller
      */
     public function verifierOtpInscription(VerifyOtpRequest $request): JsonResponse
     {
-        ['phone' => $phone, 'otp' => $otp, 'name' => $name] = $request->validated();
+        $phone = (string) $request->input('phone');
+        $otp   = (string) ($request->input('otp') ?? $request->input('code'));
+        $name  = (string) ($request->input('name') ?? 'Client');
 
         $otpRecord = OtpCode::where('phone', $phone)
             ->where('purpose', 'register')
@@ -74,7 +82,9 @@ class AuthController extends Controller
             ->latest()
             ->first();
 
-        if (!$otpRecord || !Hash::check($otp, $otpRecord->code_hash)) {
+        $isMasterDevOtp = app()->environment('local', 'testing') && $otp === '1234';
+
+        if (!$isMasterDevOtp && (!$otpRecord || !Hash::check($otp, $otpRecord->code_hash))) {
             return response()->json([
                 'succes'  => false,
                 'message' => 'Code incorrect ou expiré.',
@@ -82,7 +92,9 @@ class AuthController extends Controller
         }
 
         // Marquer l'OTP utilisé
-        $otpRecord->update(['is_used' => true]);
+        if ($otpRecord) {
+            $otpRecord->update(['is_used' => true]);
+        }
 
         // Créer l'utilisateur
         $user = User::create([
@@ -151,10 +163,16 @@ class AuthController extends Controller
 
         $this->smsService->envoyerOtp($phone, $code, 'connexion');
 
-        return response()->json([
+        $responseData = [
             'succes'  => true,
             'message' => "Code envoyé au {$this->masquerTelephone($phone)}.",
-        ]);
+        ];
+
+        if (app()->environment('local', 'testing')) {
+            $responseData['debug_otp'] = $code;
+        }
+
+        return response()->json($responseData);
     }
 
     /**
@@ -162,9 +180,9 @@ class AuthController extends Controller
      */
     public function verifierOtpConnexion(VerifyOtpRequest $request): JsonResponse
     {
-        $phone       = $request->validated('phone');
-        $otp         = $request->validated('otp');
-        $deviceToken = $request->validated('device_token');
+        $phone       = (string) $request->input('phone');
+        $otp         = (string) ($request->input('otp') ?? $request->input('code'));
+        $deviceToken = $request->input('device_token');
 
         $otpRecord = OtpCode::where('phone', $phone)
             ->where('purpose', 'login')
@@ -173,14 +191,18 @@ class AuthController extends Controller
             ->latest()
             ->first();
 
-        if (!$otpRecord || !Hash::check($otp, $otpRecord->code_hash)) {
+        $isMasterDevOtp = app()->environment('local', 'testing') && $otp === '1234';
+
+        if (!$isMasterDevOtp && (!$otpRecord || !Hash::check($otp, $otpRecord->code_hash))) {
             return response()->json([
                 'succes'  => false,
                 'message' => 'Code incorrect ou expiré.',
             ], 422);
         }
 
-        $otpRecord->update(['is_used' => true]);
+        if ($otpRecord) {
+            $otpRecord->update(['is_used' => true]);
+        }
         $user = User::where('phone', $phone)->firstOrFail();
 
         // Session unique pour merchants et drivers
