@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
-import '../../gocolis/screens/codes_gocolis_screen.dart';
+import '../../navigation/screens/driver_main_navigation_screen.dart';
 
 class DriverLoginScreen extends StatefulWidget {
   const DriverLoginScreen({super.key});
@@ -11,8 +11,8 @@ class DriverLoginScreen extends StatefulWidget {
 }
 
 class _DriverLoginScreenState extends State<DriverLoginScreen> {
-  final _phoneController = TextEditingController();
-  final _plateController = TextEditingController();
+  final _phoneController = TextEditingController(text: '0700000003');
+  final _plateController = TextEditingController(text: '1234-JK-01');
   bool _chargement = false;
 
   @override
@@ -24,12 +24,12 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
 
   void _login() {
     setState(() => _chargement = true);
-    Future.delayed(const Duration(milliseconds: 600), () {
+    Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
         setState(() => _chargement = false);
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => const CodesGoColisScreen(parcelId: 1),
+            builder: (_) => const DriverMainNavigationScreen(),
           ),
         );
       }

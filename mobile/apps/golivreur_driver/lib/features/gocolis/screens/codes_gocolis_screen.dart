@@ -45,8 +45,12 @@ class _CodesGoColisScreenState extends ConsumerState<CodesGoColisScreen> {
 
   @override
   void dispose() {
-    for (final c in _controlleursCodes) c.dispose();
-    for (final f in _focusNodes) f.dispose();
+    for (final c in _controlleursCodes) {
+      c.dispose();
+    }
+    for (final f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -184,7 +188,9 @@ class _CodesGoColisScreenState extends ConsumerState<CodesGoColisScreen> {
   }
 
   void _reinitialiserCodes() {
-    for (final c in _controlleursCodes) c.clear();
+    for (final c in _controlleursCodes) {
+      c.clear();
+    }
     if (_focusNodes.isNotEmpty) _focusNodes[0].requestFocus();
     setState(() {});
   }
