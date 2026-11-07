@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
-import '../../orders/screens/reception_commandes_screen.dart';
+import '../../navigation/screens/business_main_navigation_screen.dart';
 
 class BusinessLoginScreen extends StatefulWidget {
   const BusinessLoginScreen({super.key});
@@ -11,8 +11,8 @@ class BusinessLoginScreen extends StatefulWidget {
 }
 
 class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
-  final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _phoneController = TextEditingController(text: '0700000001');
+  final _passwordController = TextEditingController(text: '123456');
   bool _chargement = false;
 
   @override
@@ -24,12 +24,12 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
 
   void _login() {
     setState(() => _chargement = true);
-    Future.delayed(const Duration(milliseconds: 600), () {
+    Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
         setState(() => _chargement = false);
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => const ReceptionCommandesScreen(),
+            builder: (_) => const BusinessMainNavigationScreen(),
           ),
         );
       }

@@ -1,17 +1,27 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_business/main.dart';
+import 'package:golivreur_business/features/navigation/screens/business_main_navigation_screen.dart';
 
 void main() {
-  testWidgets('smoke test', (WidgetTester tester) async {
+  testWidgets('GoLivreur Business smoke test - démarrage application', (WidgetTester tester) async {
     await tester.pumpWidget(const ProviderScope(child: GoLivreurBusinessApp()));
+    expect(find.text('GoLivreur Business'), findsOneWidget);
+  });
+
+  testWidgets('BusinessMainNavigationScreen - affiche les 3 onglets Stitch', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: BusinessMainNavigationScreen(),
+        ),
+      ),
+    );
+
+    // Vérifie les 3 onglets définis dans Stitch Business
+    expect(find.text('Commandes'), findsOneWidget);
+    expect(find.text('Catalogue'), findsOneWidget);
+    expect(find.text('Revenus'), findsOneWidget);
   });
 }
