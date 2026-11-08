@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../config/app_theme.dart';
@@ -37,6 +38,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   late final Animation<Offset> _textSlide;
 
   bool _initFinished = false;
+  bool _hasNavigated = false;
+  Timer? _fallbackTimer;
 
   @override
   void initState() {
@@ -86,6 +89,13 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     // Démarrer l'animation et l'initialisation en parallèle
     _controller.forward();
     _executerInitialisation();
+
+    // Sécurité absolue : délai max de 3.2s après lequel on navigue d'office
+    _fallbackTimer = Timer(const Duration(milliseconds: 3200), () {
+      if (mounted && !_hasNavigated) {
+        _terminerEtNaviguer(force: true);
+      }
+    });
   }
 
   Future<void> _executerInitialisation() async {
@@ -102,23 +112,29 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     }
   }
 
-  void _terminerEtNaviguer() {
-    if (!_initFinished) return;
-    if (!mounted) return;
+  void _terminerEtNaviguer({bool force = false}) {
+    if (!force && !_initFinished) return;
+    if (!mounted || _hasNavigated) return;
+    _hasNavigated = true;
+    _fallbackTimer?.cancel();
 
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 600),
-        pageBuilder: (context, animation, secondaryAnimation) => widget.nextScreen,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-      ),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 500),
+          pageBuilder: (context, animation, secondaryAnimation) => widget.nextScreen,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
+      );
+    });
   }
 
   @override
   void dispose() {
+    _fallbackTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -151,8 +167,11 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212), // Fond sombre profond
-      body: SafeArea(
-        child: Center(
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _terminerEtNaviguer(force: true),
+        child: SafeArea(
+          child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -271,7 +290,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }
 

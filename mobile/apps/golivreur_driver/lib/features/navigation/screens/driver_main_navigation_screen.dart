@@ -4,6 +4,7 @@ import 'package:golivreur_core/config/app_theme.dart';
 import '../../jobs/screens/driver_jobs_screen.dart';
 import '../../wallet/screens/driver_wallet_screen.dart';
 import '../../earnings/screens/driver_earnings_screen.dart';
+import '../../profile/screens/driver_profile_screen.dart';
 
 class DriverMainNavigationScreen extends ConsumerStatefulWidget {
   final int initialIndex;
@@ -16,17 +17,20 @@ class DriverMainNavigationScreen extends ConsumerStatefulWidget {
 
 class _DriverMainNavigationScreenState extends ConsumerState<DriverMainNavigationScreen> {
   late int _currentIndex;
-
-  final List<Widget> _pages = const [
-    DriverJobsScreen(),
-    DriverWalletScreen(),
-    DriverEarningsScreen(),
-  ];
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _pages = [
+      const DriverJobsScreen(),
+      const DriverWalletScreen(),
+      const DriverEarningsScreen(),
+      DriverProfileScreen(onSwitchTab: (tabIndex) {
+        setState(() => _currentIndex = tabIndex);
+      }),
+    ];
   }
 
   @override
@@ -74,6 +78,11 @@ class _DriverMainNavigationScreenState extends ConsumerState<DriverMainNavigatio
               icon: Icon(Icons.bar_chart_outlined),
               activeIcon: Icon(Icons.bar_chart),
               label: 'Gains',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profil',
             ),
           ],
         ),

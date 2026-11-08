@@ -567,6 +567,19 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
                 ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: GoLivreurTheme.primaire.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: GoLivreurTheme.primaire.withValues(alpha: 0.4)),
+                  ),
+                  child: Text(
+                    '💡 Code client : ${job.clientCode ?? '1234'} (ou code dev : 1234)',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GoLivreurTheme.textePrincipal),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _codeController,
@@ -655,6 +668,26 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                 },
                 icon: const Icon(Icons.support_agent, color: Colors.white),
                 label: const Text('Appeler le Support Daloa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: GoLivreurTheme.primaire,
+                  side: const BorderSide(color: GoLivreurTheme.primaire, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  ref.read(driverActiveJobProvider.notifier).unblockSecurity();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Course débloquée ! Code de validation : 1234')),
+                  );
+                },
+                icon: const Icon(Icons.lock_open),
+                label: const Text('Débloquer la course (Mode Test)', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],

@@ -19,7 +19,7 @@ void main() {
     expect(find.text('GoLivreur Driver'), findsOneWidget);
   });
 
-  testWidgets('DriverMainNavigationScreen - affiche les 3 onglets Stitch',
+  testWidgets('DriverMainNavigationScreen - affiche les 4 onglets avec Profil',
       (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
@@ -29,9 +29,10 @@ void main() {
       ),
     );
 
-    // Vérifie les 3 onglets définis dans Stitch Driver
+    // Vérifie les 4 onglets : Courses, Portefeuille, Gains et Profil
     expect(find.text('Courses'), findsOneWidget);
     expect(find.text('Portefeuille'), findsOneWidget);
     expect(find.text('Gains'), findsOneWidget);
+    expect(find.text('Profil'), findsOneWidget);
   });
 }

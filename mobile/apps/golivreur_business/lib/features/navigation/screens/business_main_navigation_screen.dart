@@ -4,6 +4,7 @@ import 'package:golivreur_core/config/app_theme.dart';
 import '../../orders/screens/business_orders_screen.dart';
 import '../../catalog/screens/business_catalog_screen.dart';
 import '../../revenue/screens/business_revenue_screen.dart';
+import '../../profile/screens/business_profile_screen.dart';
 import '../../business/providers/business_provider.dart';
 
 class BusinessMainNavigationScreen extends ConsumerStatefulWidget {
@@ -17,17 +18,20 @@ class BusinessMainNavigationScreen extends ConsumerStatefulWidget {
 
 class _BusinessMainNavigationScreenState extends ConsumerState<BusinessMainNavigationScreen> {
   late int _currentIndex;
-
-  final List<Widget> _pages = const [
-    BusinessOrdersScreen(),
-    BusinessCatalogScreen(),
-    BusinessRevenueScreen(),
-  ];
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _pages = [
+      const BusinessOrdersScreen(),
+      const BusinessCatalogScreen(),
+      const BusinessRevenueScreen(),
+      BusinessProfileScreen(onSwitchTab: (tabIndex) {
+        setState(() => _currentIndex = tabIndex);
+      }),
+    ];
   }
 
   @override
@@ -99,6 +103,11 @@ class _BusinessMainNavigationScreenState extends ConsumerState<BusinessMainNavig
               icon: Icon(Icons.account_balance_wallet_outlined),
               activeIcon: Icon(Icons.account_balance_wallet),
               label: 'Revenus',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profil',
             ),
           ],
         ),

@@ -17,7 +17,7 @@ void main() {
     expect(find.text('GoLivreur Business'), findsOneWidget);
   });
 
-  testWidgets('BusinessMainNavigationScreen - affiche les 3 onglets Stitch', (WidgetTester tester) async {
+  testWidgets('BusinessMainNavigationScreen - affiche les 4 onglets avec Profil', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
@@ -26,9 +26,10 @@ void main() {
       ),
     );
 
-    // Vérifie les 3 onglets définis dans Stitch Business
+    // Vérifie les 4 onglets : Commandes, Catalogue, Revenus et Profil
     expect(find.text('Commandes'), findsOneWidget);
     expect(find.text('Catalogue'), findsOneWidget);
     expect(find.text('Revenus'), findsOneWidget);
+    expect(find.text('Profil'), findsOneWidget);
   });
 }

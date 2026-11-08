@@ -6,6 +6,10 @@ import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../providers/goshop_provider.dart';
 import 'merchant_detail_screen.dart';
 import 'cart_screen.dart';
+import '../../auth/screens/login_screen.dart';
+import '../../gocolis/screens/gocolis_home_screen.dart';
+import '../../orders/screens/orders_tracking_history_screen.dart';
+import '../../profile/screens/profile_screen.dart';
 
 class GoShopHomeScreen extends ConsumerWidget {
   const GoShopHomeScreen({super.key});
@@ -21,31 +25,41 @@ class GoShopHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
+      drawer: _buildQuickAccessDrawer(context, ref),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
         titleSpacing: 16,
         title: Row(
           children: [
-            // Logo GoLivreur
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: GoLivreurTheme.primaire,
+            // Logo GoLivreur interactif ouvrant le menu rapide
+            Builder(
+              builder: (drawerCtx) => InkWell(
+                onTap: () => Scaffold.of(drawerCtx).openDrawer(),
                 borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: GoLivreurTheme.primaire.withValues(alpha: 0.3),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                child: Tooltip(
+                  message: 'Menu & Profil',
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: GoLivreurTheme.primaire,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: GoLivreurTheme.primaire.withValues(alpha: 0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.menu,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
-                ],
-              ),
-              child: const Icon(
-                Icons.moped,
-                color: Colors.white,
-                size: 22,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -909,6 +923,151 @@ class GoShopHomeScreen extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildQuickAccessDrawer(BuildContext context, WidgetRef ref) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: GoLivreurTheme.primaire,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.moped,
+                          color: GoLivreurTheme.primaire,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'GoLivreur',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Daloa Express',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Ama Kouassi',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Text(
+                    '+225 07 01 00 00 01',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.storefront, color: GoLivreurTheme.primaire),
+                    title: const Text('GoShop - Commerces Daloa'),
+                    subtitle: const Text('Restaurants, Maquis & Boutiques'),
+                    onTap: () => Navigator.pop(context),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.all_inbox, color: Colors.blue),
+                    title: const Text('GoColis - Envoi de colis'),
+                    subtitle: const Text('Expéditions express moto à Daloa'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const GoColisHomeScreen()),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.receipt_long, color: Colors.orange),
+                    title: const Text('Mes Commandes en cours'),
+                    subtitle: const Text('Suivi en temps réel & historique'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const OrdersTrackingHistoryScreen()),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.person, color: Colors.purple),
+                    title: const Text('Mon Profil & Adresses'),
+                    subtitle: const Text('Informations personnelles & favoris'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                      );
+                    },
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.support_agent, color: Colors.teal),
+                    title: const Text('Support Client Daloa'),
+                    subtitle: const Text('+225 07 00 00 00 02'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Support GoLivreur Daloa joignable au 0700000002')),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.logout, color: GoLivreurTheme.erreur),
+                    title: const Text('Déconnexion', style: TextStyle(color: GoLivreurTheme.erreur, fontWeight: FontWeight.bold)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (route) => false,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
