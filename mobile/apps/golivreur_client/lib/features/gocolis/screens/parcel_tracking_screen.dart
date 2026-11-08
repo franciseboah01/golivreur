@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../providers/gocolis_provider.dart';
 
 class ParcelTrackingScreen extends ConsumerWidget {
@@ -223,8 +224,11 @@ class ParcelTrackingScreen extends ConsumerWidget {
             ],
           ),
         ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Erreur: $err')),
+        loading: () => const GoLivreurSpinner(message: 'Chargement des détails du colis...'),
+        error: (err, _) => GoLivreurErrorView.fromException(
+          error: err,
+          onRetry: () => ref.invalidate(singleParcelProvider(parcelId)),
+        ),
       ),
     );
   }

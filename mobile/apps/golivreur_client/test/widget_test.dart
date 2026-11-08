@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'package:golivreur_client/main.dart';
 import 'package:golivreur_client/features/auth/screens/login_screen.dart';
 import 'package:golivreur_client/features/navigation/screens/main_navigation_screen.dart';
@@ -9,10 +10,21 @@ import 'package:golivreur_client/features/goshop/providers/order_provider.dart';
 import 'package:golivreur_client/features/gocolis/providers/gocolis_provider.dart';
 
 void main() {
+  testWidgets('GoLivreur Client - affiche AnimatedSplashScreen au démarrage', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: GoLivreurClientApp(showSplash: true),
+      ),
+    );
+
+    expect(find.byType(AnimatedSplashScreen), findsOneWidget);
+    expect(find.text('CLIENT'), findsOneWidget);
+  });
+
   testWidgets('GoLivreur Client - affiche LoginScreen par défaut', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
-        child: GoLivreurClientApp(),
+        child: GoLivreurClientApp(showSplash: false),
       ),
     );
 

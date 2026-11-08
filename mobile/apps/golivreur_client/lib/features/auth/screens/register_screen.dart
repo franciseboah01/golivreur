@@ -65,14 +65,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 const Center(
                   child: GoLivreurLogo(
                     type: GoLivreurAppType.client,
-                    size: 84,
+                    size: 92,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
+                Text(
+                  'Inscription GoLivreur',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: GoLivreurTheme.textePrincipal,
+                      ),
+                ),
+                const SizedBox(height: 6),
                 const Text(
                   'Créez votre compte pour commander à Daloa',
                   textAlign: TextAlign.center,

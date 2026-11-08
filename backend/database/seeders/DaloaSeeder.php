@@ -94,6 +94,7 @@ class DaloaSeeder extends Seeder
             ['name' => 'Brou Evelyne',      'phone' => '0701000008'],
             ['name' => 'Coulibaly Moussa',  'phone' => '0701000009'],
             ['name' => 'Konaté Fatima',     'phone' => '0701000010'],
+            ['name' => 'Nouveau Client Test (Vide)', 'phone' => '0701000099'], // Pour tester l'état vide (0 commande, 0 colis)
         ];
 
         $clients = collect($clientsData)->map(fn ($data) => User::create([
@@ -117,9 +118,9 @@ class DaloaSeeder extends Seeder
                 'produits' => [
                     ['name' => 'Poulet braisé (quart)', 'price' => 1500, 'category' => 'Viandes'],
                     ['name' => 'Attiéké + Poisson braisé', 'price' => 1000, 'category' => 'Plats'],
-                    ['name' => 'Alloco + Œuf', 'price' => 500, 'category' => 'Accompagnements'],
-                    ['name' => 'Garba', 'price' => 800, 'category' => 'Plats'],
-                    ['name' => 'Jus de bissap (500ml)', 'price' => 300, 'category' => 'Boissons'],
+                    ['name' => 'Alloco + Œuf', 'price' => 500, 'category' => 'Accompagnements', 'is_available' => true],
+                    ['name' => 'Garba thon rouge (Épuisé)', 'price' => 800, 'category' => 'Plats', 'is_available' => false], // Cas limite rupture
+                    ['name' => 'Jus de bissap (500ml)', 'price' => 300, 'category' => 'Boissons', 'is_available' => true],
                 ],
             ],
             [
@@ -128,6 +129,7 @@ class DaloaSeeder extends Seeder
                 'address' => 'Avenue Houphouët-Boigny, Daloa',
                 'lat' => 6.8795, 'lng' => -6.4521,
                 'prep_time_minutes' => 25,
+                'is_open' => true,
                 'produits' => [
                     ['name' => 'Riz sauce graine', 'price' => 1200, 'category' => 'Plats'],
                     ['name' => 'Foutou banane + Soupe', 'price' => 1500, 'category' => 'Plats'],
@@ -142,6 +144,7 @@ class DaloaSeeder extends Seeder
                 'address' => 'Rue du Commerce, Daloa',
                 'lat' => 6.8809, 'lng' => -6.4495,
                 'prep_time_minutes' => 15,
+                'is_open' => true,
                 'produits' => [
                     ['name' => 'Burger Simple', 'price' => 1500, 'category' => 'Burgers'],
                     ['name' => 'Burger Double', 'price' => 2000, 'category' => 'Burgers'],
@@ -156,6 +159,7 @@ class DaloaSeeder extends Seeder
                 'address' => 'Place de la Mairie, Daloa',
                 'lat' => 6.8774, 'lng' => -6.4509,
                 'prep_time_minutes' => 10,
+                'is_open' => true,
                 'produits' => [
                     ['name' => 'Paracétamol 500mg (boîte 16)', 'price' => 500, 'category' => 'Médicaments'],
                     ['name' => 'Ibuprofène 400mg (boîte 10)', 'price' => 800, 'category' => 'Médicaments'],
@@ -170,12 +174,27 @@ class DaloaSeeder extends Seeder
                 'address' => 'Marché Central, Daloa',
                 'lat' => 6.8832, 'lng' => -6.4467,
                 'prep_time_minutes' => 5,
+                'is_open' => true,
                 'produits' => [
                     ['name' => 'Chargeur iPhone (Lightning)', 'price' => 2500, 'category' => 'Chargeurs'],
                     ['name' => 'Chargeur Android (USB-C)', 'price' => 2000, 'category' => 'Chargeurs'],
                     ['name' => 'Écouteurs filaires', 'price' => 1500, 'category' => 'Audio'],
                     ['name' => 'Coque téléphone universelle', 'price' => 1000, 'category' => 'Accessoires'],
                     ['name' => 'Powerbank 10000mAh', 'price' => 8000, 'category' => 'Batteries'],
+                ],
+            ],
+            [
+                'name' => 'Boulangerie La Centrale Daloa',
+                'category' => 'boulangerie',
+                'address' => 'Avenue Houphouët-Boigny, face Gare UTB, Daloa',
+                'lat' => 6.8785, 'lng' => -6.4515,
+                'prep_time_minutes' => 15,
+                'is_open' => false, // Commerce actuellement FERMÉ (cas limite test UI)
+                'produits' => [
+                    ['name' => 'Baguette tradition', 'price' => 200, 'category' => 'Pains', 'is_available' => true],
+                    ['name' => 'Croissant pur beurre (Rupture)', 'price' => 350, 'category' => 'Viennoiseries', 'is_available' => false],
+                    ['name' => 'Pain au chocolat', 'price' => 400, 'category' => 'Viennoiseries', 'is_available' => true],
+                    ['name' => 'Gâteau vanille 6 parts', 'price' => 6500, 'category' => 'Pâtisseries', 'is_available' => true],
                 ],
             ],
         ];
@@ -202,7 +221,7 @@ class DaloaSeeder extends Seeder
                 'lat'               => $commerceData['lat'],
                 'lng'               => $commerceData['lng'],
                 'prep_time_minutes' => $commerceData['prep_time_minutes'],
-                'is_open'           => true,
+                'is_open'           => $commerceData['is_open'] ?? true,
                 'is_active'         => true,
                 'activated_at'      => now(),
                 'activated_by'      => $citySupport->id,
@@ -226,7 +245,7 @@ class DaloaSeeder extends Seeder
                     'name'         => $produit['name'],
                     'price'        => $produit['price'],
                     'category'     => $produit['category'],
-                    'is_available' => true,
+                    'is_available' => $produit['is_available'] ?? true,
                     'sort_order'   => $sortOrder,
                 ]);
             }

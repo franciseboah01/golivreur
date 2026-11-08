@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/models/modeles.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../providers/goshop_provider.dart';
 import 'merchant_detail_screen.dart';
 import 'cart_screen.dart';
@@ -461,27 +462,13 @@ class GoShopHomeScreen extends ConsumerWidget {
                         },
                       );
                     },
-                    loading: () => const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(
-                        child: CircularProgressIndicator(color: GoLivreurTheme.primaire),
-                      ),
+                    loading: () => const GoLivreurListSkeleton(
+                      count: 4,
+                      itemHeight: 96,
                     ),
-                    error: (err, stack) => Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Center(
-                        child: Column(
-                          children: [
-                            const Icon(Icons.error_outline, size: 40, color: GoLivreurTheme.erreur),
-                            const SizedBox(height: 8),
-                            const Text('Impossible de charger les commerces'),
-                            TextButton(
-                              onPressed: () => ref.invalidate(merchantsListProvider),
-                              child: const Text('Réessayer'),
-                            ),
-                          ],
-                        ),
-                      ),
+                    error: (err, stack) => GoLivreurErrorView.fromException(
+                      error: err,
+                      onRetry: () => ref.invalidate(merchantsListProvider),
                     ),
                   ),
 

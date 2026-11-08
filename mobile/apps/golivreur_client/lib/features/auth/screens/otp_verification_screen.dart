@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
-import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../providers/auth_provider.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
@@ -74,23 +74,35 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       backgroundColor: GoLivreurTheme.fond,
       appBar: AppBar(title: const Text('Validation OTP')),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
+              const Center(
+                child: GoLivreurLogo(
+                  type: GoLivreurAppType.client,
+                  size: 76,
+                ),
+              ),
+              const SizedBox(height: 12),
               Text(
-                'Entrez le code reçu par SMS',
+                'Validation du code SMS',
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: GoLivreurTheme.textePrincipal,
                     ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 'Un code à 4 chiffres a été envoyé au +225 ${widget.phone}',
-                style: const TextStyle(color: GoLivreurTheme.texteSecondaire),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: GoLivreurTheme.texteSecondaire,
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(height: 24),
               if (authState.errorMessage != null) ...[

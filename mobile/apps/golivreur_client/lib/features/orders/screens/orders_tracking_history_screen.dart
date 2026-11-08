@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/models/modeles.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../goshop/providers/order_provider.dart';
 import '../../goshop/screens/suivi_gps_screen.dart';
 
@@ -22,11 +23,9 @@ class OrdersTrackingHistoryScreen extends ConsumerWidget {
       body: ordersAsync.when(
         data: (orders) {
           if (orders.isEmpty) {
-            return const Center(
-              child: Text(
-                'Aucune commande enregistrée pour l\'instant.',
-                style: TextStyle(color: GoLivreurTheme.texteSecondaire),
-              ),
+            return const EtatVide(
+              icone: Icons.receipt_long_outlined,
+              message: 'Aucune commande enregistrée pour l\'instant.\nCommandez chez vos commerces partenaires à Daloa !',
             );
           }
 
@@ -62,8 +61,11 @@ class OrdersTrackingHistoryScreen extends ConsumerWidget {
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator(color: GoLivreurTheme.primaire)),
-        error: (err, _) => Center(child: Text('Erreur: $err')),
+        loading: () => const GoLivreurListSkeleton(count: 3, itemHeight: 110),
+        error: (err, _) => GoLivreurErrorView.fromException(
+          error: err,
+          onRetry: () => ref.invalidate(ordersHistoryProvider),
+        ),
       ),
     );
   }

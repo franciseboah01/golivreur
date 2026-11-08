@@ -11,7 +11,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(DaloaSeeder::class);
+        $this->call([
+            DaloaSeeder::class,
+            DemoOrdersAndParcelsSeeder::class,
+        ]);
     }
 }
 

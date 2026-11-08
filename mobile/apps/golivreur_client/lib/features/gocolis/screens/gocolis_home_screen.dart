@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../providers/gocolis_provider.dart';
 import 'new_parcel_screen.dart';
 import 'parcel_tracking_screen.dart';
@@ -240,8 +241,11 @@ class GoColisHomeScreen extends ConsumerWidget {
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const Text('Erreur chargement expéditions'),
+              loading: () => const GoLivreurListSkeleton(count: 3, itemHeight: 88),
+              error: (err, _) => GoLivreurErrorView.fromException(
+                error: err,
+                onRetry: () => ref.invalidate(parcelsHistoryProvider),
+              ),
             ),
           ],
         ),

@@ -5,10 +5,12 @@ namespace Database\Seeders;
 use App\Models\City;
 use App\Models\Courier;
 use App\Models\Merchant;
+use App\Models\Notification;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Parcel;
 use App\Models\Product;
+use App\Models\Rating;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -18,7 +20,8 @@ class DemoOrdersAndParcelsSeeder extends Seeder
 {
     public function run(): void
     {
-        $clients = User::where('role', 'client')->get();
+        // On exclut le compte test 0701000099 pour qu'il garde un état vierge (0 commande, 0 colis)
+        $clients = User::where('role', 'client')->where('phone', '!=', '0701000099')->get();
         $merchants = Merchant::all();
         $couriers = Courier::all();
         $city = City::first() ?? City::create([
@@ -260,6 +263,37 @@ class DemoOrdersAndParcelsSeeder extends Seeder
                     'unit_price' => $product->price ?? 2000,
                     'product_name_snapshot' => $product->name,
                 ]);
+            }
+
+            // Évaluations réalistes pour commandes livrées
+            if ($order->status === Order::STATUS_DELIVERED) {
+                Rating::firstOrCreate(
+                    [
+                        'rater_id' => $client->id,
+                        'order_id' => $order->id,
+                        'type' => 'goshop_merchant',
+                    ],
+                    [
+                        'rateable_id' => $merchant->id,
+                        'rating' => rand(4, 5),
+                        'comment' => 'Repas très bon, commande préparée rapidement.',
+                    ]
+                );
+
+                if ($courier) {
+                    Rating::firstOrCreate(
+                        [
+                            'rater_id' => $client->id,
+                            'order_id' => $order->id,
+                            'type' => 'goshop_courier',
+                        ],
+                        [
+                            'rateable_id' => $courier->id,
+                            'rating' => rand(4, 5),
+                            'comment' => 'Livreur courtois, ponctuel et professionnel.',
+                        ]
+                    );
+                }
             }
         }
 
@@ -522,7 +556,7 @@ class DemoOrdersAndParcelsSeeder extends Seeder
 
             $createdAt = now()->subDays($t['days_ago'])->subHours(rand(1, 8));
 
-            Parcel::create([
+            $parcel = Parcel::create([
                 'sender_id' => $sender->id,
                 'courier_id' => $courier?->id,
                 'city_id' => $city->id,
@@ -558,6 +592,64 @@ class DemoOrdersAndParcelsSeeder extends Seeder
                 'created_at' => $createdAt,
                 'updated_at' => $createdAt,
             ]);
+
+            // Évaluation du livreur pour expéditions livrées
+            if ($t['status'] === Parcel::STATUS_DELIVERED && $courier) {
+                Rating::firstOrCreate(
+                    [
+                        'rater_id' => $sender->id,
+                        'parcel_id' => $parcel->id,
+                        'type' => 'gocolis_courier',
+                    ],
+                    [
+                        'rateable_id' => $courier->id,
+                        'rating' => 5,
+                        'comment' => 'Colis récupéré et remis au destinataire avec un grand professionnalisme !',
+                    ]
+                );
+            }
+        }
+
+        // ==========================================
+        // 3. NOTIFICATIONS IN-APP POUR CLIENTS
+        // ==========================================
+        $sampleNotifications = [
+            [
+                'type' => 'order_delivered',
+                'title' => 'Commande livrée 🎉',
+                'body' => 'Votre commande GoShop a été livrée à bon port. Bon appétit !',
+                'data' => ['screen' => 'order_history'],
+                'is_read' => true,
+            ],
+            [
+                'type' => 'gocolis_delivered',
+                'title' => 'Colis réceptionné 📦',
+                'body' => 'Votre colis a été remis en mains propres au destinataire avec succès.',
+                'data' => ['screen' => 'gocolis_history'],
+                'is_read' => false,
+            ],
+            [
+                'type' => 'promo',
+                'title' => 'Bienvenue à Daloa 🛵',
+                'body' => 'Profitez de la livraison offerte sur votre prochaine course avec le code BIENVENUE !',
+                'data' => ['promo_code' => 'BIENVENUE'],
+                'is_read' => false,
+            ],
+        ];
+
+        foreach ($clients->take(3) as $client) {
+            foreach ($sampleNotifications as $notifData) {
+                Notification::create([
+                    'user_id' => $client->id,
+                    'type' => $notifData['type'],
+                    'title' => $notifData['title'],
+                    'body' => $notifData['body'],
+                    'data' => $notifData['data'],
+                    'is_read' => $notifData['is_read'],
+                    'read_at' => $notifData['is_read'] ? now()->subHours(1) : null,
+                    'created_at' => now()->subHours(rand(1, 12)),
+                ]);
+            }
         }
     }
 }

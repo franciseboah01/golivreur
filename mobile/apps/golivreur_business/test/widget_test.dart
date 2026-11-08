@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'package:golivreur_business/main.dart';
 import 'package:golivreur_business/features/navigation/screens/business_main_navigation_screen.dart';
 
 void main() {
+  testWidgets('GoLivreur Business - affiche AnimatedSplashScreen au démarrage', (WidgetTester tester) async {
+    await tester.pumpWidget(const ProviderScope(child: GoLivreurBusinessApp(showSplash: true)));
+    expect(find.byType(AnimatedSplashScreen), findsOneWidget);
+    expect(find.text('BUSINESS'), findsOneWidget);
+  });
+
   testWidgets('GoLivreur Business smoke test - démarrage application', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: GoLivreurBusinessApp()));
+    await tester.pumpWidget(const ProviderScope(child: GoLivreurBusinessApp(showSplash: false)));
     expect(find.text('GoLivreur Business'), findsOneWidget);
   });
 
