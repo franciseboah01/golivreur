@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
-import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../driver/providers/driver_provider.dart';
 import '../../auth/screens/driver_login_screen.dart';
 
@@ -185,7 +184,8 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                 ),
                 Switch(
                   value: profile.isOnline,
-                  activeColor: GoLivreurTheme.secondaire,
+                  activeThumbColor: GoLivreurTheme.secondaire,
+                  activeTrackColor: GoLivreurTheme.secondaire.withValues(alpha: 0.5),
                   onChanged: (val) {
                     ref.read(driverProfileProvider.notifier).toggleOnline();
                     ScaffoldMessenger.of(context).showSnackBar(

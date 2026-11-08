@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
 import 'package:golivreur_core/widgets/golivreur_logo.dart';
-import '../../navigation/screens/main_navigation_screen.dart';
 import '../providers/auth_provider.dart';
 import 'otp_verification_screen.dart';
 import 'register_screen.dart';

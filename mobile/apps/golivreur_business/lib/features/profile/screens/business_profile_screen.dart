@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
-import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../business/providers/business_provider.dart';
 import '../../auth/screens/business_login_screen.dart';
 
@@ -159,7 +158,8 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                 ),
                 Switch(
                   value: _isOpen,
-                  activeColor: Colors.green,
+                  activeThumbColor: Colors.green,
+                  activeTrackColor: Colors.green.withValues(alpha: 0.5),
                   onChanged: (val) {
                     setState(() => _isOpen = val);
                     ScaffoldMessenger.of(context).showSnackBar(
