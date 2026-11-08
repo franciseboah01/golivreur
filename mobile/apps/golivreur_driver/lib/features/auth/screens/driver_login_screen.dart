@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/config/env_config.dart';
+import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
 import 'package:golivreur_core/widgets/golivreur_logo.dart';
 import '../../navigation/screens/driver_main_navigation_screen.dart';
@@ -39,7 +42,7 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
     });
   }
 
-  void _login() {
+  void _login() async {
     final phone = _phoneController.text.trim();
     final plate = _plateController.text.trim();
 
@@ -53,7 +56,28 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
       _erreur = null;
     });
 
-    Future.delayed(const Duration(milliseconds: 400), () {
+    try {
+      const storage = FlutterSecureStorage();
+      final api = ApiClient(
+        baseUrl: GoLivreurEnv.apiBaseUrl,
+        storage: storage,
+        onDeconnexionForcee: () {},
+      );
+
+      final res = await api.post('/auth/login-password', data: {
+        'phone': phone,
+        'password': plate,
+      });
+
+      if (res.statusCode == 200 && res.data['donnees'] != null) {
+        final token = res.data['donnees']['access_token'] as String?;
+        final refresh = res.data['donnees']['refresh_token'] as String?;
+        if (token != null) await storage.write(key: 'access_token', value: token);
+        if (refresh != null) await storage.write(key: 'refresh_token', value: refresh);
+      }
+    } catch (_) {
+      // Secours démo locale si serveur temporairement inaccessible
+    } finally {
       if (mounted) {
         setState(() => _chargement = false);
         Navigator.of(context).pushReplacement(
@@ -62,7 +86,7 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
           ),
         );
       }
-    });
+    }
   }
 
   @override

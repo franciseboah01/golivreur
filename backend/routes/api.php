@@ -31,9 +31,16 @@ Route::prefix('auth')->group(function () {
     Route::post('register',        [AuthController::class, 'register']);
     Route::post('verify-register', [AuthController::class, 'verifierOtpInscription']);
     Route::post('login',           [AuthController::class, 'login']);
+    Route::post('login-password',  [AuthController::class, 'loginPassword']);
     Route::post('verify-login',    [AuthController::class, 'verifierOtpConnexion']);
     Route::post('refresh',         [AuthController::class, 'refresh'])->middleware('auth:api');
     Route::post('logout',          [AuthController::class, 'logout'])->middleware('auth:api');
+});
+
+// ─── Catalogue GoShop Public (Accessible avec ou sans connexion) ──────────────
+Route::prefix('client')->group(function () {
+    Route::get('merchants', [ClientController::class, 'merchants']);
+    Route::get('merchants/{merchant}/catalog', [ClientController::class, 'merchantCatalog']);
 });
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
@@ -48,8 +55,6 @@ Route::middleware('auth:api')->group(function () {
     // ─── Client (GoShop + GoColis) ────────────────────────────────────────────
     Route::prefix('client')->middleware('role:client')->group(function () {
         Route::get('profile', fn () => response()->json(['succes' => true, 'donnees' => auth()->user()]));
-        Route::get('merchants', [ClientController::class, 'merchants']);
-        Route::get('merchants/{merchant}/catalog', [ClientController::class, 'merchantCatalog']);
         Route::post('orders', [ClientController::class, 'createOrder']);
         Route::get('orders', [ClientController::class, 'orders']);
         Route::get('orders/{order}', [ClientController::class, 'showOrder']);

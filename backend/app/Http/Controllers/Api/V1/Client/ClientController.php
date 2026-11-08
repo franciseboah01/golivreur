@@ -12,7 +12,7 @@ class ClientController extends Controller
 {
     public function merchants(Request $request): JsonResponse
     {
-        $cityId = $request->input('city_id', auth()->user()->city_id);
+        $cityId = $request->input('city_id', auth()->user()?->city_id ?? 1);
 
         $merchants = Merchant::query()
             ->when($cityId, fn ($q) => $q->where('city_id', $cityId))

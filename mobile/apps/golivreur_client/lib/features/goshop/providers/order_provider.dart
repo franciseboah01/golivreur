@@ -76,8 +76,13 @@ final ordersHistoryProvider = FutureProvider<List<OrderModel>>((ref) async {
   try {
     final response = await api.get('/client/orders');
     if (response.statusCode == 200 && response.data['succes'] == true) {
-      final List list = response.data['donnees'] as List;
-      return list.map((json) => OrderModel.fromJson(json)).toList();
+      final raw = response.data['donnees'];
+      final List list = (raw is Map && raw['data'] != null)
+          ? (raw['data'] as List)
+          : (raw is List ? raw : []);
+      if (list.isNotEmpty) {
+        return list.map((json) => OrderModel.fromJson(json as Map<String, dynamic>)).toList();
+      }
     }
   } catch (_) {
     // Mode démo ou fallback

@@ -82,6 +82,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: GoLivreurTheme.primaire.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: GoLivreurTheme.primaire.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: GoLivreurTheme.primaire, size: 24),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Compte Démo Client : 0701000001\nCode OTP universel : 1234',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _phoneController.text = '0701000001';
+                          });
+                        },
+                        child: const Text('Remplir', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 if (authState.errorMessage != null) ...[
                   Container(
                     padding: const EdgeInsets.all(12),

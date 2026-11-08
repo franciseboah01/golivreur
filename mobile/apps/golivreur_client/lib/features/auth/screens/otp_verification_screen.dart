@@ -61,15 +61,15 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connexion réussie ! Bienvenue sur GoLivreur.')),
+        const SnackBar(
+          content: Text('Connexion réussie ! Bienvenue sur GoLivreur.'),
+          backgroundColor: GoLivreurTheme.succes,
+        ),
       );
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-        );
-      }
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        (route) => false,
+      );
     }
   }
 
@@ -146,6 +146,17 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                 label: 'Confirmer',
                 estEnChargement: authState.status == AuthStatus.loading,
                 onPressed: _verify,
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton.icon(
+                  onPressed: () {
+                    _otpController.text = '1234';
+                    _verify();
+                  },
+                  icon: const Icon(Icons.flash_on, size: 18),
+                  label: const Text('Remplir code test (1234) & Valider', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
               ),
               const SizedBox(height: 16),
               Center(

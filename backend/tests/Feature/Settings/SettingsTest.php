@@ -108,7 +108,9 @@ class SettingsTest extends TestCase
 
     public function test_commission_service_uses_dynamic_settings(): void
     {
-        // Prix par défaut pour 1km GoShop
+        $this->travelTo(now()->setTime(10, 0));
+
+        // Prix par défaut pour 1km GoShop (hors pointe)
         $prixNormal = $this->commissionService->calculerFraisLivraison(1.0, $this->daloa);
         $this->assertEquals(500.0, $prixNormal);
 

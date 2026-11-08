@@ -466,6 +466,32 @@ class _SectionCode extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: GoLivreurTheme.secondaire.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text('💡 Démo : Code universel 1234', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    for (int i = 0; i < 4; i++) {
+                      controlleurs[i].text = '1234'[i];
+                    }
+                    if (!photoOk) {
+                      onPrendrePhoto();
+                    }
+                  },
+                  child: const Text('Remplir 1234 + Photo'),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: GoLivreurTheme.espacementM),
         ],
 

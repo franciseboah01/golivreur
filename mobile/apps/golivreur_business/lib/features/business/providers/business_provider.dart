@@ -1,5 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/models/modeles.dart';
+import 'package:golivreur_core/services/api_client.dart';
+
+void _safeIgnore(Future<dynamic>? f) {
+  f?.then((_) {}, onError: (_) {});
+}
 
 // ─── Informations du Commerce ────────────────────────────────────────────────
 class BusinessProfileState {
@@ -45,10 +50,27 @@ class BusinessProfileState {
 }
 
 class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
-  BusinessProfileNotifier() : super(const BusinessProfileState());
+  final ApiClient? _api;
+
+  BusinessProfileNotifier([this._api]) : super(const BusinessProfileState());
+
+  Future<void> chargerProfil() async {
+    try {
+      final res = await _api!.get('/merchant/status');
+      if (res.statusCode == 200 && res.data['succes'] == true) {
+        final d = res.data['donnees'];
+        state = state.copyWith(
+          isOpen: d['is_open'] == true,
+          prepTimeMinutes: d['prep_time_minutes'] ?? state.prepTimeMinutes,
+        );
+      }
+    } catch (_) {}
+  }
 
   void toggleOpenStatus() {
-    state = state.copyWith(isOpen: !state.isOpen);
+    final nextState = !state.isOpen;
+    state = state.copyWith(isOpen: nextState);
+    _safeIgnore(_api?.post('/merchant/status', data: {'is_open': nextState}));
   }
 
   void updatePrepTime(int minutes) {
@@ -64,7 +86,8 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
 
 final businessProfileProvider =
     StateNotifierProvider<BusinessProfileNotifier, BusinessProfileState>((ref) {
-  return BusinessProfileNotifier();
+  final api = ref.watch(apiClientProvider);
+  return BusinessProfileNotifier(api);
 });
 
 // ─── Catalogue & Gestion des Stocks en direct ─────────────────────────────────
@@ -104,54 +127,79 @@ class BusinessProductItem {
 }
 
 class BusinessCatalogNotifier extends StateNotifier<List<BusinessProductItem>> {
-  BusinessCatalogNotifier()
+  final ApiClient? _api;
+
+  BusinessCatalogNotifier([this._api])
       : super([
           const BusinessProductItem(
             id: 1,
-            name: 'Garba Royal (Attiéké + Poisson Thon)',
+            name: 'Poulet braisé (quart)',
             price: 1500,
             category: 'Plats',
-            description: 'Attiéké frais de Daloa avec pavé de thon frit assaisonné, piment et tomates.',
+            description: 'Poulet fermier braisé au feu de bois avec alloco.',
             isAvailable: true,
           ),
           const BusinessProductItem(
             id: 2,
-            name: 'Poulet Braisé Maison (Demi)',
-            price: 3000,
-            category: 'Grillades',
-            description: 'Poulet fermier braisé au feu de bois avec oignons caramélisés et alloco.',
+            name: 'Attiéké + Poisson braisé',
+            price: 1000,
+            category: 'Plats',
+            description: 'Attiéké frais de Daloa avec poisson braisé assaisonné.',
             isAvailable: true,
           ),
           const BusinessProductItem(
             id: 3,
-            name: 'Alloco Croustillant',
+            name: 'Alloco + Œuf',
             price: 500,
             category: 'Accompagnements',
-            description: 'Bananes plantains frites dans une huile végétale propre.',
+            description: 'Bananes plantains frites bien dorées avec œuf.',
             isAvailable: true,
           ),
           const BusinessProductItem(
             id: 4,
-            name: 'Jus de Bissap Maison Glacé',
-            price: 500,
-            category: 'Boissons',
-            description: 'Jus naturel d\'hibiscus parfumé à la menthe (500ml).',
-            isAvailable: true,
+            name: 'Garba thon rouge (Épuisé)',
+            price: 800,
+            category: 'Plats',
+            description: 'Garba classique avec pavé de thon.',
+            isAvailable: false,
           ),
           const BusinessProductItem(
             id: 5,
-            name: 'Sauce Graine + Foutou Banane',
-            price: 2000,
-            category: 'Plats',
-            description: 'Recette traditionnelle ivoirienne servie chaude.',
-            isAvailable: false, // Épuisé pour tester le switch
+            name: 'Jus de bissap (500ml)',
+            price: 300,
+            category: 'Boissons',
+            description: 'Jus naturel d\'hibiscus parfumé à la menthe.',
+            isAvailable: true,
           ),
         ]);
+
+  Future<void> chargerCatalogue() async {
+    try {
+      final res = await _api!.get('/merchant/products');
+      if (res.statusCode == 200 && res.data['succes'] == true) {
+        final List list = res.data['donnees'] as List;
+        if (list.isNotEmpty) {
+          state = list.map((json) => BusinessProductItem(
+            id: json['id'] as int,
+            name: json['name'] as String,
+            price: (num.tryParse(json['price'].toString()) ?? 0).toDouble(),
+            category: json['category'] ?? 'Plats',
+            description: json['description'],
+            isAvailable: json['is_available'] == true || json['is_available'] == 1,
+          )).toList();
+        }
+      }
+    } catch (_) {}
+  }
 
   void toggleStock(int productId) {
     state = state.map((p) {
       if (p.id == productId) {
-        return p.copyWith(isAvailable: !p.isAvailable);
+        final nextAvail = !p.isAvailable;
+        _safeIgnore(_api?.put('/merchant/products/$productId', data: {
+          'is_available': nextAvail,
+        }));
+        return p.copyWith(isAvailable: nextAvail);
       }
       return p;
     }).toList();
@@ -173,6 +221,12 @@ class BusinessCatalogNotifier extends StateNotifier<List<BusinessProductItem>> {
       isAvailable: true,
     );
     state = [...state, newItem];
+    _safeIgnore(_api?.post('/merchant/products', data: {
+      'name': name,
+      'price': price,
+      'category': category,
+      'description': description,
+    }));
   }
 
   void updateProduct(int id, {required String name, required double price, required String category, String? description}) {
@@ -182,16 +236,24 @@ class BusinessCatalogNotifier extends StateNotifier<List<BusinessProductItem>> {
       }
       return p;
     }).toList();
+    _safeIgnore(_api?.put('/merchant/products/$id', data: {
+      'name': name,
+      'price': price,
+      'category': category,
+      'description': description,
+    }));
   }
 
   void deleteProduct(int id) {
     state = state.where((p) => p.id != id).toList();
+    _safeIgnore(_api?.delete('/merchant/products/$id'));
   }
 }
 
 final businessCatalogProvider =
     StateNotifierProvider<BusinessCatalogNotifier, List<BusinessProductItem>>((ref) {
-  return BusinessCatalogNotifier();
+  final api = ref.watch(apiClientProvider);
+  return BusinessCatalogNotifier(api);
 });
 
 // ─── Commandes Business ───────────────────────────────────────────────────────
@@ -249,7 +311,9 @@ class BusinessOrder {
 }
 
 class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
-  BusinessOrdersNotifier()
+  final ApiClient? _api;
+
+  BusinessOrdersNotifier([this._api])
       : super([
           BusinessOrder(
             id: 108,
@@ -260,14 +324,14 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
               OrderItemModel(
                 id: 1,
                 productId: 1,
-                productNameSnapshot: 'Garba Royal',
+                productNameSnapshot: 'Poulet braisé (quart)',
                 quantity: 2,
                 unitPrice: 1500,
               ),
               OrderItemModel(
                 id: 2,
                 productId: 3,
-                productNameSnapshot: 'Alloco Croustillant',
+                productNameSnapshot: 'Alloco + Œuf',
                 quantity: 1,
                 unitPrice: 500,
               ),
@@ -287,7 +351,7 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
               OrderItemModel(
                 id: 3,
                 productId: 2,
-                productNameSnapshot: 'Poulet Braisé Maison (Demi)',
+                productNameSnapshot: 'Attiéké + Poisson braisé',
                 quantity: 1,
                 unitPrice: 3000,
               ),
@@ -297,26 +361,53 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
             status: BusinessOrderStatus.accepted,
             createdAt: DateTime.now().subtract(const Duration(minutes: 8)),
           ),
-          BusinessOrder(
-            id: 105,
-            clientName: 'Koffi Jean-Marc',
-            clientPhone: '0701000002',
-            deliveryAddress: 'Quartier Kennedy',
-            items: const [
-              OrderItemModel(
-                id: 4,
-                productId: 1,
-                productNameSnapshot: 'Garba Royal',
-                quantity: 1,
-                unitPrice: 1500,
-              ),
-            ],
-            totalAmount: 1500,
-            paymentMethod: 'cash',
-            status: BusinessOrderStatus.delivered,
-            createdAt: DateTime.now().subtract(const Duration(hours: 1)),
-          ),
         ]);
+
+  Future<void> chargerCommandes() async {
+    try {
+      final res = await _api!.get('/merchant/orders');
+      if (res.statusCode == 200 && res.data['succes'] == true) {
+        final List list = res.data['donnees'] as List;
+        if (list.isNotEmpty) {
+          state = list.map((json) => _mapJsonToBusinessOrder(json as Map<String, dynamic>)).toList();
+        }
+      }
+    } catch (_) {}
+  }
+
+  static BusinessOrder _mapJsonToBusinessOrder(Map<String, dynamic> json) {
+    final statusStr = json['status']?.toString() ?? 'pending';
+    final status = switch (statusStr) {
+      'pending' => BusinessOrderStatus.pending,
+      'accepted' => BusinessOrderStatus.accepted,
+      'ready' => BusinessOrderStatus.ready,
+      'picked_up' || 'in_transit' => BusinessOrderStatus.pickedUp,
+      'delivered' => BusinessOrderStatus.delivered,
+      _ => BusinessOrderStatus.refused,
+    };
+
+    final rawItems = json['items'] as List? ?? [];
+    final items = rawItems.map((item) => OrderItemModel(
+      id: item['id'] as int? ?? 1,
+      productId: item['product_id'] as int? ?? 1,
+      productNameSnapshot: item['product_name_snapshot'] ?? item['product']?['name'] ?? 'Article',
+      quantity: item['quantity'] as int? ?? 1,
+      unitPrice: (num.tryParse(item['unit_price']?.toString() ?? '') ?? 1000).toDouble(),
+    )).toList();
+
+    return BusinessOrder(
+      id: json['id'] as int,
+      clientName: json['client']?['name'] ?? 'Client Daloa',
+      clientPhone: json['client']?['phone'] ?? '0701000000',
+      deliveryAddress: json['delivery_address'] ?? 'Daloa',
+      items: items,
+      totalAmount: (num.tryParse(json['products_total']?.toString() ?? '') ?? 2000).toDouble(),
+      paymentMethod: json['payment_method'] ?? 'cash',
+      status: status,
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) ?? DateTime.now() : DateTime.now(),
+      secondsRemaining: 45,
+    );
+  }
 
   void acceptOrder(int orderId) {
     state = state.map((o) {
@@ -325,6 +416,7 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
       }
       return o;
     }).toList();
+    _safeIgnore(_api?.post('/merchant/orders/$orderId/accept'));
   }
 
   void refuseOrder(int orderId) {
@@ -334,6 +426,7 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
       }
       return o;
     }).toList();
+    _safeIgnore(_api?.post('/merchant/orders/$orderId/refuse', data: {'raison': 'Rupture de stock'}));
   }
 
   void markOrderReady(int orderId) {
@@ -343,12 +436,14 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
       }
       return o;
     }).toList();
+    _safeIgnore(_api?.post('/merchant/orders/$orderId/ready'));
   }
 }
 
 final businessOrdersProvider =
     StateNotifierProvider<BusinessOrdersNotifier, List<BusinessOrder>>((ref) {
-  return BusinessOrdersNotifier();
+  final api = ref.watch(apiClientProvider);
+  return BusinessOrdersNotifier(api);
 });
 
 // ─── Données Statistiques Revenus ─────────────────────────────────────────────
