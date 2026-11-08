@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\AdministratorResource\Pages;
 
 use App\Filament\Resources\AdministratorResource;
+use App\Filament\Resources\RoleHabilitationResource;
 use App\Models\User;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
@@ -16,6 +17,13 @@ class ListAdministrators extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('roles_habilitation')
+                ->label('Niveaux d\'Habilitation & Rôles')
+                ->icon('heroicon-o-key')
+                ->color('warning')
+                ->url(RoleHabilitationResource::getUrl('index'))
+                ->visible(fn () => auth()->user()?->role === 'super_admin'),
+
             Actions\CreateAction::make()->label('Nouvel Administrateur'),
         ];
     }

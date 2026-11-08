@@ -28,6 +28,12 @@ class MerchantCategoryResource extends Resource
 
     protected static ?int $navigationSort = 4;
 
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        return $user !== null && $user->hasHabilitationTab('merchants');
+    }
+
     public static function form(Form $form): Form
     {
         return $form

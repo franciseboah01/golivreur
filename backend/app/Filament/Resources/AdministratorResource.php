@@ -31,7 +31,7 @@ class AdministratorResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        return $user && in_array($user->role, ['super_admin', 'dg_national', 'city_manager'], true);
+        return $user !== null && $user->hasHabilitationTab('administrators');
     }
 
     public static function getEloquentQuery(): Builder
@@ -75,21 +75,34 @@ class AdministratorResource extends Resource
                             ->dehydrated(fn ($state) => filled($state))
                             ->required(fn (string $operation): bool => $operation === 'create')
                             ->maxLength(255),
-                        Forms\Components\Select::make('role')
+                        Forms\Components\Select::make('role_habilitation_id')
                             ->label('Niveau d\'Habilitation & Rôle')
-                            ->options([
-                                'super_admin' => 'Super Administrateur (Accès Total Plateforme)',
-                                'dg_national' => 'Directeur Général National',
-                                'national_finance' => 'Responsable Finance National',
-                                'national_tech' => 'Responsable Technique & IT',
-                                'national_support' => 'Responsable Support National',
-                                'city_manager' => 'City Manager (Gestionnaire de Ville)',
-                                'city_finance' => 'Responsable Finance Ville',
-                                'city_support' => 'Support Opérations & Déblocages Ville',
-                                'city_agent' => 'Agent Terrain Ville',
-                            ])
+                            ->relationship('roleHabilitation', 'name')
+                            ->preload()
+                            ->searchable()
                             ->required()
-                            ->default('city_agent'),
+                            ->live()
+                            ->afterStateUpdated(function ($state, Forms\Set $set) {
+                                if ($state) {
+                                    $level = \App\Models\RoleHabilitation::find($state);
+                                    if ($level && $level->slug) {
+                                        $set('role', $level->slug);
+                                    }
+                                }
+                            })
+                            ->helperText('Tous les onglets et accès du panneau sont automatiquement hérités selon ce niveau.'),
+                        Forms\Components\Hidden::make('role')
+                            ->default('city_agent')
+                            ->dehydrateStateUsing(function ($state, Forms\Get $get) {
+                                $levelId = $get('role_habilitation_id');
+                                if ($levelId) {
+                                    $level = \App\Models\RoleHabilitation::find($levelId);
+                                    if ($level) {
+                                        return $level->slug;
+                                    }
+                                }
+                                return $state ?? 'admin';
+                            }),
                         Forms\Components\Select::make('city_id')
                             ->label('Ville d\'affectation')
                             ->relationship('city', 'name')
@@ -148,6 +161,13 @@ class AdministratorResource extends Resource
                     })
                     ->sortable(),
 
+                Tables\Columns\TextColumn::make('roleHabilitation.name')
+                    ->label('Niveau d\'Habilitation')
+                    ->badge()
+                    ->color('warning')
+                    ->searchable()
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('city.name')
                     ->label('Périmètre / Ville')
                     ->placeholder('National')
@@ -186,6 +206,7 @@ class AdministratorResource extends Resource
                     ->relationship('city', 'name'),
             ])
             ->actions([
+                Tables\Actions\ViewAction::make()->label('Voir'),
                 Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([

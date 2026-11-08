@@ -28,6 +28,12 @@ class VehicleTypeResource extends Resource
 
     protected static ?int $navigationSort = 6;
 
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        return $user !== null && $user->hasHabilitationTab('couriers');
+    }
+
     public static function form(Form $form): Form
     {
         return $form

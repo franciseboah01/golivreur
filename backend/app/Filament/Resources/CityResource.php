@@ -28,6 +28,12 @@ class CityResource extends Resource
 
     protected static ?int $navigationSort = 10;
 
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        return $user !== null && $user->hasHabilitationTab('cities');
+    }
+
     public static function form(Form $form): Form
     {
         return $form

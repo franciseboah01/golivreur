@@ -37,7 +37,7 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
     ];
 
     protected $fillable = [
-        'name', 'phone', 'role', 'city_id',
+        'name', 'phone', 'role', 'role_habilitation_id', 'city_id',
         'device_token', 'session_token', 'is_active',
         'phone_verified_at', 'avatar_url',
         'email', 'password', 'two_factor_enabled',
@@ -57,17 +57,44 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return in_array($this->role, [
-            'super_admin',
-            'dg_national',
-            'national_finance',
-            'national_tech',
-            'national_support',
-            'city_manager',
-            'city_finance',
-            'city_support',
-            'city_agent',
-        ]);
+        if (!$this->is_active) {
+            return false;
+        }
+
+        if ($this->role === 'super_admin') {
+            return true;
+        }
+
+        return in_array($this->role, self::ADMIN_ROLES, true) || $this->role_habilitation_id !== null;
+    }
+
+    public function roleHabilitation(): BelongsTo
+    {
+        return $this->belongsTo(RoleHabilitation::class, 'role_habilitation_id');
+    }
+
+    /**
+     * Vérifie si l'administrateur a accès à un onglet donné selon son niveau d'habilitation.
+     */
+    public function hasHabilitationTab(string $tabKey): bool
+    {
+        if ($this->role === 'super_admin') {
+            return true;
+        }
+
+        if ($this->roleHabilitation) {
+            return $this->roleHabilitation->hasOnglet($tabKey);
+        }
+
+        // Rôles opérationnels hérités par défaut si pas encore assigné
+        return match ($this->role) {
+            'dg_national' => true,
+            'national_finance' => in_array($tabKey, ['dashboard', 'finances', 'refunds', 'activity_logs'], true),
+            'city_manager' => in_array($tabKey, ['dashboard', 'orders', 'parcels', 'merchants', 'couriers', 'clients', 'pending_validations', 'disputes', 'emergency_center', 'administrators', 'cities'], true),
+            'city_support', 'national_support' => in_array($tabKey, ['dashboard', 'orders', 'parcels', 'merchants', 'couriers', 'clients', 'pending_validations', 'disputes', 'refunds'], true),
+            'city_agent' => in_array($tabKey, ['dashboard', 'merchants', 'couriers', 'pending_validations'], true),
+            default => false,
+        };
     }
 
     // ─── JWT ──────────────────────────────────────────────────────────────────

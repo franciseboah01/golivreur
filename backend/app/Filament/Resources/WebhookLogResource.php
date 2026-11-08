@@ -34,7 +34,7 @@ class WebhookLogResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        return $user && in_array($user->role, ['super_admin', 'dg_national'], true);
+        return $user !== null && $user->hasHabilitationTab('webhook_logs');
     }
 
     public static function form(Form $form): Form

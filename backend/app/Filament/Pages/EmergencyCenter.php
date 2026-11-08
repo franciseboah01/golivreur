@@ -34,6 +34,12 @@ class EmergencyCenter extends Page implements HasForms, HasTable
 
     protected static ?int $navigationSort = 1;
 
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        return $user !== null && $user->hasHabilitationTab('emergency_center');
+    }
+
     protected function getHeaderWidgets(): array
     {
         return [

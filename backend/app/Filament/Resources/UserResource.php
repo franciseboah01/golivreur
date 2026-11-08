@@ -27,6 +27,12 @@ class UserResource extends Resource
 
     protected static ?int $navigationSort = 9;
 
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        return $user !== null && $user->hasHabilitationTab('clients');
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

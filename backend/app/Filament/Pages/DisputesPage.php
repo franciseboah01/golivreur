@@ -33,13 +33,7 @@ class DisputesPage extends Page implements HasTable
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        return $user && in_array($user->role, [
-            'city_support',
-            'city_manager',
-            'national_support',
-            'super_admin',
-            'dg_national',
-        ], true);
+        return $user !== null && $user->hasHabilitationTab('disputes');
     }
 
     public static function getNavigationBadge(): ?string

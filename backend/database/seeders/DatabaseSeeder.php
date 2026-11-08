@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             DaloaSeeder::class,
             DemoOrdersAndParcelsSeeder::class,
+            RoleHabilitationSeeder::class,
         ]);
     }
 }

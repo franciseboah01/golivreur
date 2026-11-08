@@ -39,7 +39,7 @@ class SettingsPage extends Page implements HasForms
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        return $user && in_array($user->role, ['super_admin', 'dg_national'], true);
+        return $user !== null && $user->hasHabilitationTab('settings');
     }
 
     public function mount(): void

@@ -34,15 +34,7 @@ class RefundResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        return $user && in_array($user->role, [
-            'city_support',
-            'city_finance',
-            'city_manager',
-            'national_support',
-            'national_finance',
-            'super_admin',
-            'dg_national',
-        ], true);
+        return $user !== null && $user->hasHabilitationTab('refunds');
     }
 
     public static function getEloquentQuery(): Builder

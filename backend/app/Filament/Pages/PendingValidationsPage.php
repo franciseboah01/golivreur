@@ -33,14 +33,7 @@ class PendingValidationsPage extends Page implements HasTable
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        return $user && in_array($user->role, [
-            'city_agent',
-            'city_support',
-            'city_manager',
-            'national_support',
-            'dg_national',
-            'super_admin',
-        ], true);
+        return $user !== null && $user->hasHabilitationTab('pending_validations');
     }
 
     public static function getNavigationBadge(): ?string

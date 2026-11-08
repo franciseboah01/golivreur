@@ -35,13 +35,7 @@ class ClientResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        return $user && in_array($user->role, [
-            'city_support',
-            'city_manager',
-            'national_support',
-            'super_admin',
-            'dg_national',
-        ], true);
+        return $user !== null && $user->hasHabilitationTab('clients');
     }
 
     public static function getEloquentQuery(): Builder
