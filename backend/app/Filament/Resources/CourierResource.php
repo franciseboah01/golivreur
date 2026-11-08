@@ -3,7 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CourierResource\Pages;
-use App\Models\{ActivityLog, Courier, VehicleType};
+use App\Models\{ActivityLog, Courier, User, VehicleType};
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -11,6 +11,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Hash;
 
 class CourierResource extends Resource
 {
@@ -38,21 +39,67 @@ class CourierResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Identité & Profil')
+                Forms\Components\Section::make('Identité & Profil du Livreur')
+                    ->description('Renseignez le compte utilisateur, la ville d\'affectation, le véhicule et la photo du livreur.')
                     ->schema([
+                        // Listes déroulantes remontées en haut du formulaire avec recherche et tri
                         Forms\Components\Select::make('user_id')
-                            ->label('Compte Utilisateur')
-                            ->relationship('user', 'name')
+                            ->label('Compte Utilisateur (Livreur)')
+                            ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->whereIn('role', ['driver', 'courier'])->orWhereDoesntHave('courier')->orderBy('name'))
+                            ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} (" . ($record->phone ?? 'Sans téléphone') . ")")
                             ->searchable()
-                            ->required(),
+                            ->preload()
+                            ->required()
+                            ->helperText('Sélectionnez un livreur existant ou créez-en un nouveau via le bouton +.')
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nom et Prénom du Livreur')
+                                    ->required()
+                                    ->maxLength(100),
+                                Forms\Components\TextInput::make('phone')
+                                    ->label('Numéro de Téléphone Professionnel')
+                                    ->tel()
+                                    ->required()
+                                    ->unique('users', 'phone')
+                                    ->maxLength(20),
+                                Forms\Components\TextInput::make('email')
+                                    ->label('Email de Connexion')
+                                    ->email()
+                                    ->required()
+                                    ->unique('users', 'email')
+                                    ->maxLength(100),
+                                Forms\Components\TextInput::make('password')
+                                    ->label('Mot de passe')
+                                    ->password()
+                                    ->required()
+                                    ->minLength(8)
+                                    ->dehydrateStateUsing(fn ($state) => Hash::make($state)),
+                            ])
+                            ->createOptionUsing(function (array $data): int {
+                                $user = User::create([
+                                    'name' => $data['name'],
+                                    'phone' => $data['phone'],
+                                    'email' => $data['email'],
+                                    'password' => Hash::make($data['password']),
+                                    'role' => 'driver',
+                                    'is_active' => true,
+                                    'phone_verified_at' => now(),
+                                ]);
+                                return $user->id;
+                            }),
+
                         Forms\Components\Select::make('city_id')
                             ->label('Ville d\'affectation')
-                            ->relationship('city', 'name')
+                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                            ->searchable()
+                            ->preload()
                             ->required(),
+
                         Forms\Components\Select::make('vehicle_type')
                             ->label('Type de véhicule')
-                            ->options(fn () => VehicleType::where('is_active', true)->pluck('name', 'slug')->toArray())
+                            ->options(fn () => VehicleType::where('is_active', true)->orderBy('name')->pluck('name', 'slug')->toArray())
                             ->searchable()
+                            ->preload()
                             ->required()
                             ->createOptionForm([
                                 Forms\Components\TextInput::make('name')
@@ -76,11 +123,26 @@ class CourierResource extends Resource
                                 ]);
                                 return $vt->slug;
                             }),
+
+                        Forms\Components\FileUpload::make('photo_path')
+                            ->label('Photo du livreur (Portrait)')
+                            ->image()
+                            ->disk('public')
+                            ->directory('livreurs')
+                            ->maxSize(2048)
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->imageEditor()
+                            ->previewable()
+                            ->columnSpanFull()
+                            ->helperText('Formats acceptés : JPG, PNG, WEBP (Max : 2 Mo). Aperçu instantané avant validation.'),
+
                         Forms\Components\TextInput::make('vehicle_plate')
-                            ->label('Numéro d\'immatriculation')
+                            ->label('Numéro d\'immatriculation du véhicule')
+                            ->placeholder('Ex: 1234 AB 01')
                             ->maxLength(30),
+
                         Forms\Components\TextInput::make('id_card_number')
-                            ->label('N° Pièce d\'identité (CNI / Passeport)')
+                            ->label('N° Pièce d\'identité (CNI / Passeport / Permis)')
                             ->maxLength(50),
                     ])->columns(2),
 
@@ -107,6 +169,12 @@ class CourierResource extends Resource
                 Tables\Columns\TextColumn::make('rowIndex')
                     ->rowIndex()
                     ->label('N°'),
+
+                Tables\Columns\ImageColumn::make('photo_path')
+                    ->label('Photo')
+                    ->disk('public')
+                    ->circular()
+                    ->defaultImageUrl(asset('images/placeholder-driver.png')),
 
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('Livreur')

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MerchantResource\Pages;
 
+use App\Filament\Resources\MerchantCategoryResource;
 use App\Filament\Resources\MerchantResource;
 use App\Models\Merchant;
 use Filament\Actions;
@@ -16,6 +17,12 @@ class ListMerchants extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('categories')
+                ->label('Catégories d\'Activité')
+                ->icon('heroicon-o-tag')
+                ->color('gray')
+                ->url(MerchantCategoryResource::getUrl('index')),
+
             Actions\CreateAction::make()->label('Nouveau Commerce'),
         ];
     }

@@ -43,3 +43,4 @@ return new class extends Migration
         Schema::dropIfExists('roles_habilitation');
     }
 };
+

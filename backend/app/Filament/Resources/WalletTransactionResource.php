@@ -38,23 +38,35 @@ class WalletTransactionResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Détails de l\'Opération Financière')
                     ->schema([
+                        Forms\Components\Select::make('type')
+                            ->label('Nature de la transaction')
+                            ->options([
+                                'adjustment' => 'Ajustement manuel admin',
+                                'commission' => 'Prélèvement commission plateforme',
+                                'delivery_fee' => 'Rémunération course livreur',
+                                'deposit' => 'Rechargement / Dépôt Mobile Money',
+                                'order_payment' => 'Paiement commande GoShop',
+                                'parcel_payment' => 'Paiement course GoColis',
+                                'refund' => 'Remboursement client / indemnisation',
+                                'withdrawal' => 'Demande de Retrait vers Mobile Money',
+                            ])
+                            ->searchable()
+                            ->native(false)
+                            ->required(),
+                        Forms\Components\Select::make('status')
+                            ->label('Statut du transfert')
+                            ->options([
+                                'completed' => 'Validé avec succès',
+                                'failed' => 'Échoué / Rejeté',
+                                'pending' => 'En cours de traitement',
+                            ])
+                            ->searchable()
+                            ->native(false)
+                            ->required(),
                         Forms\Components\TextInput::make('reference')
                             ->label('Référence unique')
                             ->required()
                             ->maxLength(100),
-                        Forms\Components\Select::make('type')
-                            ->label('Nature de la transaction')
-                            ->options([
-                                'deposit' => 'Rechargement / Dépôt Mobile Money',
-                                'withdrawal' => 'Demande de Retrait vers Mobile Money',
-                                'order_payment' => 'Paiement commande GoShop',
-                                'parcel_payment' => 'Paiement course GoColis',
-                                'delivery_fee' => 'Rémunération course livreur',
-                                'commission' => 'Prélèvement commission plateforme',
-                                'refund' => 'Remboursement client / indemnisation',
-                                'adjustment' => 'Ajustement manuel admin',
-                            ])
-                            ->required(),
                         Forms\Components\TextInput::make('amount')
                             ->label('Montant (F CFA)')
                             ->numeric()
@@ -66,14 +78,6 @@ class WalletTransactionResource extends Resource
                         Forms\Components\TextInput::make('balance_after')
                             ->label('Nouveau solde (F CFA)')
                             ->numeric()
-                            ->required(),
-                        Forms\Components\Select::make('status')
-                            ->label('Statut du transfert')
-                            ->options([
-                                'completed' => 'Validé avec succès',
-                                'pending' => 'En cours de traitement',
-                                'failed' => 'Échoué / Rejeté',
-                            ])
                             ->required(),
                         Forms\Components\Textarea::make('description')
                             ->label('Motif / Libellé de l\'opération')

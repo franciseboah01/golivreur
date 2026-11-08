@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CourierResource\Pages;
 
 use App\Filament\Resources\CourierResource;
+use App\Filament\Resources\VehicleTypeResource;
 use App\Models\Courier;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
@@ -16,6 +17,12 @@ class ListCouriers extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('vehicle_types')
+                ->label('Types de Véhicules')
+                ->icon('heroicon-o-truck')
+                ->color('gray')
+                ->url(VehicleTypeResource::getUrl('index')),
+
             Actions\CreateAction::make()->label('Nouveau Livreur'),
         ];
     }

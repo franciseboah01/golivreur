@@ -28,6 +28,8 @@ class MerchantCategoryResource extends Resource
 
     protected static ?int $navigationSort = 4;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     public static function canAccess(): bool
     {
         $user = auth()->user();

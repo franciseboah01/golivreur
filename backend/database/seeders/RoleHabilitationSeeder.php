@@ -111,3 +111,4 @@ class RoleHabilitationSeeder extends Seeder
             ->update(['role_habilitation_id' => $limitedRole->id]);
     }
 }
+

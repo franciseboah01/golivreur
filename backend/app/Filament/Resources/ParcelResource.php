@@ -40,33 +40,40 @@ class ParcelResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Expéditeur & Destinataire')
                     ->schema([
+                        Forms\Components\Select::make('city_id')
+                            ->label('Ville')
+                            ->relationship('city', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->searchable()
+                            ->preload()
+                            ->required(),
+                        Forms\Components\Select::make('size')
+                            ->label('Format du colis')
+                            ->options([
+                                'grand' => 'Grand (Carton, colis volumineux)',
+                                'moyen' => 'Moyen (Boîte à chaussures, vêtement)',
+                                'petit' => 'Petit (Plis, documents, clés)',
+                            ])
+                            ->searchable()
+                            ->native(false)
+                            ->required(),
                         Forms\Components\Select::make('sender_id')
                             ->label('Client Expéditeur')
-                            ->relationship('sender', 'name')
+                            ->relationship('sender', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
                             ->searchable()
+                            ->preload()
                             ->required(),
                         Forms\Components\Select::make('courier_id')
                             ->label('Livreur assigné')
-                            ->relationship('courier', 'id')
-                            ->searchable(),
-                        Forms\Components\Select::make('city_id')
-                            ->label('Ville')
-                            ->relationship('city', 'name')
-                            ->required(),
+                            ->relationship('courier', 'id', modifyQueryUsing: fn ($q) => $q->with('user')->orderBy('id'))
+                            ->getOptionLabelFromRecordUsing(fn ($r) => ($r->user?->name ?? "Livreur #{$r->id}") . ($r->user?->phone ? " ({$r->user->phone})" : ''))
+                            ->searchable()
+                            ->preload(),
                         Forms\Components\TextInput::make('recipient_name')
                             ->label('Nom du Destinataire')
                             ->required(),
                         Forms\Components\TextInput::make('recipient_phone')
                             ->label('Téléphone du Destinataire')
                             ->tel()
-                            ->required(),
-                        Forms\Components\Select::make('size')
-                            ->label('Format du colis')
-                            ->options([
-                                'petit' => 'Petit (Plis, documents, clés)',
-                                'moyen' => 'Moyen (Boîte à chaussures, vêtement)',
-                                'grand' => 'Grand (Carton, colis volumineux)',
-                            ])
                             ->required(),
                     ])->columns(2),
 
@@ -93,10 +100,12 @@ class ParcelResource extends Resource
                         Forms\Components\Select::make('payment_status')
                             ->label('Statut du paiement')
                             ->options([
-                                'pending' => 'En attente',
-                                'paid' => 'Payé',
                                 'failed' => 'Échoué',
+                                'paid' => 'Payé',
+                                'pending' => 'En attente',
                             ])
+                            ->searchable()
+                            ->native(false)
                             ->required(),
                     ])->columns(3),
 
@@ -111,14 +120,16 @@ class ParcelResource extends Resource
                         Forms\Components\Select::make('status')
                             ->label('Statut d\'acheminement')
                             ->options([
-                                'pending'    => 'En attente de livreur',
-                                'waiting'    => 'En attente de ramassage',
                                 'assigned'   => 'Livreur en route vers la collecte',
-                                'in_transit' => 'Colis récupéré - En transit',
-                                'delivered'  => 'Colis livré avec succès',
                                 'cancelled'  => 'Annulé',
+                                'delivered'  => 'Colis livré avec succès',
+                                'in_transit' => 'Colis récupéré - En transit',
+                                'pending'    => 'En attente de livreur',
                                 'refused'    => 'Refusé',
+                                'waiting'    => 'En attente de ramassage',
                             ])
+                            ->searchable()
+                            ->native(false)
                             ->required(),
                         Forms\Components\Toggle::make('sender_code_locked')
                             ->label('Code Enlèvement Bloqué (3 erreurs)'),

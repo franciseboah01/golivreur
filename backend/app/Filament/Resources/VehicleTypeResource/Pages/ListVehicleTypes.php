@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VehicleTypeResource\Pages;
 
+use App\Filament\Resources\CourierResource;
 use App\Filament\Resources\VehicleTypeResource;
 use App\Models\VehicleType;
 use Filament\Actions;
@@ -13,9 +14,23 @@ class ListVehicleTypes extends ListRecords
 {
     protected static string $resource = VehicleTypeResource::class;
 
+    public function getBreadcrumbs(): array
+    {
+        return [
+            CourierResource::getUrl('index') => 'Livreurs Partenaires',
+            'Types de Véhicules',
+        ];
+    }
+
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('back_to_couriers')
+                ->label('Retour aux Livreurs')
+                ->icon('heroicon-o-arrow-left')
+                ->color('gray')
+                ->url(CourierResource::getUrl('index')),
+
             Actions\CreateAction::make()->label('Nouveau Type de Véhicule'),
         ];
     }

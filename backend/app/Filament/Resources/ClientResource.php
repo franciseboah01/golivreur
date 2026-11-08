@@ -51,15 +51,17 @@ class ClientResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Fiche Client')
                     ->schema([
+                        Forms\Components\Select::make('city_id')
+                            ->label('Ville de rattachement')
+                            ->relationship('city', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->searchable()
+                            ->preload()
+                            ->required(),
                         Forms\Components\TextInput::make('name')
                             ->label('Nom complet')
                             ->required(),
                         Forms\Components\TextInput::make('phone')
                             ->label('Numéro de téléphone')
-                            ->required(),
-                        Forms\Components\Select::make('city_id')
-                            ->label('Ville de rattachement')
-                            ->relationship('city', 'name')
                             ->required(),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Compte Actif')

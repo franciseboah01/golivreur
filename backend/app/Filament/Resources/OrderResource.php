@@ -41,37 +41,45 @@ class OrderResource extends Resource
                 Forms\Components\Section::make('Informations Générales')
                     ->description('Détails de la commande et intervenants')
                     ->schema([
-                        Forms\Components\Select::make('client_id')
-                            ->label('Client')
-                            ->relationship('client', 'name')
-                            ->searchable()
-                            ->required(),
-                        Forms\Components\Select::make('merchant_id')
-                            ->label('Commerce')
-                            ->relationship('merchant', 'name')
-                            ->searchable()
-                            ->required(),
-                        Forms\Components\Select::make('courier_id')
-                            ->label('Livreur')
-                            ->relationship('courier', 'id')
-                            ->searchable(),
                         Forms\Components\Select::make('city_id')
                             ->label('Ville')
-                            ->relationship('city', 'name')
+                            ->relationship('city', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->searchable()
+                            ->preload()
                             ->required(),
                         Forms\Components\Select::make('status')
                             ->label('Statut de la commande')
                             ->options([
-                                'pending' => 'En attente',
                                 'accepted' => 'Acceptée',
-                                'preparing' => 'En préparation',
-                                'ready' => 'Prête',
+                                'cancelled' => 'Annulée',
                                 'delivering' => 'En cours de livraison',
                                 'delivered' => 'Livrée',
-                                'cancelled' => 'Annulée',
+                                'pending' => 'En attente',
+                                'preparing' => 'En préparation',
+                                'ready' => 'Prête',
                             ])
+                            ->searchable()
+                            ->native(false)
                             ->required()
                             ->default('pending'),
+                        Forms\Components\Select::make('client_id')
+                            ->label('Client')
+                            ->relationship('client', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->searchable()
+                            ->preload()
+                            ->required(),
+                        Forms\Components\Select::make('merchant_id')
+                            ->label('Commerce')
+                            ->relationship('merchant', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->searchable()
+                            ->preload()
+                            ->required(),
+                        Forms\Components\Select::make('courier_id')
+                            ->label('Livreur')
+                            ->relationship('courier', 'id', modifyQueryUsing: fn ($q) => $q->with('user')->orderBy('id'))
+                            ->getOptionLabelFromRecordUsing(fn ($r) => ($r->user?->name ?? "Livreur #{$r->id}") . ($r->user?->phone ? " ({$r->user->phone})" : ''))
+                            ->searchable()
+                            ->preload(),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Détails Financiers (F CFA)')
@@ -100,20 +108,24 @@ class OrderResource extends Resource
                             ->label('Mode de règlement')
                             ->options([
                                 'cash' => 'Espèces à la livraison',
+                                'moov' => 'Moov Money',
+                                'mtn' => 'MTN Mobile Money',
+                                'orange' => 'Orange Money',
                                 'wallet' => 'Portefeuille GoLivreur',
                                 'wave' => 'Wave Mobile Money',
-                                'orange' => 'Orange Money',
-                                'mtn' => 'MTN Mobile Money',
-                                'moov' => 'Moov Money',
                             ])
+                            ->searchable()
+                            ->native(false)
                             ->required(),
                         Forms\Components\Select::make('payment_status')
                             ->label('Statut du paiement')
                             ->options([
-                                'pending' => 'En attente',
-                                'paid' => 'Payé',
                                 'failed' => 'Échoué',
+                                'paid' => 'Payé',
+                                'pending' => 'En attente',
                             ])
+                            ->searchable()
+                            ->native(false)
                             ->required(),
                         Forms\Components\TextInput::make('payment_reference')
                             ->label('Référence de paiement'),

@@ -26,3 +26,4 @@ class ListRoleHabilitations extends ListRecords
         ];
     }
 }
+

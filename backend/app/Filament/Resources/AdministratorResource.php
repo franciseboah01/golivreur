@@ -54,30 +54,10 @@ class AdministratorResource extends Resource
                 Forms\Components\Section::make('Identité & Accès d\'Administration')
                     ->description('Gestion des comptes ayant accès au tableau de bord et à la gestion opérationnelle')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
-                            ->label('Nom et Prénom')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('email')
-                            ->label('Email de connexion au panneau')
-                            ->email()
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('phone')
-                            ->label('Numéro de Téléphone Professionnel')
-                            ->tel()
-                            ->required()
-                            ->maxLength(20),
-                        Forms\Components\TextInput::make('password')
-                            ->label('Mot de passe')
-                            ->password()
-                            ->dehydrateStateUsing(fn ($state) => Hash::make($state))
-                            ->dehydrated(fn ($state) => filled($state))
-                            ->required(fn (string $operation): bool => $operation === 'create')
-                            ->maxLength(255),
+                        // Listes déroulantes en haut avec recherche live et tri alphabétique
                         Forms\Components\Select::make('role_habilitation_id')
                             ->label('Niveau d\'Habilitation & Rôle')
-                            ->relationship('roleHabilitation', 'name')
+                            ->relationship('roleHabilitation', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
                             ->preload()
                             ->searchable()
                             ->required()
@@ -105,8 +85,31 @@ class AdministratorResource extends Resource
                             }),
                         Forms\Components\Select::make('city_id')
                             ->label('Ville d\'affectation')
-                            ->relationship('city', 'name')
+                            ->relationship('city', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->searchable()
+                            ->preload()
                             ->helperText('Laisser vide pour les fonctions à compétence nationale'),
+                        Forms\Components\TextInput::make('name')
+                            ->label('Nom et Prénom')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('email')
+                            ->label('Email de connexion au panneau')
+                            ->email()
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('phone')
+                            ->label('Numéro de Téléphone Professionnel')
+                            ->tel()
+                            ->required()
+                            ->maxLength(20),
+                        Forms\Components\TextInput::make('password')
+                            ->label('Mot de passe')
+                            ->password()
+                            ->dehydrateStateUsing(fn ($state) => Hash::make($state))
+                            ->dehydrated(fn ($state) => filled($state))
+                            ->required(fn (string $operation): bool => $operation === 'create')
+                            ->maxLength(255),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Compte administrateur autorisé et actif')
                             ->default(true),

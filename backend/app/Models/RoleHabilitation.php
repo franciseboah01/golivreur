@@ -183,3 +183,4 @@ class RoleHabilitation extends Model
         return array_keys(self::AVAILABLE_ONGLETS);
     }
 }
+

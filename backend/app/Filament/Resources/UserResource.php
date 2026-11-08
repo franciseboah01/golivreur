@@ -45,6 +45,21 @@ class UserResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Identifiants & Contact')
                     ->schema([
+                        Forms\Components\Select::make('role')
+                            ->label('Type de compte')
+                            ->options([
+                                'client' => 'Client Final',
+                                'driver' => 'Livreur Partenaire',
+                                'merchant' => 'Commerce Partenaire',
+                            ])
+                            ->searchable()
+                            ->native(false)
+                            ->required(),
+                        Forms\Components\Select::make('city_id')
+                            ->label('Ville de rattachement')
+                            ->relationship('city', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->searchable()
+                            ->preload(),
                         Forms\Components\TextInput::make('name')
                             ->label('Nom et Prénom')
                             ->required()
@@ -58,17 +73,6 @@ class UserResource extends Resource
                             ->label('Adresse Email (Optionnelle)')
                             ->email()
                             ->maxLength(255),
-                        Forms\Components\Select::make('role')
-                            ->label('Type de compte')
-                            ->options([
-                                'client' => 'Client Final',
-                                'merchant' => 'Commerce Partenaire',
-                                'driver' => 'Livreur Partenaire',
-                            ])
-                            ->required(),
-                        Forms\Components\Select::make('city_id')
-                            ->label('Ville de rattachement')
-                            ->relationship('city', 'name'),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Compte autorisé et actif')
                             ->default(true),

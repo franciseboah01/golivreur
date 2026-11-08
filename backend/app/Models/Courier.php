@@ -17,6 +17,7 @@ class Courier extends Model
         'city_id',
         'vehicle_type',
         'license_plate',
+        'photo_path',
         'is_active',
         'is_online',
         'is_available',
@@ -39,6 +40,14 @@ class Courier extends Model
         'total_ratings'        => 'integer',
         'completed_deliveries' => 'integer',
     ];
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (!empty($this->attributes['photo_path'])) {
+            return asset('storage/' . $this->attributes['photo_path']);
+        }
+        return $this->attributes['photo_url'] ?? asset('images/placeholder-driver.png');
+    }
 
     public function user(): BelongsTo
     {

@@ -19,6 +19,7 @@ class Merchant extends Model
         'category',
         'description',
         'address',
+        'photo_path',
         'lat',
         'lng',
         'open_hours',
@@ -39,6 +40,14 @@ class Merchant extends Model
         'lat'               => 'float',
         'lng'               => 'float',
     ];
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (!empty($this->attributes['photo_path'])) {
+            return asset('storage/' . $this->attributes['photo_path']);
+        }
+        return $this->attributes['photo_url'] ?? $this->attributes['logo_url'] ?? asset('images/placeholder-merchant.png');
+    }
 
     public function user(): BelongsTo
     {

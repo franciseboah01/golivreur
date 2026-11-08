@@ -3,7 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\MerchantResource\Pages;
-use App\Models\{ActivityLog, Merchant, MerchantCategory};
+use App\Models\{ActivityLog, Merchant, MerchantCategory, User};
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -11,6 +11,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Hash;
 
 class MerchantResource extends Resource
 {
@@ -38,25 +39,67 @@ class MerchantResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Identité du Commerce')
+                Forms\Components\Section::make('Identité & Localisation du Commerce')
+                    ->description('Renseignez le compte gestionnaire, la ville, la catégorie et les coordonnées du commerce.')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
-                            ->label('Nom de l\'enseigne')
-                            ->required()
-                            ->maxLength(100),
+                        // Listes déroulantes remontées en haut du formulaire avec recherche et tri
                         Forms\Components\Select::make('user_id')
                             ->label('Compte Gestionnaire')
-                            ->relationship('user', 'name')
+                            ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->where('role', 'merchant')->orWhereDoesntHave('merchant')->orderBy('name'))
+                            ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} (" . ($record->phone ?? 'Sans téléphone') . ")")
                             ->searchable()
-                            ->required(),
+                            ->preload()
+                            ->required()
+                            ->helperText('Sélectionnez un compte gestionnaire ou créez-en un nouveau via le bouton +.')
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nom et Prénom du Gérant')
+                                    ->required()
+                                    ->maxLength(100),
+                                Forms\Components\TextInput::make('phone')
+                                    ->label('Téléphone Professionnel (Identifiant)')
+                                    ->tel()
+                                    ->required()
+                                    ->unique('users', 'phone')
+                                    ->maxLength(20),
+                                Forms\Components\TextInput::make('email')
+                                    ->label('Email de Connexion')
+                                    ->email()
+                                    ->required()
+                                    ->unique('users', 'email')
+                                    ->maxLength(100),
+                                Forms\Components\TextInput::make('password')
+                                    ->label('Mot de passe')
+                                    ->password()
+                                    ->required()
+                                    ->minLength(8)
+                                    ->dehydrateStateUsing(fn ($state) => Hash::make($state)),
+                            ])
+                            ->createOptionUsing(function (array $data): int {
+                                $user = User::create([
+                                    'name' => $data['name'],
+                                    'phone' => $data['phone'],
+                                    'email' => $data['email'],
+                                    'password' => Hash::make($data['password']),
+                                    'role' => 'merchant',
+                                    'is_active' => true,
+                                    'phone_verified_at' => now(),
+                                ]);
+                                return $user->id;
+                            }),
+
                         Forms\Components\Select::make('city_id')
                             ->label('Ville d\'implantation')
-                            ->relationship('city', 'name')
+                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                            ->searchable()
+                            ->preload()
                             ->required(),
+
                         Forms\Components\Select::make('category')
                             ->label('Catégorie d\'activité')
-                            ->options(fn () => MerchantCategory::where('is_active', true)->pluck('name', 'slug')->toArray())
+                            ->options(fn () => MerchantCategory::where('is_active', true)->orderBy('name')->pluck('name', 'slug')->toArray())
                             ->searchable()
+                            ->preload()
                             ->required()
                             ->createOptionForm([
                                 Forms\Components\TextInput::make('name')
@@ -80,9 +123,34 @@ class MerchantResource extends Resource
                                 ]);
                                 return $cat->slug;
                             }),
+
+                        Forms\Components\TextInput::make('name')
+                            ->label('Nom de l\'enseigne')
+                            ->placeholder('Ex: Restaurant Le Carrefour')
+                            ->required()
+                            ->maxLength(100),
+
+                        Forms\Components\FileUpload::make('photo_path')
+                            ->label('Photo du commerce (Vitrine / Enseigne)')
+                            ->image()
+                            ->disk('public')
+                            ->directory('commerces')
+                            ->maxSize(2048)
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->imageEditor()
+                            ->previewable()
+                            ->columnSpanFull()
+                            ->helperText('Formats acceptés : JPG, PNG, WEBP (Max : 2 Mo). Aperçu instantané avant validation.'),
+
                         Forms\Components\Textarea::make('address')
                             ->label('Adresse physique')
+                            ->placeholder('Quartier, repère, rue...')
                             ->required()
+                            ->columnSpanFull(),
+
+                        Forms\Components\Textarea::make('description')
+                            ->label('Description de la boutique / spécialités')
+                            ->rows(2)
                             ->columnSpanFull(),
                     ])->columns(2),
 
@@ -113,6 +181,12 @@ class MerchantResource extends Resource
                 Tables\Columns\TextColumn::make('rowIndex')
                     ->rowIndex()
                     ->label('N°'),
+
+                Tables\Columns\ImageColumn::make('photo_path')
+                    ->label('Photo')
+                    ->disk('public')
+                    ->circular()
+                    ->defaultImageUrl(asset('images/placeholder-merchant.png')),
 
                 Tables\Columns\TextColumn::make('name')
                     ->label('Enseigne')
