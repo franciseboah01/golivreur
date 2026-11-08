@@ -3,10 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CourierResource\Pages;
-use App\Models\Courier;
-use App\Models\VehicleType;
+use App\Models\{ActivityLog, Courier, VehicleType};
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -196,6 +196,79 @@ class CourierResource extends Resource
                     }),
             ])
             ->actions([
+                Tables\Actions\ViewAction::make()->label('Détail'),
+
+                Tables\Actions\Action::make('toggleActive')
+                    ->label(fn (Courier $record): string => $record->is_active ? 'Suspendre' : 'Valider & Activer')
+                    ->icon(fn (Courier $record): string => $record->is_active ? 'heroicon-m-no-symbol' : 'heroicon-m-check-circle')
+                    ->color(fn (Courier $record): string => $record->is_active ? 'danger' : 'success')
+                    ->requiresConfirmation()
+                    ->modalHeading(fn (Courier $record): string => $record->is_active ? "Suspendre le livreur {$record->user?->name}" : "Valider et activer {$record->user?->name}")
+                    ->action(function (Courier $record): void {
+                        $newStatus = ! $record->is_active;
+                        $record->update([
+                            'is_active'    => $newStatus,
+                            'activated_at' => $newStatus ? now() : null,
+                            'activated_by' => $newStatus ? auth()->id() : null,
+                        ]);
+
+                        ActivityLog::create([
+                            'user_id'     => auth()->id(),
+                            'action'      => $newStatus ? 'courier_activated' : 'courier_suspended',
+                            'entity_type' => 'courier',
+                            'entity_id'   => $record->id,
+                            'properties'  => ['courier_id' => $record->id, 'new_status' => $newStatus],
+                            'ip_address'  => request()->ip(),
+                            'severity'    => 'warning',
+                        ]);
+
+                        Notification::make()
+                            ->title("Livreur {$record->user?->name} " . ($newStatus ? 'validé et activé' : 'suspendu'))
+                            ->color($newStatus ? 'success' : 'danger')
+                            ->send();
+                    }),
+
+                Tables\Actions\Action::make('applyPenalty')
+                    ->label('Pénalité')
+                    ->icon('heroicon-m-clock')
+                    ->color('warning')
+                    ->form([
+                        Forms\Components\TextInput::make('minutes')
+                            ->label('Durée de suspension (minutes)')
+                            ->numeric()
+                            ->default(15)
+                            ->required(),
+                        Forms\Components\Textarea::make('reason')
+                            ->label('Motif de la sanction')
+                            ->required(),
+                    ])
+                    ->action(function (Courier $record, array $data): void {
+                        $penaltyUntil = now()->addMinutes((int) $data['minutes']);
+                        $record->update([
+                            'penalty_until' => $penaltyUntil,
+                            'is_online'     => false,
+                        ]);
+
+                        ActivityLog::create([
+                            'user_id'     => auth()->id(),
+                            'action'      => 'courier_penalty_applied',
+                            'entity_type' => 'courier',
+                            'entity_id'   => $record->id,
+                            'properties'  => [
+                                'minutes'       => $data['minutes'],
+                                'penalty_until' => $penaltyUntil->toDateTimeString(),
+                                'reason'        => $data['reason'],
+                            ],
+                            'ip_address'  => request()->ip(),
+                            'severity'    => 'warning',
+                        ]);
+
+                        Notification::make()
+                            ->title("Pénalité de {$data['minutes']} min appliquée à {$record->user?->name}")
+                            ->warning()
+                            ->send();
+                    }),
+
                 Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([

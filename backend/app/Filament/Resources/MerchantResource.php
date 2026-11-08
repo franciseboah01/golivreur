@@ -3,10 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\MerchantResource\Pages;
-use App\Models\Merchant;
-use App\Models\MerchantCategory;
+use App\Models\{ActivityLog, Merchant, MerchantCategory};
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -206,6 +206,51 @@ class MerchantResource extends Resource
                     }),
             ])
             ->actions([
+                Tables\Actions\ViewAction::make()->label('Détail'),
+
+                Tables\Actions\Action::make('toggleActive')
+                    ->label(fn (Merchant $record): string => $record->is_active ? 'Désactiver' : 'Activer')
+                    ->icon(fn (Merchant $record): string => $record->is_active ? 'heroicon-m-no-symbol' : 'heroicon-m-check-circle')
+                    ->color(fn (Merchant $record): string => $record->is_active ? 'danger' : 'success')
+                    ->form(fn (Merchant $record): array => $record->is_active ? [] : [
+                        Forms\Components\TextInput::make('commission_rate')
+                            ->label('Taux de commission négocié (%)')
+                            ->numeric()
+                            ->default($record->commission_rate ?? 15.0)
+                            ->required(),
+                    ])
+                    ->requiresConfirmation()
+                    ->modalHeading(fn (Merchant $record): string => $record->is_active ? "Désactiver {$record->name}" : "Activer {$record->name}")
+                    ->action(function (Merchant $record, array $data): void {
+                        $newStatus = ! $record->is_active;
+                        $updateData = ['is_active' => $newStatus];
+
+                        if ($newStatus) {
+                            $updateData['activated_at'] = now();
+                            $updateData['activated_by'] = auth()->id();
+                            if (isset($data['commission_rate'])) {
+                                $updateData['commission_rate'] = (float) $data['commission_rate'];
+                            }
+                        }
+
+                        $record->update($updateData);
+
+                        ActivityLog::create([
+                            'user_id'     => auth()->id(),
+                            'action'      => $newStatus ? 'merchant_activated' : 'merchant_deactivated',
+                            'entity_type' => 'merchant',
+                            'entity_id'   => $record->id,
+                            'properties'  => $updateData,
+                            'ip_address'  => request()->ip(),
+                            'severity'    => 'warning',
+                        ]);
+
+                        Notification::make()
+                            ->title("Commerce {$record->name} " . ($newStatus ? 'activé' : 'désactivé'))
+                            ->color($newStatus ? 'success' : 'danger')
+                            ->send();
+                    }),
+
                 Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([

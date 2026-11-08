@@ -28,10 +28,23 @@ class AdministratorResource extends Resource
 
     protected static ?int $navigationSort = 8;
 
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        return $user && in_array($user->role, ['super_admin', 'dg_national', 'city_manager'], true);
+    }
+
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->whereIn('role', User::ADMIN_ROLES);
+
+        $user = auth()->user();
+        if ($user && $user->role === 'city_manager' && $user->city_id) {
+            $query->where('city_id', $user->city_id);
+        }
+
+        return $query;
     }
 
     public static function form(Form $form): Form

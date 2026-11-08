@@ -48,9 +48,17 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
+      drawer: _buildDriverDrawer(context, ref, profile),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
+        leading: Builder(
+          builder: (drawerCtx) => IconButton(
+            icon: const Icon(Icons.menu, color: GoLivreurTheme.textePrincipal),
+            tooltip: 'Menu rapide & Profil',
+            onPressed: () => Scaffold.of(drawerCtx).openDrawer(),
+          ),
+        ),
         title: Row(
           children: [
             Container(
@@ -569,15 +577,31 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                 ),
                 const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: GoLivreurTheme.primaire.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: GoLivreurTheme.primaire.withValues(alpha: 0.4)),
                   ),
-                  child: Text(
-                    '💡 Code client : ${job.clientCode ?? '1234'} (ou code dev : 1234)',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GoLivreurTheme.textePrincipal),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '💡 Code client : ${job.clientCode ?? '1234'} (ou code dev : 1234)',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GoLivreurTheme.textePrincipal),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          _codeController.text = job.clientCode ?? '1234';
+                          final ok = ref.read(driverActiveJobProvider.notifier).verifyCode(_codeController.text.trim());
+                          if (ok) {
+                            ref.read(driverProfileProvider.notifier).addEarnings(job.payout);
+                          }
+                        },
+                        child: const Text('Remplir 1234', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -591,6 +615,14 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                     counterText: '',
                     hintText: '••••',
                   ),
+                  onChanged: (val) {
+                    if (val.length == 4) {
+                      final ok = ref.read(driverActiveJobProvider.notifier).verifyCode(val.trim());
+                      if (ok) {
+                        ref.read(driverProfileProvider.notifier).addEarnings(job.payout);
+                      }
+                    }
+                  },
                 ),
                 if (job.failedCodeAttempts > 0) ...[
                   const SizedBox(height: 8),
@@ -758,6 +790,112 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDriverDrawer(BuildContext context, WidgetRef ref, DriverProfileState profile) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: GoLivreurTheme.primaire,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.two_wheeler, color: GoLivreurTheme.primaire, size: 28),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              profile.name,
+                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              'Moto: ${profile.motoPlate}',
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Solde : ${profile.walletBalance.toInt()} F CFA',
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person, color: GoLivreurTheme.secondaire),
+              title: const Text('Mon Profil Livreur', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Coordonnées, véhicule, documents'),
+              onTap: () {
+                Navigator.pop(context);
+                // Navigue vers l'onglet Profil
+              },
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet, color: GoLivreurTheme.secondaire),
+              title: const Text('Portefeuille & Retraits'),
+              subtitle: const Text('Wave, Orange Money, historique'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.trending_up, color: GoLivreurTheme.secondaire),
+              title: const Text('Historique des Gains'),
+              onTap: () => Navigator.pop(context),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.primaire),
+              title: const Text('Support d\'urgence Daloa'),
+              subtitle: const Text('+225 07 00 00 00 02'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Appel d\'urgence Support Daloa : +225 07 00 00 00 02')),
+                );
+              },
+            ),
+            const Spacer(),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.exit_to_app, color: GoLivreurTheme.erreur),
+              title: const Text('Terminer mon service', style: TextStyle(color: GoLivreurTheme.erreur, fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).pushReplacementNamed('/');
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

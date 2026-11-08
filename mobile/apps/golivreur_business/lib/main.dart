@@ -23,18 +23,44 @@ class GoLivreurBusinessApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const targetScreen = BusinessLoginScreen();
-
     return MaterialApp(
       title: 'GoLivreur Business',
       theme: GoLivreurTheme.theme,
       debugShowCheckedModeBanner: false,
-      home: showSplash
-          ? const AnimatedSplashScreen(
-              appType: GoLivreurAppType.business,
-              nextScreen: targetScreen,
-            )
-          : targetScreen,
+      home: BusinessRootGate(showSplash: showSplash),
     );
+  }
+}
+
+class BusinessRootGate extends StatefulWidget {
+  final bool showSplash;
+  const BusinessRootGate({super.key, required this.showSplash});
+
+  @override
+  State<BusinessRootGate> createState() => _BusinessRootGateState();
+}
+
+class _BusinessRootGateState extends State<BusinessRootGate> {
+  late bool _splashFinished;
+
+  @override
+  void initState() {
+    super.initState();
+    _splashFinished = !widget.showSplash;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_splashFinished) {
+      return AnimatedSplashScreen(
+        appType: GoLivreurAppType.business,
+        onFinished: () {
+          if (mounted) {
+            setState(() => _splashFinished = true);
+          }
+        },
+      );
+    }
+    return const BusinessLoginScreen();
   }
 }

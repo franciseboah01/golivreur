@@ -15,13 +15,15 @@ import 'golivreur_logo.dart';
 ///  - Transition fluide vers l'écran suivant (login ou accueil)
 class AnimatedSplashScreen extends StatefulWidget {
   final GoLivreurAppType appType;
-  final Widget nextScreen;
+  final Widget? nextScreen;
+  final VoidCallback? onFinished;
   final Future<void> Function()? onInit;
 
   const AnimatedSplashScreen({
     super.key,
     this.appType = GoLivreurAppType.client,
-    required this.nextScreen,
+    this.nextScreen,
+    this.onFinished,
     this.onInit,
   });
 
@@ -118,18 +120,25 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     _hasNavigated = true;
     _fallbackTimer?.cancel();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 500),
-          pageBuilder: (context, animation, secondaryAnimation) => widget.nextScreen,
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
-      );
-    });
+    if (widget.onFinished != null) {
+      widget.onFinished!();
+      return;
+    }
+
+    if (widget.nextScreen != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            transitionDuration: const Duration(milliseconds: 500),
+            pageBuilder: (context, animation, secondaryAnimation) => widget.nextScreen!,
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
+        );
+      });
+    }
   }
 
   @override

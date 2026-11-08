@@ -16,12 +16,13 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
   late final TextEditingController _phoneController;
   late final TextEditingController _plateController;
   bool _chargement = false;
+  String? _erreur;
 
   @override
   void initState() {
     super.initState();
-    _phoneController = TextEditingController(text: kDebugMode ? '0700000003' : '');
-    _plateController = TextEditingController(text: kDebugMode ? '1234-JK-01' : '');
+    _phoneController = TextEditingController(text: '0703000001');
+    _plateController = TextEditingController(text: '1234-JK-01');
   }
 
   @override
@@ -31,8 +32,28 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
     super.dispose();
   }
 
+  void _remplirDemo() {
+    setState(() {
+      _phoneController.text = '0703000001';
+      _plateController.text = '1234-JK-01';
+      _erreur = null;
+    });
+  }
+
   void _login() {
-    setState(() => _chargement = true);
+    final phone = _phoneController.text.trim();
+    final plate = _plateController.text.trim();
+
+    if (phone.isEmpty || plate.isEmpty) {
+      setState(() => _erreur = 'Veuillez saisir le numéro et l\'immatriculation.');
+      return;
+    }
+
+    setState(() {
+      _chargement = true;
+      _erreur = null;
+    });
+
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
         setState(() => _chargement = false);
@@ -51,11 +72,11 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
       backgroundColor: GoLivreurTheme.fond,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               const Center(
                 child: GoLivreurLogo(
                   type: GoLivreurAppType.driver,
@@ -81,6 +102,59 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+
+              // Carte info démo pour faciliter le test
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B5E20).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF1B5E20).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.two_wheeler, color: Color(0xFF1B5E20), size: 28),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Ouattara Seydou (Moto Daloa)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1B5E20)),
+                          ),
+                          Text(
+                            'Tél: 0703000001 • Moto: 1234-JK-01',
+                            style: TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _remplirDemo,
+                      child: const Text('Remplir', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (_erreur != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: GoLivreurTheme.erreur.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: GoLivreurTheme.erreur),
+                  ),
+                  child: Text(
+                    _erreur!,
+                    style: const TextStyle(color: GoLivreurTheme.erreur),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
@@ -94,7 +168,7 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
               TextFormField(
                 controller: _plateController,
                 decoration: const InputDecoration(
-                  labelText: 'Immatriculation moto (ex: 1234-AB-01)',
+                  labelText: 'Immatriculation moto (ex: 1234-JK-01)',
                   prefixIcon: Icon(Icons.badge_outlined),
                 ),
               ),

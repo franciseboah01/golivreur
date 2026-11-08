@@ -3,10 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\OrderResource\Pages;
-use App\Models\City;
-use App\Models\Order;
+use App\Models\{ActivityLog, City, Courier, Order};
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -306,6 +306,94 @@ class OrderResource extends Resource
                     }),
             ])
             ->actions([
+                Tables\Actions\ViewAction::make()->label('Détail'),
+
+                Tables\Actions\Action::make('cancelOrder')
+                    ->label('Annuler')
+                    ->icon('heroicon-m-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading(fn (Order $record): string => "Annulation de la commande #{$record->order_number}")
+                    ->form([
+                        Forms\Components\Textarea::make('cancellation_reason')
+                            ->label('Motif d\'annulation obligatoire')
+                            ->required(),
+                    ])
+                    ->visible(fn (Order $record): bool => !in_array($record->status, ['delivered', 'cancelled'], true))
+                    ->action(function (Order $record, array $data): void {
+                        $record->update([
+                            'status'              => 'cancelled',
+                            'cancellation_reason' => $data['cancellation_reason'],
+                        ]);
+
+                        ActivityLog::create([
+                            'user_id'     => auth()->id(),
+                            'action'      => 'order_cancelled_by_admin',
+                            'entity_type' => 'order',
+                            'entity_id'   => $record->id,
+                            'properties'  => ['reason' => $data['cancellation_reason']],
+                            'ip_address'  => request()->ip(),
+                            'severity'    => 'warning',
+                        ]);
+
+                        Notification::make()
+                            ->title("Commande #{$record->order_number} annulée")
+                            ->danger()
+                            ->send();
+                    }),
+
+                Tables\Actions\Action::make('reassignCourier')
+                    ->label('Réassigner')
+                    ->icon('heroicon-m-arrow-path')
+                    ->color('warning')
+                    ->form([
+                        Forms\Components\Select::make('courier_id')
+                            ->label('Nouveau livreur assigné')
+                            ->options(fn () => Courier::where('is_active', true)->get()->mapWithKeys(
+                                fn ($c) => [$c->id => "{$c->user?->name} ({$c->moto_plate})"]
+                            ))
+                            ->searchable()
+                            ->required(),
+                    ])
+                    ->visible(fn (Order $record): bool => !in_array($record->status, ['delivered', 'cancelled'], true))
+                    ->action(function (Order $record, array $data): void {
+                        $oldCourier = $record->courier_id;
+                        $record->update(['courier_id' => $data['courier_id']]);
+
+                        ActivityLog::create([
+                            'user_id'     => auth()->id(),
+                            'action'      => 'order_reassigned',
+                            'entity_type' => 'order',
+                            'entity_id'   => $record->id,
+                            'properties'  => ['old_courier' => $oldCourier, 'new_courier' => $data['courier_id']],
+                            'ip_address'  => request()->ip(),
+                            'severity'    => 'info',
+                        ]);
+
+                        Notification::make()
+                            ->title("Commande #{$record->order_number} réassignée")
+                            ->success()
+                            ->send();
+                    }),
+
+                Tables\Actions\Action::make('unlockCode')
+                    ->label('Débloquer code')
+                    ->icon('heroicon-m-lock-open')
+                    ->color('success')
+                    ->visible(fn (Order $record): bool => (bool) $record->confirmation_locked)
+                    ->action(function (Order $record): void {
+                        $record->update([
+                            'confirmation_locked'      => false,
+                            'confirmation_attempts'    => 0,
+                            'confirmation_unlocked_by' => auth()->id(),
+                        ]);
+
+                        Notification::make()
+                            ->title("Code débloqué pour commande #{$record->order_number}")
+                            ->success()
+                            ->send();
+                    }),
+
                 Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([

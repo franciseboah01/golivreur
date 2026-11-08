@@ -71,3 +71,4 @@ class GoLivreurEnv {
     defaultValue: '1.0.0',
   );
 }
+

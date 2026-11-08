@@ -36,6 +36,7 @@ class AdminPanelProvider extends PanelProvider
                 'Partenaires',
                 'Finances',
                 'Administration',
+                'Paramètres & Système',
                 'Autre',
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
@@ -46,6 +47,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 \App\Filament\Widgets\StatsOverview::class,
+                \App\Filament\Widgets\HorizonQueueWidget::class,
                 \App\Filament\Widgets\WeeklyOrdersChart::class,
                 \App\Filament\Widgets\WeeklyRevenueChart::class,
                 \App\Filament\Widgets\PaymentMethodsChart::class,

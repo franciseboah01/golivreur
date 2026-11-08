@@ -15,7 +15,7 @@ void main() {
   );
 }
 
-class GoLivreurClientApp extends ConsumerWidget {
+class GoLivreurClientApp extends StatelessWidget {
   final bool showSplash;
 
   const GoLivreurClientApp({
@@ -24,22 +24,58 @@ class GoLivreurClientApp extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authProvider);
-    final targetScreen = authState.status == AuthStatus.authenticated
-        ? const MainNavigationScreen()
-        : const LoginScreen();
-
+  Widget build(BuildContext context) {
     return MaterialApp(
       title: 'GoLivreur Client',
       theme: GoLivreurTheme.theme,
       debugShowCheckedModeBanner: false,
-      home: showSplash
-          ? AnimatedSplashScreen(
-              appType: GoLivreurAppType.client,
-              nextScreen: targetScreen,
-            )
-          : targetScreen,
+      home: ClientRootGate(showSplash: showSplash),
     );
+  }
+}
+
+class ClientRootGate extends StatefulWidget {
+  final bool showSplash;
+  const ClientRootGate({super.key, required this.showSplash});
+
+  @override
+  State<ClientRootGate> createState() => _ClientRootGateState();
+}
+
+class _ClientRootGateState extends State<ClientRootGate> {
+  late bool _splashFinished;
+
+  @override
+  void initState() {
+    super.initState();
+    _splashFinished = !widget.showSplash;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_splashFinished) {
+      return AnimatedSplashScreen(
+        appType: GoLivreurAppType.client,
+        onFinished: () {
+          if (mounted) {
+            setState(() => _splashFinished = true);
+          }
+        },
+      );
+    }
+    return const ClientAuthGate();
+  }
+}
+
+class ClientAuthGate extends ConsumerWidget {
+  const ClientAuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    if (authState.status == AuthStatus.authenticated) {
+      return const MainNavigationScreen();
+    }
+    return const LoginScreen();
   }
 }

@@ -47,15 +47,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
 
-    ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.status == AuthStatus.authenticated && mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-          (route) => false,
-        );
-      }
-    });
-
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
       body: SafeArea(

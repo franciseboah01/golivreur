@@ -16,12 +16,13 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
   late final TextEditingController _phoneController;
   late final TextEditingController _passwordController;
   bool _chargement = false;
+  String? _erreur;
 
   @override
   void initState() {
     super.initState();
-    _phoneController = TextEditingController(text: kDebugMode ? '0700000001' : '');
-    _passwordController = TextEditingController(text: kDebugMode ? '123456' : '');
+    _phoneController = TextEditingController(text: '0702010001');
+    _passwordController = TextEditingController(text: '123456');
   }
 
   @override
@@ -31,8 +32,28 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
     super.dispose();
   }
 
+  void _remplirDemo() {
+    setState(() {
+      _phoneController.text = '0702010001';
+      _passwordController.text = '123456';
+      _erreur = null;
+    });
+  }
+
   void _login() {
-    setState(() => _chargement = true);
+    final phone = _phoneController.text.trim();
+    final pwd = _passwordController.text.trim();
+
+    if (phone.isEmpty || pwd.isEmpty) {
+      setState(() => _erreur = 'Veuillez saisir votre téléphone et mot de passe.');
+      return;
+    }
+
+    setState(() {
+      _chargement = true;
+      _erreur = null;
+    });
+
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
         setState(() => _chargement = false);
@@ -51,11 +72,11 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
       backgroundColor: GoLivreurTheme.fond,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               const Center(
                 child: GoLivreurLogo(
                   type: GoLivreurAppType.business,
@@ -81,6 +102,59 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+
+              // Carte info démo pour faciliter le test
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E75B6).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF2E75B6).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.storefront, color: Color(0xFF2E75B6), size: 28),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Maquis Chez Tantie Adjoua (Daloa)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2E75B6)),
+                          ),
+                          Text(
+                            'Tél: 0702010001 • MDP: 123456',
+                            style: TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _remplirDemo,
+                      child: const Text('Remplir', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (_erreur != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: GoLivreurTheme.erreur.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: GoLivreurTheme.erreur),
+                  ),
+                  child: Text(
+                    _erreur!,
+                    style: const TextStyle(color: GoLivreurTheme.erreur),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,

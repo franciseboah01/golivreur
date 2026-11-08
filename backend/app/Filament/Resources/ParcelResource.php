@@ -6,6 +6,7 @@ use App\Filament\Resources\ParcelResource\Pages;
 use App\Models\Parcel;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -104,12 +105,13 @@ class ParcelResource extends Resource
                         Forms\Components\Select::make('status')
                             ->label('Statut d\'acheminement')
                             ->options([
-                                'pending' => 'En attente de livreur',
-                                'assigned' => 'Livreur en route vers la collecte',
+                                'pending'    => 'En attente de livreur',
+                                'waiting'    => 'En attente de ramassage',
+                                'assigned'   => 'Livreur en route vers la collecte',
                                 'in_transit' => 'Colis récupéré - En transit',
-                                'delivered' => 'Colis livré avec succès',
-                                'cancelled' => 'Annulé',
-                                'refused' => 'Refusé',
+                                'delivered'  => 'Colis livré avec succès',
+                                'cancelled'  => 'Annulé',
+                                'refused'    => 'Refusé',
                             ])
                             ->required(),
                         Forms\Components\Toggle::make('sender_code_locked')
@@ -117,6 +119,26 @@ class ParcelResource extends Resource
                         Forms\Components\Toggle::make('recipient_code_locked')
                             ->label('Code Livraison Bloqué (3 erreurs)'),
                     ])->columns(2),
+
+                Forms\Components\Section::make('Photos de Preuve (Enlèvement & Livraison)')
+                    ->description('Clichés horodatés et géolocalisés pris par le livreur')
+                    ->schema([
+                        Forms\Components\Repeater::make('photos')
+                            ->relationship('photos')
+                            ->schema([
+                                Forms\Components\TextInput::make('type')
+                                    ->label('Étape (ramassage / livraison)')
+                                    ->disabled(),
+                                Forms\Components\TextInput::make('photo_url')
+                                    ->label('Chemin de l\'image')
+                                    ->disabled(),
+                                Forms\Components\TextInput::make('created_at')
+                                    ->label('Horodatage')
+                                    ->disabled(),
+                            ])
+                            ->columns(3)
+                            ->disabled(),
+                    ]),
             ]);
     }
 
@@ -226,11 +248,14 @@ class ParcelResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Filtrer par Statut')
                     ->options([
-                        'pending' => 'En attente de livreur',
+                        'pending'    => 'En attente de livreur',
+                        'waiting'    => 'En attente de ramassage',
+                        'assigned'   => 'Livreur assigné',
                         'in_transit' => 'En transit',
-                        'delivered' => 'Livré avec succès',
-                        'cancelled' => 'Annulé',
-                        'refused' => 'Refusé',
+                        'delivered'  => 'Livré avec succès',
+                        'cancelled'  => 'Annulé',
+                        'refused'    => 'Refusé',
+                        'refunded'   => 'Indemnisé / Remboursé',
                     ]),
 
                 Tables\Filters\SelectFilter::make('size')
@@ -282,6 +307,44 @@ class ParcelResource extends Resource
                     }),
             ])
             ->actions([
+                Tables\Actions\ViewAction::make()->label('Détail'),
+
+                Tables\Actions\Action::make('unlockSenderCode')
+                    ->label('Débloquer Code Enlèvement')
+                    ->icon('heroicon-m-lock-open')
+                    ->color('success')
+                    ->visible(fn (Parcel $record): bool => (bool) $record->sender_code_locked)
+                    ->action(function (Parcel $record): void {
+                        $record->update([
+                            'sender_code_locked'      => false,
+                            'sender_code_attempts'    => 0,
+                            'sender_code_unlocked_by' => auth()->id(),
+                        ]);
+
+                        Notification::make()
+                            ->title("Code expéditeur débloqué pour le colis #{$record->id}")
+                            ->success()
+                            ->send();
+                    }),
+
+                Tables\Actions\Action::make('unlockRecipientCode')
+                    ->label('Débloquer Code Livraison')
+                    ->icon('heroicon-m-lock-open')
+                    ->color('success')
+                    ->visible(fn (Parcel $record): bool => (bool) $record->recipient_code_locked)
+                    ->action(function (Parcel $record): void {
+                        $record->update([
+                            'recipient_code_locked'      => false,
+                            'recipient_code_attempts'    => 0,
+                            'recipient_code_unlocked_by' => auth()->id(),
+                        ]);
+
+                        Notification::make()
+                            ->title("Code destinataire débloqué pour le colis #{$record->id}")
+                            ->success()
+                            ->send();
+                    }),
+
                 Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([

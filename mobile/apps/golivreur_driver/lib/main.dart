@@ -23,18 +23,44 @@ class GoLivreurDriverApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const targetScreen = DriverLoginScreen();
-
     return MaterialApp(
       title: 'GoLivreur Driver',
       theme: GoLivreurTheme.theme,
       debugShowCheckedModeBanner: false,
-      home: showSplash
-          ? const AnimatedSplashScreen(
-              appType: GoLivreurAppType.driver,
-              nextScreen: targetScreen,
-            )
-          : targetScreen,
+      home: DriverRootGate(showSplash: showSplash),
     );
+  }
+}
+
+class DriverRootGate extends StatefulWidget {
+  final bool showSplash;
+  const DriverRootGate({super.key, required this.showSplash});
+
+  @override
+  State<DriverRootGate> createState() => _DriverRootGateState();
+}
+
+class _DriverRootGateState extends State<DriverRootGate> {
+  late bool _splashFinished;
+
+  @override
+  void initState() {
+    super.initState();
+    _splashFinished = !widget.showSplash;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_splashFinished) {
+      return AnimatedSplashScreen(
+        appType: GoLivreurAppType.driver,
+        onFinished: () {
+          if (mounted) {
+            setState(() => _splashFinished = true);
+          }
+        },
+      );
+    }
+    return const DriverLoginScreen();
   }
 }

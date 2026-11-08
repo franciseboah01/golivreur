@@ -50,9 +50,17 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
+      drawer: _buildBusinessDrawer(context, ref, profile),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
+        leading: Builder(
+          builder: (drawerCtx) => IconButton(
+            icon: const Icon(Icons.menu, color: GoLivreurTheme.textePrincipal),
+            tooltip: 'Menu rapide & Profil',
+            onPressed: () => Scaffold.of(drawerCtx).openDrawer(),
+          ),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -432,6 +440,110 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBusinessDrawer(BuildContext context, WidgetRef ref, BusinessProfileState profile) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Color(0xFF2E75B6),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.storefront, color: Color(0xFF2E75B6), size: 28),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              profile.name,
+                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              profile.quarter,
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Solde : ${profile.walletBalance.toInt()} F CFA',
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person, color: Color(0xFF2E75B6)),
+              title: const Text('Mon Profil Commerce', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Horaires, temps de prépa, coordonnées'),
+              onTap: () => Navigator.pop(context),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.restaurant_menu, color: Color(0xFF2E75B6)),
+              title: const Text('Gestion du Catalogue & Plats'),
+              subtitle: const Text('Mettre en rupture, modifier prix'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.payments_outlined, color: Color(0xFF2E75B6)),
+              title: const Text('Revenus & Versements'),
+              subtitle: const Text('Demande de retrait Orange / Wave'),
+              onTap: () => Navigator.pop(context),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.primaire),
+              title: const Text('Support Partenaires Daloa'),
+              subtitle: const Text('+225 07 00 00 00 02'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Support Partenaires Daloa : +225 07 00 00 00 02')),
+                );
+              },
+            ),
+            const Spacer(),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.exit_to_app, color: GoLivreurTheme.erreur),
+              title: const Text('Fermer la session', style: TextStyle(color: GoLivreurTheme.erreur, fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).pushReplacementNamed('/');
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

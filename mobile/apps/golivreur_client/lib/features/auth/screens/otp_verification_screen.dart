@@ -63,10 +63,13 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Connexion réussie ! Bienvenue sur GoLivreur.')),
       );
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-        (route) => false,
-      );
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        );
+      }
     }
   }
 

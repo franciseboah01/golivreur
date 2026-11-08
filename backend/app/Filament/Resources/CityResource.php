@@ -3,9 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CityResource\Pages;
-use App\Models\City;
+use App\Models\{ActivityLog, City};
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -160,6 +161,73 @@ class CityResource extends Resource
                     }),
             ])
             ->actions([
+                Tables\Actions\Action::make('toggleRain')
+                    ->label(fn (City $record): string => $record->rain_mode_active ? 'Couper Pluie' : 'Activer Pluie')
+                    ->icon(fn (City $record): string => $record->rain_mode_active ? 'heroicon-m-sun' : 'heroicon-m-cloud')
+                    ->color(fn (City $record): string => $record->rain_mode_active ? 'gray' : 'warning')
+                    ->action(function (City $record): void {
+                        $newStatus = ! $record->rain_mode_active;
+                        $record->update([
+                            'rain_mode_active'       => $newStatus,
+                            'rain_mode_activated_at' => $newStatus ? now() : null,
+                        ]);
+
+                        ActivityLog::create([
+                            'user_id'     => auth()->id(),
+                            'action'      => $newStatus ? 'rain_mode_activated' : 'rain_mode_deactivated',
+                            'entity_type' => 'city',
+                            'entity_id'   => $record->id,
+                            'properties'  => ['city_name' => $record->name, 'new_status' => $newStatus],
+                            'ip_address'  => request()->ip(),
+                            'severity'    => 'info',
+                        ]);
+
+                        Notification::make()
+                            ->title("Mode Pluie {$record->name} : " . ($newStatus ? 'Activé (+20%)' : 'Désactivé'))
+                            ->color($newStatus ? 'warning' : 'success')
+                            ->send();
+                    }),
+
+                Tables\Actions\Action::make('toggleEmergency')
+                    ->label(fn (City $record): string => $record->emergency_mode_active ? 'Lever Urgence' : 'Déclencher Urgence')
+                    ->icon(fn (City $record): string => $record->emergency_mode_active ? 'heroicon-m-shield-check' : 'heroicon-m-exclamation-triangle')
+                    ->color(fn (City $record): string => $record->emergency_mode_active ? 'success' : 'danger')
+                    ->visible(fn (): bool => in_array(auth()->user()?->role, ['super_admin', 'dg_national'], true))
+                    ->form(fn (City $record): array => $record->emergency_mode_active ? [] : [
+                        Forms\Components\Textarea::make('message')
+                            ->label('Message d\'alerte diffusé aux clients et livreurs de cette ville')
+                            ->default('En raison d\'intempéries ou de circonstances exceptionnelles, les livraisons sont momentanément suspendues.')
+                            ->required(),
+                    ])
+                    ->modalHeading(fn (City $record): string => $record->emergency_mode_active ? "Lever l'urgence sur {$record->name}" : "Déclencher l'urgence sur {$record->name}")
+                    ->action(function (City $record, array $data): void {
+                        $newStatus = ! $record->emergency_mode_active;
+                        $record->update([
+                            'emergency_mode_active'       => $newStatus,
+                            'emergency_mode_activated_at' => $newStatus ? now() : null,
+                            'emergency_mode_message'      => $newStatus ? ($data['message'] ?? 'Service temporairement interrompu') : null,
+                        ]);
+
+                        ActivityLog::create([
+                            'user_id'     => auth()->id(),
+                            'action'      => $newStatus ? 'emergency_mode_activated' : 'emergency_mode_deactivated',
+                            'entity_type' => 'city',
+                            'entity_id'   => $record->id,
+                            'properties'  => [
+                                'city_name'  => $record->name,
+                                'new_status' => $newStatus,
+                                'message'    => $data['message'] ?? null,
+                            ],
+                            'ip_address'  => request()->ip(),
+                            'severity'    => 'critical',
+                        ]);
+
+                        Notification::make()
+                            ->title("Mode Urgence {$record->name} : " . ($newStatus ? 'Enclenché' : 'Levé'))
+                            ->color($newStatus ? 'danger' : 'success')
+                            ->send();
+                    }),
+
                 Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([
