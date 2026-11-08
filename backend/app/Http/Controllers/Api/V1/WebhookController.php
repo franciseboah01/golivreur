@@ -140,6 +140,7 @@ class WebhookController extends Controller
     {
         $emailAdmin = config('app.admin_alert_email', 'francis@golivreur.ci');
 
+        $horizonUrl = rtrim(config('app.url', 'https://golivreur.ci'), '/') . '/horizon';
         try {
             Mail::raw(
                 "⚠️ ALERTE SÉCURITÉ — Webhook signature invalide\n\n"
@@ -148,7 +149,7 @@ class WebhookController extends Controller
                 . "Source déclarée : " . ($request->header('X-Hub2-Signature') ? 'Hub2' : 'CinetPay') . "\n"
                 . "Webhook Log ID : #{$log->id}\n\n"
                 . "Action : Webhook rejeté automatiquement. Aucun traitement effectué.\n"
-                . "Vérifiez dans le dashboard Horizon : https://admin.golivreur.ci/horizon",
+                . "Vérifiez dans le dashboard Horizon : {$horizonUrl}",
                 fn ($mail) => $mail
                     ->to($emailAdmin)
                     ->subject('🚨 GoLivreur — Webhook signature invalide détecté'),

@@ -17,8 +17,16 @@ return [
         'credentials_path' => env('FCM_CREDENTIALS_PATH', ''),
     ],
 
+    'twilio' => [
+        'sid'   => env('TWILIO_SID', ''),
+        'token' => env('TWILIO_AUTH_TOKEN', ''),
+        'from'  => env('TWILIO_FROM', ''),
+    ],
+
+    'admin_alert_email' => env('ADMIN_ALERT_EMAIL', 'admin@golivreur.ci'),
+
     'health' => [
-        'token' => env('HEALTH_CHECK_TOKEN', 'edulink-secret-health-token'),
+        'token' => env('HEALTH_CHECK_TOKEN', 'golivreur-secret-health-token'),
     ],
 ];
 

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../config/env_config.dart';
 
 /// Client HTTP Dio configuré pour l'API GoLivreur.
 ///
@@ -183,7 +184,9 @@ class ApiClient {
 
 /// Provider Riverpod de l'ApiClient — disponible dans toutes les apps.
 final apiClientProvider = Provider<ApiClient>((ref) {
-  throw UnimplementedError(
-    'apiClientProvider doit être overridé dans chaque app avec la bonne baseUrl.',
+  return ApiClient(
+    baseUrl: GoLivreurEnv.apiBaseUrl,
+    storage: const FlutterSecureStorage(),
+    onDeconnexionForcee: () {},
   );
 });

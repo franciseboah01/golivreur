@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
@@ -12,9 +13,16 @@ class BusinessLoginScreen extends StatefulWidget {
 }
 
 class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
-  final _phoneController = TextEditingController(text: '0700000001');
-  final _passwordController = TextEditingController(text: '123456');
+  late final TextEditingController _phoneController;
+  late final TextEditingController _passwordController;
   bool _chargement = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneController = TextEditingController(text: kDebugMode ? '0700000001' : '');
+    _passwordController = TextEditingController(text: kDebugMode ? '123456' : '');
+  }
 
   @override
   void dispose() {

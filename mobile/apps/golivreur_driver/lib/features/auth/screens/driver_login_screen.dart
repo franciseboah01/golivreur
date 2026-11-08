@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
@@ -12,9 +13,16 @@ class DriverLoginScreen extends StatefulWidget {
 }
 
 class _DriverLoginScreenState extends State<DriverLoginScreen> {
-  final _phoneController = TextEditingController(text: '0700000003');
-  final _plateController = TextEditingController(text: '1234-JK-01');
+  late final TextEditingController _phoneController;
+  late final TextEditingController _plateController;
   bool _chargement = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneController = TextEditingController(text: kDebugMode ? '0700000003' : '');
+    _plateController = TextEditingController(text: kDebugMode ? '1234-JK-01' : '');
+  }
 
   @override
   void dispose() {

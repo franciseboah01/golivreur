@@ -1,50 +1,33 @@
+import 'package:golivreur_core/config/env_config.dart';
+
 /// Variables d'environnement GoLivreur Client.
 ///
-/// INSTRUCTIONS POUR FRANCIS EBOAH :
-///   Recherchez "CHANGE_ME" dans ce fichier et remplacez par vos vraies valeurs.
-///   Ces valeurs sont dans Bitwarden > GoLivreur > Flutter Config.
-///
-/// ⚠️ Ne commitez JAMAIS ce fichier avec de vraies clés dans Git.
-
+/// Configurable dynamiquement via --dart-define ou détection automatique de plateforme.
 class Env {
   Env._();
 
   // ── API Backend ────────────────────────────────────────────────────────────
-  /// URL de base de l'API GoLivreur.
-  /// Local     : http://10.0.2.2:8000/api/v1  (émulateur Android → localhost)
-  /// Local iOS : http://localhost:8000/api/v1
-  /// Staging   : https://staging.golivreur.ci/api/v1
-  /// Production: https://golivreur.ci/api/v1
-  static const String apiBaseUrl = 'http://localhost:8080/api/v1'; // Local dev API
+  /// URL de base de l'API GoLivreur (détection automatique Android émulateur, Web, ou surchargée).
+  static String get apiBaseUrl => GoLivreurEnv.apiBaseUrl;
 
   // ── WebSocket Reverb (GPS temps réel) ──────────────────────────────────────
-  /// Même hôte que l'API, port 8080.
-  static const String reverbHost   = 'CHANGE_ME'; // Ex: golivreur.ci
-  static const int    reverbPort   = 8080;
-  static const String reverbAppKey = 'CHANGE_ME'; // Depuis .env Laravel: REVERB_APP_KEY
-  static const String reverbScheme = 'https';     // Local: http
+  static String get reverbHost => GoLivreurEnv.reverbHost;
+  static int get reverbPort => GoLivreurEnv.reverbPort;
+  static String get reverbAppKey => GoLivreurEnv.reverbAppKey;
+  static String get reverbScheme => GoLivreurEnv.reverbScheme;
 
   // ── Google Maps ────────────────────────────────────────────────────────────
-  /// Clé API Google Maps — restreinte aux apps mobiles Android/iOS.
-  /// Récupérer dans Bitwarden > GoLivreur > Google Maps.
-  static const String googleMapsKeyAndroid = 'CHANGE_ME';
-  static const String googleMapsKeyIOS     = 'CHANGE_ME';
-
-  // ── Firebase ───────────────────────────────────────────────────────────────
-  /// Configuré via google-services.json (Android) et GoogleService-Info.plist (iOS).
-  /// Fichiers à placer dans :
-  ///   Android : android/app/google-services.json
-  ///   iOS     : ios/Runner/GoogleService-Info.plist
-  /// Ces fichiers sont dans Bitwarden > GoLivreur > Firebase.
+  static String get googleMapsKeyAndroid => GoLivreurEnv.googleMapsKeyAndroid;
+  static String get googleMapsKeyIOS => GoLivreurEnv.googleMapsKeyIOS;
 
   // ── Configuration app ──────────────────────────────────────────────────────
-  static const String appName    = 'GoLivreur';
-  static const String appVersion = '1.0.0';
+  static const String appName = 'GoLivreur';
+  static String get appVersion => GoLivreurEnv.appVersion;
 
   // Timeout requêtes API (8 secondes — réseau ivoirien instable)
-  static const int timeoutSecondes = 8;
+  static int get timeoutSecondes => GoLivreurEnv.timeoutSeconds;
 
   // Intervalle GPS en secondes (filtre : envoie seulement si déplacement > 10m)
   static const int gpsIntervalleSecondes = 5;
-  static const double gpsFiltreMetres   = 10.0;
+  static const double gpsFiltreMetres = 10.0;
 }
