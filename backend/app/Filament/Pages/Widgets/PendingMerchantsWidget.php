@@ -114,3 +114,4 @@ class PendingMerchantsWidget extends BaseWidget
             ->emptyStateDescription('Tous les commerces partenaires enregistrés ont été validés et activés.');
     }
 }
+

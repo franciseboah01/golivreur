@@ -57,7 +57,7 @@ class AdministratorResource extends Resource
                         // Listes déroulantes en haut avec recherche live et tri alphabétique
                         Forms\Components\Select::make('role_habilitation_id')
                             ->label('Niveau d\'Habilitation & Rôle')
-                            ->relationship('roleHabilitation', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->relationship('roleHabilitation', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
                             ->preload()
                             ->searchable()
                             ->required()
@@ -85,7 +85,7 @@ class AdministratorResource extends Resource
                             }),
                         Forms\Components\Select::make('city_id')
                             ->label('Ville d\'affectation')
-                            ->relationship('city', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
                             ->searchable()
                             ->preload()
                             ->helperText('Laisser vide pour les fonctions à compétence nationale'),

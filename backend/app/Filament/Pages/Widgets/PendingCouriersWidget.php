@@ -112,3 +112,4 @@ class PendingCouriersWidget extends BaseWidget
             ->emptyStateDescription('Tous les profils de livreurs enregistrés ont été validés et activés.');
     }
 }
+

@@ -43,7 +43,7 @@ class OrderResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('city_id')
                             ->label('Ville')
-                            ->relationship('city', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
                             ->searchable()
                             ->preload()
                             ->required(),
@@ -64,20 +64,20 @@ class OrderResource extends Resource
                             ->default('pending'),
                         Forms\Components\Select::make('client_id')
                             ->label('Client')
-                            ->relationship('client', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->relationship('client', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
                             ->searchable()
                             ->preload()
                             ->required(),
                         Forms\Components\Select::make('merchant_id')
                             ->label('Commerce')
-                            ->relationship('merchant', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->relationship('merchant', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
                             ->searchable()
                             ->preload()
                             ->required(),
                         Forms\Components\Select::make('courier_id')
                             ->label('Livreur')
-                            ->relationship('courier', 'id', modifyQueryUsing: fn ($q) => $q->with('user')->orderBy('id'))
-                            ->getOptionLabelFromRecordUsing(fn ($r) => ($r->user?->name ?? "Livreur #{$r->id}") . ($r->user?->phone ? " ({$r->user->phone})" : ''))
+                            ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => $query->with('user')->orderBy('id'))
+                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}") . ($record->user?->phone ? " ({$record->user->phone})" : ''))
                             ->searchable()
                             ->preload(),
                     ])->columns(2),
@@ -367,8 +367,8 @@ class OrderResource extends Resource
                     ->form([
                         Forms\Components\Select::make('courier_id')
                             ->label('Nouveau livreur assigné')
-                            ->options(fn () => Courier::where('is_active', true)->get()->mapWithKeys(
-                                fn ($c) => [$c->id => "{$c->user?->name} ({$c->moto_plate})"]
+                            ->options(fn () => Courier::where('is_active', true)->with('user')->get()->mapWithKeys(
+                                fn ($courier) => [$courier->id => ($courier->user?->name ?? "Livreur #{$courier->id}") . ($courier->vehicle_plate ? " ({$courier->vehicle_plate})" : '')]
                             ))
                             ->searchable()
                             ->required(),

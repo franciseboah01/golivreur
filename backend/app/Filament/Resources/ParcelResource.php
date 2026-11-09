@@ -3,7 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ParcelResource\Pages;
-use App\Models\Parcel;
+use App\Models\{Courier, Parcel};
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -42,7 +42,7 @@ class ParcelResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('city_id')
                             ->label('Ville')
-                            ->relationship('city', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
                             ->searchable()
                             ->preload()
                             ->required(),
@@ -58,14 +58,14 @@ class ParcelResource extends Resource
                             ->required(),
                         Forms\Components\Select::make('sender_id')
                             ->label('Client Expéditeur')
-                            ->relationship('sender', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->relationship('sender', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
                             ->searchable()
                             ->preload()
                             ->required(),
                         Forms\Components\Select::make('courier_id')
                             ->label('Livreur assigné')
-                            ->relationship('courier', 'id', modifyQueryUsing: fn ($q) => $q->with('user')->orderBy('id'))
-                            ->getOptionLabelFromRecordUsing(fn ($r) => ($r->user?->name ?? "Livreur #{$r->id}") . ($r->user?->phone ? " ({$r->user->phone})" : ''))
+                            ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => $query->with('user')->orderBy('id'))
+                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}") . ($record->user?->phone ? " ({$record->user->phone})" : ''))
                             ->searchable()
                             ->preload(),
                         Forms\Components\TextInput::make('recipient_name')

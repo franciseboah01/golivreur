@@ -57,7 +57,7 @@ class UserResource extends Resource
                             ->required(),
                         Forms\Components\Select::make('city_id')
                             ->label('Ville de rattachement')
-                            ->relationship('city', 'name', modifyQueryUsing: fn ($q) => $q->orderBy('name'))
+                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
                             ->searchable()
                             ->preload(),
                         Forms\Components\TextInput::make('name')
