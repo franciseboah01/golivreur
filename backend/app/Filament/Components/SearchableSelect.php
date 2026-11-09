@@ -19,3 +19,4 @@ class SearchableSelect
             ->native(false);
     }
 }
+

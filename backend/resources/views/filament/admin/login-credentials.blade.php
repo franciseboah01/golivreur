@@ -20,7 +20,8 @@
             <button
                 type="button"
                 onclick="window.fillAdminCredentials('superadmin@golivreur.ci', 'SuperAdmin2026!')"
-                class="shrink-0 px-3 py-1.5 text-xs font-semibold rounded-md bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition shadow-sm cursor-pointer"
+                style="background-color: #f59e0b !important; color: #ffffff !important;"
+                class="shrink-0 px-3 py-1.5 text-xs font-semibold rounded-md hover:opacity-90 active:scale-95 transition shadow-sm cursor-pointer"
             >
                 Remplir
             </button>

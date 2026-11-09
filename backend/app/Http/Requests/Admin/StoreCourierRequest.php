@@ -48,3 +48,4 @@ class StoreCourierRequest extends FormRequest
         ];
     }
 }
+
