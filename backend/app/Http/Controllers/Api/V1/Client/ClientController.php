@@ -3,13 +3,34 @@
 namespace App\Http\Controllers\Api\V1\Client;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Merchant, Notification, Order};
+use App\Http\Resources\MerchantCategoryResource;
+use App\Http\Resources\MerchantResource;
+use App\Models\{Merchant, MerchantCategory, Notification, Order};
 use App\Modules\GoShop\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ClientController extends Controller
 {
+    /**
+     * Liste des Catégories d'Activité actives avec emoji et logo depuis la base de données.
+     */
+    public function categories(): JsonResponse
+    {
+        $categories = MerchantCategory::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'succes'  => true,
+            'donnees' => MerchantCategoryResource::collection($categories),
+        ]);
+    }
+
+    /**
+     * Liste des Commerces Partenaires actifs avec nom, emoji, logo_url, photo_url et catalogue.
+     */
     public function merchants(Request $request): JsonResponse
     {
         $cityId = $request->input('city_id', auth()->user()?->city_id ?? 1);
@@ -18,18 +39,25 @@ class ClientController extends Controller
             ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->input('category')))
             ->where('is_active', true)
+            ->with([
+                'categoryModel',
+                'products' => fn ($q) => $q->where('is_available', true)->orderBy('sort_order'),
+            ])
             ->withCount('products')
             ->orderByDesc('is_open')
+            ->orderBy('name')
             ->get();
 
         return response()->json([
             'succes'  => true,
-            'donnees' => $merchants,
+            'donnees' => MerchantResource::collection($merchants),
         ]);
     }
 
     public function merchantCatalog(Merchant $merchant): JsonResponse
     {
+        $merchant->load('categoryModel');
+
         $products = $merchant->products()
             ->where('is_available', true)
             ->orderBy('sort_order')
@@ -39,7 +67,7 @@ class ClientController extends Controller
         return response()->json([
             'succes'  => true,
             'donnees' => [
-                'merchant' => $merchant,
+                'merchant' => new MerchantResource($merchant),
                 'catalog'  => $products,
             ],
         ]);

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\WalletTransactionResource\Pages;
 use App\Models\WalletTransaction;
 use Filament\Forms;
@@ -38,30 +39,27 @@ class WalletTransactionResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Détails de l\'Opération Financière')
                     ->schema([
-                        Forms\Components\Select::make('type')
+                        // Listes déroulantes en haut avec recherche live et tri alphabétique
+                        SearchableSelect::make('type')
                             ->label('Nature de la transaction')
-                            ->options([
+                            ->options(SearchableSelect::sortedOptions([
                                 'adjustment' => 'Ajustement manuel admin',
-                                'commission' => 'Prélèvement commission plateforme',
-                                'delivery_fee' => 'Rémunération course livreur',
-                                'deposit' => 'Rechargement / Dépôt Mobile Money',
-                                'order_payment' => 'Paiement commande GoShop',
-                                'parcel_payment' => 'Paiement course GoColis',
-                                'refund' => 'Remboursement client / indemnisation',
                                 'withdrawal' => 'Demande de Retrait vers Mobile Money',
-                            ])
-                            ->searchable()
-                            ->native(false)
+                                'parcel_payment' => 'Paiement course GoColis',
+                                'order_payment' => 'Paiement commande GoShop',
+                                'commission' => 'Prélèvement commission plateforme',
+                                'deposit' => 'Rechargement / Dépôt Mobile Money',
+                                'refund' => 'Remboursement client / indemnisation',
+                                'delivery_fee' => 'Rémunération course livreur',
+                            ]))
                             ->required(),
-                        Forms\Components\Select::make('status')
+                        SearchableSelect::make('status')
                             ->label('Statut du transfert')
-                            ->options([
-                                'completed' => 'Validé avec succès',
+                            ->options(SearchableSelect::sortedOptions([
                                 'failed' => 'Échoué / Rejeté',
                                 'pending' => 'En cours de traitement',
-                            ])
-                            ->searchable()
-                            ->native(false)
+                                'completed' => 'Validé avec succès',
+                            ]))
                             ->required(),
                         Forms\Components\TextInput::make('reference')
                             ->label('Référence unique')

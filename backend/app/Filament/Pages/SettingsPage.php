@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Components\SearchableSelect;
 use App\Models\City;
 use App\Services\SettingsService;
 use Filament\Forms;
@@ -64,11 +65,11 @@ class SettingsPage extends Page implements HasForms
     {
         return $form
             ->schema([
-                Forms\Components\Select::make('selectedCityId')
+                SearchableSelect::make('selectedCityId')
                     ->label('Périmètre de configuration')
                     ->options([
-                        null => '🌐 Configuration Globale (Toutes les villes)',
-                        ...City::pluck('name', 'id')->toArray(),
+                        '' => '🌐 Configuration Globale (Toutes les villes)',
+                        ...City::orderBy('name')->pluck('name', 'id')->toArray(),
                     ])
                     ->reactive()
                     ->afterStateUpdated(fn ($state) => $this->selectedCityId = $state ? (int) $state : null)

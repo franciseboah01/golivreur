@@ -91,6 +91,34 @@ ou suppression de champ doit être documenté ICI avant le merge sur `develop`.
 
 ---
 
+## [1.1.0] — 2026-11-10 (Cohérence Admin ↔ Mobile : Emojis, Logos & Catégories dynamiques)
+
+### Ajouté
+
+- **`GET /api/v1/client/categories`** (et alias public `GET /api/v1/categories`) — Retourne la liste des catégories d'activité actives triées par nom (`MerchantCategoryResource`) :
+  - `id` *(int)* : Identifiant unique en base
+  - `name` *(string)* : Libellé officiel configuré dans l'admin
+  - `slug` *(string)* : Identifiant technique utilisé pour filtrer `/client/merchants?category={slug}`
+  - `description` *(string|null)* : Description courte
+  - `icon` *(string|null)* : Icône fallback optionnelle
+  - `emoji` *(string)* : Emoji choisi dans l'admin (fallback `"🏪"`)
+  - `logo_url` *(string|null)* : URL publique du logo uploadé (`storage/categories/logos/...`), ou `null`
+  - `is_active` *(bool)* : Statut d'activation
+
+### Modifié
+
+- **`GET /api/v1/client/merchants`** et **`GET /api/v1/client/merchants/{id}/catalog`** (`MerchantResource`) :
+  - Ajout de `category_name` *(string)* : Nom lisible de la catégorie depuis `merchant_categories`
+  - Ajout de `category_emoji` *(string|null)* : Emoji de la catégorie associée
+  - Ajout de `emoji` *(string)* : Emoji de la boutique (ou celui de sa catégorie en fallback)
+  - Ajout de `logo_url` *(string|null)* : URL publique du logo de la boutique (`storage/commerces/logos/...`)
+  - `photo_url` *(string|null)* : URL publique de la photo vitrine (`storage/commerces/...`) ou placeholder
+  - Inclusion automatique des `products` disponibles dans `/client/merchants` pour affichage immédiat côté mobile
+- **`GET /api/v1/merchant/status`** (`MerchantController::status`) :
+  - Ajout de `id`, `category_name`, `emoji`, `logo_url` et `photo_url` pour synchroniser l'application `GoLivreur Business`.
+
+---
+
 ## [Non publié] — En préparation
 
 ### Prévu pour v1.1.0 (Phase 2 — S11-S12)

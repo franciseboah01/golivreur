@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ClientResource\Pages;
 use App\Models\{ActivityLog, User};
 use Filament\Forms;
@@ -51,11 +52,9 @@ class ClientResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Fiche Client')
                     ->schema([
-                        Forms\Components\Select::make('city_id')
+                        SearchableSelect::make('city_id')
                             ->label('Ville de rattachement')
                             ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->searchable()
-                            ->preload()
                             ->required(),
                         Forms\Components\TextInput::make('name')
                             ->label('Nom complet')

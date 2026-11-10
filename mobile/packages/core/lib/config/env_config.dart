@@ -28,6 +28,40 @@ class GoLivreurEnv {
   static String get apiBaseUrl =>
       _configuredApiUrl.isNotEmpty ? _configuredApiUrl : defaultApiUrl;
 
+  /// Résout une URL de média (logo/photo) retournée par le backend.
+  /// Adapte automatiquement les URLs `localhost`/`127.0.0.1` vers l'hôte actif
+  /// (ex: `10.0.2.2` sur émulateur Android ou IP LAN sur appareil physique).
+  static String? resolveMediaUrl(String? rawUrl) {
+    if (rawUrl == null) return null;
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return null;
+
+    final apiUri = Uri.tryParse(apiBaseUrl);
+    if (apiUri == null || !apiUri.hasScheme || apiUri.host.isEmpty) {
+      return trimmed;
+    }
+
+    final origin = '${apiUri.scheme}://${apiUri.authority}';
+    if (trimmed.startsWith('/')) {
+      return '$origin$trimmed';
+    }
+
+    final mediaUri = Uri.tryParse(trimmed);
+    if (mediaUri != null &&
+        (mediaUri.host == 'localhost' || mediaUri.host == '127.0.0.1') &&
+        apiUri.host != mediaUri.host) {
+      return mediaUri
+          .replace(
+            scheme: apiUri.scheme,
+            host: apiUri.host,
+            port: apiUri.hasPort ? apiUri.port : null,
+          )
+          .toString();
+    }
+
+    return trimmed;
+  }
+
   /// WebSocket Reverb
   static const String reverbHost = String.fromEnvironment(
     'REVERB_HOST',

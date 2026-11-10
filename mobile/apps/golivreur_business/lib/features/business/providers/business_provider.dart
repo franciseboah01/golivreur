@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:golivreur_core/config/env_config.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/services/api_client.dart';
 
@@ -11,6 +12,9 @@ class BusinessProfileState {
   final int id;
   final String name;
   final String category;
+  final String? emoji;
+  final String? logoUrl;
+  final String? photoUrl;
   final String quarter;
   final bool isOpen;
   final int prepTimeMinutes;
@@ -22,6 +26,9 @@ class BusinessProfileState {
     this.id = 1,
     this.name = 'Maquis Chez Tantie Adjoua',
     this.category = 'Maquis & Grillades',
+    this.emoji = '🍖',
+    this.logoUrl,
+    this.photoUrl,
     this.quarter = 'Quartier Commerce, Daloa',
     this.isOpen = true,
     this.prepTimeMinutes = 20,
@@ -31,14 +38,23 @@ class BusinessProfileState {
   });
 
   BusinessProfileState copyWith({
+    int? id,
+    String? name,
+    String? category,
+    String? emoji,
+    String? logoUrl,
+    String? photoUrl,
     bool? isOpen,
     int? prepTimeMinutes,
     double? walletBalance,
   }) {
     return BusinessProfileState(
-      id: id,
-      name: name,
-      category: category,
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      emoji: emoji ?? this.emoji,
+      logoUrl: logoUrl ?? this.logoUrl,
+      photoUrl: photoUrl ?? this.photoUrl,
       quarter: quarter,
       isOpen: isOpen ?? this.isOpen,
       prepTimeMinutes: prepTimeMinutes ?? this.prepTimeMinutes,
@@ -60,6 +76,12 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
       if (res.statusCode == 200 && res.data['succes'] == true) {
         final d = res.data['donnees'];
         state = state.copyWith(
+          id: d['id'] ?? state.id,
+          name: d['name'] ?? state.name,
+          category: d['category_name'] ?? d['category'] ?? state.category,
+          emoji: d['emoji'] as String?,
+          logoUrl: GoLivreurEnv.resolveMediaUrl(d['logo_url'] as String?),
+          photoUrl: GoLivreurEnv.resolveMediaUrl(d['photo_url'] as String?),
           isOpen: d['is_open'] == true,
           prepTimeMinutes: d['prep_time_minutes'] ?? state.prepTimeMinutes,
         );

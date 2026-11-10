@@ -2,6 +2,9 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Components\EmojiSelectField;
+use App\Filament\Components\ImageUploadField;
+use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\MerchantResource\Pages;
 use App\Models\{ActivityLog, Merchant, MerchantCategory, User};
 use Filament\Forms;
@@ -40,15 +43,13 @@ class MerchantResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Identité & Localisation du Commerce')
-                    ->description('Renseignez le compte gestionnaire, la ville, la catégorie et les coordonnées du commerce.')
+                    ->description('Renseignez le compte gestionnaire, la ville, la catégorie, l\'emoji/logo et la photo du commerce.')
                     ->schema([
-                        // Listes déroulantes remontées en haut du formulaire avec recherche et tri
-                        Forms\Components\Select::make('user_id')
+                        // Listes déroulantes remontées en haut du formulaire avec recherche live et tri alphabétique
+                        SearchableSelect::make('user_id')
                             ->label('Compte Gestionnaire')
                             ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->where('role', 'merchant')->orWhereDoesntHave('merchant')->orderBy('name'))
                             ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} (" . ($record->phone ?? 'Sans téléphone') . ")")
-                            ->searchable()
-                            ->preload()
                             ->required()
                             ->helperText('Sélectionnez un compte gestionnaire ou créez-en un nouveau via le bouton +.')
                             ->createOptionForm([
@@ -88,20 +89,26 @@ class MerchantResource extends Resource
                                 return $user->id;
                             }),
 
-                        Forms\Components\Select::make('city_id')
+                        SearchableSelect::make('city_id')
                             ->label('Ville d\'implantation')
                             ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->searchable()
-                            ->preload()
                             ->required(),
 
-                        Forms\Components\Select::make('category')
+                        SearchableSelect::make('category')
                             ->label('Catégorie d\'activité')
                             ->options(fn () => MerchantCategory::where('is_active', true)->orderBy('name')->pluck('name', 'slug')->toArray())
-                            ->searchable()
-                            ->preload()
                             ->required()
+                            ->live()
+                            ->afterStateUpdated(function (?string $state, Forms\Get $get, Forms\Set $set) {
+                                if ($state && empty($get('emoji'))) {
+                                    $catEmoji = MerchantCategory::where('slug', $state)->value('emoji');
+                                    if ($catEmoji) {
+                                        $set('emoji', $catEmoji);
+                                    }
+                                }
+                            })
                             ->createOptionForm([
+                                EmojiSelectField::make('emoji', 'Emoji de la catégorie'),
                                 Forms\Components\TextInput::make('name')
                                     ->label('Nom de la nouvelle catégorie')
                                     ->required()
@@ -110,6 +117,7 @@ class MerchantResource extends Resource
                                     ->label('Identifiant unique (slug)')
                                     ->required()
                                     ->maxLength(100),
+                                ImageUploadField::make('logo_path', 'categories/logos', 'Logo de la catégorie (optionnel)'),
                                 Forms\Components\Textarea::make('description')
                                     ->label('Description'),
                             ])
@@ -118,29 +126,34 @@ class MerchantResource extends Resource
                                 $cat = MerchantCategory::create([
                                     'name' => $data['name'],
                                     'slug' => $slug,
+                                    'emoji' => $data['emoji'] ?? '🏪',
+                                    'logo_path' => $data['logo_path'] ?? null,
                                     'description' => $data['description'] ?? null,
                                     'is_active' => true,
                                 ]);
                                 return $cat->slug;
                             }),
 
+                        EmojiSelectField::make('emoji', 'Emoji de la boutique'),
+
                         Forms\Components\TextInput::make('name')
                             ->label('Nom de l\'enseigne')
                             ->placeholder('Ex: Restaurant Le Carrefour')
                             ->required()
-                            ->maxLength(100),
+                            ->maxLength(100)
+                            ->columnSpanFull(),
 
-                        Forms\Components\FileUpload::make('photo_path')
-                            ->label('Photo du commerce (Vitrine / Enseigne)')
-                            ->image()
-                            ->disk('public')
-                            ->directory('commerces')
-                            ->maxSize(2048)
-                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                            ->imageEditor()
-                            ->previewable()
-                            ->columnSpanFull()
-                            ->helperText('Formats acceptés : JPG, PNG, WEBP (Max : 2 Mo). Aperçu instantané avant validation.'),
+                        ImageUploadField::make(
+                            'photo_path',
+                            'commerces',
+                            'Photo du commerce (Vitrine / Enseigne)'
+                        ),
+
+                        ImageUploadField::make(
+                            'logo_path',
+                            'commerces/logos',
+                            'Logo de la boutique (Image carrée / Marque)'
+                        ),
 
                         Forms\Components\Textarea::make('address')
                             ->label('Adresse physique')
@@ -186,7 +199,18 @@ class MerchantResource extends Resource
                     ->label('Photo')
                     ->disk('public')
                     ->circular()
-                    ->defaultImageUrl(asset('images/placeholder-merchant.png')),
+                    ->defaultImageUrl(url('images/placeholder-merchant.png')),
+
+                Tables\Columns\ImageColumn::make('logo_path')
+                    ->label('Logo')
+                    ->disk('public')
+                    ->circular()
+                    ->placeholder('-'),
+
+                Tables\Columns\TextColumn::make('emoji')
+                    ->label('Emoji')
+                    ->formatStateUsing(fn (?string $state, Merchant $record): string => $state ?: $record->resolved_emoji)
+                    ->extraAttributes(['class' => 'text-xl']),
 
                 Tables\Columns\TextColumn::make('name')
                     ->label('Enseigne')

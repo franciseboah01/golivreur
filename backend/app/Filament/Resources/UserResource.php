@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
 use Filament\Forms;
@@ -45,21 +46,17 @@ class UserResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Identifiants & Contact')
                     ->schema([
-                        Forms\Components\Select::make('role')
+                        SearchableSelect::make('role')
                             ->label('Type de compte')
-                            ->options([
+                            ->options(SearchableSelect::sortedOptions([
                                 'client' => 'Client Final',
-                                'driver' => 'Livreur Partenaire',
                                 'merchant' => 'Commerce Partenaire',
-                            ])
-                            ->searchable()
-                            ->native(false)
+                                'driver' => 'Livreur Partenaire',
+                            ]))
                             ->required(),
-                        Forms\Components\Select::make('city_id')
+                        SearchableSelect::make('city_id')
                             ->label('Ville de rattachement')
-                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->searchable()
-                            ->preload(),
+                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name')),
                         Forms\Components\TextInput::make('name')
                             ->label('Nom et Prénom')
                             ->required()

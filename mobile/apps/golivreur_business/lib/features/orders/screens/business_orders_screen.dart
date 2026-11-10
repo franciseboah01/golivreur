@@ -461,12 +461,27 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.storefront, color: Color(0xFF2E75B6), size: 28),
+                        clipBehavior: Clip.antiAlias,
+                        child: profile.logoUrl != null && profile.logoUrl!.isNotEmpty
+                            ? Image.network(
+                                profile.logoUrl!,
+                                width: 44,
+                                height: 44,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => profile.emoji != null
+                                    ? Text(profile.emoji!, style: const TextStyle(fontSize: 24))
+                                    : const Icon(Icons.storefront, color: Color(0xFF2E75B6), size: 28),
+                              )
+                            : (profile.emoji != null && profile.emoji!.trim().isNotEmpty
+                                ? Text(profile.emoji!, style: const TextStyle(fontSize: 24))
+                                : const Icon(Icons.storefront, color: Color(0xFF2E75B6), size: 28)),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

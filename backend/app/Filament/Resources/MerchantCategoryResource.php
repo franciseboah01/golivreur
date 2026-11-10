@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Components\EmojiSelectField;
+use App\Filament\Components\ImageUploadField;
 use App\Filament\Resources\MerchantCategoryResource\Pages;
 use App\Models\MerchantCategory;
 use Filament\Forms;
@@ -28,6 +30,7 @@ class MerchantCategoryResource extends Resource
 
     protected static ?int $navigationSort = 4;
 
+    // Retirée du menu principal : accessible depuis Commerces Partenaires
     protected static bool $shouldRegisterNavigation = false;
 
     public static function canAccess(): bool
@@ -40,9 +43,13 @@ class MerchantCategoryResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Informations de la Catégorie')
-                    ->description('Définissez une catégorie commerciale pour regrouper les commerces partenaires')
+                Forms\Components\Section::make('Informations & Identité Visuelle de la Catégorie')
+                    ->description('Définissez une catégorie commerciale, son emoji et/ou son logo visibles dans l\'application mobile.')
                     ->schema([
+                        // Liste déroulante remontée en haut avec recherche live
+                        EmojiSelectField::make('emoji', 'Emoji représentatif (recommandé)')
+                            ->columnSpanFull(),
+
                         Forms\Components\TextInput::make('name')
                             ->label('Nom de la catégorie')
                             ->required()
@@ -60,13 +67,19 @@ class MerchantCategoryResource extends Resource
                             ->maxLength(100)
                             ->unique(MerchantCategory::class, 'slug', ignoreRecord: true),
 
+                        ImageUploadField::make(
+                            'logo_path',
+                            'categories/logos',
+                            'Logo de la catégorie (image optionnelle)'
+                        )->columnSpanFull(),
+
                         Forms\Components\Textarea::make('description')
                             ->label('Description & Types de produits')
                             ->placeholder('Ex: Plats chauds, maquis traditionnels, fast-food et boissons fraîches')
                             ->columnSpanFull(),
 
                         Forms\Components\Toggle::make('is_active')
-                            ->label('Catégorie active (visible lors de l\'enregistrement des commerces)')
+                            ->label('Catégorie active (visible dans l\'admin et sur l\'application mobile)')
                             ->default(true),
                     ])->columns(2),
             ]);
@@ -79,6 +92,17 @@ class MerchantCategoryResource extends Resource
                 Tables\Columns\TextColumn::make('rowIndex')
                     ->rowIndex()
                     ->label('N°'),
+
+                Tables\Columns\ImageColumn::make('logo_path')
+                    ->label('Logo')
+                    ->disk('public')
+                    ->circular()
+                    ->placeholder('-'),
+
+                Tables\Columns\TextColumn::make('emoji')
+                    ->label('Emoji')
+                    ->formatStateUsing(fn (?string $state): string => $state ?: '🏪')
+                    ->extraAttributes(['class' => 'text-xl']),
 
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nom de la Catégorie')
@@ -117,7 +141,7 @@ class MerchantCategoryResource extends Resource
                     ->dateTime('d/m/Y')
                     ->sortable(),
             ])
-            ->defaultSort('created_at', 'asc')
+            ->defaultSort('name', 'asc')
             ->defaultKeySort(true)
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')
@@ -150,4 +174,3 @@ class MerchantCategoryResource extends Resource
         ];
     }
 }
-

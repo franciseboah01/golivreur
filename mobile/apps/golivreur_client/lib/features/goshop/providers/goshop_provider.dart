@@ -52,28 +52,67 @@ final selectedNeighborhoodProvider = StateProvider<String>((ref) {
   return 'Quartier Résidentiel';
 });
 
-// ─── Catégories GoShop ────────────────────────────────────────────────────────
+// ─── Catégories GoShop (chargées dynamiquement depuis la BDD) ────────────────
 class CategoryItem {
   final String id;
   final String name;
+  final String? emoji;
+  final String? logoUrl;
   final String iconName;
 
-  const CategoryItem({required this.id, required this.name, required this.iconName});
+  const CategoryItem({
+    required this.id,
+    required this.name,
+    this.emoji,
+    this.logoUrl,
+    this.iconName = 'storefront',
+  });
+
+  factory CategoryItem.fromModel(CategoryModel model) => CategoryItem(
+        id: model.slug,
+        name: model.name,
+        emoji: model.emoji,
+        logoUrl: model.logoUrl,
+        iconName: model.icon ?? model.slug,
+      );
 }
 
-final categoriesProvider = Provider<List<CategoryItem>>((ref) {
-  return const [
-    CategoryItem(id: 'all', name: 'Tous', iconName: 'apps'),
-    CategoryItem(id: 'restaurant', name: 'Restaurants', iconName: 'restaurant'),
-    CategoryItem(id: 'maquis', name: 'Maquis', iconName: 'outdoor_grill'),
-    CategoryItem(id: 'pharmacie', name: 'Pharmacies', iconName: 'local_pharmacy'),
-    CategoryItem(id: 'patisserie', name: 'Pâtisseries', iconName: 'bakery_dining'),
-    CategoryItem(id: 'fastfood', name: 'Fast-foods', iconName: 'lunch_dining'),
-    CategoryItem(id: 'epicerie', name: 'Épiceries', iconName: 'shopping_cart'),
-    CategoryItem(id: 'boissons', name: 'Boissons & Vins', iconName: 'liquor'),
-    CategoryItem(id: 'mode', name: 'Mode & Tissus', iconName: 'checkroom'),
-    CategoryItem(id: 'electronique', name: 'Électronique', iconName: 'devices'),
-  ];
+const List<CategoryItem> fallbackCategoriesList = [
+  CategoryItem(id: 'all', name: 'Tous', emoji: '🏬', iconName: 'apps'),
+  CategoryItem(id: 'restaurant', name: 'Restaurants', emoji: '🍽️', iconName: 'restaurant'),
+  CategoryItem(id: 'maquis', name: 'Maquis & Grillades', emoji: '🍖', iconName: 'outdoor_grill'),
+  CategoryItem(id: 'fast_food', name: 'Fast-Foods', emoji: '🍔', iconName: 'lunch_dining'),
+  CategoryItem(id: 'pharmacie', name: 'Pharmacies', emoji: '💊', iconName: 'local_pharmacy'),
+  CategoryItem(id: 'boulangerie', name: 'Boulangeries', emoji: '🥐', iconName: 'bakery_dining'),
+  CategoryItem(id: 'supermarche', name: 'Supermarchés', emoji: '🛒', iconName: 'shopping_cart'),
+  CategoryItem(id: 'boissons', name: 'Boissons & Vins', emoji: '🥤', iconName: 'liquor'),
+  CategoryItem(id: 'boutique', name: 'Mode & Tissus', emoji: '👕', iconName: 'checkroom'),
+  CategoryItem(id: 'high_tech', name: 'High-Tech', emoji: '📱', iconName: 'devices'),
+];
+
+final categoriesProvider = FutureProvider<List<CategoryItem>>((ref) async {
+  final api = ref.watch(apiClientProvider);
+
+  try {
+    final response = await api.get('/client/categories');
+    if (response.statusCode == 200 && response.data['succes'] == true) {
+      final List data = response.data['donnees'] as List;
+      final dynamicCategories = data
+          .map((json) => CategoryItem.fromModel(
+                CategoryModel.fromJson(json as Map<String, dynamic>),
+              ))
+          .toList();
+
+      return [
+        const CategoryItem(id: 'all', name: 'Tous', emoji: '🏬', iconName: 'apps'),
+        ...dynamicCategories,
+      ];
+    }
+  } catch (_) {
+    // Repli local uniquement si l'API est inaccessible
+  }
+
+  return fallbackCategoriesList;
 });
 
 final selectedCategoryProvider = StateProvider<String>((ref) => 'all');
@@ -96,9 +135,11 @@ final merchantsListProvider = FutureProvider<List<MerchantModel>>((ref) async {
   return [
     const MerchantModel(
       id: 1,
-      name: 'Chez Tantie Adjoua',
+      name: 'Maquis Chez Tantie Adjoua',
       category: 'maquis',
-      address: 'Quartier Résidentiel, Daloa (Face Maquis Le Baoulé)',
+      categoryName: 'Maquis & Grillades',
+      emoji: '🍖',
+      address: 'Quartier Commerce, Daloa',
       lat: 6.8821,
       lng: -6.4478,
       prepTimeMinutes: 20,
@@ -142,9 +183,11 @@ final merchantsListProvider = FutureProvider<List<MerchantModel>>((ref) async {
     ),
     const MerchantModel(
       id: 2,
-      name: 'Pharmacie Centrale de Daloa',
+      name: 'Pharmacie Centrale Daloa',
       category: 'pharmacie',
-      address: 'Centre-ville, Boulevard Principal, Daloa',
+      categoryName: 'Pharmacies',
+      emoji: '💊',
+      address: 'Place de la Mairie, Daloa',
       lat: 6.8770,
       lng: -6.4502,
       prepTimeMinutes: 10,
@@ -180,9 +223,11 @@ final merchantsListProvider = FutureProvider<List<MerchantModel>>((ref) async {
     ),
     const MerchantModel(
       id: 3,
-      name: 'Speed Burger Daloa',
-      category: 'fastfood',
-      address: 'Carrefour Total, Quartier Lobia, Daloa',
+      name: 'Fast Food Speed Burger Daloa',
+      category: 'fast_food',
+      categoryName: 'Fast-Foods',
+      emoji: '🍔',
+      address: 'Rue du Commerce, Daloa',
       lat: 6.8795,
       lng: -6.4521,
       prepTimeMinutes: 15,
@@ -218,9 +263,11 @@ final merchantsListProvider = FutureProvider<List<MerchantModel>>((ref) async {
     ),
     const MerchantModel(
       id: 4,
-      name: 'Pâtisserie & Boulangerie La Grâce',
-      category: 'patisserie',
-      address: 'Quartier Kennedy, Route d\'Issia, Daloa',
+      name: 'Boulangerie La Centrale Daloa',
+      category: 'boulangerie',
+      categoryName: 'Boulangeries & Pâtisseries',
+      emoji: '🥐',
+      address: 'Avenue Houphouët-Boigny, face Gare UTB, Daloa',
       lat: 6.8745,
       lng: -6.4580,
       prepTimeMinutes: 10,

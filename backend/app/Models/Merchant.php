@@ -17,6 +17,8 @@ class Merchant extends Model
         'city_id',
         'name',
         'category',
+        'emoji',
+        'logo_path',
         'description',
         'address',
         'photo_path',
@@ -27,8 +29,7 @@ class Merchant extends Model
         'is_active',
         'is_open',
         'commission_rate',
-        'logo_url',
-        'banner_url',
+        'photo_url',
     ];
 
     protected $casts = [
@@ -41,12 +42,49 @@ class Merchant extends Model
         'lng'               => 'float',
     ];
 
+    protected $appends = [
+        'photo_url',
+        'logo_url',
+    ];
+
+    /**
+     * URL publique de la photo principale du commerce (vitrine / bannière).
+     */
     public function getPhotoUrlAttribute(): ?string
     {
         if (!empty($this->attributes['photo_path'])) {
-            return asset('storage/' . $this->attributes['photo_path']);
+            return url('storage/' . $this->attributes['photo_path']);
         }
-        return $this->attributes['photo_url'] ?? $this->attributes['logo_url'] ?? asset('images/placeholder-merchant.png');
+
+        if (!empty($this->attributes['photo_url'])) {
+            return $this->attributes['photo_url'];
+        }
+
+        return $this->logo_url ?? url('images/placeholder-merchant.png');
+    }
+
+    /**
+     * URL publique du logo de la boutique (si uploadé depuis l'admin).
+     */
+    public function getLogoUrlAttribute(): ?string
+    {
+        if (!empty($this->attributes['logo_path'])) {
+            return url('storage/' . $this->attributes['logo_path']);
+        }
+
+        return null;
+    }
+
+    /**
+     * Emoji effectif : celui de la boutique, sinon celui de sa catégorie, sinon un fallback.
+     */
+    public function getResolvedEmojiAttribute(): string
+    {
+        if (!empty($this->attributes['emoji'])) {
+            return $this->attributes['emoji'];
+        }
+
+        return $this->categoryModel?->emoji ?: '🏪';
     }
 
     public function user(): BelongsTo
@@ -59,6 +97,11 @@ class Merchant extends Model
         return $this->belongsTo(City::class);
     }
 
+    public function categoryModel(): BelongsTo
+    {
+        return $this->belongsTo(MerchantCategory::class, 'category', 'slug');
+    }
+
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
@@ -69,4 +112,3 @@ class Merchant extends Model
         return $this->hasMany(Order::class);
     }
 }
-

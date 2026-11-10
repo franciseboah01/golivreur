@@ -18,7 +18,7 @@ class GoShopHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final weather = ref.watch(weatherProvider);
     final selectedQuarter = ref.watch(selectedNeighborhoodProvider);
-    final categories = ref.watch(categoriesProvider);
+    final categories = ref.watch(categoriesProvider).valueOrNull ?? fallbackCategoriesList;
     final selectedCat = ref.watch(selectedCategoryProvider);
     final merchantsAsync = ref.watch(merchantsListProvider);
     final cart = ref.watch(cartProvider);
@@ -144,6 +144,7 @@ class GoShopHomeScreen extends ConsumerWidget {
           RefreshIndicator(
             color: GoLivreurTheme.primaire,
             onRefresh: () async {
+              ref.invalidate(categoriesProvider);
               ref.invalidate(merchantsListProvider);
             },
             child: SingleChildScrollView(
@@ -376,13 +377,8 @@ class GoShopHomeScreen extends ConsumerWidget {
                                     ),
                                   ],
                                 ),
-                                child: Icon(
-                                  _getCategoryIcon(cat.id),
-                                  color: isSelected
-                                      ? Colors.white
-                                      : GoLivreurTheme.primaire,
-                                  size: 28,
-                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: _buildCategoryVisual(cat, isSelected),
                               ),
                               const SizedBox(height: 6),
                               SizedBox(
@@ -645,11 +641,11 @@ class GoShopHomeScreen extends ConsumerWidget {
                       ? Image.network(
                           merchant.photoUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildPlaceholderImage(merchant.category),
+                          errorBuilder: (_, __, ___) => _buildPlaceholderImage(merchant),
                         )
-                      : _buildPlaceholderImage(merchant.category),
+                      : _buildPlaceholderImage(merchant),
                 ),
-                // Badge Catégorie
+                // Badge Catégorie officiel depuis la base de données
                 Positioned(
                   top: 10,
                   left: 10,
@@ -666,7 +662,7 @@ class GoShopHomeScreen extends ConsumerWidget {
                       ],
                     ),
                     child: Text(
-                      merchant.category.toUpperCase(),
+                      (merchant.categoryName ?? merchant.category).toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -716,17 +712,26 @@ class GoShopHomeScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(
-                          merchant.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: GoLivreurTheme.textePrincipal,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            _buildMerchantLogoBadge(merchant),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                merchant.name,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: GoLivreurTheme.textePrincipal,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
@@ -814,25 +819,84 @@ class GoShopHomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPlaceholderImage(String category) {
-    IconData icon;
-    switch (category) {
-      case 'pharmacie':
-        icon = Icons.local_pharmacy;
-        break;
-      case 'maquis':
-        icon = Icons.outdoor_grill;
-        break;
-      case 'patisserie':
-        icon = Icons.bakery_dining;
-        break;
-      default:
-        icon = Icons.restaurant;
+  /// Affiche le logo de la catégorie si uploadé en BDD, sinon son emoji, sinon l'icône fallback.
+  Widget _buildCategoryVisual(CategoryItem cat, bool isSelected) {
+    if (cat.logoUrl != null && cat.logoUrl!.isNotEmpty) {
+      return Image.network(
+        cat.logoUrl!,
+        width: 58,
+        height: 58,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildCategoryEmojiOrIcon(cat, isSelected),
+      );
     }
+
+    return _buildCategoryEmojiOrIcon(cat, isSelected);
+  }
+
+  Widget _buildCategoryEmojiOrIcon(CategoryItem cat, bool isSelected) {
+    if (cat.emoji != null && cat.emoji!.trim().isNotEmpty) {
+      return Center(
+        child: Text(
+          cat.emoji!,
+          style: const TextStyle(fontSize: 26),
+        ),
+      );
+    }
+
+    return Icon(
+      _getCategoryIcon(cat.id),
+      color: isSelected ? Colors.white : GoLivreurTheme.primaire,
+      size: 28,
+    );
+  }
+
+  /// Affiche le logo du commerce si uploadé en BDD, sinon son emoji, sinon icône fallback.
+  Widget _buildMerchantLogoBadge(MerchantModel merchant) {
+    if (merchant.logoUrl != null && merchant.logoUrl!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          merchant.logoUrl!,
+          width: 28,
+          height: 28,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildMerchantEmojiBox(merchant),
+        ),
+      );
+    }
+
+    return _buildMerchantEmojiBox(merchant);
+  }
+
+  Widget _buildMerchantEmojiBox(MerchantModel merchant) {
+    final emoji = merchant.emoji?.trim();
+    return Container(
+      width: 28,
+      height: 28,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: GoLivreurTheme.primaire.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: emoji != null && emoji.isNotEmpty
+          ? Text(emoji, style: const TextStyle(fontSize: 16))
+          : Icon(_getCategoryIcon(merchant.category), size: 16, color: GoLivreurTheme.primaire),
+    );
+  }
+
+  Widget _buildPlaceholderImage(MerchantModel merchant) {
+    final emoji = merchant.emoji?.trim();
     return Container(
       color: const Color(0xFFF0EDED),
       child: Center(
-        child: Icon(icon, size: 54, color: GoLivreurTheme.primaire.withValues(alpha: 0.5)),
+        child: emoji != null && emoji.isNotEmpty
+            ? Text(emoji, style: const TextStyle(fontSize: 48))
+            : Icon(
+                _getCategoryIcon(merchant.category),
+                size: 54,
+                color: GoLivreurTheme.primaire.withValues(alpha: 0.5),
+              ),
       ),
     );
   }
@@ -845,16 +909,22 @@ class GoShopHomeScreen extends ConsumerWidget {
         return Icons.outdoor_grill;
       case 'pharmacie':
         return Icons.local_pharmacy;
+      case 'boulangerie':
       case 'patisserie':
         return Icons.bakery_dining;
+      case 'fast_food':
       case 'fastfood':
         return Icons.lunch_dining;
+      case 'supermarche':
       case 'epicerie':
         return Icons.shopping_cart;
       case 'boissons':
         return Icons.liquor;
+      case 'boutique':
       case 'mode':
         return Icons.checkroom;
+      case 'high_tech':
+      case 'hightech':
       case 'electronique':
         return Icons.devices;
       default:

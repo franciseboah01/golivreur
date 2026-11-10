@@ -39,9 +39,11 @@ Route::prefix('auth')->group(function () {
 
 // ─── Catalogue GoShop Public (Accessible avec ou sans connexion) ──────────────
 Route::prefix('client')->group(function () {
+    Route::get('categories', [ClientController::class, 'categories']);
     Route::get('merchants', [ClientController::class, 'merchants']);
     Route::get('merchants/{merchant}/catalog', [ClientController::class, 'merchantCatalog']);
 });
+Route::get('categories', [ClientController::class, 'categories']);
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
 Route::prefix('webhooks')->group(function () {

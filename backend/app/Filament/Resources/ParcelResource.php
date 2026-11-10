@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ParcelResource\Pages;
 use App\Models\{Courier, Parcel};
 use Filament\Forms;
@@ -40,34 +41,27 @@ class ParcelResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Expéditeur & Destinataire')
                     ->schema([
-                        Forms\Components\Select::make('city_id')
+                        // Listes déroulantes remontées en haut avec recherche live et tri alphabétique
+                        SearchableSelect::make('city_id')
                             ->label('Ville')
                             ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->searchable()
-                            ->preload()
                             ->required(),
-                        Forms\Components\Select::make('size')
+                        SearchableSelect::make('size')
                             ->label('Format du colis')
-                            ->options([
+                            ->options(SearchableSelect::sortedOptions([
                                 'grand' => 'Grand (Carton, colis volumineux)',
                                 'moyen' => 'Moyen (Boîte à chaussures, vêtement)',
                                 'petit' => 'Petit (Plis, documents, clés)',
-                            ])
-                            ->searchable()
-                            ->native(false)
+                            ]))
                             ->required(),
-                        Forms\Components\Select::make('sender_id')
+                        SearchableSelect::make('sender_id')
                             ->label('Client Expéditeur')
                             ->relationship('sender', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->searchable()
-                            ->preload()
                             ->required(),
-                        Forms\Components\Select::make('courier_id')
+                        SearchableSelect::make('courier_id')
                             ->label('Livreur assigné')
                             ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => $query->with('user')->orderBy('id'))
-                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}") . ($record->user?->phone ? " ({$record->user->phone})" : ''))
-                            ->searchable()
-                            ->preload(),
+                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}") . ($record->user?->phone ? " ({$record->user->phone})" : '')),
                         Forms\Components\TextInput::make('recipient_name')
                             ->label('Nom du Destinataire')
                             ->required(),
@@ -79,6 +73,16 @@ class ParcelResource extends Resource
 
                 Forms\Components\Section::make('Tarification & Assurance (F CFA)')
                     ->schema([
+                        // Liste déroulante en haut de section
+                        SearchableSelect::make('payment_status')
+                            ->label('Statut du paiement')
+                            ->options(SearchableSelect::sortedOptions([
+                                'failed' => 'Échoué',
+                                'pending' => 'En attente',
+                                'paid' => 'Payé',
+                            ]))
+                            ->required()
+                            ->columnSpanFull(),
                         Forms\Components\TextInput::make('shipping_fee')
                             ->label('Frais de livraison (F CFA)')
                             ->numeric()
@@ -97,29 +101,14 @@ class ParcelResource extends Resource
                             ->label('Rémunération livreur (F CFA)')
                             ->numeric()
                             ->required(),
-                        Forms\Components\Select::make('payment_status')
-                            ->label('Statut du paiement')
-                            ->options([
-                                'failed' => 'Échoué',
-                                'paid' => 'Payé',
-                                'pending' => 'En attente',
-                            ])
-                            ->searchable()
-                            ->native(false)
-                            ->required(),
                     ])->columns(3),
 
                 Forms\Components\Section::make('Itinéraire & Validation Sécurisée')
                     ->schema([
-                        Forms\Components\Textarea::make('pickup_address')
-                            ->label('Adresse de collecte (Ramassage)')
-                            ->required(),
-                        Forms\Components\Textarea::make('delivery_address')
-                            ->label('Adresse de livraison finale')
-                            ->required(),
-                        Forms\Components\Select::make('status')
+                        // Liste déroulante en haut de section
+                        SearchableSelect::make('status')
                             ->label('Statut d\'acheminement')
-                            ->options([
+                            ->options(SearchableSelect::sortedOptions([
                                 'assigned'   => 'Livreur en route vers la collecte',
                                 'cancelled'  => 'Annulé',
                                 'delivered'  => 'Colis livré avec succès',
@@ -127,9 +116,14 @@ class ParcelResource extends Resource
                                 'pending'    => 'En attente de livreur',
                                 'refused'    => 'Refusé',
                                 'waiting'    => 'En attente de ramassage',
-                            ])
-                            ->searchable()
-                            ->native(false)
+                            ]))
+                            ->required()
+                            ->columnSpanFull(),
+                        Forms\Components\Textarea::make('pickup_address')
+                            ->label('Adresse de collecte (Ramassage)')
+                            ->required(),
+                        Forms\Components\Textarea::make('delivery_address')
+                            ->label('Adresse de livraison finale')
                             ->required(),
                         Forms\Components\Toggle::make('sender_code_locked')
                             ->label('Code Enlèvement Bloqué (3 erreurs)'),

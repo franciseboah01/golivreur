@@ -21,16 +21,21 @@ class MerchantController extends Controller
 
     public function status(): JsonResponse
     {
-        $merchant = $this->getMerchant();
+        $merchant = $this->getMerchant()->load('categoryModel');
 
         return response()->json([
             'succes'  => true,
             'donnees' => [
+                'id'                => $merchant->id,
                 'is_open'           => $merchant->is_open,
                 'is_active'         => $merchant->is_active,
                 'prep_time_minutes' => $merchant->prep_time_minutes,
                 'name'              => $merchant->name,
                 'category'          => $merchant->category,
+                'category_name'     => $merchant->categoryModel?->name ?? ucfirst((string) $merchant->category),
+                'emoji'             => $merchant->resolved_emoji,
+                'logo_url'          => $merchant->logo_url ?? $merchant->categoryModel?->logo_url,
+                'photo_url'         => $merchant->photo_url,
             ],
         ]);
     }

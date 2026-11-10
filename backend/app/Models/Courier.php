@@ -44,9 +44,9 @@ class Courier extends Model
     public function getPhotoUrlAttribute(): ?string
     {
         if (!empty($this->attributes['photo_path'])) {
-            return asset('storage/' . $this->attributes['photo_path']);
+            return url('storage/' . $this->attributes['photo_path']);
         }
-        return $this->attributes['photo_url'] ?? asset('images/placeholder-driver.png');
+        return $this->attributes['photo_url'] ?? url('images/placeholder-driver.png');
     }
 
     public function user(): BelongsTo

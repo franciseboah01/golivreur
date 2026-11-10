@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\AdministratorResource\Pages;
 use App\Models\User;
 use Filament\Forms;
@@ -55,11 +56,9 @@ class AdministratorResource extends Resource
                     ->description('Gestion des comptes ayant accès au tableau de bord et à la gestion opérationnelle')
                     ->schema([
                         // Listes déroulantes en haut avec recherche live et tri alphabétique
-                        Forms\Components\Select::make('role_habilitation_id')
+                        SearchableSelect::make('role_habilitation_id')
                             ->label('Niveau d\'Habilitation & Rôle')
                             ->relationship('roleHabilitation', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->preload()
-                            ->searchable()
                             ->required()
                             ->live()
                             ->afterStateUpdated(function ($state, Forms\Set $set) {
@@ -83,11 +82,9 @@ class AdministratorResource extends Resource
                                 }
                                 return $state ?? 'admin';
                             }),
-                        Forms\Components\Select::make('city_id')
+                        SearchableSelect::make('city_id')
                             ->label('Ville d\'affectation')
                             ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->searchable()
-                            ->preload()
                             ->helperText('Laisser vide pour les fonctions à compétence nationale'),
                         Forms\Components\TextInput::make('name')
                             ->label('Nom et Prénom')

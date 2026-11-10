@@ -1,5 +1,6 @@
 /// Modèles de données partagés entre les 3 applications GoLivreur.
 /// Correspondent exactement aux réponses JSON de l'API Laravel.
+import '../config/env_config.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // USER
@@ -268,13 +269,49 @@ class ParcelPhotoModel {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MERCHANT
+// CATEGORY & MERCHANT
 // ═══════════════════════════════════════════════════════════════════════════════
+
+class CategoryModel {
+  final int id;
+  final String name;
+  final String slug;
+  final String? description;
+  final String? icon;
+  final String? emoji;
+  final String? logoUrl;
+  final bool isActive;
+
+  const CategoryModel({
+    required this.id,
+    required this.name,
+    required this.slug,
+    this.description,
+    this.icon,
+    this.emoji,
+    this.logoUrl,
+    this.isActive = true,
+  });
+
+  factory CategoryModel.fromJson(Map<String, dynamic> json) => CategoryModel(
+        id: json['id'] as int? ?? 0,
+        name: json['name'] as String? ?? '',
+        slug: json['slug'] as String? ?? '',
+        description: json['description'] as String?,
+        icon: json['icon'] as String?,
+        emoji: json['emoji'] as String?,
+        logoUrl: GoLivreurEnv.resolveMediaUrl(json['logo_url'] as String?),
+        isActive: json['is_active'] as bool? ?? true,
+      );
+}
 
 class MerchantModel {
   final int id;
   final String name;
   final String category;
+  final String? categoryName;
+  final String? emoji;
+  final String? logoUrl;
   final String address;
   final double lat;
   final double lng;
@@ -288,6 +325,9 @@ class MerchantModel {
     required this.id,
     required this.name,
     required this.category,
+    this.categoryName,
+    this.emoji,
+    this.logoUrl,
     required this.address,
     required this.lat,
     required this.lng,
@@ -302,13 +342,16 @@ class MerchantModel {
         id: json['id'] as int,
         name: json['name'] as String,
         category: json['category'] as String,
+        categoryName: json['category_name'] as String?,
+        emoji: json['emoji'] as String?,
+        logoUrl: GoLivreurEnv.resolveMediaUrl(json['logo_url'] as String?),
         address: json['address'] as String,
         lat: (json['lat'] as num).toDouble(),
         lng: (json['lng'] as num).toDouble(),
         prepTimeMinutes: json['prep_time_minutes'] as int? ?? 15,
         isOpen: json['is_open'] as bool? ?? false,
         averageRating: (json['average_rating'] as num? ?? 0).toDouble(),
-        photoUrl: json['photo_url'] as String?,
+        photoUrl: GoLivreurEnv.resolveMediaUrl(json['photo_url'] as String?),
         products: (json['products'] as List<dynamic>? ?? [])
             .map((e) => ProductModel.fromJson(e as Map<String, dynamic>))
             .toList(),

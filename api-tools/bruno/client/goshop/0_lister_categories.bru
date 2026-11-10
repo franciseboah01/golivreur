@@ -1,0 +1,35 @@
+meta {
+  name: 0. Lister les catégories d'activité
+  type: http
+  seq: 0
+}
+
+get {
+  url: {{base_url}}/client/categories
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+tests {
+  test("Retourne une liste de catégories", function() {
+    expect(res.body.donnees).to.be.an("array");
+  });
+
+  test("Chaque catégorie expose name, slug, emoji et logo_url", function() {
+    if (res.body.donnees.length > 0) {
+      expect(res.body.donnees[0]).to.have.property("name");
+      expect(res.body.donnees[0]).to.have.property("slug");
+      expect(res.body.donnees[0]).to.have.property("emoji");
+      expect(res.body.donnees[0]).to.have.property("logo_url");
+    }
+  });
+}
+
+docs {
+  Retourne les Catégories d'Activité actives avec leurs noms, emojis et logos
+  depuis la base de données pour synchroniser l'application mobile GoLivreur Client.
+}

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Components\ImageUploadField;
+use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\CourierResource\Pages;
 use App\Models\{ActivityLog, Courier, User, VehicleType};
 use Filament\Forms;
@@ -42,13 +44,11 @@ class CourierResource extends Resource
                 Forms\Components\Section::make('Identité & Profil du Livreur')
                     ->description('Renseignez le compte utilisateur, la ville d\'affectation, le véhicule et la photo du livreur.')
                     ->schema([
-                        // Listes déroulantes remontées en haut du formulaire avec recherche et tri
-                        Forms\Components\Select::make('user_id')
+                        // Listes déroulantes remontées en haut du formulaire avec recherche live et tri alphabétique
+                        SearchableSelect::make('user_id')
                             ->label('Compte Utilisateur (Livreur)')
                             ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->whereIn('role', ['driver', 'courier'])->orWhereDoesntHave('courier')->orderBy('name'))
                             ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} (" . ($record->phone ?? 'Sans téléphone') . ")")
-                            ->searchable()
-                            ->preload()
                             ->required()
                             ->helperText('Sélectionnez un livreur existant ou créez-en un nouveau via le bouton +.')
                             ->createOptionForm([
@@ -88,18 +88,14 @@ class CourierResource extends Resource
                                 return $user->id;
                             }),
 
-                        Forms\Components\Select::make('city_id')
+                        SearchableSelect::make('city_id')
                             ->label('Ville d\'affectation')
                             ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->searchable()
-                            ->preload()
                             ->required(),
 
-                        Forms\Components\Select::make('vehicle_type')
+                        SearchableSelect::make('vehicle_type')
                             ->label('Type de véhicule')
                             ->options(fn () => VehicleType::where('is_active', true)->orderBy('name')->pluck('name', 'slug')->toArray())
-                            ->searchable()
-                            ->preload()
                             ->required()
                             ->createOptionForm([
                                 Forms\Components\TextInput::make('name')
@@ -124,17 +120,11 @@ class CourierResource extends Resource
                                 return $vt->slug;
                             }),
 
-                        Forms\Components\FileUpload::make('photo_path')
-                            ->label('Photo du livreur (Portrait)')
-                            ->image()
-                            ->disk('public')
-                            ->directory('livreurs')
-                            ->maxSize(2048)
-                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                            ->imageEditor()
-                            ->previewable()
-                            ->columnSpanFull()
-                            ->helperText('Formats acceptés : JPG, PNG, WEBP (Max : 2 Mo). Aperçu instantané avant validation.'),
+                        ImageUploadField::make(
+                            'photo_path',
+                            'livreurs',
+                            'Photo du livreur (Portrait)'
+                        )->columnSpanFull(),
 
                         Forms\Components\TextInput::make('vehicle_plate')
                             ->label('Numéro d\'immatriculation du véhicule')

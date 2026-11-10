@@ -4,6 +4,7 @@ namespace App\Filament\Resources\MerchantResource\Pages;
 
 use App\Filament\Resources\MerchantResource;
 use App\Models\City;
+use App\Models\MerchantCategory;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -17,6 +18,10 @@ class CreateMerchant extends CreateRecord
             $city = City::find($data['city_id'] ?? null);
             $data['lat'] = $city?->center_lat ?? 6.8770;
             $data['lng'] = $city?->center_lng ?? -6.4502;
+        }
+
+        if (empty($data['emoji']) && !empty($data['category'])) {
+            $data['emoji'] = MerchantCategory::where('slug', $data['category'])->value('emoji') ?? '🏪';
         }
 
         return $data;

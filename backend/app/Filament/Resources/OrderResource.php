@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\{ActivityLog, City, Courier, Order};
 use Filament\Forms;
@@ -41,49 +42,62 @@ class OrderResource extends Resource
                 Forms\Components\Section::make('Informations Générales')
                     ->description('Détails de la commande et intervenants')
                     ->schema([
-                        Forms\Components\Select::make('city_id')
+                        // Listes déroulantes en haut avec recherche live et tri alphabétique
+                        SearchableSelect::make('city_id')
                             ->label('Ville')
                             ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->searchable()
-                            ->preload()
                             ->required(),
-                        Forms\Components\Select::make('status')
+                        SearchableSelect::make('status')
                             ->label('Statut de la commande')
-                            ->options([
+                            ->options(SearchableSelect::sortedOptions([
                                 'accepted' => 'Acceptée',
                                 'cancelled' => 'Annulée',
-                                'delivering' => 'En cours de livraison',
-                                'delivered' => 'Livrée',
                                 'pending' => 'En attente',
+                                'delivering' => 'En cours de livraison',
                                 'preparing' => 'En préparation',
+                                'delivered' => 'Livrée',
                                 'ready' => 'Prête',
-                            ])
-                            ->searchable()
-                            ->native(false)
+                            ]))
                             ->required()
                             ->default('pending'),
-                        Forms\Components\Select::make('client_id')
+                        SearchableSelect::make('client_id')
                             ->label('Client')
                             ->relationship('client', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->searchable()
-                            ->preload()
                             ->required(),
-                        Forms\Components\Select::make('merchant_id')
+                        SearchableSelect::make('merchant_id')
                             ->label('Commerce')
                             ->relationship('merchant', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->searchable()
-                            ->preload()
                             ->required(),
-                        Forms\Components\Select::make('courier_id')
+                        SearchableSelect::make('courier_id')
                             ->label('Livreur')
                             ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => $query->with('user')->orderBy('id'))
-                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}") . ($record->user?->phone ? " ({$record->user->phone})" : ''))
-                            ->searchable()
-                            ->preload(),
+                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}") . ($record->user?->phone ? " ({$record->user->phone})" : '')),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Détails Financiers (F CFA)')
                     ->schema([
+                        // Listes déroulantes remontées en haut de la section
+                        SearchableSelect::make('payment_method')
+                            ->label('Mode de règlement')
+                            ->options(SearchableSelect::sortedOptions([
+                                'cash' => 'Espèces à la livraison',
+                                'moov' => 'Moov Money',
+                                'mtn' => 'MTN Mobile Money',
+                                'orange' => 'Orange Money',
+                                'wallet' => 'Portefeuille GoLivreur',
+                                'wave' => 'Wave Mobile Money',
+                            ]))
+                            ->required(),
+                        SearchableSelect::make('payment_status')
+                            ->label('Statut du paiement')
+                            ->options(SearchableSelect::sortedOptions([
+                                'failed' => 'Échoué',
+                                'pending' => 'En attente',
+                                'paid' => 'Payé',
+                            ]))
+                            ->required(),
+                        Forms\Components\TextInput::make('payment_reference')
+                            ->label('Référence de paiement'),
                         Forms\Components\TextInput::make('products_total')
                             ->label('Total articles (F CFA)')
                             ->numeric()
@@ -104,31 +118,6 @@ class OrderResource extends Resource
                             ->label('Rémunération livreur (F CFA)')
                             ->numeric()
                             ->required(),
-                        Forms\Components\Select::make('payment_method')
-                            ->label('Mode de règlement')
-                            ->options([
-                                'cash' => 'Espèces à la livraison',
-                                'moov' => 'Moov Money',
-                                'mtn' => 'MTN Mobile Money',
-                                'orange' => 'Orange Money',
-                                'wallet' => 'Portefeuille GoLivreur',
-                                'wave' => 'Wave Mobile Money',
-                            ])
-                            ->searchable()
-                            ->native(false)
-                            ->required(),
-                        Forms\Components\Select::make('payment_status')
-                            ->label('Statut du paiement')
-                            ->options([
-                                'failed' => 'Échoué',
-                                'paid' => 'Payé',
-                                'pending' => 'En attente',
-                            ])
-                            ->searchable()
-                            ->native(false)
-                            ->required(),
-                        Forms\Components\TextInput::make('payment_reference')
-                            ->label('Référence de paiement'),
                     ])->columns(3),
 
                 Forms\Components\Section::make('Sécurité & Livraison')

@@ -92,15 +92,44 @@ class _MerchantDetailScreenState extends ConsumerState<MerchantDetailScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(
-                          merchant.name,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: GoLivreurTheme.textePrincipal,
-                          ),
+                        child: Row(
+                          children: [
+                            if (merchant.logoUrl != null && merchant.logoUrl!.isNotEmpty) ...[
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.network(
+                                  merchant.logoUrl!,
+                                  width: 36,
+                                  height: 36,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Text(
+                                    merchant.emoji ?? '🏪',
+                                    style: const TextStyle(fontSize: 24),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                            ] else if (merchant.emoji != null && merchant.emoji!.trim().isNotEmpty) ...[
+                              Text(
+                                merchant.emoji!,
+                                style: const TextStyle(fontSize: 24),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Expanded(
+                              child: Text(
+                                merchant.name,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: GoLivreurTheme.textePrincipal,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
@@ -126,7 +155,7 @@ class _MerchantDetailScreenState extends ConsumerState<MerchantDetailScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${merchant.category.toUpperCase()} • ${merchant.address}',
+                    '${(merchant.categoryName ?? merchant.category).toUpperCase()} • ${merchant.address}',
                     style: const TextStyle(
                       fontSize: 14,
                       color: GoLivreurTheme.texteSecondaire,

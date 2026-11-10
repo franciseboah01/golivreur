@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\RefundResource\Pages;
 
+use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\RefundResource;
 use App\Models\{ActivityLog, Order, Parcel, User};
 use App\Services\{SettingsService, WalletService};
@@ -24,30 +25,32 @@ class ListRefunds extends ListRecords
                 ->modalHeading('Validation d\'un Remboursement ou d\'une Indemnisation')
                 ->modalDescription('Contrôle strict des plafonds selon votre rôle (CDC Ch. 8.5 & 10).')
                 ->form([
-                    Forms\Components\Select::make('contexte')
+                    SearchableSelect::make('contexte')
                         ->label('Type d\'opération')
-                        ->options([
+                        ->options(SearchableSelect::sortedOptions([
                             'order'  => 'Commande GoShop (Repas / Courses)',
                             'parcel' => 'Expédition GoColis (Colis endommagé / retard)',
-                        ])
+                        ]))
                         ->required()
                         ->reactive(),
 
-                    Forms\Components\Select::make('order_id')
+                    SearchableSelect::make('order_id')
                         ->label('Commande GoShop concernée')
-                        ->options(fn () => Order::latest()->limit(50)->get()->mapWithKeys(
-                            fn ($o) => [$o->id => "#{$o->order_number} - {$o->total} F CFA ({$o->client?->name})"]
+                        ->options(fn () => SearchableSelect::sortedOptions(
+                            Order::latest()->limit(50)->get()->mapWithKeys(
+                                fn ($o) => [$o->id => "#{$o->order_number} - {$o->total} F CFA ({$o->client?->name})"]
+                            )->toArray()
                         ))
-                        ->searchable()
                         ->visible(fn (Forms\Get $get) => $get('contexte') === 'order')
                         ->required(fn (Forms\Get $get) => $get('contexte') === 'order'),
 
-                    Forms\Components\Select::make('parcel_id')
+                    SearchableSelect::make('parcel_id')
                         ->label('Colis GoColis concerné')
-                        ->options(fn () => Parcel::latest()->limit(50)->get()->mapWithKeys(
-                            fn ($p) => [$p->id => "#{$p->tracking_number} - Déclaré {$p->declared_value} F CFA"]
+                        ->options(fn () => SearchableSelect::sortedOptions(
+                            Parcel::latest()->limit(50)->get()->mapWithKeys(
+                                fn ($p) => [$p->id => "#{$p->tracking_number} - Déclaré {$p->declared_value} F CFA"]
+                            )->toArray()
                         ))
-                        ->searchable()
                         ->visible(fn (Forms\Get $get) => $get('contexte') === 'parcel')
                         ->required(fn (Forms\Get $get) => $get('contexte') === 'parcel'),
 
