@@ -16,29 +16,40 @@ class Courier extends Model
         'user_id',
         'city_id',
         'vehicle_type',
-        'license_plate',
+        'vehicle_plate',
+        'id_card_number',
+        'id_card_photo_url',
+        'driver_license_number',
         'photo_path',
+        'photo_url',
         'is_active',
+        'activated_at',
+        'activated_by',
         'is_online',
-        'is_available',
         'current_lat',
         'current_lng',
-        'last_location_at',
+        'location_updated_at',
+        'consecutive_refusals',
+        'penalty_until',
         'average_rating',
         'total_ratings',
-        'completed_deliveries',
     ];
 
     protected $casts = [
         'is_active'            => 'boolean',
         'is_online'            => 'boolean',
-        'is_available'         => 'boolean',
+        'activated_at'         => 'datetime',
+        'location_updated_at'  => 'datetime',
+        'penalty_until'        => 'datetime',
         'current_lat'          => 'float',
         'current_lng'          => 'float',
-        'last_location_at'     => 'datetime',
+        'consecutive_refusals' => 'integer',
         'average_rating'       => 'float',
         'total_ratings'        => 'integer',
-        'completed_deliveries' => 'integer',
+    ];
+
+    protected $appends = [
+        'photo_url',
     ];
 
     public function getPhotoUrlAttribute(): ?string
@@ -46,7 +57,14 @@ class Courier extends Model
         if (!empty($this->attributes['photo_path'])) {
             return url('storage/' . $this->attributes['photo_path']);
         }
-        return $this->attributes['photo_url'] ?? url('images/placeholder-driver.png');
+
+        if (!empty($this->attributes['photo_url'])) {
+            return $this->attributes['photo_url'];
+        }
+
+        return $this->relationLoaded('user') && $this->user?->photo_url
+            ? $this->user->photo_url
+            : url('images/placeholder-driver.png');
     }
 
     public function user(): BelongsTo

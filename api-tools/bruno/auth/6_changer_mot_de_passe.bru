@@ -1,0 +1,28 @@
+meta {
+  name: 6. Changer mot de passe profil
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{base_url}}/profile/password
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_client}}
+}
+
+body:json {
+  {
+    "current_password": "AncienPassword123",
+    "password": "NouveauPassword123",
+    "password_confirmation": "NouveauPassword123"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}

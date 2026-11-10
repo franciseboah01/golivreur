@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/env_config.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/services/api_client.dart';
+import 'package:image_picker/image_picker.dart';
 
 void _safeIgnore(Future<dynamic>? f) {
   f?.then((_) {}, onError: (_) {});
@@ -12,10 +14,19 @@ class BusinessProfileState {
   final int id;
   final String name;
   final String category;
+  final String categorySlug;
   final String? emoji;
   final String? logoUrl;
   final String? photoUrl;
   final String quarter;
+  final String? description;
+  final String openHoursText;
+  final String ownerName;
+  final String ownerPhone;
+  final String? ownerEmail;
+  final String? ownerPhotoUrl;
+  final String language;
+  final bool notificationsEnabled;
   final bool isOpen;
   final int prepTimeMinutes;
   final double rating;
@@ -26,10 +37,19 @@ class BusinessProfileState {
     this.id = 1,
     this.name = 'Maquis Chez Tantie Adjoua',
     this.category = 'Maquis & Grillades',
+    this.categorySlug = 'maquis',
     this.emoji = '🍖',
     this.logoUrl,
     this.photoUrl,
     this.quarter = 'Quartier Commerce, Daloa',
+    this.description,
+    this.openHoursText = 'Lun - Dim : 08h00 - 22h00',
+    this.ownerName = 'Adjoua Kouassi',
+    this.ownerPhone = '0702010001',
+    this.ownerEmail,
+    this.ownerPhotoUrl,
+    this.language = 'fr',
+    this.notificationsEnabled = true,
     this.isOpen = true,
     this.prepTimeMinutes = 20,
     this.rating = 4.8,
@@ -41,25 +61,46 @@ class BusinessProfileState {
     int? id,
     String? name,
     String? category,
+    String? categorySlug,
     String? emoji,
     String? logoUrl,
     String? photoUrl,
+    String? quarter,
+    String? description,
+    String? openHoursText,
+    String? ownerName,
+    String? ownerPhone,
+    String? ownerEmail,
+    String? ownerPhotoUrl,
+    String? language,
+    bool? notificationsEnabled,
     bool? isOpen,
     int? prepTimeMinutes,
+    double? rating,
+    int? reviewCount,
     double? walletBalance,
   }) {
     return BusinessProfileState(
       id: id ?? this.id,
       name: name ?? this.name,
       category: category ?? this.category,
+      categorySlug: categorySlug ?? this.categorySlug,
       emoji: emoji ?? this.emoji,
       logoUrl: logoUrl ?? this.logoUrl,
       photoUrl: photoUrl ?? this.photoUrl,
-      quarter: quarter,
+      quarter: quarter ?? this.quarter,
+      description: description ?? this.description,
+      openHoursText: openHoursText ?? this.openHoursText,
+      ownerName: ownerName ?? this.ownerName,
+      ownerPhone: ownerPhone ?? this.ownerPhone,
+      ownerEmail: ownerEmail ?? this.ownerEmail,
+      ownerPhotoUrl: ownerPhotoUrl ?? this.ownerPhotoUrl,
+      language: language ?? this.language,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       isOpen: isOpen ?? this.isOpen,
       prepTimeMinutes: prepTimeMinutes ?? this.prepTimeMinutes,
-      rating: rating,
-      reviewCount: reviewCount,
+      rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
       walletBalance: walletBalance ?? this.walletBalance,
     );
   }
@@ -70,23 +111,91 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
 
   BusinessProfileNotifier([this._api]) : super(const BusinessProfileState());
 
+  void _appliquerDonneesProfil(Map<String, dynamic> d) {
+    state = state.copyWith(
+      id: (d['merchant_id'] ?? d['id']) as int? ?? state.id,
+      name: (d['business_name'] ?? d['name']) as String? ?? state.name,
+      categorySlug: d['category'] as String? ?? state.categorySlug,
+      category: d['category_name'] as String? ?? d['category'] as String? ?? state.category,
+      emoji: d['emoji'] as String? ?? state.emoji,
+      logoUrl: GoLivreurEnv.resolveMediaUrl(d['logo_url'] as String?),
+      photoUrl: GoLivreurEnv.resolveMediaUrl((d['merchant_photo_url'] ?? d['photo_url']) as String?),
+      quarter: d['address'] as String? ?? state.quarter,
+      description: d['description'] as String?,
+      openHoursText: (d['open_hours_text'] as String?) ?? state.openHoursText,
+      ownerName: d['name'] as String? ?? state.ownerName,
+      ownerPhone: d['phone'] as String? ?? state.ownerPhone,
+      ownerEmail: d['email'] as String?,
+      ownerPhotoUrl: GoLivreurEnv.resolveMediaUrl(d['photo_url'] as String?),
+      language: d['language'] as String? ?? state.language,
+      notificationsEnabled: d['notifications_enabled'] as bool? ?? state.notificationsEnabled,
+      isOpen: d['is_open'] == true,
+      prepTimeMinutes: d['prep_time_minutes'] as int? ?? state.prepTimeMinutes,
+      rating: (d['average_rating'] as num?)?.toDouble() ?? state.rating,
+      reviewCount: d['total_ratings'] as int? ?? state.reviewCount,
+    );
+  }
+
   Future<void> chargerProfil() async {
     try {
-      final res = await _api!.get('/merchant/status');
-      if (res.statusCode == 200 && res.data['succes'] == true) {
-        final d = res.data['donnees'];
-        state = state.copyWith(
-          id: d['id'] ?? state.id,
-          name: d['name'] ?? state.name,
-          category: d['category_name'] ?? d['category'] ?? state.category,
-          emoji: d['emoji'] as String?,
-          logoUrl: GoLivreurEnv.resolveMediaUrl(d['logo_url'] as String?),
-          photoUrl: GoLivreurEnv.resolveMediaUrl(d['photo_url'] as String?),
-          isOpen: d['is_open'] == true,
-          prepTimeMinutes: d['prep_time_minutes'] ?? state.prepTimeMinutes,
-        );
+      final res = await _api!.get('/merchant/profile');
+      if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
+        _appliquerDonneesProfil(res.data['donnees'] as Map<String, dynamic>);
       }
     } catch (_) {}
+  }
+
+  Future<(bool, String?)> mettreAJourProfil({
+    required String ownerName,
+    required String ownerPhone,
+    String? ownerEmail,
+    required String businessName,
+    required String categorySlug,
+    String? emoji,
+    required String address,
+    String? description,
+    String? openHoursText,
+    String language = 'fr',
+    bool notificationsEnabled = true,
+    XFile? logoFile,
+    XFile? merchantPhotoFile,
+    XFile? ownerPhotoFile,
+  }) async {
+    try {
+      final files = <String, XFile>{
+        if (logoFile != null) 'logo': logoFile,
+        if (merchantPhotoFile != null) 'merchant_photo': merchantPhotoFile,
+        if (ownerPhotoFile != null) 'photo': ownerPhotoFile,
+      };
+
+      final res = await _api!.uploadMultipart(
+        '/merchant/profile',
+        fields: {
+          'name': ownerName,
+          'phone': ownerPhone,
+          'email': ownerEmail ?? '',
+          'business_name': businessName,
+          'category': categorySlug,
+          'emoji': emoji ?? '',
+          'address': address,
+          'description': description ?? '',
+          'open_hours': openHoursText ?? '',
+          'language': language,
+          'notifications_enabled': notificationsEnabled ? '1' : '0',
+        },
+        files: files.isNotEmpty ? files : null,
+      );
+
+      if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
+        _appliquerDonneesProfil(res.data['donnees'] as Map<String, dynamic>);
+        return (true, null);
+      }
+      return (false, 'Réponse inattendue du serveur.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Impossible de mettre à jour le profil commerce.');
+    }
   }
 
   void toggleOpenStatus() {

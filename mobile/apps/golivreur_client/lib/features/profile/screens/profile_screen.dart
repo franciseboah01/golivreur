@@ -1,15 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/config/env_config.dart';
 import '../../auth/providers/auth_provider.dart';
+import 'edit_client_profile_screen.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(authProvider.notifier).chargerProfil();
+    });
+  }
+
+  Future<void> _openEditProfile() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EditClientProfileScreen()),
+    );
+    if (mounted) {
+      await ref.read(authProvider.notifier).chargerProfil();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
+    final photoUrl = GoLivreurEnv.resolveMediaUrl(user?.photoUrl);
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -17,80 +42,110 @@ class ProfileScreen extends ConsumerWidget {
         title: const Text('Mon Profil'),
         backgroundColor: Colors.white,
         elevation: 0.5,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // ─── En-tête Utilisateur ─────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: GoLivreurTheme.bordure),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: GoLivreurTheme.primaire.withValues(alpha: 0.15),
-                  child: const Icon(Icons.person, color: GoLivreurTheme.primaire, size: 36),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user?.name ?? 'Francis Client',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: GoLivreurTheme.textePrincipal,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '+225 ${user?.phone ?? "0701000001"}',
-                        style: const TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 14),
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Daloa, Côte d\'Ivoire',
-                        style: TextStyle(color: GoLivreurTheme.secondaire, fontSize: 12, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, color: GoLivreurTheme.texteSecondaire),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Modification du profil disponible prochainement')),
-                    );
-                  },
-                ),
-              ],
-            ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: GoLivreurTheme.texteSecondaire),
+            tooltip: 'Actualiser le profil',
+            onPressed: () => ref.read(authProvider.notifier).chargerProfil(),
           ),
-          const SizedBox(height: 20),
-
-          // ─── Menu Options ────────────────────────────────────────────────
-          Material(
-            color: Colors.white,
-            clipBehavior: Clip.antiAlias,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: GoLivreurTheme.bordure),
+        ],
+      ),
+      body: RefreshIndicator(
+        color: GoLivreurTheme.primaire,
+        onRefresh: () => ref.read(authProvider.notifier).chargerProfil(),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // ─── En-tête Utilisateur ───────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: GoLivreurTheme.bordure),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 32,
+                    backgroundColor: GoLivreurTheme.primaire.withValues(alpha: 0.15),
+                    backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) ? NetworkImage(photoUrl) : null,
+                    child: (photoUrl == null || photoUrl.isEmpty)
+                        ? const Icon(Icons.person, color: GoLivreurTheme.primaire, size: 36)
+                        : null,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.name ?? 'Client GoLivreur',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: GoLivreurTheme.textePrincipal,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '+225 ${user?.phone ?? "0701000001"}',
+                          style: const TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 14),
+                        ),
+                        if (user?.email != null && user!.email!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            user.email!,
+                            style: const TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 12),
+                          ),
+                        ],
+                        const SizedBox(height: 2),
+                        Text(
+                          user?.defaultAddress?.isNotEmpty == true
+                              ? user!.defaultAddress!
+                              : '${user?.cityName ?? "Daloa"}, Côte d\'Ivoire',
+                          style: const TextStyle(color: GoLivreurTheme.secondaire, fontSize: 12, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, color: GoLivreurTheme.primaire),
+                    tooltip: 'Modifier mon profil',
+                    onPressed: _openEditProfile,
+                  ),
+                ],
+              ),
             ),
-            child: Column(
-              children: [
-                _buildTile(
-                  icon: Icons.location_on_outlined,
-                  title: 'Mes adresses de livraison favorites',
-                  subtitle: 'Quartier Résidentiel, Lobia, Hublot...',
-                  onTap: () => _showAddressesDialog(context),
-                ),
+            const SizedBox(height: 20),
+
+            // ─── Menu Options ──────────────────────────────────────────────
+            Material(
+              color: Colors.white,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: GoLivreurTheme.bordure),
+              ),
+              child: Column(
+                children: [
+                  _buildTile(
+                    icon: Icons.manage_accounts_outlined,
+                    title: 'Modifier mon profil',
+                    subtitle: 'Nom, téléphone, email, photo et adresse par défaut',
+                    onTap: _openEditProfile,
+                  ),
+                  const Divider(height: 1),
+                  _buildTile(
+                    icon: Icons.location_on_outlined,
+                    title: 'Mes adresses de livraison favorites',
+                    subtitle: user?.defaultAddress?.isNotEmpty == true
+                        ? user!.defaultAddress!
+                        : 'Quartier Résidentiel, Lobia, Hublot...',
+                    onTap: () => _showAddressesDialog(context),
+                  ),
                 const Divider(height: 1),
                 _buildTile(
                   icon: Icons.notifications_none,
@@ -152,6 +207,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

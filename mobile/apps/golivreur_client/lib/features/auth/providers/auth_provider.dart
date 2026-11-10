@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/services/api_client.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../config/env.dart';
 
 final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
@@ -208,6 +210,60 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
     }
     return false;
+  }
+
+  Future<void> chargerProfil() async {
+    try {
+      final res = await _apiClient.get('/client/profile');
+      if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
+        final user = UserModel.fromJson(res.data['donnees'] as Map<String, dynamic>);
+        state = state.copyWith(
+          status: AuthStatus.authenticated,
+          user: user,
+          phoneNumber: user.phone,
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<(bool, String?)> mettreAJourProfil({
+    required String name,
+    required String phone,
+    String? email,
+    String? defaultAddress,
+    String language = 'fr',
+    bool notificationsEnabled = true,
+    XFile? photo,
+  }) async {
+    try {
+      final res = await _apiClient.uploadMultipart(
+        '/client/profile',
+        fields: {
+          'name': name,
+          'phone': phone,
+          'email': email ?? '',
+          'default_address': defaultAddress ?? '',
+          'language': language,
+          'notifications_enabled': notificationsEnabled ? '1' : '0',
+        },
+        files: photo != null ? {'photo': photo} : null,
+      );
+
+      if (res.statusCode == 200 && res.data['succes'] == true) {
+        final user = UserModel.fromJson(res.data['donnees'] as Map<String, dynamic>);
+        state = state.copyWith(
+          status: AuthStatus.authenticated,
+          user: user,
+          phoneNumber: user.phone,
+        );
+        return (true, null);
+      }
+      return (false, 'Réponse inattendue du serveur.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Impossible de mettre à jour le profil.');
+    }
   }
 
   void deconnecterLocalement() async {

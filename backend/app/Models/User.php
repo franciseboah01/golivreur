@@ -38,8 +38,9 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
 
     protected $fillable = [
         'name', 'phone', 'role', 'role_habilitation_id', 'city_id',
+        'default_address', 'language', 'notifications_enabled',
         'device_token', 'session_token', 'is_active',
-        'phone_verified_at', 'avatar_url',
+        'phone_verified_at', 'avatar_url', 'photo_path',
         'email', 'password', 'two_factor_enabled',
         'last_login_ip', 'last_login_at',
     ];
@@ -49,11 +50,28 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
     ];
 
     protected $casts = [
-        'is_active'           => 'boolean',
-        'two_factor_enabled'  => 'boolean',
-        'phone_verified_at'   => 'datetime',
-        'last_login_at'       => 'datetime',
+        'is_active'              => 'boolean',
+        'two_factor_enabled'     => 'boolean',
+        'notifications_enabled'  => 'boolean',
+        'phone_verified_at'      => 'datetime',
+        'last_login_at'          => 'datetime',
     ];
+
+    protected $appends = [
+        'photo_url',
+    ];
+
+    /**
+     * URL publique de la photo de profil utilisateur.
+     */
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (!empty($this->attributes['photo_path'])) {
+            return url('storage/' . $this->attributes['photo_path']);
+        }
+
+        return $this->attributes['avatar_url'] ?? null;
+    }
 
     public function canAccessPanel(Panel $panel): bool
     {

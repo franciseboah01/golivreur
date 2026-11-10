@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Client\ClientController;
 use App\Http\Controllers\Api\V1\Driver\DriverController;
 use App\Http\Controllers\Api\V1\GoColis\ParcelController;
 use App\Http\Controllers\Api\V1\Merchant\MerchantController;
+use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RatingController;
 use App\Http\Controllers\Api\V1\WebhookController;
 use Illuminate\Support\Facades\Route;
@@ -44,6 +45,14 @@ Route::prefix('client')->group(function () {
     Route::get('merchants/{merchant}/catalog', [ClientController::class, 'merchantCatalog']);
 });
 Route::get('categories', [ClientController::class, 'categories']);
+Route::get('vehicle-types', fn () => response()->json([
+    'succes'  => true,
+    'donnees' => \App\Models\VehicleType::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'description']),
+]));
+Route::get('cities', fn () => response()->json([
+    'succes'  => true,
+    'donnees' => \App\Models\City::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+]));
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
 Route::prefix('webhooks')->group(function () {
@@ -54,9 +63,16 @@ Route::prefix('webhooks')->group(function () {
 // ─── Routes protégées par JWT ─────────────────────────────────────────────────
 Route::middleware('auth:api')->group(function () {
 
+    // ─── Profil unifié & mot de passe ─────────────────────────────────────────
+    Route::get('profile', [ProfileController::class, 'show']);
+    Route::put('profile/password', [ProfileController::class, 'updatePassword']);
+    Route::get('profile/{user}', [ProfileController::class, 'showForUser']);
+    Route::match(['put', 'post'], 'profile/{user}', [ProfileController::class, 'updateForUser']);
+
     // ─── Client (GoShop + GoColis) ────────────────────────────────────────────
     Route::prefix('client')->middleware('role:client')->group(function () {
-        Route::get('profile', fn () => response()->json(['succes' => true, 'donnees' => auth()->user()]));
+        Route::get('profile', [ProfileController::class, 'showClient']);
+        Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateClient']);
         Route::post('orders', [ClientController::class, 'createOrder']);
         Route::get('orders', [ClientController::class, 'orders']);
         Route::get('orders/{order}', [ClientController::class, 'showOrder']);
@@ -67,8 +83,15 @@ Route::middleware('auth:api')->group(function () {
         Route::post('ratings', [RatingController::class, 'store']);
     });
 
-    // ─── Merchant (GoShop Business) ──────────────────────────────────────────
+    // ─── Merchant / Business (GoShop Business) ───────────────────────────────
+    Route::prefix('business')->middleware('role:merchant')->group(function () {
+        Route::get('profile', [ProfileController::class, 'showBusiness']);
+        Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateBusiness']);
+    });
+
     Route::prefix('merchant')->middleware('role:merchant')->group(function () {
+        Route::get('profile', [ProfileController::class, 'showBusiness']);
+        Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateBusiness']);
         Route::get('status', [MerchantController::class, 'status']);
         Route::post('status', [MerchantController::class, 'toggleStatus']);
         Route::get('orders', [MerchantController::class, 'orders']);
@@ -82,7 +105,9 @@ Route::middleware('auth:api')->group(function () {
     });
 
     // ─── Driver (GoShop & GoColis Courier) ────────────────────────────────────
-    Route::prefix('driver')->middleware('role:driver')->group(function () {
+    Route::prefix('driver')->middleware('role:driver,courier')->group(function () {
+        Route::get('profile', [ProfileController::class, 'showDriver']);
+        Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateDriver']);
         Route::post('availability', [DriverController::class, 'availability']);
         Route::post('location', [DriverController::class, 'updateLocation']);
         Route::get('courses', [DriverController::class, 'courses']);

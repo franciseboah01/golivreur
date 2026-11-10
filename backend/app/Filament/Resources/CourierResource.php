@@ -132,7 +132,12 @@ class CourierResource extends Resource
                             ->maxLength(30),
 
                         Forms\Components\TextInput::make('id_card_number')
-                            ->label('N° Pièce d\'identité (CNI / Passeport / Permis)')
+                            ->label('N° Pièce d\'identité (CNI / Passeport)')
+                            ->maxLength(50),
+
+                        Forms\Components\TextInput::make('driver_license_number')
+                            ->label('N° Permis de conduire')
+                            ->placeholder('Ex: CI-DL-987654')
                             ->maxLength(50),
                     ])->columns(2),
 

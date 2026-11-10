@@ -165,6 +165,13 @@ class MerchantResource extends Resource
                             ->label('Description de la boutique / spécialités')
                             ->rows(2)
                             ->columnSpanFull(),
+
+                        Forms\Components\KeyValue::make('open_hours')
+                            ->label('Horaires d\'ouverture')
+                            ->keyLabel('Jour / Période')
+                            ->valueLabel('Plage horaire (ex: 08:00 - 22:00)')
+                            ->addActionLabel('Ajouter une plage')
+                            ->columnSpanFull(),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Paramètres d\'Exploitation & Commission')

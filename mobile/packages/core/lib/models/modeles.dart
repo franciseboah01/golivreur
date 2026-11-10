@@ -10,34 +10,88 @@ class UserModel {
   final int id;
   final String name;
   final String phone;
+  final String? email;
   final String role;
   final int? cityId;
+  final String? cityName;
+  final String? defaultAddress;
+  final String language;
+  final bool notificationsEnabled;
   final String? avatarUrl;
+  final String? photoUrl;
   final bool isActive;
 
   const UserModel({
     required this.id,
     required this.name,
     required this.phone,
+    this.email,
     required this.role,
     this.cityId,
+    this.cityName,
+    this.defaultAddress,
+    this.language = 'fr',
+    this.notificationsEnabled = true,
     this.avatarUrl,
+    this.photoUrl,
     required this.isActive,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
-        id: json['id'] as int,
-        name: json['name'] as String,
-        phone: json['phone'] as String,
-        role: json['role'] as String,
-        cityId: json['city_id'] as int?,
-        avatarUrl: json['avatar_url'] as String?,
-        isActive: json['is_active'] as bool? ?? true,
-      );
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    final resolvedPhoto = GoLivreurEnv.resolveMediaUrl(
+      (json['photo_url'] as String?) ?? (json['avatar_url'] as String?),
+    );
+
+    return UserModel(
+      id: json['id'] as int,
+      name: json['name'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      email: json['email'] as String?,
+      role: json['role'] as String? ?? 'client',
+      cityId: json['city_id'] as int?,
+      cityName: json['city_name'] as String?,
+      defaultAddress: json['default_address'] as String?,
+      language: json['language'] as String? ?? 'fr',
+      notificationsEnabled: json['notifications_enabled'] as bool? ?? true,
+      avatarUrl: resolvedPhoto,
+      photoUrl: resolvedPhoto,
+      isActive: json['is_active'] as bool? ?? true,
+    );
+  }
+
+  UserModel copyWith({
+    String? name,
+    String? phone,
+    String? email,
+    int? cityId,
+    String? cityName,
+    String? defaultAddress,
+    String? language,
+    bool? notificationsEnabled,
+    String? avatarUrl,
+    String? photoUrl,
+    bool? isActive,
+  }) {
+    return UserModel(
+      id: id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      role: role,
+      cityId: cityId ?? this.cityId,
+      cityName: cityName ?? this.cityName,
+      defaultAddress: defaultAddress ?? this.defaultAddress,
+      language: language ?? this.language,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      photoUrl: photoUrl ?? this.photoUrl,
+      isActive: isActive ?? this.isActive,
+    );
+  }
 
   bool get estClient   => role == 'client';
   bool get estMerchant => role == 'merchant';
-  bool get estDriver   => role == 'driver';
+  bool get estDriver   => role == 'driver' || role == 'courier';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

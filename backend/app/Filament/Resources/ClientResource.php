@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Components\ImageUploadField;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ClientResource\Pages;
 use App\Models\{ActivityLog, User};
@@ -56,12 +57,31 @@ class ClientResource extends Resource
                             ->label('Ville de rattachement')
                             ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
                             ->required(),
+                        SearchableSelect::make('language')
+                            ->label('Langue préférée')
+                            ->options(SearchableSelect::sortedOptions([
+                                'en' => 'Anglais (EN)',
+                                'fr' => 'Français (FR)',
+                            ]))
+                            ->default('fr'),
                         Forms\Components\TextInput::make('name')
                             ->label('Nom complet')
                             ->required(),
                         Forms\Components\TextInput::make('phone')
                             ->label('Numéro de téléphone')
                             ->required(),
+                        Forms\Components\TextInput::make('email')
+                            ->label('Adresse email')
+                            ->email()
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('default_address')
+                            ->label('Adresse de livraison par défaut')
+                            ->maxLength(255),
+                        ImageUploadField::make('photo_path', 'profils', 'Photo de profil')
+                            ->columnSpanFull(),
+                        Forms\Components\Toggle::make('notifications_enabled')
+                            ->label('Notifications activées')
+                            ->default(true),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Compte Actif')
                             ->required(),
@@ -73,6 +93,12 @@ class ClientResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\ImageColumn::make('photo_path')
+                    ->label('Photo')
+                    ->disk('public')
+                    ->circular()
+                    ->placeholder('-'),
+
                 Tables\Columns\TextColumn::make('name')
                     ->label('Client')
                     ->weight('bold')
@@ -82,6 +108,16 @@ class ClientResource extends Resource
                     ->label('Téléphone')
                     ->searchable()
                     ->copyable(),
+
+                Tables\Columns\TextColumn::make('email')
+                    ->label('Email')
+                    ->searchable()
+                    ->placeholder('-'),
+
+                Tables\Columns\TextColumn::make('default_address')
+                    ->label('Adresse par défaut')
+                    ->limit(30)
+                    ->placeholder('-'),
 
                 Tables\Columns\TextColumn::make('city.name')
                     ->label('Ville')
@@ -110,6 +146,8 @@ class ClientResource extends Resource
                     ->relationship('city', 'name'),
             ])
             ->actions([
+                Tables\Actions\ViewAction::make()->label('Détail'),
+                Tables\Actions\EditAction::make()->label('Modifier'),
                 Tables\Actions\Action::make('toggleActive')
                     ->label(fn (User $record): string => $record->is_active ? 'Désactiver' : 'Réactiver')
                     ->icon(fn (User $record): string => $record->is_active ? 'heroicon-m-no-symbol' : 'heroicon-m-check-circle')

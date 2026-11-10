@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import '../config/env_config.dart';
 
 /// Client HTTP Dio configuré pour l'API GoLivreur.
@@ -152,6 +153,34 @@ class ApiClient {
     );
   }
 
+  /// Upload multi-plateforme (Chrome Web, Android, iOS, Desktop) avec champs texte + fichiers XFile.
+  Future<Response<T>> uploadMultipart<T>(
+    String path, {
+    required Map<String, dynamic> fields,
+    Map<String, XFile>? files,
+    String method = 'PUT',
+  }) async {
+    final map = <String, dynamic>{
+      ...fields,
+      if (method.toUpperCase() != 'POST') '_method': method.toUpperCase(),
+    };
+
+    if (files != null) {
+      for (final entry in files.entries) {
+        final bytes = await entry.value.readAsBytes();
+        final fileName = entry.value.name.isNotEmpty ? entry.value.name : '${entry.key}.jpg';
+        map[entry.key] = MultipartFile.fromBytes(bytes, filename: fileName);
+      }
+    }
+
+    final formData = FormData.fromMap(map);
+    return _dio.post<T>(
+      path,
+      data: formData,
+      options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+    );
+  }
+
   /// Gestion centralisée des erreurs — retourne un message lisible en français.
   static String messageErreur(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout ||
@@ -166,12 +195,23 @@ class ApiClient {
     }
 
     final statusCode = e.response?.statusCode;
-    final message = e.response?.data?['message'];
+    final data = e.response?.data;
+    String? message = data is Map ? data['message'] as String? : null;
+
+    if (data is Map && data['errors'] is Map) {
+      final errors = data['errors'] as Map;
+      if (errors.isNotEmpty) {
+        final firstVal = errors.values.first;
+        if (firstVal is List && firstVal.isNotEmpty) {
+          message = firstVal.first.toString();
+        }
+      }
+    }
 
     return switch (statusCode) {
       400 => message ?? 'Données invalides.',
       401 => 'Session expirée. Veuillez vous reconnecter.',
-      403 => 'Vous n\'avez pas les droits pour cette action.',
+      403 => message ?? 'Vous n\'avez pas les droits pour cette action.',
       404 => 'Ressource introuvable.',
       409 => message ?? 'Conflit de données.',
       422 => message ?? 'Données invalides.',

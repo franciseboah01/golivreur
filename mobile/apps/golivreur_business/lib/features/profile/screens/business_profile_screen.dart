@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/config/env_config.dart';
 import '../../business/providers/business_provider.dart';
 import '../../auth/screens/business_login_screen.dart';
+import 'edit_business_profile_screen.dart';
 
 /// Écran "Mon Profil" & Menus d'Accès Rapide — GoLivreur Business.
 class BusinessProfileScreen extends ConsumerStatefulWidget {
@@ -15,13 +17,30 @@ class BusinessProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
-  bool _isOpen = true;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(businessProfileProvider.notifier).chargerProfil();
+    });
+  }
+
+  Future<void> _openEditProfile() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EditBusinessProfileScreen()),
+    );
+    if (mounted) {
+      await ref.read(businessProfileProvider.notifier).chargerProfil();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final profile = ref.watch(businessProfileProvider);
     final orders = ref.watch(businessOrdersProvider);
     final pendingCount = orders.where((o) => o.status == BusinessOrderStatus.pending).length;
     final totalRevenue = orders.fold<double>(0, (sum, o) => sum + o.totalAmount);
+    final logoUrl = GoLivreurEnv.resolveMediaUrl(profile.logoUrl);
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -30,6 +49,11 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, color: Color(0xFF2E75B6)),
+            tooltip: 'Modifier mon profil',
+            onPressed: _openEditProfile,
+          ),
           IconButton(
             icon: const Icon(Icons.help_outline, color: GoLivreurTheme.texteSecondaire),
             tooltip: 'Support Partenaires',
@@ -41,138 +65,157 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // ─── En-tête Commerce Partenaire ────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: GoLivreurTheme.bordure),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E75B6).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
+      body: RefreshIndicator(
+        color: const Color(0xFF2E75B6),
+        onRefresh: () => ref.read(businessProfileProvider.notifier).chargerProfil(),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // ─── En-tête Commerce Partenaire ──────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: GoLivreurTheme.bordure),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E75B6).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: (logoUrl != null && logoUrl.isNotEmpty)
+                        ? Image.network(
+                            logoUrl,
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _buildStoreFallback(profile.emoji),
+                          )
+                        : _buildStoreFallback(profile.emoji),
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.storefront_rounded,
-                      color: Color(0xFF2E75B6),
-                      size: 36,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          profile.name,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: GoLivreurTheme.textePrincipal,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Gérant : ${profile.ownerName} • +225 ${profile.ownerPhone}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: GoLivreurTheme.texteSecondaire,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on, size: 14, color: GoLivreurTheme.primaire),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                profile.quarter,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: GoLivreurTheme.textePrincipal,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, color: Color(0xFF2E75B6)),
+                    tooltip: 'Modifier mon profil',
+                    onPressed: _openEditProfile,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // ─── Statut Boutique (Ouvert / Fermé en direct) ───────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: profile.isOpen ? Colors.green.shade50 : Colors.red.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: profile.isOpen ? Colors.green.shade300 : Colors.red.shade300,
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      const Text(
-                        'Maquis Chez Tantie Adjoua',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: GoLivreurTheme.textePrincipal,
-                        ),
+                      Icon(
+                        profile.isOpen ? Icons.check_circle : Icons.pause_circle_filled,
+                        color: profile.isOpen ? Colors.green : Colors.red,
+                        size: 24,
                       ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Gérant : Adjoua Kouassi • +225 0702010001',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: GoLivreurTheme.texteSecondaire,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.location_on, size: 14, color: GoLivreurTheme.primaire),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Quartier Commerce, Daloa',
+                          Text(
+                            profile.isOpen ? 'Boutique Ouverte' : 'Boutique Fermée',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: profile.isOpen ? Colors.green.shade900 : Colors.red.shade900,
+                            ),
+                          ),
+                          Text(
+                            profile.isOpen ? 'Visible par les clients à Daloa' : 'Commandes suspendues temporairement',
                             style: TextStyle(
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: GoLivreurTheme.textePrincipal,
+                              color: profile.isOpen ? Colors.green.shade700 : Colors.red.shade700,
                             ),
                           ),
                         ],
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // ─── Statut Boutique (Ouvert / Fermé en direct) ─────────────────
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: _isOpen ? Colors.green.shade50 : Colors.red.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _isOpen ? Colors.green.shade300 : Colors.red.shade300,
+                  Switch(
+                    value: profile.isOpen,
+                    activeThumbColor: Colors.green,
+                    activeTrackColor: Colors.green.withValues(alpha: 0.5),
+                    onChanged: (val) {
+                      ref.read(businessProfileProvider.notifier).toggleOpenStatus();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(val ? '🟢 Votre boutique accepte maintenant les commandes.' : '🔴 Votre boutique est fermée.'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      _isOpen ? Icons.check_circle : Icons.pause_circle_filled,
-                      color: _isOpen ? Colors.green : Colors.red,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _isOpen ? 'Boutique Ouverte' : 'Boutique Fermée',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: _isOpen ? Colors.green.shade900 : Colors.red.shade900,
-                          ),
-                        ),
-                        Text(
-                          _isOpen ? 'Visible par les clients à Daloa' : 'Commandes suspendues temporairement',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _isOpen ? Colors.green.shade700 : Colors.red.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                Switch(
-                  value: _isOpen,
-                  activeThumbColor: Colors.green,
-                  activeTrackColor: Colors.green.withValues(alpha: 0.5),
-                  onChanged: (val) {
-                    setState(() => _isOpen = val);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(val ? '🟢 Votre boutique accepte maintenant les commandes.' : '🔴 Votre boutique est fermée.'),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 20),
 
           // ─── MENUS D'ACCÈS RAPIDE ───────────────────────────────────────
@@ -248,11 +291,19 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
             child: Column(
               children: [
                 ListTile(
+                  leading: const Icon(Icons.manage_accounts_outlined, color: Color(0xFF2E75B6)),
+                  title: const Text('Modifier mon profil'),
+                  subtitle: const Text('Commerce, catégorie, emoji, logo, horaires et gérant'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _openEditProfile,
+                ),
+                const Divider(height: 1),
+                ListTile(
                   leading: const Icon(Icons.schedule, color: GoLivreurTheme.texteSecondaire),
                   title: const Text('Horaires de livraison'),
-                  subtitle: const Text('Lun - Dim : 08h00 - 22h00'),
+                  subtitle: Text(profile.openHoursText),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: _openEditProfile,
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -285,6 +336,22 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
           ),
           const SizedBox(height: 24),
         ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildStoreFallback(String? emoji) {
+    if (emoji != null && emoji.trim().isNotEmpty) {
+      return Center(
+        child: Text(emoji, style: const TextStyle(fontSize: 32)),
+      );
+    }
+    return const Center(
+      child: Icon(
+        Icons.storefront_rounded,
+        color: Color(0xFF2E75B6),
+        size: 36,
       ),
     );
   }

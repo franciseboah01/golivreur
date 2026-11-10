@@ -6,6 +6,7 @@ import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../providers/goshop_provider.dart';
 import 'merchant_detail_screen.dart';
 import 'cart_screen.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../gocolis/screens/gocolis_home_screen.dart';
 import '../../orders/screens/orders_tracking_history_screen.dart';
@@ -997,6 +998,8 @@ class GoShopHomeScreen extends ConsumerWidget {
   }
 
   Widget _buildQuickAccessDrawer(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider).user;
+
     return Drawer(
       child: SafeArea(
         child: Column(
@@ -1048,17 +1051,17 @@ class GoShopHomeScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Ama Kouassi',
-                    style: TextStyle(
+                  Text(
+                    user?.name ?? 'Client GoLivreur',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const Text(
-                    '+225 07 01 00 00 01',
-                    style: TextStyle(
+                  Text(
+                    '+225 ${user?.phone ?? "0701000001"}',
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 13,
                     ),

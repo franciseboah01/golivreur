@@ -1,5 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:golivreur_core/config/env_config.dart';
 import 'package:golivreur_core/services/api_client.dart';
+import 'package:image_picker/image_picker.dart';
 
 void _safeIgnore(Future<dynamic>? f) {
   f?.then((_) {}, onError: (_) {});
@@ -10,7 +13,16 @@ class DriverProfileState {
   final int id;
   final String name;
   final String phone;
+  final String? email;
+  final String? photoUrl;
+  final String vehicleType;
+  final String vehicleTypeName;
   final String motoPlate;
+  final String? idCardNumber;
+  final String? driverLicenseNumber;
+  final String? cityName;
+  final String language;
+  final bool notificationsEnabled;
   final bool isOnline;
   final double walletBalance;
   final double averageRating;
@@ -20,9 +32,18 @@ class DriverProfileState {
 
   const DriverProfileState({
     this.id = 10,
-    this.name = 'Mamadou Touré',
-    this.phone = '0700000003',
-    this.motoPlate = '1234-JK-01 (TVS Apache)',
+    this.name = 'Ouattara Seydou',
+    this.phone = '0703000001',
+    this.email,
+    this.photoUrl,
+    this.vehicleType = 'moto',
+    this.vehicleTypeName = 'Moto / Scooter',
+    this.motoPlate = '1234-JK-01',
+    this.idCardNumber,
+    this.driverLicenseNumber,
+    this.cityName = 'Daloa',
+    this.language = 'fr',
+    this.notificationsEnabled = true,
     this.isOnline = true,
     this.walletBalance = 8450,
     this.averageRating = 4.9,
@@ -32,20 +53,43 @@ class DriverProfileState {
   });
 
   DriverProfileState copyWith({
+    int? id,
+    String? name,
+    String? phone,
+    String? email,
+    String? photoUrl,
+    String? vehicleType,
+    String? vehicleTypeName,
+    String? motoPlate,
+    String? idCardNumber,
+    String? driverLicenseNumber,
+    String? cityName,
+    String? language,
+    bool? notificationsEnabled,
     bool? isOnline,
     double? walletBalance,
+    double? averageRating,
     int? coursesToday,
     double? earningsToday,
     double? earningsWeek,
   }) {
     return DriverProfileState(
-      id: id,
-      name: name,
-      phone: phone,
-      motoPlate: motoPlate,
+      id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      photoUrl: photoUrl ?? this.photoUrl,
+      vehicleType: vehicleType ?? this.vehicleType,
+      vehicleTypeName: vehicleTypeName ?? this.vehicleTypeName,
+      motoPlate: motoPlate ?? this.motoPlate,
+      idCardNumber: idCardNumber ?? this.idCardNumber,
+      driverLicenseNumber: driverLicenseNumber ?? this.driverLicenseNumber,
+      cityName: cityName ?? this.cityName,
+      language: language ?? this.language,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       isOnline: isOnline ?? this.isOnline,
       walletBalance: walletBalance ?? this.walletBalance,
-      averageRating: averageRating,
+      averageRating: averageRating ?? this.averageRating,
       coursesToday: coursesToday ?? this.coursesToday,
       earningsToday: earningsToday ?? this.earningsToday,
       earningsWeek: earningsWeek ?? this.earningsWeek,
@@ -57,6 +101,76 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
   final ApiClient? _api;
 
   DriverProfileNotifier([this._api]) : super(const DriverProfileState());
+
+  void _appliquerDonneesProfil(Map<String, dynamic> d) {
+    state = state.copyWith(
+      id: d['id'] as int? ?? state.id,
+      name: d['name'] as String? ?? state.name,
+      phone: d['phone'] as String? ?? state.phone,
+      email: d['email'] as String?,
+      photoUrl: GoLivreurEnv.resolveMediaUrl(d['photo_url'] as String?),
+      vehicleType: d['vehicle_type'] as String? ?? state.vehicleType,
+      vehicleTypeName: d['vehicle_type_name'] as String? ?? state.vehicleTypeName,
+      motoPlate: (d['vehicle_plate'] as String?) ?? state.motoPlate,
+      idCardNumber: d['id_card_number'] as String?,
+      driverLicenseNumber: d['driver_license_number'] as String?,
+      cityName: d['city_name'] as String? ?? state.cityName,
+      language: d['language'] as String? ?? state.language,
+      notificationsEnabled: d['notifications_enabled'] as bool? ?? state.notificationsEnabled,
+      isOnline: d['is_online'] as bool? ?? state.isOnline,
+      averageRating: (d['average_rating'] as num?)?.toDouble() ?? state.averageRating,
+    );
+  }
+
+  Future<void> chargerProfil() async {
+    try {
+      final res = await _api!.get('/driver/profile');
+      if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
+        _appliquerDonneesProfil(res.data['donnees'] as Map<String, dynamic>);
+      }
+    } catch (_) {}
+  }
+
+  Future<(bool, String?)> mettreAJourProfil({
+    required String name,
+    required String phone,
+    String? email,
+    required String vehicleType,
+    String? vehiclePlate,
+    String? idCardNumber,
+    String? driverLicenseNumber,
+    String language = 'fr',
+    bool notificationsEnabled = true,
+    XFile? photo,
+  }) async {
+    try {
+      final res = await _api!.uploadMultipart(
+        '/driver/profile',
+        fields: {
+          'name': name,
+          'phone': phone,
+          'email': email ?? '',
+          'vehicle_type': vehicleType,
+          'vehicle_plate': vehiclePlate ?? '',
+          'id_card_number': idCardNumber ?? '',
+          'driver_license_number': driverLicenseNumber ?? '',
+          'language': language,
+          'notifications_enabled': notificationsEnabled ? '1' : '0',
+        },
+        files: photo != null ? {'photo': photo} : null,
+      );
+
+      if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
+        _appliquerDonneesProfil(res.data['donnees'] as Map<String, dynamic>);
+        return (true, null);
+      }
+      return (false, 'Réponse inattendue du serveur.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Impossible de mettre à jour le profil.');
+    }
+  }
 
   Future<void> chargerPortefeuille() async {
     try {

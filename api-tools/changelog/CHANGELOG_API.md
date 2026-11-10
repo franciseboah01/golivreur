@@ -91,6 +91,27 @@ ou suppression de champ doit être documenté ICI avant le merge sur `develop`.
 
 ---
 
+## [1.2.0] — 2026-11-10 (Gestion Complète du Profil Mobile : Client, Driver, Business)
+
+### Ajouté
+
+- **Profil Client** (`role:client`) :
+  - `GET /api/v1/client/profile` — Lecture du profil complet (`ClientProfileResource` : `id`, `name`, `phone`, `email`, `city_id`, `city_name`, `default_address`, `language`, `notifications_enabled`, `photo_url`, `is_active`).
+  - `PUT /api/v1/client/profile` *(et `POST` + `_method=PUT` pour multipart)* — Mise à jour nom, téléphone ivoirien, email unique, adresse par défaut, préférences et upload photo (`storage/app/public/profils/`, max 2 Mo, suppression de l'ancienne).
+- **Profil Driver** (`role:driver,courier`) :
+  - `GET /api/v1/driver/profile` — Lecture du profil livreur (`DriverProfileResource` : champs communs + `vehicle_type`, `vehicle_type_name`, `vehicle_plate`, `id_card_number`, `driver_license_number`, `is_online`, `average_rating`, `total_ratings`).
+  - `PUT /api/v1/driver/profile` — Mise à jour infos + véhicule/plaque/permis + photo (`storage/app/public/livreurs/`).
+- **Profil Business** (`role:merchant`) :
+  - `GET /api/v1/business/profile` et `GET /api/v1/merchant/profile` — Lecture (`BusinessProfileResource` : champs gérant + `business_name`, `category`, `category_name`, `emoji`, `logo_url`, `merchant_photo_url`, `address`, `description`, `open_hours`, `open_hours_text`).
+  - `PUT /api/v1/business/profile` et `PUT /api/v1/merchant/profile` — Mise à jour commerce + upload `logo` (`commerces/logos/`), `merchant_photo` (`commerces/`), `photo` (`profils/`).
+- **Profil unifié & Sécurité** :
+  - `GET /api/v1/profile` — Retourne automatiquement le profil selon le rôle JWT.
+  - `GET/PUT /api/v1/profile/{user}` — Contrôlé par `ProfilePolicy` (403 si autre utilisateur).
+  - `PUT /api/v1/profile/password` — Changement de mot de passe avec vérification de `current_password`.
+  - `GET /api/v1/vehicle-types` & `GET /api/v1/cities` — Référentiels actifs pour les formulaires mobiles.
+
+---
+
 ## [1.1.0] — 2026-11-10 (Cohérence Admin ↔ Mobile : Emojis, Logos & Catégories dynamiques)
 
 ### Ajouté

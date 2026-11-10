@@ -1,0 +1,37 @@
+meta {
+  name: 4. Modifier profil Commerce
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{base_url}}/business/profile
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_merchant}}
+}
+
+body:json {
+  {
+    "name": "Adjoua Kouassi",
+    "phone": "0702010001",
+    "business_name": "Maquis Chez Tantie Adjoua",
+    "category": "maquis",
+    "emoji": "🍖",
+    "address": "Quartier Commerce, Daloa",
+    "description": "Poulet braisé, garba et plats ivoiriens",
+    "open_hours": "Lun - Dim : 08h00 - 22h00"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+docs {
+  Met à jour le profil du commerce et de son gérant (supports multipart avec logo, merchant_photo et photo).
+}

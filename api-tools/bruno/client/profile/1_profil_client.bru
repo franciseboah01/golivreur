@@ -1,0 +1,35 @@
+meta {
+  name: 1. Lire et modifier profil Client
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{base_url}}/client/profile
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_client}}
+}
+
+body:json {
+  {
+    "name": "Ama Kouassi",
+    "phone": "0701000001",
+    "email": "ama.kouassi@golivreur.ci",
+    "default_address": "Quartier Résidentiel, Face Maquis Le Baoulé",
+    "language": "fr",
+    "notifications_enabled": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+docs {
+  Met à jour le profil du client authentifié (supports multipart/form-data avec champ photo).
+}

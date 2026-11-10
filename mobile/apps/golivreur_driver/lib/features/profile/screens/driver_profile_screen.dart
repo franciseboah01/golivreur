@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/config/env_config.dart';
 import '../../driver/providers/driver_provider.dart';
 import '../../auth/screens/driver_login_screen.dart';
+import 'edit_driver_profile_screen.dart';
 
 /// Écran "Mon Profil" & Menus d'Accès Rapide — GoLivreur Driver.
 class DriverProfileScreen extends ConsumerStatefulWidget {
@@ -16,9 +18,27 @@ class DriverProfileScreen extends ConsumerStatefulWidget {
 
 class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(driverProfileProvider.notifier).chargerProfil();
+    });
+  }
+
+  Future<void> _openEditProfile() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EditDriverProfileScreen()),
+    );
+    if (mounted) {
+      await ref.read(driverProfileProvider.notifier).chargerProfil();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final profile = ref.watch(driverProfileProvider);
     final activeJob = ref.watch(driverActiveJobProvider);
+    final photoUrl = GoLivreurEnv.resolveMediaUrl(profile.photoUrl);
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -27,6 +47,11 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, color: GoLivreurTheme.secondaire),
+            tooltip: 'Modifier mon profil',
+            onPressed: _openEditProfile,
+          ),
           IconButton(
             icon: const Icon(Icons.help_outline, color: GoLivreurTheme.texteSecondaire),
             tooltip: 'Support Dispatch Daloa',
@@ -38,105 +63,121 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // ─── En-tête Livreur ─────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: GoLivreurTheme.bordure),
-            ),
-            child: Row(
-              children: [
-                Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 32,
-                      backgroundColor: GoLivreurTheme.secondaire.withValues(alpha: 0.15),
-                      child: const Icon(
-                        Icons.two_wheeler,
-                        color: GoLivreurTheme.secondaire,
-                        size: 34,
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: profile.isOnline ? Colors.green : Colors.grey,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      body: RefreshIndicator(
+        color: GoLivreurTheme.secondaire,
+        onRefresh: () => ref.read(driverProfileProvider.notifier).chargerProfil(),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // ─── En-tête Livreur ───────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: GoLivreurTheme.bordure),
+              ),
+              child: Row(
+                children: [
+                  Stack(
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            profile.name,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                              color: GoLivreurTheme.textePrincipal,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(Icons.verified, size: 16, color: Colors.blue),
-                        ],
+                      CircleAvatar(
+                        radius: 32,
+                        backgroundColor: GoLivreurTheme.secondaire.withValues(alpha: 0.15),
+                        backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) ? NetworkImage(photoUrl) : null,
+                        child: (photoUrl == null || photoUrl.isEmpty)
+                            ? const Icon(
+                                Icons.two_wheeler,
+                                color: GoLivreurTheme.secondaire,
+                                size: 34,
+                              )
+                            : null,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Moto : ${profile.motoPlate} • +225 ${profile.phone}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: GoLivreurTheme.texteSecondaire,
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: profile.isOnline ? Colors.green : Colors.grey,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.shade100,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.star, size: 13, color: Colors.amber),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '${profile.averageRating} (${profile.coursesToday} courses)',
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Daloa Centre',
-                            style: TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
-                          ),
-                        ],
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                profile.name,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: GoLivreurTheme.textePrincipal,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.verified, size: 16, color: Colors.blue),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${profile.vehicleTypeName}${profile.motoPlate.isNotEmpty ? " (${profile.motoPlate})" : ""} • +225 ${profile.phone}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: GoLivreurTheme.texteSecondaire,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.star, size: 13, color: Colors.amber),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${profile.averageRating} (${profile.coursesToday} courses)',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              profile.cityName ?? 'Daloa Centre',
+                              style: const TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, color: GoLivreurTheme.secondaire),
+                    tooltip: 'Modifier mon profil',
+                    onPressed: _openEditProfile,
+                  ),
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: 16),
 
           // ─── Statut Livreur En Ligne / Hors Ligne ────────────────────────
@@ -279,6 +320,14 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
             child: Column(
               children: [
                 ListTile(
+                  leading: const Icon(Icons.manage_accounts_outlined, color: GoLivreurTheme.secondaire),
+                  title: const Text('Modifier mon profil'),
+                  subtitle: const Text('Nom, téléphone, véhicule, plaque et photo'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _openEditProfile,
+                ),
+                const Divider(height: 1),
+                ListTile(
                   leading: const Icon(Icons.shield_outlined, color: GoLivreurTheme.texteSecondaire),
                   title: const Text('Code de sécurité universel'),
                   subtitle: const Text('En mode démo : saisissez 1234'),
@@ -320,6 +369,7 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
           ),
           const SizedBox(height: 24),
         ],
+      ),
       ),
     );
   }

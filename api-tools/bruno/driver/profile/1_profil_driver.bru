@@ -1,0 +1,36 @@
+meta {
+  name: 1. Lire et modifier profil Driver
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{base_url}}/driver/profile
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token_driver}}
+}
+
+body:json {
+  {
+    "name": "Ouattara Seydou",
+    "phone": "0703000001",
+    "vehicle_type": "moto",
+    "vehicle_plate": "1234-JK-01",
+    "driver_license_number": "CI-DL-90210",
+    "language": "fr",
+    "notifications_enabled": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.succes: eq true
+}
+
+docs {
+  Met à jour le profil du livreur authentifié (supports multipart/form-data avec champ photo).
+}
