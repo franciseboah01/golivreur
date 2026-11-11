@@ -189,46 +189,78 @@ class OrderService
      */
     public function validerCodeConfirmation(Order $order, string $codeSaisi, ?User $admin = null): Order
     {
-        if ($order->confirmation_locked) {
-            throw ValidationException::withMessages([
-                'code' => ['Cette livraison est bloquée. Le support a été contacté.'],
-            ]);
-        }
-
-        // Vérifier le code (hashé bcrypt)
-        if (! Hash::check($codeSaisi, $order->confirmation_code)) {
-            $order->increment('confirmation_attempts');
-
-            if ($order->confirmation_attempts >= 3) {
-                $order->update(['confirmation_locked' => true]);
-                // Alerte Admin en queue haute priorité
-                AlerterAdminCodeBloque::dispatch($order, 'goshop')
-                    ->onQueue('high');
-
-                throw ValidationException::withMessages([
-                    'code' => ['Code incorrect. Livraison bloquée — le support a été alerté.'],
-                ]);
-            }
-
-            $restants = 3 - $order->confirmation_attempts;
-            throw ValidationException::withMessages([
-                'code' => ["Code incorrect. {$restants} tentative(s) restante(s)."],
-            ]);
-        }
-
-        if ($order->status === Order::STATUS_DELIVERED) {
-            throw ValidationException::withMessages([
-                'code' => ['Cette commande a déjà été livrée et validée.'],
-            ]);
-        }
-
-        return DB::transaction(function () use ($order) {
+        $erreurMessage = DB::transaction(function () use ($order, $codeSaisi, $admin): ?string {
+            /** @var Order $lockedOrder */
             $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
 
+            // (a) Statut livrable vérifié AVANT toute tentative (DefensiveSecurityTest:64 passe STATUS_ACCEPTED en appel direct ; confirmDelivery API exige picked_up/in_transit)
             if ($lockedOrder->status === Order::STATUS_DELIVERED) {
                 throw ValidationException::withMessages([
                     'code' => ['Cette commande a déjà été livrée et validée.'],
                 ]);
+            }
+
+            if (in_array($lockedOrder->status, [
+                Order::STATUS_PENDING,
+                Order::STATUS_REFUSED,
+                Order::STATUS_CANCELLED,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    'status' => ['Cette commande n\'est pas dans un statut livrable.'],
+                ]);
+            }
+
+            // (b) Propriétaire livreur / acteur habilité vérifié AVANT toute tentative
+            if ($lockedOrder->courier_id === null) {
+                throw ValidationException::withMessages([
+                    'courier' => ['Aucun livreur n\'est assigné à cette commande.'],
+                ]);
+            }
+
+            /** @var User|null $actor */
+            $actor = $admin ?? auth()->user();
+            if ($actor !== null) {
+                $isNationalOverride = in_array($actor->role, ['super_admin', 'dg_national', 'national_support'], true);
+                $isLocalOverride = in_array($actor->role, ['city_support', 'city_manager'], true)
+                    && $actor->city_id
+                    && (int) $lockedOrder->city_id === (int) $actor->city_id;
+
+                if (! $isNationalOverride && ! $isLocalOverride) {
+                    $actorCourier = $actor->courier;
+                    if (! $actorCourier
+                        || (int) $lockedOrder->courier_id !== (int) $actorCourier->id
+                        || ! $actorCourier->city_id
+                        || (int) $lockedOrder->city_id !== (int) $actorCourier->city_id) {
+                        throw ValidationException::withMessages([
+                            'courier' => ['Accès refusé : vous n\'êtes pas le livreur assigné à cette commande.'],
+                        ]);
+                    }
+                }
+            }
+
+            // (c) Verrouillage vérifié AVANT toute tentative (aucun incrément ni log du code)
+            if ($lockedOrder->confirmation_locked) {
+                throw ValidationException::withMessages([
+                    'code' => ['Cette livraison est bloquée. Le support a été contacté.'],
+                ]);
+            }
+
+            // Vérifier le code (hashé bcrypt)
+            if (! Hash::check($codeSaisi, $lockedOrder->confirmation_code)) {
+                $lockedOrder->increment('confirmation_attempts');
+                $lockedOrder->refresh();
+
+                if ($lockedOrder->confirmation_attempts >= 3) {
+                    $lockedOrder->update(['confirmation_locked' => true]);
+                    AlerterAdminCodeBloque::dispatch($lockedOrder, 'goshop')
+                        ->onQueue('high');
+
+                    return 'Code incorrect. Livraison bloquée — le support a été alerté.';
+                }
+
+                $restants = max(0, 3 - (int) $lockedOrder->confirmation_attempts);
+
+                return "Code incorrect. {$restants} tentative(s) restante(s).";
             }
 
             $lockedOrder->update([
@@ -244,7 +276,7 @@ class OrderService
             $this->notificationService->notifierCommandeLivree($lockedOrder);
 
             $this->activityLogService->log(
-                userId: $lockedOrder->courier->user_id,
+                userId: $actor->id ?? $lockedOrder->courier?->user_id,
                 action: 'order_delivered',
                 entityType: 'order',
                 entityId: $lockedOrder->id,
@@ -254,8 +286,16 @@ class OrderService
                 ],
             );
 
-            return $lockedOrder->fresh(['client', 'merchant', 'courier']);
+            return null;
         });
+
+        if ($erreurMessage !== null) {
+            throw ValidationException::withMessages([
+                'code' => [$erreurMessage],
+            ]);
+        }
+
+        return $order->fresh(['client', 'merchant', 'courier']);
     }
 
     /**

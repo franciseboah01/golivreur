@@ -255,8 +255,19 @@ class DriverController extends Controller
     {
         $courier = $this->getCourier();
 
-        if ($order->courier_id !== $courier->id) {
+        if (! $courier->city_id || (int) $order->city_id !== (int) $courier->city_id) {
+            return response()->json(['succes' => false, 'message' => 'Course introuvable.'], 404);
+        }
+
+        if ($order->courier_id === null || (int) $order->courier_id !== (int) $courier->id) {
             return response()->json(['succes' => false, 'message' => 'Accès refusé.'], 403);
+        }
+
+        if (! in_array($order->status, [Order::STATUS_PICKED_UP, Order::STATUS_IN_TRANSIT], true)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Cette commande n\'est pas au statut livrable.',
+            ], 422);
         }
 
         $request->validate(['code' => 'required|string|size:4']);
