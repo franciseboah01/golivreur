@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Components\ImageUploadField;
 use App\Filament\Components\SearchableSelect;
 use App\Models\City;
 use App\Services\SettingsService;
@@ -11,6 +12,8 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
 
 /**
  * Page Filament « Paramètres » pour le Super Admin et DG National.
@@ -57,6 +60,7 @@ class SettingsPage extends Page implements HasForms
     {
         $settingsService = app(SettingsService::class);
         $settings = $settingsService->getAll($this->selectedCityId);
+        $settings['branding'] = $settingsService->getBranding();
 
         $this->form->fill($settings);
     }
@@ -77,6 +81,53 @@ class SettingsPage extends Page implements HasForms
 
                 Forms\Components\Tabs::make('SettingsTabs')
                     ->tabs([
+                        // ── 0. Logo & Identité GoLivreur ──────────────────────
+                        Forms\Components\Tabs\Tab::make('Logo & Identité')
+                            ->icon('heroicon-o-photo')
+                            ->schema([
+                                Forms\Components\Section::make('Logo de la plateforme GoLivreur')
+                                    ->description('Si un logo est uploadé ici, il remplace l\'emoji par défaut dans l\'administration et les applications mobiles.')
+                                    ->schema([
+                                        ImageUploadField::make(
+                                            'branding.logo_path',
+                                            'branding',
+                                            'Logo de GoLivreur (JPG, PNG, WEBP — Max 2 Mo)'
+                                        )->columnSpanFull(),
+
+                                        Forms\Components\TextInput::make('branding.default_emoji')
+                                            ->label('Emoji par défaut (si aucun logo)')
+                                            ->maxLength(16)
+                                            ->placeholder('🛵')
+                                            ->helperText('Affiché partout lorsqu\'aucun logo n\'est enregistré (défaut : 🛵).'),
+
+                                        Forms\Components\Placeholder::make('branding_preview')
+                                            ->label('Aperçu actuel affiché')
+                                            ->content(function (Forms\Get $get): HtmlString {
+                                                $settingsService = app(SettingsService::class);
+                                                $branding = $settingsService->getBranding();
+                                                $emoji = trim((string) ($get('branding.default_emoji') ?? $branding['default_emoji'] ?? '🛵')) ?: '🛵';
+
+                                                if (!empty($branding['logo_url'])) {
+                                                    $url = e($branding['logo_url']);
+
+                                                    return new HtmlString(
+                                                        '<div style="display:flex;align-items:center;gap:12px;">'
+                                                        . '<img src="' . $url . '" alt="GoLivreur" style="height:48px;width:48px;object-fit:contain;border-radius:12px;border:1px solid #e5e7eb;background:#fff;padding:4px;" />'
+                                                        . '<span style="font-weight:700;">Logo personnalisé actif (affiché partout)</span>'
+                                                        . '</div>'
+                                                    );
+                                                }
+
+                                                return new HtmlString(
+                                                    '<div style="display:flex;align-items:center;gap:12px;">'
+                                                    . '<span style="display:inline-flex;align-items:center;justify-content:center;height:48px;width:48px;border-radius:12px;background:#fef3c7;font-size:28px;">' . e($emoji) . '</span>'
+                                                    . '<span>Aucun logo — emoji par défaut actif</span>'
+                                                    . '</div>'
+                                                );
+                                            }),
+                                    ])->columns(2),
+                            ]),
+
                         // ── 1. Tarifs GoShop ──────────────────────────────────
                         Forms\Components\Tabs\Tab::make('Tarifs GoShop')
                             ->icon('heroicon-o-shopping-bag')
@@ -334,10 +385,46 @@ class SettingsPage extends Page implements HasForms
     public function save(): void
     {
         $settingsService = app(SettingsService::class);
+        $oldBranding = $settingsService->getBranding();
         $state = $this->form->getState();
+        $brandingChanged = false;
 
         foreach ($state as $key => $value) {
-            if ($key === 'selectedCityId') continue;
+            if ($key === 'selectedCityId') {
+                continue;
+            }
+
+            if ($key === 'branding' && is_array($value)) {
+                $newLogoPath = $value['logo_path'] ?? null;
+                if (is_array($newLogoPath)) {
+                    $newLogoPath = reset($newLogoPath) ?: null;
+                }
+                $newLogoPath = is_string($newLogoPath) && $newLogoPath !== '' ? $newLogoPath : null;
+
+                $newEmoji = trim((string) ($value['default_emoji'] ?? '')) ?: '🛵';
+                $normalizedBranding = [
+                    'logo_path'     => $newLogoPath,
+                    'default_emoji' => $newEmoji,
+                ];
+
+                $oldLogoPath = $oldBranding['logo_path'] ?? null;
+                if (is_string($oldLogoPath) && $oldLogoPath !== '' && $oldLogoPath !== $newLogoPath) {
+                    Storage::disk('public')->delete($oldLogoPath);
+                }
+
+                $brandingChanged = ($oldLogoPath !== $newLogoPath)
+                    || (($oldBranding['default_emoji'] ?? '🛵') !== $newEmoji);
+
+                $settingsService->set(
+                    key: 'branding',
+                    value: $normalizedBranding,
+                    cityId: null,
+                    userId: auth()->id(),
+                    description: 'Mise à jour identité visuelle via le panneau Filament Paramètres'
+                );
+                continue;
+            }
+
             $settingsService->set(
                 key: $key,
                 value: $value,
@@ -347,11 +434,17 @@ class SettingsPage extends Page implements HasForms
             );
         }
 
+        $this->loadSettings();
+
         Notification::make()
             ->title('Paramètres enregistrés avec succès')
-            ->body('Les nouveaux tarifs et règles ont été mis à jour et immédiatement appliqués.')
+            ->body('Les nouveaux tarifs, logos et règles ont été mis à jour et immédiatement appliqués.')
             ->success()
             ->send();
+
+        if ($brandingChanged && !app()->runningUnitTests()) {
+            $this->redirect(static::getUrl(), navigate: false);
+        }
     }
 }
 

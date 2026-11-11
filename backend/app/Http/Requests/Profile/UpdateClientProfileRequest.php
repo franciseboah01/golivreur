@@ -11,3 +11,4 @@ class UpdateClientProfileRequest extends BaseProfileRequest
         ]);
     }
 }
+

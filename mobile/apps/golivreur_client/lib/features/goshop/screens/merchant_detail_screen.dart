@@ -15,13 +15,20 @@ class MerchantDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _MerchantDetailScreenState extends ConsumerState<MerchantDetailScreen> {
-  bool _isFavorite = false;
-
   @override
   Widget build(BuildContext context) {
     final weather = ref.watch(weatherProvider);
+    final selectedQuarter = ref.watch(selectedNeighborhoodProvider);
     final cart = ref.watch(cartProvider);
+    final estimate = ref.watch(cartDeliveryEstimateProvider);
+    final favoriteIds = ref.watch(favoritesProvider);
     final merchant = widget.merchant;
+    final isFavorite = favoriteIds.contains(merchant.id);
+    final distKm = weather.distancePourQuartier(selectedQuarter, merchant: merchant);
+    final merchantDeliveryFee = weather.calculerFraisLivraison(
+      distKm,
+      isPharmacy: merchant.category == 'pharmacie',
+    ).toInt();
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -49,15 +56,16 @@ class _MerchantDetailScreenState extends ConsumerState<MerchantDetailScreen> {
                   backgroundColor: Colors.white.withValues(alpha: 0.9),
                   child: IconButton(
                     icon: Icon(
-                      _isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: _isFavorite ? GoLivreurTheme.erreur : GoLivreurTheme.textePrincipal,
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite ? GoLivreurTheme.erreur : GoLivreurTheme.textePrincipal,
                     ),
-                    onPressed: () {
-                      setState(() => _isFavorite = !_isFavorite);
+                    onPressed: () async {
+                      final added = await ref.read(favoritesProvider.notifier).toggleFavori(merchant);
+                      if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            _isFavorite
+                            added
                                 ? '${merchant.name} ajouté aux favoris'
                                 : '${merchant.name} retiré des favoris',
                           ),
@@ -199,7 +207,7 @@ class _MerchantDetailScreenState extends ConsumerState<MerchantDetailScreen> {
                             const Icon(Icons.delivery_dining, color: Color(0xFFC47B00), size: 16),
                             const SizedBox(width: 4),
                             Text(
-                              merchant.category == 'pharmacie' ? 'Frais : 500 F CFA' : 'Frais : 800 F CFA',
+                              'Frais : $merchantDeliveryFee F CFA',
                               style: const TextStyle(
                                 color: Color(0xFF835500),
                                 fontWeight: FontWeight.bold,
@@ -317,7 +325,7 @@ class _MerchantDetailScreenState extends ConsumerState<MerchantDetailScreen> {
                         ],
                       ),
                       Text(
-                        '${cart.total.toInt()} F CFA',
+                        '${(cart.subtotal + estimate.deliveryFee).toInt()} F CFA',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ],

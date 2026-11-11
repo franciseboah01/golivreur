@@ -29,3 +29,4 @@ class ClientProfileResource extends JsonResource
         ];
     }
 }
+

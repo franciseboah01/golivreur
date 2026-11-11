@@ -2,10 +2,14 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Filament\Pages\SettingsPage;
 use App\Models\{ActivityLog, City, Setting, User};
 use App\Modules\GoShop\Services\CommissionService;
 use App\Services\SettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class SettingsTest extends TestCase
@@ -129,6 +133,71 @@ class SettingsTest extends TestCase
         // Le nouveau tarif pour Daloa doit être 600 F
         $nouveauPrix = $this->commissionService->calculerFraisLivraison(1.0, $this->daloa);
         $this->assertEquals(600.0, $nouveauPrix);
+    }
+
+    public function test_branding_returns_default_emoji_when_no_logo_uploaded(): void
+    {
+        $branding = $this->settingsService->getBranding();
+        $this->assertNull($branding['logo_path']);
+        $this->assertNull($branding['logo_url']);
+        $this->assertSame('🛵', $branding['default_emoji']);
+
+        $this->getJson('/api/v1/branding')
+            ->assertOk()
+            ->assertJsonPath('succes', true)
+            ->assertJsonPath('donnees.logo_url', null)
+            ->assertJsonPath('donnees.default_emoji', '🛵');
+
+        $this->getJson('/api/v1/client/city-status')
+            ->assertOk()
+            ->assertJsonPath('donnees.app_logo_url', null)
+            ->assertJsonPath('donnees.app_default_emoji', '🛵');
+
+        $this->actingAs($this->admin)
+            ->get('/admin')
+            ->assertOk()
+            ->assertSee('🛵');
+    }
+
+    public function test_admin_settings_page_uploads_and_removes_golivreur_logo(): void
+    {
+        Storage::fake('public');
+        $this->actingAs($this->admin);
+
+        $fakeLogo = UploadedFile::fake()->image('golivreur-brand.png', 120, 120);
+
+        Livewire::test(SettingsPage::class)
+            ->set('data.branding.logo_path', $fakeLogo)
+            ->set('data.branding.default_emoji', '🛵')
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $branding = $this->settingsService->getBranding();
+        $this->assertNotNull($branding['logo_path']);
+        $this->assertNotNull($branding['logo_url']);
+        Storage::disk('public')->assertExists($branding['logo_path']);
+
+        $this->getJson('/api/v1/branding')
+            ->assertOk()
+            ->assertJsonPath('donnees.logo_url', $branding['logo_url']);
+
+        $this->getJson('/api/v1/client/city-status')
+            ->assertOk()
+            ->assertJsonPath('donnees.app_logo_url', $branding['logo_url']);
+
+        $this->get('/admin')
+            ->assertOk()
+            ->assertSee($branding['logo_url'], false);
+
+        // Suppression du logo -> retour à l'emoji par défaut et suppression du fichier
+        $oldPath = $branding['logo_path'];
+        Livewire::test(SettingsPage::class)
+            ->set('data.branding.logo_path', null)
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        Storage::disk('public')->assertMissing($oldPath);
+        $this->assertNull($this->settingsService->getAppLogoUrl());
     }
 }
 

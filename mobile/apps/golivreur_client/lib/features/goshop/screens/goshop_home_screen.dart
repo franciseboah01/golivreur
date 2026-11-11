@@ -1,33 +1,81 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/config/env_config.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../providers/goshop_provider.dart';
 import 'merchant_detail_screen.dart';
 import 'cart_screen.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../auth/screens/login_screen.dart';
+import '../../auth/utils/client_logout.dart';
 import '../../gocolis/screens/gocolis_home_screen.dart';
 import '../../orders/screens/orders_tracking_history_screen.dart';
+import '../../profile/screens/client_addresses_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 
-class GoShopHomeScreen extends ConsumerWidget {
+class GoShopHomeScreen extends ConsumerStatefulWidget {
   const GoShopHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GoShopHomeScreen> createState() => _GoShopHomeScreenState();
+}
+
+class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = ref.read(authProvider);
+      ref.read(weatherProvider.notifier).chargerStatutVille(cityId: authState.user?.cityId);
+      ref.read(clientAddressesProvider.notifier).chargerAdresses();
+      ref.read(favoritesProvider.notifier).chargerFavoris();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _searchFocusNode.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _focusSearch() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+    _searchFocusNode.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final weather = ref.watch(weatherProvider);
     final selectedQuarter = ref.watch(selectedNeighborhoodProvider);
+    final destination = ref.watch(activeDeliveryDestinationProvider);
     final categories = ref.watch(categoriesProvider).valueOrNull ?? fallbackCategoriesList;
     final selectedCat = ref.watch(selectedCategoryProvider);
+    final searchQuery = ref.watch(searchQueryProvider);
     final merchantsAsync = ref.watch(merchantsListProvider);
     final cart = ref.watch(cartProvider);
+    final deliveryEstimate = ref.watch(cartDeliveryEstimateProvider);
+    final favoriteIds = ref.watch(favoritesProvider);
+    final notifs = ref.watch(clientNotificationsProvider).valueOrNull ?? const <ClientNotificationItem>[];
+    final unreadCount = notifs.where((n) => !n.isRead).length;
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
       drawer: _buildQuickAccessDrawer(context, ref),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         elevation: 0.5,
         titleSpacing: 16,
@@ -87,7 +135,13 @@ class GoShopHomeScreen extends ConsumerWidget {
                         children: [
                           Flexible(
                             child: Text(
-                              'Daloa, $selectedQuarter',
+                              selectedQuarter.isNotEmpty
+                                  ? (destination.cityName.isNotEmpty
+                                      ? '${destination.cityName}, $selectedQuarter'
+                                      : selectedQuarter)
+                                  : (destination.cityName.isNotEmpty
+                                      ? destination.cityName
+                                      : 'Choisir un quartier'),
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
@@ -111,33 +165,125 @@ class GoShopHomeScreen extends ConsumerWidget {
           ],
         ),
         actions: [
-          // Bouton Notification avec pastille rouge
+          // 1. Bouton Recherche
+          IconButton(
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            padding: EdgeInsets.zero,
+            tooltip: 'Rechercher',
+            icon: const Icon(Icons.search, color: GoLivreurTheme.textePrincipal, size: 22),
+            onPressed: _focusSearch,
+          ),
+          // 2. Bouton Panier avec badge compteur
           Stack(
             alignment: Alignment.center,
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined, color: GoLivreurTheme.textePrincipal),
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: EdgeInsets.zero,
+                tooltip: 'Mon panier',
+                icon: const Icon(
+                  Icons.shopping_cart_outlined,
+                  color: GoLivreurTheme.textePrincipal,
+                  size: 22,
+                ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Aucune nouvelle alerte non lue.')),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CartScreen()),
                   );
                 },
               ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: GoLivreurTheme.erreur,
-                    shape: BoxShape.circle,
+              if (cart.totalItemCount > 0)
+                Positioned(
+                  top: 4,
+                  right: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: GoLivreurTheme.secondaire,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${cart.totalItemCount}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
-          const SizedBox(width: 8),
+          // 3. Bouton Favoris avec badge compteur
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: EdgeInsets.zero,
+                tooltip: 'Mes favoris',
+                icon: Icon(
+                  favoriteIds.isNotEmpty ? Icons.favorite : Icons.favorite_border,
+                  color: favoriteIds.isNotEmpty
+                      ? GoLivreurTheme.erreur
+                      : GoLivreurTheme.textePrincipal,
+                  size: 22,
+                ),
+                onPressed: () => _showFavoritesSheet(context),
+              ),
+              if (favoriteIds.isNotEmpty)
+                Positioned(
+                  top: 4,
+                  right: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: GoLivreurTheme.primaire,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${favoriteIds.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          // 4. Bouton Notification (après Recherche, Panier et Favoris)
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: EdgeInsets.zero,
+                tooltip: 'Notifications',
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: GoLivreurTheme.textePrincipal,
+                  size: 22,
+                ),
+                onPressed: () => _showNotificationsSheet(context),
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: GoLivreurTheme.erreur,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 6),
         ],
       ),
       body: Stack(
@@ -145,10 +291,17 @@ class GoShopHomeScreen extends ConsumerWidget {
           RefreshIndicator(
             color: GoLivreurTheme.primaire,
             onRefresh: () async {
+              await ref
+                  .read(weatherProvider.notifier)
+                  .chargerStatutVille(cityId: ref.read(authProvider).user?.cityId);
+              await ref.read(clientAddressesProvider.notifier).chargerAdresses(syncNeighborhood: false);
+              await ref.read(favoritesProvider.notifier).chargerFavoris();
               ref.invalidate(categoriesProvider);
               ref.invalidate(merchantsListProvider);
+              ref.invalidate(clientNotificationsProvider);
             },
             child: SingleChildScrollView(
+              controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.only(
                 bottom: cart.items.isNotEmpty ? 100 : 32,
@@ -156,8 +309,38 @@ class GoShopHomeScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ─── Bandeau Mode Pluie Daloa ────────────────────────────
-                  if (weather.isRainMode)
+                  // ─── Bandeau Mode Urgence (si actif en base) ───────────
+                  if (weather.emergencyModeActive)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: GoLivreurTheme.erreur.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: GoLivreurTheme.erreur.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: GoLivreurTheme.erreur, size: 22),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              weather.emergencyMessage ??
+                                  'Mode Urgence activé : les livraisons peuvent être perturbées.',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: GoLivreurTheme.erreur,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // ─── Bandeau Mode Pluie (uniquement si actif en base) ────
+                  if (weather.isRainMode && !weather.bannerDismissed)
                     Container(
                       width: double.infinity,
                       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -183,7 +366,7 @@ class GoShopHomeScreen extends ConsumerWidget {
                           ),
                           GestureDetector(
                             onTap: () {
-                              ref.read(weatherProvider.notifier).toggleRainMode();
+                              ref.read(weatherProvider.notifier).dismissBanner();
                             },
                             child: const Padding(
                               padding: EdgeInsets.only(left: 6),
@@ -194,9 +377,58 @@ class GoShopHomeScreen extends ConsumerWidget {
                       ),
                     ),
 
-                  // ─── Zone Recherche & Filtres ────────────────────────────
+                  // ─── Bandeau Adresse de livraison cohérente avec le quartier ─
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: InkWell(
+                      onTap: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ClientAddressesScreen()),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: GoLivreurTheme.bordure),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_on_outlined, size: 18, color: GoLivreurTheme.secondaire),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                destination.fullAddress.isNotEmpty
+                                    ? 'Adresse : ${destination.fullAddress}'
+                                    : 'Aucune adresse par défaut définie',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: GoLivreurTheme.textePrincipal,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Text(
+                              'Gérer',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: GoLivreurTheme.primaire,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // ─── Zone Recherche & Filtres (Interactive) ───────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
                     child: Container(
                       height: 50,
                       decoration: BoxDecoration(
@@ -214,29 +446,53 @@ class GoShopHomeScreen extends ConsumerWidget {
                       child: Row(
                         children: [
                           const SizedBox(width: 12),
-                          const Icon(Icons.search, color: GoLivreurTheme.primaire, size: 24),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              'Rechercher un maquis, garba, pharmacie...',
-                              style: TextStyle(
-                                color: GoLivreurTheme.texteSecondaire,
-                                fontSize: 14,
+                          const Icon(Icons.search, color: GoLivreurTheme.primaire, size: 22),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _searchCtrl,
+                              focusNode: _searchFocusNode,
+                              onChanged: (value) {
+                                ref.read(searchQueryProvider.notifier).state = value;
+                              },
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                filled: false,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                                hintText: 'Rechercher un maquis, garba, pharmacie...',
+                                hintStyle: TextStyle(
+                                  color: GoLivreurTheme.texteSecondaire,
+                                  fontSize: 14,
+                                ),
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: GoLivreurTheme.fond,
-                              borderRadius: BorderRadius.circular(8),
+                          if (searchQuery.trim().isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 18, color: GoLivreurTheme.texteSecondaire),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                ref.read(searchQueryProvider.notifier).state = '';
+                              },
                             ),
-                            child: const Icon(
-                              Icons.tune,
-                              color: GoLivreurTheme.textePrincipal,
-                              size: 18,
+                          InkWell(
+                            onTap: () => _showNeighborhoodPicker(context, ref),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: GoLivreurTheme.fond,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.tune,
+                                color: GoLivreurTheme.textePrincipal,
+                                size: 18,
+                              ),
                             ),
                           ),
                         ],
@@ -439,22 +695,35 @@ class GoShopHomeScreen extends ConsumerWidget {
                   // ─── Liste des Commerces ─────────────────────────────────
                   merchantsAsync.when(
                     data: (merchants) {
-                      final filtered = selectedCat == 'all'
-                          ? merchants
-                          : merchants.where((m) => m.category == selectedCat).toList();
+                      final normalizedQuery = searchQuery.trim().toLowerCase();
+                      final filtered = merchants.where((m) {
+                        final matchesCategory =
+                            selectedCat == 'all' || m.category == selectedCat;
+                        if (!matchesCategory) return false;
+                        if (normalizedQuery.isEmpty) return true;
+                        final inMerchant = m.name.toLowerCase().contains(normalizedQuery) ||
+                            m.address.toLowerCase().contains(normalizedQuery) ||
+                            (m.categoryName ?? m.category).toLowerCase().contains(normalizedQuery);
+                        final inProducts = m.products.any(
+                          (p) => p.name.toLowerCase().contains(normalizedQuery),
+                        );
+                        return inMerchant || inProducts;
+                      }).toList();
 
                       if (filtered.isEmpty) {
                         return Container(
                           padding: const EdgeInsets.all(32),
                           alignment: Alignment.center,
-                          child: const Column(
+                          child: Column(
                             children: [
-                              Icon(Icons.storefront_outlined, size: 48, color: GoLivreurTheme.texteSecondaire),
-                              SizedBox(height: 12),
+                              const Icon(Icons.storefront_outlined, size: 48, color: GoLivreurTheme.texteSecondaire),
+                              const SizedBox(height: 12),
                               Text(
-                                'Aucun commerce disponible dans cette catégorie pour le moment.',
+                                normalizedQuery.isNotEmpty
+                                    ? 'Aucun résultat pour « ${searchQuery.trim()} ».'
+                                    : 'Aucun commerce disponible dans cette catégorie pour le moment.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: GoLivreurTheme.texteSecondaire),
+                                style: const TextStyle(color: GoLivreurTheme.texteSecondaire),
                               ),
                             ],
                           ),
@@ -469,7 +738,14 @@ class GoShopHomeScreen extends ConsumerWidget {
                         separatorBuilder: (_, __) => const SizedBox(height: 16),
                         itemBuilder: (context, index) {
                           final merchant = filtered[index];
-                          return _buildMerchantCard(context, ref, merchant, weather.isRainMode);
+                          return _buildMerchantCard(
+                            context,
+                            ref,
+                            merchant,
+                            weather,
+                            selectedQuarter,
+                            favoriteIds.contains(merchant.id),
+                          );
                         },
                       );
                     },
@@ -580,7 +856,7 @@ class GoShopHomeScreen extends ConsumerWidget {
                       ),
                       const Spacer(),
                       Text(
-                        '${cart.total.toInt()} F CFA',
+                        '${(cart.subtotal + deliveryEstimate.deliveryFee).toInt()} F CFA',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -603,8 +879,17 @@ class GoShopHomeScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     MerchantModel merchant,
-    bool isRainMode,
+    WeatherState weather,
+    String selectedQuarter,
+    bool isFavorite,
   ) {
+    final isRainMode = weather.isRainMode;
+    final distKm = weather.distancePourQuartier(selectedQuarter, merchant: merchant);
+    final fee = weather.calculerFraisLivraison(
+      distKm,
+      isPharmacy: merchant.category == 'pharmacie',
+    ).toInt();
+
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
@@ -668,6 +953,41 @@ class GoShopHomeScreen extends ConsumerWidget {
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ),
+                // Bouton Favori (Cœur) sur la carte
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Material(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () async {
+                        final added = await ref.read(favoritesProvider.notifier).toggleFavori(merchant);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                added
+                                    ? '${merchant.name} ajouté aux favoris'
+                                    : '${merchant.name} retiré des favoris',
+                              ),
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: isFavorite ? GoLivreurTheme.erreur : GoLivreurTheme.textePrincipal,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
@@ -779,7 +1099,7 @@ class GoShopHomeScreen extends ConsumerWidget {
                             style: TextStyle(fontSize: 13, color: GoLivreurTheme.texteSecondaire),
                           ),
                           Text(
-                            merchant.category == 'pharmacie' ? '500 F CFA' : '800 F CFA',
+                            '$fee F CFA (${distKm.toStringAsFixed(1)} km)',
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -933,64 +1253,292 @@ class GoShopHomeScreen extends ConsumerWidget {
     }
   }
 
-  void _showNeighborhoodPicker(BuildContext context, WidgetRef ref) {
-    final quarters = ref.read(daloaNeighborhoodsProvider);
-    final current = ref.read(selectedNeighborhoodProvider);
+  void _showFavoritesSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Consumer(
+            builder: (ctx, modalRef, _) {
+              final favoriteIds = modalRef.watch(favoritesProvider);
+              final merchants = modalRef.watch(merchantsListProvider).valueOrNull ?? [];
+              final favMerchants =
+                  merchants.where((m) => favoriteIds.contains(m.id)).toList();
 
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Mes Commerces Favoris',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(sheetCtx),
+                        ),
+                      ],
+                    ),
+                    const Divider(),
+                    if (favMerchants.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 28),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(Icons.favorite_border, size: 44, color: GoLivreurTheme.texteSecondaire),
+                              SizedBox(height: 10),
+                              Text(
+                                'Aucun commerce en favori pour le moment.\nTouchez le cœur sur un commerce pour l\'ajouter.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 360),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: favMerchants.length,
+                          itemBuilder: (_, index) {
+                            final m = favMerchants[index];
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: _buildMerchantLogoBadge(m),
+                              title: Text(
+                                m.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(m.address, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.favorite, color: GoLivreurTheme.erreur),
+                                onPressed: () {
+                                  modalRef.read(favoritesProvider.notifier).toggleFavori(m);
+                                },
+                              ),
+                              onTap: () {
+                                Navigator.pop(sheetCtx);
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => MerchantDetailScreen(merchant: m),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _showNotificationsSheet(BuildContext context) {
+    ref.invalidate(clientNotificationsProvider);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (sheetCtx) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-                child: Text(
-                  'Choisissez votre quartier à Daloa',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: GoLivreurTheme.textePrincipal,
-                  ),
-                ),
-              ),
-              const Divider(),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: quarters.length,
-                  itemBuilder: (context, index) {
-                    final q = quarters[index];
-                    final isSel = q == current;
-                    return ListTile(
-                      leading: Icon(
-                        Icons.location_on,
-                        color: isSel ? GoLivreurTheme.primaire : GoLivreurTheme.texteSecondaire,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Consumer(
+              builder: (ctx, modalRef, _) {
+                final notifsAsync = modalRef.watch(clientNotificationsProvider);
+                final weather = modalRef.watch(weatherProvider);
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Notifications & Alertes',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: (weather.isRainMode
+                                    ? const Color(0xFF2E75B6)
+                                    : GoLivreurTheme.secondaire)
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            weather.isRainMode ? '🌧️ Mode Pluie actif' : '☀️ Météo normale',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: weather.isRainMode
+                                  ? const Color(0xFF2E75B6)
+                                  : GoLivreurTheme.secondaire,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(),
+                    notifsAsync.when(
+                      loading: () => const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: CircularProgressIndicator()),
                       ),
-                      title: Text(
-                        q,
-                        style: TextStyle(
-                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                          color: isSel ? GoLivreurTheme.primaire : GoLivreurTheme.textePrincipal,
+                      error: (_, __) => const Text('Impossible de charger les alertes.'),
+                      data: (items) {
+                        if (items.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Text(
+                              'Aucune nouvelle notification pour le moment.',
+                              style: TextStyle(color: GoLivreurTheme.texteSecondaire),
+                            ),
+                          );
+                        }
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: items.take(6).map((n) {
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
+                                n.type == 'rain_mode'
+                                    ? Icons.cloudy_snowing
+                                    : Icons.notifications_active_outlined,
+                                color: n.type == 'rain_mode'
+                                    ? const Color(0xFF2E75B6)
+                                    : GoLivreurTheme.primaire,
+                              ),
+                              title: Text(n.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              subtitle: Text(n.body),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showNeighborhoodPicker(BuildContext context, WidgetRef ref) {
+    final weather = ref.read(weatherProvider);
+    final quarters = ref.read(daloaNeighborhoodsProvider);
+    final current = ref.read(selectedNeighborhoodProvider);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.68,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 12, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          weather.cityName.isNotEmpty
+                              ? 'Choisissez votre quartier (${weather.cityName})'
+                              : 'Choisissez votre quartier',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: GoLivreurTheme.textePrincipal,
+                          ),
                         ),
                       ),
-                      trailing: isSel
-                          ? const Icon(Icons.check, color: GoLivreurTheme.primaire)
-                          : null,
-                      onTap: () {
-                        ref.read(selectedNeighborhoodProvider.notifier).state = q;
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.pop(sheetCtx);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const ClientAddressesScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.edit_location_alt_outlined, size: 18),
+                        label: const Text('Mes adresses'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const Divider(height: 1),
+                Expanded(
+                  child: quarters.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text(
+                              'Aucun quartier disponible pour cette ville.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: GoLivreurTheme.texteSecondaire),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: quarters.length,
+                          itemBuilder: (_, index) {
+                            final q = quarters[index];
+                            final isSel = q == current;
+                            return ListTile(
+                              leading: Icon(
+                                Icons.location_on,
+                                color: isSel ? GoLivreurTheme.primaire : GoLivreurTheme.texteSecondaire,
+                              ),
+                              title: Text(
+                                q,
+                                style: TextStyle(
+                                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                  color: isSel ? GoLivreurTheme.primaire : GoLivreurTheme.textePrincipal,
+                                ),
+                              ),
+                              trailing: isSel
+                                  ? const Icon(Icons.check, color: GoLivreurTheme.primaire)
+                                  : null,
+                              onTap: () {
+                                ref.read(selectedNeighborhoodProvider.notifier).state = q;
+                                Navigator.pop(sheetCtx);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -999,6 +1547,9 @@ class GoShopHomeScreen extends ConsumerWidget {
 
   Widget _buildQuickAccessDrawer(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
+    final branding = ref.watch(appBrandingProvider);
+    final photoUrl = GoLivreurEnv.resolveMediaUrl(user?.photoUrl);
+    final cityName = (user?.cityName ?? '').trim();
 
     return Drawer(
       child: SafeArea(
@@ -1013,58 +1564,109 @@ class GoShopHomeScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ── Identité GoLivreur (logo configuré ou emoji par défaut) ──
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(
-                          Icons.moped,
-                          color: GoLivreurTheme.primaire,
-                          size: 28,
+                        clipBehavior: Clip.antiAlias,
+                        child: GoLivreurBrandMark(
+                          logoUrl: branding.logoUrl,
+                          defaultEmoji: branding.defaultEmoji,
+                          size: 44,
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'GoLivreur',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'GoLivreur',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'Daloa Express',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
+                            if (cityName.isNotEmpty)
+                              Text(
+                                cityName,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    user?.name ?? 'Client GoLivreur',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    '+225 ${user?.phone ?? "0701000001"}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                    ),
+                  // ── Profil du client (photo à côté de son nom) ─────────────
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            width: 1.5,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: (photoUrl != null && photoUrl.isNotEmpty)
+                            ? Image.network(
+                                photoUrl,
+                                width: 44,
+                                height: 44,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.person,
+                                  color: GoLivreurTheme.primaire,
+                                  size: 24,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.person,
+                                color: GoLivreurTheme.primaire,
+                                size: 24,
+                              ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user?.name ?? 'Client',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '+225 ${user?.phone ?? ""}',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1127,12 +1729,9 @@ class GoShopHomeScreen extends ConsumerWidget {
                   ListTile(
                     leading: const Icon(Icons.logout, color: GoLivreurTheme.erreur),
                     title: const Text('Déconnexion', style: TextStyle(color: GoLivreurTheme.erreur, fontWeight: FontWeight.bold)),
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        (route) => false,
-                      );
+                      await deconnecterEtReinitialiserClient(context, ref);
                     },
                   ),
                 ],

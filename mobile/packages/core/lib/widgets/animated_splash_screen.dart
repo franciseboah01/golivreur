@@ -18,6 +18,8 @@ class AnimatedSplashScreen extends StatefulWidget {
   final Widget? nextScreen;
   final VoidCallback? onFinished;
   final Future<void> Function()? onInit;
+  final String? logoUrl;
+  final String defaultEmoji;
 
   const AnimatedSplashScreen({
     super.key,
@@ -25,6 +27,8 @@ class AnimatedSplashScreen extends StatefulWidget {
     this.nextScreen,
     this.onFinished,
     this.onInit,
+    this.logoUrl,
+    this.defaultEmoji = '🛵',
   });
 
   @override
@@ -204,7 +208,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                             strokeWidth: 3.5,
                           ),
                         ),
-                        // Moto orange centrée
+                        // Logo configuré ou emoji par défaut centré
                         Transform.scale(
                           scale: _motorcycleScale.value,
                           child: Container(
@@ -214,12 +218,11 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                               shape: BoxShape.circle,
                               color: GoLivreurTheme.primaire.withValues(alpha: 0.12),
                             ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.two_wheeler_rounded,
-                                size: 48,
-                                color: GoLivreurTheme.primaire, // Moto en orange
-                              ),
+                            clipBehavior: Clip.antiAlias,
+                            child: GoLivreurBrandMark(
+                              logoUrl: widget.logoUrl,
+                              defaultEmoji: widget.defaultEmoji,
+                              size: 80,
                             ),
                           ),
                         ),

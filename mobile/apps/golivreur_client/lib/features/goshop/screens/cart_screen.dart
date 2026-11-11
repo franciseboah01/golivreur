@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../profile/screens/client_addresses_screen.dart';
 import '../providers/goshop_provider.dart';
 import 'suivi_gps_screen.dart';
 
@@ -29,6 +30,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final cart = ref.read(cartProvider);
     if (cart.items.isEmpty || cart.merchant == null) return;
 
+    final destination = ref.read(activeDeliveryDestinationProvider);
+    final estimate = ref.read(cartDeliveryEstimateProvider);
+
     setState(() => _isSubmitting = true);
 
     final api = ref.read(apiClientProvider);
@@ -43,10 +47,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   'quantity': item.quantity,
                 })
             .toList(),
-        'delivery_address': 'Daloa, Quartier Résidentiel',
+        'delivery_address': destination.fullAddress,
+        'delivery_lat': destination.lat,
+        'delivery_lng': destination.lng,
         'special_instructions': _instructionsController.text.trim(),
         'payment_method': _selectedPaymentMethod,
-        'distance_km': 2.5,
+        'distance_km': estimate.distanceKm,
       };
 
       final response = await api.post('/client/orders', data: payload);
@@ -54,15 +60,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         orderId = response.data['donnees']['id'] as int;
       }
     } catch (_) {
-      // Si déconnecté ou erreur, utilise un ID de démonstration pour que Francis puisse tester le parcours
+      // Fallback hors-ligne si le serveur est injoignable
       orderId = 1;
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        // Vider le panier
         ref.read(cartProvider.notifier).clear();
 
-        // Aller directement au Suivi GPS de la commande
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => SuiviGPSScreen(orderId: orderId),
@@ -72,10 +76,138 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     }
   }
 
+  Future<void> _showQuickAddressPicker(BuildContext context) async {
+    final addresses = ref.read(clientAddressesProvider).addresses;
+    final quarters = ref.read(daloaNeighborhoodsProvider);
+    final currentQuarter = ref.read(selectedNeighborhoodProvider);
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.65,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Adresse & quartier de livraison',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(sheetCtx);
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ClientAddressesScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Gérer'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView(
+                  children: [
+                    if (addresses.isNotEmpty) ...[
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                        child: Text(
+                          'MES ADRESSES ENREGISTRÉES',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: GoLivreurTheme.texteSecondaire,
+                          ),
+                        ),
+                      ),
+                      ...addresses.map(
+                        (addr) => ListTile(
+                          leading: Icon(
+                            Icons.bookmark,
+                            color: addr.isDefault
+                                ? GoLivreurTheme.secondaire
+                                : GoLivreurTheme.primaire,
+                          ),
+                          title: Text('${addr.label} — ${addr.neighborhood}'),
+                          subtitle: Text(addr.addressLine),
+                          trailing: addr.isDefault
+                              ? const Icon(Icons.check_circle, color: GoLivreurTheme.secondaire)
+                              : null,
+                          onTap: () async {
+                            await ref.read(clientAddressesProvider.notifier).choisirParDefaut(addr);
+                            if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                          },
+                        ),
+                      ),
+                    ],
+                    if (quarters.isNotEmpty) ...[
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                        child: Text(
+                          'OU CHOISIR UN QUARTIER',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: GoLivreurTheme.texteSecondaire,
+                          ),
+                        ),
+                      ),
+                      ...quarters.map(
+                        (q) => ListTile(
+                          leading: Icon(
+                            Icons.location_on_outlined,
+                            color: q == currentQuarter
+                                ? GoLivreurTheme.primaire
+                                : GoLivreurTheme.texteSecondaire,
+                          ),
+                          title: Text(q),
+                          trailing: q == currentQuarter
+                              ? const Icon(Icons.check, color: GoLivreurTheme.primaire)
+                              : null,
+                          onTap: () {
+                            ref.read(selectedNeighborhoodProvider.notifier).state = q;
+                            Navigator.pop(sheetCtx);
+                          },
+                        ),
+                      ),
+                    ] else if (addresses.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text(
+                          'Aucun quartier disponible pour le moment.',
+                          style: TextStyle(color: GoLivreurTheme.texteSecondaire),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
+    final destination = ref.watch(activeDeliveryDestinationProvider);
+    final estimate = ref.watch(cartDeliveryEstimateProvider);
+    final weather = ref.watch(weatherProvider);
     final merchant = cart.merchant;
+    final total = cart.subtotal + estimate.deliveryFee;
 
     if (cart.items.isEmpty) {
       return Scaffold(
@@ -199,6 +331,64 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             ),
             const SizedBox(height: 20),
 
+            // ─── Adresse & Quartier de livraison ───────────────────────────
+            const Text(
+              'Adresse de livraison',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: GoLivreurTheme.textePrincipal,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: GoLivreurTheme.bordure),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, color: GoLivreurTheme.primaire),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          destination.neighborhood,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          destination.fullAddress,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: GoLivreurTheme.texteSecondaire,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Distance estimée : ${estimate.distanceKm.toStringAsFixed(1)} km${weather.isRainMode ? " • 🌧️ Mode Pluie" : ""}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: GoLivreurTheme.secondaire,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _showQuickAddressPicker(context),
+                    child: const Text('Changer', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
             // ─── Repères & Instructions de livraison à Daloa ────────────────
             const Text(
               'Instructions de livraison (Repères à Daloa)',
@@ -221,6 +411,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 maxLines: 2,
                 decoration: const InputDecoration(
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
                   hintText: 'Ex: En face du maquis Le Baoulé, portail bleu, appeler dès arrivée',
                   hintStyle: TextStyle(fontSize: 13, color: GoLivreurTheme.texteSecondaire),
                 ),
@@ -300,8 +494,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Frais de livraison Daloa', style: TextStyle(color: GoLivreurTheme.texteSecondaire)),
-                      Text('${cart.deliveryFee.toInt()} F CFA', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Text(
+                        'Frais de livraison (${destination.neighborhood})',
+                        style: const TextStyle(color: GoLivreurTheme.texteSecondaire),
+                      ),
+                      Text(
+                        '${estimate.deliveryFee.toInt()} F CFA',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ],
                   ),
                   const Padding(
@@ -316,7 +516,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: GoLivreurTheme.textePrincipal),
                       ),
                       Text(
-                        '${cart.total.toInt()} F CFA',
+                        '${total.toInt()} F CFA',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -348,7 +548,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                       )
                     : Text(
-                        'Confirmer la commande • ${cart.total.toInt()} F CFA',
+                        'Confirmer la commande • ${total.toInt()} F CFA',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -160,6 +161,17 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);
+    }
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(ClientAddress::class);
+    }
+
+    public function favoriteMerchants(): BelongsToMany
+    {
+        return $this->belongsToMany(Merchant::class, 'client_favorite_merchants', 'user_id', 'merchant_id')
+            ->withTimestamps();
     }
 
     public function adminSessions(): HasMany

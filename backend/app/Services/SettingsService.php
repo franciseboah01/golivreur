@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\{ActivityLog, Setting};
-use Illuminate\Support\Facades\{Cache, Log};
+use Illuminate\Support\Facades\{Cache, Log, Storage};
 
 /**
  * Service centralisé de gestion des Paramètres GoLivreur.
@@ -95,6 +95,11 @@ class SettingsService
             'faq_url'          => 'https://golivreur.ci/faq',
             'app_version_min'  => '1.0.0',
         ],
+
+        'branding' => [
+            'logo_path'     => null,
+            'default_emoji' => '🛵',
+        ],
     ];
 
     /**
@@ -184,6 +189,49 @@ class SettingsService
         }
 
         return $setting;
+    }
+
+    /**
+     * Retourne l'identité visuelle GoLivreur (logo personnalisé si existant, sinon emoji par défaut).
+     *
+     * @return array{logo_path: ?string, logo_url: ?string, default_emoji: string}
+     */
+    public function getBranding(): array
+    {
+        $branding = $this->get('branding', null, self::DEFAULTS['branding']);
+        $logoPath = is_array($branding) ? ($branding['logo_path'] ?? null) : null;
+
+        if (is_array($logoPath)) {
+            $logoPath = reset($logoPath) ?: null;
+        }
+
+        $hasLogo = is_string($logoPath)
+            && $logoPath !== ''
+            && Storage::disk('public')->exists($logoPath);
+
+        $defaultEmoji = is_array($branding) && !empty($branding['default_emoji'])
+            ? trim((string) $branding['default_emoji'])
+            : '🛵';
+
+        if ($defaultEmoji === '') {
+            $defaultEmoji = '🛵';
+        }
+
+        return [
+            'logo_path'     => $hasLogo ? $logoPath : null,
+            'logo_url'      => $hasLogo ? url('storage/' . $logoPath) : null,
+            'default_emoji' => $defaultEmoji,
+        ];
+    }
+
+    public function getAppLogoUrl(): ?string
+    {
+        return $this->getBranding()['logo_url'];
+    }
+
+    public function getDefaultEmoji(): string
+    {
+        return $this->getBranding()['default_emoji'];
     }
 
     /**

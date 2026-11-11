@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CityResource\Pages;
 
 use App\Filament\Resources\CityResource;
+use App\Filament\Resources\NeighborhoodResource;
 use App\Models\City;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
@@ -16,6 +17,12 @@ class ListCities extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('neighborhoods')
+                ->label('Quartiers & Zones')
+                ->icon('heroicon-o-map')
+                ->color('gray')
+                ->url(NeighborhoodResource::getUrl('index')),
+
             Actions\CreateAction::make()->label('Ajouter une Ville'),
         ];
     }

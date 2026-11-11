@@ -29,6 +29,7 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
 
   bool _isInitialLoading = true;
   bool _isSaving = false;
+  bool _loadFailed = false;
   String? _errorMsg;
 
   @override
@@ -57,10 +58,11 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
   Future<void> _loadFromApi() async {
     setState(() {
       _isInitialLoading = true;
+      _loadFailed = false;
       _errorMsg = null;
     });
 
-    await ref.read(authProvider.notifier).chargerProfil();
+    final err = await ref.read(authProvider.notifier).chargerProfil();
     final user = ref.read(authProvider).user;
     if (mounted) {
       if (user != null) {
@@ -71,7 +73,11 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
         _language = user.language;
         _notificationsEnabled = user.notificationsEnabled;
       }
-      setState(() => _isInitialLoading = false);
+      setState(() {
+        _isInitialLoading = false;
+        _loadFailed = err != null;
+        _errorMsg = err;
+      });
     }
   }
 
@@ -80,6 +86,7 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
 
     setState(() {
       _isSaving = true;
+      _loadFailed = false;
       _errorMsg = null;
     });
 
@@ -175,7 +182,7 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
                               ),
                             ),
                             TextButton(
-                              onPressed: _isSaving ? null : _save,
+                              onPressed: _isSaving ? null : (_loadFailed ? _loadFromApi : _save),
                               child: const Text('Réessayer'),
                             ),
                           ],
@@ -238,7 +245,7 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
                             maxLines: 2,
                             decoration: const InputDecoration(
                               labelText: 'Adresse de livraison par défaut',
-                              hintText: 'Ex: Quartier Résidentiel, Face Maquis Le Baoulé',
+                              hintText: 'Ex: Nom du quartier, rue ou repère',
                               prefixIcon: Icon(Icons.location_on_outlined),
                               border: OutlineInputBorder(),
                             ),

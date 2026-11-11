@@ -16,3 +16,4 @@ class UpdateDriverProfileRequest extends BaseProfileRequest
         ]);
     }
 }
+

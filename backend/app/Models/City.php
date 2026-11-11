@@ -56,5 +56,10 @@ class City extends Model
     {
         return $this->hasMany(Parcel::class);
     }
+
+    public function neighborhoods(): HasMany
+    {
+        return $this->hasMany(Neighborhood::class);
+    }
 }
 

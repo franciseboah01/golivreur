@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\{LoginRequest, RegisterRequest, VerifyOtpRequest};
-use App\Models\{OtpCode, User};
+use App\Models\{City, OtpCode, User};
 use App\Services\{ActivityLogService, SmsService};
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\{Cache, Hash, RateLimiter};
@@ -52,6 +52,16 @@ class AuthController extends Controller
             'expires_at' => now()->addMinutes(5),
         ]);
 
+        // Mémoriser les informations d'inscription pour l'étape 2 (/verify-register)
+        $pendingName = trim((string) $request->input('name', ''));
+        $pendingCityId = $request->input('city_id');
+        if ($pendingName !== '' || $pendingCityId !== null) {
+            Cache::put("register_meta:{$phone}", [
+                'name'    => $pendingName,
+                'city_id' => $pendingCityId,
+            ], now()->addMinutes(15));
+        }
+
         $this->smsService->envoyerOtp($phone, $code, 'inscription');
 
         $responseData = [
@@ -73,7 +83,9 @@ class AuthController extends Controller
     {
         $phone = (string) $request->input('phone');
         $otp   = (string) ($request->input('otp') ?? $request->input('code'));
-        $name  = (string) ($request->input('name') ?? 'Client');
+        $meta  = Cache::get("register_meta:{$phone}", []);
+        $rawName = trim((string) ($request->input('name') ?: ($meta['name'] ?? '')));
+        $name    = $rawName !== '' ? $rawName : 'Client';
 
         $otpRecord = OtpCode::where('phone', $phone)
             ->where('purpose', 'register')
@@ -91,19 +103,35 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // Marquer l'OTP utilisé
+        if (User::where('phone', $phone)->exists()) {
+            return response()->json([
+                'succes'  => false,
+                'message' => 'Ce numéro est déjà associé à un compte.',
+            ], 409);
+        }
+
+        // Marquer l'OTP utilisé et consommer les métadonnées d'inscription
         if ($otpRecord) {
             $otpRecord->update(['is_used' => true]);
         }
+        Cache::forget("register_meta:{$phone}");
+        RateLimiter::clear("otp_register:{$phone}");
+
+        $requestedCityId = $request->input('city_id') ?? ($meta['city_id'] ?? null);
+        $validCityId = $requestedCityId && City::whereKey($requestedCityId)->exists()
+            ? (int) $requestedCityId
+            : null;
 
         // Créer l'utilisateur
         $user = User::create([
             'name'               => $name,
             'phone'              => $phone,
             'role'               => 'client',
+            'city_id'            => $validCityId,
             'is_active'          => true,
             'phone_verified_at'  => now(),
         ]);
+        $user->load('city');
 
         $token = JWTAuth::fromUser($user);
 
@@ -114,12 +142,7 @@ class AuthController extends Controller
                 'access_token'  => $token,
                 'refresh_token' => $this->genererRefreshToken($user),
                 'token_type'    => 'bearer',
-                'user'          => [
-                    'id'    => $user->id,
-                    'name'  => $user->name,
-                    'phone' => $user->phone,
-                    'role'  => $user->role,
-                ],
+                'user'          => $this->formatUserPayload($user),
             ],
         ], 201);
     }
@@ -132,14 +155,15 @@ class AuthController extends Controller
         $phone = $request->validated('phone');
 
         $rateLimitKey = "otp_login:{$phone}";
-        if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
+        $maxLoginAttempts = app()->environment('local', 'testing') ? 10 : 3;
+        if (RateLimiter::tooManyAttempts($rateLimitKey, $maxLoginAttempts)) {
             $secondes = RateLimiter::availableIn($rateLimitKey);
             return response()->json([
                 'succes'  => false,
                 'message' => "Trop de tentatives. Réessayez dans " . ceil($secondes / 60) . " minute(s).",
             ], 429);
         }
-        RateLimiter::hit($rateLimitKey, 3600);
+        RateLimiter::hit($rateLimitKey, 600);
 
         $user = User::where('phone', $phone)
             ->where('is_active', true)
@@ -217,6 +241,7 @@ class AuthController extends Controller
         }
 
         $token = JWTAuth::fromUser($user);
+        $user->load('city');
 
         return response()->json([
             'succes'  => true,
@@ -226,13 +251,7 @@ class AuthController extends Controller
                 'refresh_token' => $this->genererRefreshToken($user),
                 'token_type'    => 'bearer',
                 'expires_in'    => config('jwt.ttl') * 60,
-                'user'          => [
-                    'id'      => $user->id,
-                    'name'    => $user->name,
-                    'phone'   => $user->phone,
-                    'role'    => $user->role,
-                    'city_id' => $user->city_id,
-                ],
+                'user'          => $this->formatUserPayload($user),
             ],
         ]);
     }
@@ -262,10 +281,22 @@ class AuthController extends Controller
             ], 422);
         }
 
+        $user = User::where('phone', $phone)
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'succes'  => false,
+                'message' => 'Numéro non reconnu ou compte désactivé.',
+            ], 404);
+        }
+
         if ($otpRecord) {
             $otpRecord->update(['is_used' => true]);
         }
-        $user = User::where('phone', $phone)->firstOrFail();
+        RateLimiter::clear("otp_login:{$phone}");
 
         // Session unique pour merchants et drivers
         if (in_array($user->role, ['merchant', 'driver'])) {
@@ -282,6 +313,7 @@ class AuthController extends Controller
             'last_login_ip' => $request->ip(),
             'last_login_at' => now(),
         ]);
+        $user->load('city');
 
         $token = JWTAuth::fromUser($user);
 
@@ -299,13 +331,7 @@ class AuthController extends Controller
                 'refresh_token' => $this->genererRefreshToken($user),
                 'token_type'    => 'bearer',
                 'expires_in'    => config('jwt.ttl') * 60,
-                'user'          => [
-                    'id'      => $user->id,
-                    'name'    => $user->name,
-                    'phone'   => $user->phone,
-                    'role'    => $user->role,
-                    'city_id' => $user->city_id,
-                ],
+                'user'          => $this->formatUserPayload($user),
             ],
         ]);
     }
@@ -352,6 +378,24 @@ class AuthController extends Controller
     }
 
     // ─── Méthodes privées ─────────────────────────────────────────────────────
+
+    private function formatUserPayload(User $user): array
+    {
+        return [
+            'id'                    => $user->id,
+            'name'                  => $user->name,
+            'phone'                 => $user->phone,
+            'email'                 => $user->email,
+            'role'                  => $user->role,
+            'city_id'               => $user->city_id,
+            'city_name'             => $user->city?->name,
+            'default_address'       => $user->default_address,
+            'language'              => $user->language ?? 'fr',
+            'notifications_enabled' => (bool) ($user->notifications_enabled ?? true),
+            'photo_url'             => $user->photo_url,
+            'is_active'             => (bool) ($user->is_active ?? true),
+        ];
+    }
 
     private function masquerTelephone(string $phone): string
     {

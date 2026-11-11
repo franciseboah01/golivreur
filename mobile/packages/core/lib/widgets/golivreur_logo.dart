@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../config/app_theme.dart';
+import '../config/env_config.dart';
 
 /// Type d'application GoLivreur pour la déclinaison du logo.
 enum GoLivreurAppType {
@@ -8,21 +9,67 @@ enum GoLivreurAppType {
   driver,
 }
 
+/// Badge visuel GoLivreur : affiche le logo configuré en base s'il existe,
+/// sinon l'emoji par défaut (🛵).
+class GoLivreurBrandMark extends StatelessWidget {
+  final String? logoUrl;
+  final String defaultEmoji;
+  final double size;
+
+  const GoLivreurBrandMark({
+    super.key,
+    this.logoUrl,
+    this.defaultEmoji = '🛵',
+    this.size = 48.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedUrl = GoLivreurEnv.resolveMediaUrl(logoUrl);
+    final emoji = defaultEmoji.trim().isNotEmpty ? defaultEmoji.trim() : '🛵';
+
+    if (resolvedUrl != null && resolvedUrl.isNotEmpty) {
+      return Image.network(
+        resolvedUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Center(
+          child: Text(
+            emoji,
+            style: TextStyle(fontSize: size * 0.54, height: 1.0),
+          ),
+        ),
+      );
+    }
+
+    return Center(
+      child: Text(
+        emoji,
+        style: TextStyle(fontSize: size * 0.54, height: 1.0),
+      ),
+    );
+  }
+}
+
 /// Logo officiel GoLivreur conforme aux spécifications :
-///  - Carré orange aux couleurs de GoLivreur (#F4A623)
-///  - Dessin d'une moto simple blanche à l'intérieur
+///  - Logo configuré par l'admin si présent, sinon emoji par défaut (🛵)
 ///  - Texte "GoLivreur" centré
 ///  - Déclinaison "Client", "Business" ou "Driver" en dessous centré
 class GoLivreurLogo extends StatelessWidget {
   final GoLivreurAppType type;
   final double size;
   final bool showSubtitle;
+  final String? logoUrl;
+  final String defaultEmoji;
 
   const GoLivreurLogo({
     super.key,
     this.type = GoLivreurAppType.client,
     this.size = 88.0,
     this.showSubtitle = true,
+    this.logoUrl,
+    this.defaultEmoji = '🛵',
   });
 
   String get _badgeText {
@@ -49,16 +96,19 @@ class GoLivreurLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resolvedLogo = GoLivreurEnv.resolveMediaUrl(logoUrl);
+    final hasCustomLogo = resolvedLogo != null && resolvedLogo.isNotEmpty;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // 1. Carré orange avec moto simple au centre
+        // 1. Logo configuré ou badge orange avec emoji par défaut
         Container(
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: GoLivreurTheme.primaire,
+            color: hasCustomLogo ? Colors.white : GoLivreurTheme.primaire,
             borderRadius: BorderRadius.circular(size * 0.24),
             boxShadow: [
               BoxShadow(
@@ -67,21 +117,22 @@ class GoLivreurLogo extends StatelessWidget {
                 offset: const Offset(0, 8),
               ),
             ],
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFFFFB732),
-                Color(0xFFF4A623),
-              ],
-            ),
+            gradient: hasCustomLogo
+                ? null
+                : const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFFFB732),
+                      Color(0xFFF4A623),
+                    ],
+                  ),
           ),
-          child: Center(
-            child: Icon(
-              Icons.two_wheeler_rounded,
-              size: size * 0.58,
-              color: Colors.white,
-            ),
+          clipBehavior: Clip.antiAlias,
+          child: GoLivreurBrandMark(
+            logoUrl: resolvedLogo,
+            defaultEmoji: defaultEmoji,
+            size: size,
           ),
         ),
         const SizedBox(height: 14),

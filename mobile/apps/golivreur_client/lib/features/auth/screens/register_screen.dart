@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
 import 'package:golivreur_core/widgets/golivreur_logo.dart';
+import '../../goshop/providers/goshop_provider.dart';
 import '../providers/auth_provider.dart';
 import 'otp_verification_screen.dart';
 import 'login_screen.dart';
@@ -18,7 +19,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  int _selectedCityId = 1; // Daloa par défaut
+  int? _selectedCityId;
 
   @override
   void dispose() {
@@ -29,14 +30,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedCityId == null) return;
 
-    final phone = _phoneController.text.trim();
+    final phone = AuthNotifier.normalizePhone(_phoneController.text);
     final name = _nameController.text.trim();
+    final cityId = _selectedCityId!;
 
     final success = await ref.read(authProvider.notifier).demanderOtpInscription(
           phone: phone,
           name: name,
-          cityId: _selectedCityId,
+          cityId: cityId,
         );
 
     if (success && mounted) {
@@ -45,6 +48,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           builder: (_) => OtpVerificationScreen(
             phone: phone,
             isRegister: true,
+            name: name,
+            cityId: cityId,
           ),
         ),
       );
@@ -54,6 +59,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final branding = ref.watch(appBrandingProvider);
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -66,10 +72,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 24),
-                const Center(
+                Center(
                   child: GoLivreurLogo(
                     type: GoLivreurAppType.client,
                     size: 92,
+                    logoUrl: branding.logoUrl,
+                    defaultEmoji: branding.defaultEmoji,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -83,7 +91,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Créez votre compte pour commander à Daloa',
+                  'Créez votre compte GoLivreur',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: GoLivreurTheme.texteSecondaire,
@@ -129,25 +137,55 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     prefixText: '+225 ',
                   ),
                   validator: (val) {
-                    if (val == null || val.trim().length != 10) {
+                    if (val == null || AuthNotifier.normalizePhone(val).length != 10) {
                       return 'Le numéro ivoirien doit comporter 10 chiffres';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<int>(
-                  initialValue: _selectedCityId,
-                  decoration: const InputDecoration(
-                    labelText: 'Ville de livraison',
-                    prefixIcon: Icon(Icons.location_city),
+                ref.watch(citiesListProvider).when(
+                  loading: () => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: LinearProgressIndicator(color: GoLivreurTheme.primaire),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 1, child: Text('Daloa (Pilote)')),
-                    DropdownMenuItem(value: 2, child: Text('Bouaké (Prochainement)')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedCityId = val);
+                  error: (_, __) => const Text(
+                    'Impossible de charger la liste des villes.',
+                    style: TextStyle(color: GoLivreurTheme.erreur, fontSize: 13),
+                  ),
+                  data: (cities) {
+                    if (cities.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: GoLivreurTheme.bordure),
+                        ),
+                        child: const Text(
+                          'Aucune ville disponible pour le moment.',
+                          style: TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 13),
+                        ),
+                      );
+                    }
+                    final validValue = cities.any((c) => c.id == _selectedCityId)
+                        ? _selectedCityId
+                        : null;
+                    return DropdownButtonFormField<int>(
+                      initialValue: validValue,
+                      decoration: const InputDecoration(
+                        labelText: 'Ville de livraison *',
+                        prefixIcon: Icon(Icons.location_city),
+                      ),
+                      items: cities
+                          .map((c) => DropdownMenuItem<int>(
+                                value: c.id,
+                                child: Text(c.name),
+                              ))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedCityId = val),
+                      validator: (val) => val == null ? 'Veuillez choisir votre ville' : null,
+                    );
                   },
                 ),
                 const SizedBox(height: 24),
@@ -163,6 +201,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const Text('Déjà un compte ? '),
                     TextButton(
                       onPressed: () {
+                        ref.read(authProvider.notifier).clearError();
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(builder: (_) => const LoginScreen()),
                         );

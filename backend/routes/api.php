@@ -26,6 +26,10 @@ Route::get('/health', fn () => response()->json([
     'timestamp' => now()->toIso8601String(),
     'service'   => 'GoLivreur API',
 ]));
+Route::get('/branding', fn (\App\Services\SettingsService $settingsService) => response()->json([
+    'succes'  => true,
+    'donnees' => $settingsService->getBranding(),
+]));
 
 // ─── Authentification (public) ───────────────────────────────────────────────
 Route::prefix('auth')->group(function () {
@@ -40,6 +44,7 @@ Route::prefix('auth')->group(function () {
 
 // ─── Catalogue GoShop Public (Accessible avec ou sans connexion) ──────────────
 Route::prefix('client')->group(function () {
+    Route::get('city-status', [ClientController::class, 'cityStatus']);
     Route::get('categories', [ClientController::class, 'categories']);
     Route::get('merchants', [ClientController::class, 'merchants']);
     Route::get('merchants/{merchant}/catalog', [ClientController::class, 'merchantCatalog']);
@@ -51,7 +56,15 @@ Route::get('vehicle-types', fn () => response()->json([
 ]));
 Route::get('cities', fn () => response()->json([
     'succes'  => true,
-    'donnees' => \App\Models\City::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+    'donnees' => \App\Models\City::where('is_active', true)->orderBy('name')->get([
+        'id',
+        'name',
+        'center_lat',
+        'center_lng',
+        'rain_mode_active',
+        'emergency_mode_active',
+        'emergency_mode_message',
+    ]),
 ]));
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
@@ -73,6 +86,13 @@ Route::middleware('auth:api')->group(function () {
     Route::prefix('client')->middleware('role:client')->group(function () {
         Route::get('profile', [ProfileController::class, 'showClient']);
         Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateClient']);
+        Route::get('addresses', [ClientController::class, 'addresses']);
+        Route::post('addresses', [ClientController::class, 'storeAddress']);
+        Route::put('addresses/{address}', [ClientController::class, 'updateAddress']);
+        Route::post('addresses/{address}/default', [ClientController::class, 'setDefaultAddress']);
+        Route::delete('addresses/{address}', [ClientController::class, 'destroyAddress']);
+        Route::get('favorites', [ClientController::class, 'favorites']);
+        Route::post('favorites/{merchant}/toggle', [ClientController::class, 'toggleFavorite']);
         Route::post('orders', [ClientController::class, 'createOrder']);
         Route::get('orders', [ClientController::class, 'orders']);
         Route::get('orders/{order}', [ClientController::class, 'showOrder']);

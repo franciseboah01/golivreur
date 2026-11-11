@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../goshop/providers/goshop_provider.dart';
+import '../../profile/screens/client_addresses_screen.dart';
 import '../providers/gocolis_provider.dart';
 import 'parcel_tracking_screen.dart';
 
@@ -16,13 +18,20 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
   final _formKey = GlobalKey<FormState>();
   final _recipientNameController = TextEditingController(text: 'Koffi Jean-Marc');
   final _recipientPhoneController = TextEditingController(text: '0701000002');
-  final _addressController = TextEditingController(text: 'Daloa, Quartier Lobia (Face Grande Mosquée)');
+  late final TextEditingController _addressController;
   final _descriptionController = TextEditingController(text: 'Documents scellés + clés');
   final _declaredValueController = TextEditingController(text: '10000');
 
   String _selectedSize = 'moyen'; // petit, moyen, grand
   String _selectedPaymentMethod = 'wave';
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final destination = ref.read(activeDeliveryDestinationProvider);
+    _addressController = TextEditingController(text: destination.fullAddress);
+  }
 
   @override
   void dispose() {
@@ -143,6 +152,45 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
                         hintText: 'Ex: Lobia, face pharmacie de garde',
                       ),
                       validator: (val) => val == null || val.isEmpty ? 'Champ obligatoire' : null,
+                    ),
+                    const SizedBox(height: 10),
+                    Consumer(
+                      builder: (_, chipRef, __) {
+                        final savedAddresses = chipRef.watch(clientAddressesProvider).addresses;
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: savedAddresses
+                                      .map(
+                                        (addr) => Padding(
+                                          padding: const EdgeInsets.only(right: 6),
+                                          child: ActionChip(
+                                            avatar: const Icon(Icons.bookmark_outline, size: 15),
+                                            label: Text('${addr.label} (${addr.neighborhood})', style: const TextStyle(fontSize: 12)),
+                                            onPressed: () {
+                                              _addressController.text = addr.formattedAddress;
+                                            },
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const ClientAddressesScreen()),
+                                );
+                              },
+                              child: const Text('Adresses', style: TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),

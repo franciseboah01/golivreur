@@ -57,3 +57,4 @@ class BusinessProfileResource extends JsonResource
         ];
     }
 }
+

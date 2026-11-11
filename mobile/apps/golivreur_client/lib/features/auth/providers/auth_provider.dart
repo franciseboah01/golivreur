@@ -6,16 +6,18 @@ import 'package:golivreur_core/services/api_client.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../config/env.dart';
 
-final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
+void Function()? _forcedLogoutHandler;
+
+final Provider<FlutterSecureStorage> secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
   return const FlutterSecureStorage();
 });
 
-final apiClientProvider = Provider<ApiClient>((ref) {
+final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
   final storage = ref.watch(secureStorageProvider);
   return ApiClient(
     baseUrl: Env.apiBaseUrl,
     storage: storage,
-    onDeconnexionForcee: () {},
+    onDeconnexionForcee: () => _forcedLogoutHandler?.call(),
   );
 });
 
@@ -31,25 +33,35 @@ class AuthState {
   final AuthStatus status;
   final UserModel? user;
   final String? phoneNumber;
+  final String? pendingName;
+  final int? pendingCityId;
   final String? errorMessage;
 
   const AuthState({
     this.status = AuthStatus.initial,
     this.user,
     this.phoneNumber,
+    this.pendingName,
+    this.pendingCityId,
     this.errorMessage,
   });
 
   AuthState copyWith({
     AuthStatus? status,
     UserModel? user,
+    bool clearUser = false,
     String? phoneNumber,
+    String? pendingName,
+    int? pendingCityId,
+    bool clearPendingRegistration = false,
     String? errorMessage,
   }) {
     return AuthState(
       status: status ?? this.status,
-      user: user ?? this.user,
-      phoneNumber: phoneNumber ?? this.phoneNumber,
+      user: clearUser ? null : (user ?? this.user),
+      phoneNumber: clearUser ? null : (phoneNumber ?? this.phoneNumber),
+      pendingName: clearPendingRegistration ? null : (pendingName ?? this.pendingName),
+      pendingCityId: clearPendingRegistration ? null : (pendingCityId ?? this.pendingCityId),
       errorMessage: errorMessage,
     );
   }
@@ -59,18 +71,49 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _apiClient;
   final FlutterSecureStorage _storage;
 
-  AuthNotifier(this._apiClient, this._storage) : super(const AuthState());
+  AuthNotifier(this._apiClient, this._storage) : super(const AuthState()) {
+    _forcedLogoutHandler = forcerDeconnexionLocale;
+  }
+
+  static String normalizePhone(String raw) {
+    var cleaned = raw.replaceAll(RegExp(r'[\s\.\-\(\)]+'), '').trim();
+    if (cleaned.startsWith('+225')) {
+      cleaned = cleaned.substring(4);
+    } else if (cleaned.startsWith('00225')) {
+      cleaned = cleaned.substring(5);
+    } else if (cleaned.length == 13 && cleaned.startsWith('225')) {
+      cleaned = cleaned.substring(3);
+    }
+    return cleaned;
+  }
+
+  void clearError() {
+    if (state.errorMessage != null || state.status == AuthStatus.error) {
+      state = state.copyWith(
+        status: state.user != null ? AuthStatus.authenticated : AuthStatus.initial,
+        errorMessage: null,
+      );
+    }
+  }
 
   Future<bool> demanderOtpInscription({
     required String phone,
     required String name,
     required int cityId,
   }) async {
-    state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
+    final cleanPhone = normalizePhone(phone);
+    final cleanName = name.trim();
+    state = state.copyWith(
+      status: AuthStatus.loading,
+      phoneNumber: cleanPhone,
+      pendingName: cleanName,
+      pendingCityId: cityId,
+      errorMessage: null,
+    );
     try {
       final res = await _apiClient.post('/auth/register', data: {
-        'phone': phone,
-        'name': name,
+        'phone': cleanPhone,
+        'name': cleanName,
         'city_id': cityId,
         'role': 'client',
       });
@@ -78,11 +121,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (res.statusCode == 200) {
         state = state.copyWith(
           status: AuthStatus.otpSent,
-          phoneNumber: phone,
+          phoneNumber: cleanPhone,
+          pendingName: cleanName,
+          pendingCityId: cityId,
+          errorMessage: null,
         );
         return true;
       }
-    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Impossible d\'envoyer le code SMS. Vérifiez le numéro.',
+      );
+    } on DioException catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: ApiClient.messageErreur(e),
+      );
+    } catch (_) {
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: 'Impossible d\'envoyer le code SMS. Vérifiez le numéro.',
@@ -94,32 +149,67 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> verifierOtpInscription({
     required String phone,
     required String code,
+    String? name,
+    int? cityId,
   }) async {
+    final cleanPhone = normalizePhone(phone);
+    final effectiveName = (name ?? state.pendingName ?? '').trim();
+    final effectiveCityId = cityId ?? state.pendingCityId;
+
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
     try {
       final res = await _apiClient.post('/auth/verify-register', data: {
-        'phone': phone,
-        'code': code,
-        'otp': code,
+        'phone': cleanPhone,
+        'code': code.trim(),
+        'otp': code.trim(),
+        if (effectiveName.isNotEmpty) 'name': effectiveName,
+        if (effectiveCityId != null) 'city_id': effectiveCityId,
       });
 
       if (res.statusCode == 200 || res.statusCode == 201) {
-        final data = res.data['donnees'];
-        final accessToken = data['access_token'];
-        final refreshToken = data['refresh_token'];
-        final userJson = data['user'];
+        final data = res.data['donnees'] as Map<String, dynamic>;
+        final accessToken = data['access_token'] as String?;
+        final refreshToken = data['refresh_token'] as String?;
+        final userJson = data['user'] as Map<String, dynamic>?;
 
+        if (accessToken == null || accessToken.isEmpty || userJson == null) {
+          state = state.copyWith(
+            status: AuthStatus.error,
+            errorMessage: 'Réponse d\'inscription incomplète du serveur.',
+          );
+          return false;
+        }
+
+        await _storage.deleteAll();
         await _storage.write(key: 'access_token', value: accessToken);
-        await _storage.write(key: 'refresh_token', value: refreshToken);
+        if (refreshToken != null) {
+          await _storage.write(key: 'refresh_token', value: refreshToken);
+        }
 
-        final user = UserModel.fromJson(userJson);
+        var user = UserModel.fromJson(userJson);
+        if (user.name.trim().isEmpty && effectiveName.isNotEmpty) {
+          user = user.copyWith(name: effectiveName);
+        }
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
+          phoneNumber: user.phone,
+          clearPendingRegistration: true,
+          errorMessage: null,
         );
+        await chargerProfil();
         return true;
       }
-    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Code OTP invalide ou expiré.',
+      );
+    } on DioException catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: ApiClient.messageErreur(e),
+      );
+    } catch (_) {
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: 'Code OTP invalide ou expiré.',
@@ -129,31 +219,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<bool> demanderOtpConnexion(String phone) async {
-    state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
+    final cleanPhone = normalizePhone(phone);
+    state = state.copyWith(
+      status: AuthStatus.loading,
+      clearPendingRegistration: true,
+      errorMessage: null,
+    );
     try {
       final res = await _apiClient.post('/auth/login', data: {
-        'phone': phone,
+        'phone': cleanPhone,
       });
 
       if (res.statusCode == 200) {
         state = state.copyWith(
           status: AuthStatus.otpSent,
-          phoneNumber: phone,
-        );
-        return true;
-      }
-    } catch (e) {
-      // Secours démo : autorise les numéros de test si le backend est hors de portée réseau
-      if (phone.isNotEmpty) {
-        state = state.copyWith(
-          status: AuthStatus.otpSent,
-          phoneNumber: phone,
+          phoneNumber: cleanPhone,
+          errorMessage: null,
         );
         return true;
       }
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: 'Numéro inconnu ou inactif.',
+        errorMessage: 'Numéro inconnu ou compte désactivé.',
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.statusCode == 404
+          ? 'Aucun compte trouvé avec ce numéro. Veuillez vous inscrire.'
+          : ApiClient.messageErreur(e);
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: msg,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Impossible de contacter le serveur.',
       );
     }
     return false;
@@ -163,47 +263,56 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String phone,
     required String code,
   }) async {
+    final cleanPhone = normalizePhone(phone);
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
     try {
       final res = await _apiClient.post('/auth/verify-login', data: {
-        'phone': phone,
-        'code': code,
-        'otp': code,
+        'phone': cleanPhone,
+        'code': code.trim(),
+        'otp': code.trim(),
       });
 
       if (res.statusCode == 200) {
-        final data = res.data['donnees'];
-        final accessToken = data['access_token'];
-        final refreshToken = data['refresh_token'];
-        final userJson = data['user'];
+        final data = res.data['donnees'] as Map<String, dynamic>;
+        final accessToken = data['access_token'] as String?;
+        final refreshToken = data['refresh_token'] as String?;
+        final userJson = data['user'] as Map<String, dynamic>?;
 
+        if (accessToken == null || accessToken.isEmpty || userJson == null) {
+          state = state.copyWith(
+            status: AuthStatus.error,
+            errorMessage: 'Réponse de connexion incomplète du serveur.',
+          );
+          return false;
+        }
+
+        await _storage.deleteAll();
         await _storage.write(key: 'access_token', value: accessToken);
-        await _storage.write(key: 'refresh_token', value: refreshToken);
+        if (refreshToken != null) {
+          await _storage.write(key: 'refresh_token', value: refreshToken);
+        }
 
         final user = UserModel.fromJson(userJson);
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
+          phoneNumber: user.phone,
+          clearPendingRegistration: true,
+          errorMessage: null,
         );
+        await chargerProfil();
         return true;
       }
-    } catch (e) {
-      // Secours démo : Le code maître 1234 permet toujours la connexion de test
-      if (code == '1234' || code == '0000') {
-        const demoUser = UserModel(
-          id: 1,
-          name: 'Ama Kouassi',
-          phone: '0701000001',
-          role: 'client',
-          cityId: 1,
-          isActive: true,
-        );
-        state = state.copyWith(
-          status: AuthStatus.authenticated,
-          user: demoUser,
-        );
-        return true;
-      }
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Code OTP incorrect ou expiré.',
+      );
+    } on DioException catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: ApiClient.messageErreur(e),
+      );
+    } catch (_) {
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: 'Code OTP incorrect ou expiré.',
@@ -212,7 +321,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return false;
   }
 
-  Future<void> chargerProfil() async {
+  Future<String?> chargerProfil() async {
     try {
       final res = await _apiClient.get('/client/profile');
       if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
@@ -221,9 +330,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
           status: AuthStatus.authenticated,
           user: user,
           phoneNumber: user.phone,
+          errorMessage: null,
         );
+        return null;
       }
-    } catch (_) {}
+      return 'Impossible de charger votre profil.';
+    } on DioException catch (e) {
+      return ApiClient.messageErreur(e);
+    } catch (_) {
+      return 'Impossible de charger votre profil.';
+    }
   }
 
   Future<(bool, String?)> mettreAJourProfil({
@@ -239,10 +355,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiClient.uploadMultipart(
         '/client/profile',
         fields: {
-          'name': name,
-          'phone': phone,
-          'email': email ?? '',
-          'default_address': defaultAddress ?? '',
+          'name': name.trim(),
+          'phone': normalizePhone(phone),
+          'email': email?.trim() ?? '',
+          'default_address': defaultAddress?.trim() ?? '',
           'language': language,
           'notifications_enabled': notificationsEnabled ? '1' : '0',
         },
@@ -255,6 +371,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           status: AuthStatus.authenticated,
           user: user,
           phoneNumber: user.phone,
+          errorMessage: null,
         );
         return (true, null);
       }
@@ -266,14 +383,55 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  void deconnecterLocalement() async {
+  Future<void> deconnecter() async {
+    try {
+      await _apiClient.post('/auth/logout').timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // Déconnexion locale même si le serveur ou le réseau est indisponible
+    }
+    await forcerDeconnexionLocale();
+  }
+
+  Future<void> forcerDeconnexionLocale() async {
     await _storage.deleteAll();
     state = const AuthState(status: AuthStatus.initial);
   }
+
+  Future<void> deconnecterLocalement() => deconnecter();
 }
 
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+final StateNotifierProvider<AuthNotifier, AuthState> authProvider =
+    StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   final storage = ref.watch(secureStorageProvider);
   return AuthNotifier(apiClient, storage);
+});
+
+class CityOption {
+  final int id;
+  final String name;
+
+  const CityOption({required this.id, required this.name});
+
+  factory CityOption.fromJson(Map<String, dynamic> json) => CityOption(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+      );
+}
+
+/// Liste des villes actives chargée depuis l'API (/api/v1/cities), sans liste statique codée en dur.
+final FutureProvider<List<CityOption>> citiesListProvider =
+    FutureProvider<List<CityOption>>((ref) async {
+  final apiClient = ref.watch(apiClientProvider);
+  try {
+    final res = await apiClient.get('/cities');
+    if (res.statusCode == 200 && res.data['succes'] == true) {
+      final raw = res.data['donnees'] as List<dynamic>? ?? const [];
+      return raw
+          .map((e) => CityOption.fromJson(e as Map<String, dynamic>))
+          .where((c) => c.name.isNotEmpty)
+          .toList();
+    }
+  } catch (_) {}
+  return const [];
 });

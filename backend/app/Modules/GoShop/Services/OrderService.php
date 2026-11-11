@@ -37,7 +37,8 @@ class OrderService
             }
 
             // Calculer les montants
-            $city         = City::findOrFail($client->city_id);
+            $cityId        = $client->city_id ?? $merchant->city_id ?? 1;
+            $city          = City::findOrFail($cityId);
             $produitsTotal = $this->calculerTotalProduits($donnees['items']);
             $fraisLivraison = $this->commissionService->calculerFraisLivraison(
                 distance: $donnees['distance_km'],
@@ -53,7 +54,7 @@ class OrderService
             $order = Order::create([
                 'client_id'           => $client->id,
                 'merchant_id'         => $merchant->id,
-                'city_id'             => $client->city_id,
+                'city_id'             => $city->id,
                 'status'              => Order::STATUS_PENDING,
                 'products_total'      => $produitsTotal,
                 'delivery_fee'        => $fraisLivraison,

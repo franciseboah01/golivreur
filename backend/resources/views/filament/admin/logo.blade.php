@@ -1,9 +1,27 @@
+@php
+    $logoUrl = null;
+    $defaultEmoji = '🛵';
+    try {
+        $branding = app(\App\Services\SettingsService::class)->getBranding();
+        $logoUrl = $branding['logo_url'] ?? null;
+        $defaultEmoji = $branding['default_emoji'] ?? '🛵';
+    } catch (\Throwable) {
+    }
+@endphp
 <div class="flex items-center justify-center gap-3">
-    <img
-        src="{{ asset('images/logo.png') }}"
-        alt="GoLivreur"
-        class="h-10 w-10 rounded-xl shadow-md ring-2 ring-amber-500/20 object-contain bg-amber-500/10 p-0.5"
-    />
+    @if (!empty($logoUrl))
+        <img
+            src="{{ $logoUrl }}"
+            alt="GoLivreur"
+            class="h-10 w-10 rounded-xl shadow-md ring-2 ring-amber-500/20 object-contain bg-amber-500/10 p-0.5"
+        />
+    @else
+        <span
+            role="img"
+            aria-label="GoLivreur"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-xl shadow-md ring-2 ring-amber-500/20 bg-amber-500/10 text-2xl leading-none"
+        >{{ $defaultEmoji }}</span>
+    @endif
     <div class="flex flex-col text-left">
         <span class="text-2xl font-black tracking-tight text-gray-900 dark:text-white leading-none">
             Go<span class="text-amber-500">Livreur</span>

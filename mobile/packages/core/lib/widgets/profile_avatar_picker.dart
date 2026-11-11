@@ -41,7 +41,8 @@ class ProfileAvatarPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resolvedUrl = GoLivreurEnv.resolveMediaUrl(currentImageUrl);
-    final radius = isSquare ? BorderRadius.circular(18) : BorderRadius.circular(size / 2);
+    final radius =
+        isSquare ? BorderRadius.circular(18) : BorderRadius.circular(size / 2);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -109,7 +110,8 @@ class ProfileAvatarPicker extends StatelessWidget {
         const SizedBox(height: 8),
         TextButton.icon(
           onPressed: isUploading ? null : () => _showPickerSheet(context),
-          icon: Icon(Icons.photo_library_outlined, size: 18, color: accentColor),
+          icon:
+              Icon(Icons.photo_library_outlined, size: 18, color: accentColor),
           label: Text(
             buttonLabel,
             style: TextStyle(
@@ -244,7 +246,8 @@ class ProfileAvatarPicker extends StatelessWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('L\'image dépasse la taille maximale autorisée de 2 Mo.'),
+              content: Text(
+                  'L\'image dépasse la taille maximale autorisée de 2 Mo.'),
               backgroundColor: GoLivreurTheme.erreur,
             ),
           );

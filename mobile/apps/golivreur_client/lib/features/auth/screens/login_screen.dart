@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
 import 'package:golivreur_core/widgets/golivreur_logo.dart';
+import '../../goshop/providers/goshop_provider.dart';
 import '../providers/auth_provider.dart';
 import 'otp_verification_screen.dart';
 import 'register_screen.dart';
@@ -27,7 +28,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final phone = _phoneController.text.trim();
+    final phone = AuthNotifier.normalizePhone(_phoneController.text);
     final success = await ref.read(authProvider.notifier).demanderOtpConnexion(phone);
 
     if (success && mounted) {
@@ -45,6 +46,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final branding = ref.watch(appBrandingProvider);
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -57,10 +59,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 24),
-                const Center(
+                Center(
                   child: GoLivreurLogo(
                     type: GoLivreurAppType.client,
                     size: 92,
+                    logoUrl: branding.logoUrl,
+                    defaultEmoji: branding.defaultEmoji,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -135,7 +139,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     prefixText: '+225 ',
                   ),
                   validator: (val) {
-                    if (val == null || val.trim().length != 10) {
+                    if (val == null || AuthNotifier.normalizePhone(val).length != 10) {
                       return 'Veuillez saisir un numéro à 10 chiffres';
                     }
                     return null;
@@ -154,6 +158,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const Text('Nouveau sur GoLivreur ? '),
                     TextButton(
                       onPressed: () {
+                        ref.read(authProvider.notifier).clearError();
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(builder: (_) => const RegisterScreen()),
                         );

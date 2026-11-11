@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/goshop/providers/goshop_provider.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 import 'features/auth/providers/auth_provider.dart';
 
@@ -34,15 +35,15 @@ class GoLivreurClientApp extends StatelessWidget {
   }
 }
 
-class ClientRootGate extends StatefulWidget {
+class ClientRootGate extends ConsumerStatefulWidget {
   final bool showSplash;
   const ClientRootGate({super.key, required this.showSplash});
 
   @override
-  State<ClientRootGate> createState() => _ClientRootGateState();
+  ConsumerState<ClientRootGate> createState() => _ClientRootGateState();
 }
 
-class _ClientRootGateState extends State<ClientRootGate> {
+class _ClientRootGateState extends ConsumerState<ClientRootGate> {
   late bool _splashFinished;
 
   @override
@@ -53,9 +54,13 @@ class _ClientRootGateState extends State<ClientRootGate> {
 
   @override
   Widget build(BuildContext context) {
+    final branding = ref.watch(appBrandingProvider);
+
     if (!_splashFinished) {
       return AnimatedSplashScreen(
         appType: GoLivreurAppType.client,
+        logoUrl: branding.logoUrl,
+        defaultEmoji: branding.defaultEmoji,
         onFinished: () {
           if (mounted) {
             setState(() => _splashFinished = true);
@@ -74,7 +79,9 @@ class ClientAuthGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     if (authState.status == AuthStatus.authenticated) {
-      return const MainNavigationScreen();
+      return MainNavigationScreen(
+        key: ValueKey('main_${authState.user?.id ?? "guest"}'),
+      );
     }
     return const LoginScreen();
   }

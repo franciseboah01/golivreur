@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/config/env_config.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/utils/client_logout.dart';
+import '../../goshop/providers/goshop_provider.dart';
+import 'client_addresses_screen.dart';
 import 'edit_client_profile_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -18,6 +22,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(authProvider.notifier).chargerProfil();
+      ref.read(clientAddressesProvider.notifier).chargerAdresses(syncNeighborhood: false);
     });
   }
 
@@ -27,14 +32,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
     if (mounted) {
       await ref.read(authProvider.notifier).chargerProfil();
+      await ref.read(clientAddressesProvider.notifier).chargerAdresses(syncNeighborhood: false);
+    }
+  }
+
+  Future<void> _openAddressesScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ClientAddressesScreen()),
+    );
+    if (mounted) {
+      await ref.read(authProvider.notifier).chargerProfil();
+      await ref.read(clientAddressesProvider.notifier).chargerAdresses(syncNeighborhood: false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final branding = ref.watch(appBrandingProvider);
+    final addressesState = ref.watch(clientAddressesProvider);
     final user = authState.user;
     final photoUrl = GoLivreurEnv.resolveMediaUrl(user?.photoUrl);
+    final registeredCity = (user?.cityName ?? '').trim();
+    final activeDefaultAddress = addressesState.defaultAddress?.formattedAddress ??
+        (user?.defaultAddress?.trim() ?? '');
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -66,13 +87,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: GoLivreurTheme.primaire.withValues(alpha: 0.15),
-                    backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) ? NetworkImage(photoUrl) : null,
-                    child: (photoUrl == null || photoUrl.isEmpty)
-                        ? const Icon(Icons.person, color: GoLivreurTheme.primaire, size: 36)
-                        : null,
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: GoLivreurTheme.primaire.withValues(alpha: 0.15),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: (photoUrl != null && photoUrl.isNotEmpty)
+                        ? Image.network(
+                            photoUrl,
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.person,
+                              color: GoLivreurTheme.primaire,
+                              size: 36,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.person,
+                            color: GoLivreurTheme.primaire,
+                            size: 36,
+                          ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -80,7 +119,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user?.name ?? 'Client GoLivreur',
+                          user?.name ?? 'Client',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -89,7 +128,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '+225 ${user?.phone ?? "0701000001"}',
+                          '+225 ${user?.phone ?? ""}',
                           style: const TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 14),
                         ),
                         if (user?.email != null && user!.email!.isNotEmpty) ...[
@@ -99,15 +138,43 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             style: const TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 12),
                           ),
                         ],
-                        const SizedBox(height: 2),
-                        Text(
-                          user?.defaultAddress?.isNotEmpty == true
-                              ? user!.defaultAddress!
-                              : '${user?.cityName ?? "Daloa"}, Côte d\'Ivoire',
-                          style: const TextStyle(color: GoLivreurTheme.secondaire, fontSize: 12, fontWeight: FontWeight.w600),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.location_city_outlined,
+                              size: 14,
+                              color: GoLivreurTheme.secondaire,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                registeredCity.isNotEmpty
+                                    ? registeredCity
+                                    : '',
+                                style: const TextStyle(
+                                  color: GoLivreurTheme.secondaire,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
+                        if (activeDefaultAddress.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            activeDefaultAddress,
+                            style: const TextStyle(
+                              color: GoLivreurTheme.texteSecondaire,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -141,10 +208,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   _buildTile(
                     icon: Icons.location_on_outlined,
                     title: 'Mes adresses de livraison favorites',
-                    subtitle: user?.defaultAddress?.isNotEmpty == true
-                        ? user!.defaultAddress!
-                        : 'Quartier Résidentiel, Lobia, Hublot...',
-                    onTap: () => _showAddressesDialog(context),
+                    subtitle: addressesState.defaultAddress != null
+                        ? '${addressesState.defaultAddress!.label} — ${addressesState.defaultAddress!.neighborhood} (${addressesState.addresses.length} enregistrée(s))'
+                        : (user?.defaultAddress?.isNotEmpty == true
+                            ? user!.defaultAddress!
+                            : 'Ajouter, modifier ou choisir une adresse par défaut'),
+                    onTap: _openAddressesScreen,
                   ),
                 const Divider(height: 1),
                 _buildTile(
@@ -192,18 +261,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 foregroundColor: GoLivreurTheme.erreur,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: () {
-                ref.read(authProvider.notifier).deconnecterLocalement();
-              },
+              onPressed: () => deconnecterEtReinitialiserClient(context, ref),
               icon: const Icon(Icons.logout, size: 20),
               label: const Text('Se déconnecter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ),
           ),
           const SizedBox(height: 16),
-          const Center(
-            child: Text(
-              'GoLivreur v5.0 • Fait avec passion pour Daloa',
-              style: TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 12),
+          Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: GoLivreurBrandMark(
+                    logoUrl: branding.logoUrl,
+                    defaultEmoji: branding.defaultEmoji,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'GoLivreur v5.0 • Fait avec passion pour Daloa',
+                  style: TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 12),
+                ),
+              ],
             ),
           ),
         ],
@@ -234,48 +320,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  void _showAddressesDialog(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Mes adresses favorites à Daloa',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  leading: const Icon(Icons.home, color: GoLivreurTheme.secondaire),
-                  title: const Text('Maison — Quartier Résidentiel'),
-                  subtitle: const Text('Face Maquis Le Baoulé, portail bleu'),
-                  trailing: const Icon(Icons.check, color: GoLivreurTheme.secondaire),
-                  onTap: () => Navigator.pop(context),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.work, color: GoLivreurTheme.primaire),
-                  title: const Text('Bureau — Centre-ville Daloa'),
-                  subtitle: const Text('Immeuble Palmier, 2ème étage'),
-                  onTap: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   void _showNotificationsDialog(BuildContext context) {
+    ref.invalidate(clientNotificationsProvider);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -286,26 +332,65 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Notifications Récentes',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  leading: const Icon(Icons.cloudy_snowing, color: Color(0xFF2E75B6)),
-                  title: const Text('🌧️ Mode Pluie activé à Daloa'),
-                  subtitle: const Text('Les livreurs réduisent leur vitesse pour assurer la sécurité.'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.check_circle, color: GoLivreurTheme.secondaire),
-                  title: const Text('Commande #98 livrée avec succès'),
-                  subtitle: const Text('Chez Pharmacie Centrale — Merci de votre confiance !'),
-                ),
-              ],
+            child: Consumer(
+              builder: (ctx, modalRef, _) {
+                final notifsAsync = modalRef.watch(clientNotificationsProvider);
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Notifications Récentes',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    notifsAsync.when(
+                      loading: () => const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                      error: (_, __) => const Text('Impossible de charger les notifications.'),
+                      data: (items) {
+                        if (items.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Row(
+                              children: [
+                                Icon(Icons.notifications_none, color: GoLivreurTheme.texteSecondaire),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Aucune alerte en cours. Service standard actif à Daloa.',
+                                    style: TextStyle(color: GoLivreurTheme.texteSecondaire),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: items.take(5).map((item) {
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
+                                item.type == 'rain_mode'
+                                    ? Icons.cloudy_snowing
+                                    : Icons.notifications_active_outlined,
+                                color: item.type == 'rain_mode'
+                                    ? const Color(0xFF2E75B6)
+                                    : GoLivreurTheme.primaire,
+                              ),
+                              title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              subtitle: Text(item.body),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         );

@@ -3,17 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
-import '../../navigation/screens/main_navigation_screen.dart';
+import '../../../main.dart';
+import '../../gocolis/providers/gocolis_provider.dart';
+import '../../goshop/providers/goshop_provider.dart';
+import '../../goshop/providers/order_provider.dart';
 import '../providers/auth_provider.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String phone;
   final bool isRegister;
+  final String? name;
+  final int? cityId;
 
   const OtpVerificationScreen({
     super.key,
     required this.phone,
     required this.isRegister,
+    this.name,
+    this.cityId,
   });
 
   @override
@@ -56,10 +63,26 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
     final notifier = ref.read(authProvider.notifier);
     final success = widget.isRegister
-        ? await notifier.verifierOtpInscription(phone: widget.phone, code: code)
+        ? await notifier.verifierOtpInscription(
+            phone: widget.phone,
+            code: code,
+            name: widget.name,
+            cityId: widget.cityId,
+          )
         : await notifier.verifierOtpConnexion(phone: widget.phone, code: code);
 
     if (success && mounted) {
+      ref.read(cartProvider.notifier).clear();
+      ref.read(searchQueryProvider.notifier).state = '';
+      ref.invalidate(clientAddressesProvider);
+      ref.invalidate(favoritesProvider);
+      ref.invalidate(clientNotificationsProvider);
+      ref.invalidate(ordersHistoryProvider);
+      ref.invalidate(parcelsHistoryProvider);
+      ref.read(weatherProvider.notifier).chargerStatutVille();
+      ref.read(clientAddressesProvider.notifier).chargerAdresses();
+      ref.read(favoritesProvider.notifier).chargerFavoris();
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Connexion réussie ! Bienvenue sur GoLivreur.'),
@@ -67,7 +90,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         ),
       );
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        MaterialPageRoute(builder: (_) => const ClientAuthGate()),
         (route) => false,
       );
     }
@@ -166,7 +189,11 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                         onPressed: () {
                           _startTimer();
                           if (widget.isRegister) {
-                            // resend register
+                            ref.read(authProvider.notifier).demanderOtpInscription(
+                                  phone: widget.phone,
+                                  name: widget.name ?? '',
+                                  cityId: widget.cityId ?? 1,
+                                );
                           } else {
                             ref.read(authProvider.notifier).demanderOtpConnexion(widget.phone);
                           }

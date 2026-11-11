@@ -20,3 +20,4 @@ class UpdateBusinessProfileRequest extends BaseProfileRequest
         ]);
     }
 }
+

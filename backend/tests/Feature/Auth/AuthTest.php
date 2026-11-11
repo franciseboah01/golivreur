@@ -196,3 +196,50 @@ it('un utilisateur connecté peut se déconnecter', function () {
          ->getJson('/api/v1/client/profile')
          ->assertStatus(401);
 });
+
+it('conserve le nom du client lors de l\'inscription même si verify-register ne le renvoie pas', function () {
+    $phone = '0705112233';
+
+    $reg = $this->postJson('/api/v1/auth/register', [
+        'phone' => "+225 {$phone}",
+        'name'  => 'Ahou Koffi',
+    ]);
+    $reg->assertOk();
+    $code = $reg->json('debug_otp') ?? '1234';
+
+    $verify = $this->postJson('/api/v1/auth/verify-register', [
+        'phone' => $phone,
+        'code'  => $code,
+    ]);
+
+    $verify->assertCreated()
+           ->assertJsonPath('donnees.user.name', 'Ahou Koffi')
+           ->assertJsonPath('donnees.user.phone', $phone);
+
+    $this->assertDatabaseHas('users', [
+        'phone' => $phone,
+        'name'  => 'Ahou Koffi',
+        'role'  => 'client',
+    ]);
+});
+
+it('réinitialise le rate limit de connexion après vérification OTP réussie', function () {
+    $user = User::factory()->create([
+        'name'      => 'Serge Yao',
+        'phone'     => '0708998877',
+        'role'      => 'client',
+        'is_active' => true,
+    ]);
+
+    for ($i = 0; $i < 4; $i++) {
+        $loginRes = $this->postJson('/api/v1/auth/login', ['phone' => $user->phone])->assertOk();
+        $code = $loginRes->json('debug_otp') ?? '1234';
+
+        $this->postJson('/api/v1/auth/verify-login', [
+            'phone' => $user->phone,
+            'otp'   => $code,
+        ])->assertOk()
+          ->assertJsonPath('donnees.user.id', $user->id)
+          ->assertJsonPath('donnees.user.name', 'Serge Yao');
+    }
+});

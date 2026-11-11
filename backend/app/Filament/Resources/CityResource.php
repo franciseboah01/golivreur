@@ -45,16 +45,13 @@ class CityResource extends Resource
                             ->required()
                             ->maxLength(100),
                         Forms\Components\Toggle::make('is_active')
-                            ->label('Ville ouverte au service GoLivreur')
-                            ->default(true),
+                            ->label('Ville ouverte au service GoLivreur'),
                         Forms\Components\TextInput::make('center_lat')
                             ->label('Latitude GPS du centre')
                             ->numeric()
                             ->minValue(-90.0)
                             ->maxValue(90.0)
                             ->step(0.000001)
-                            ->placeholder('Ex: 7.6900 pour Bouaké, 6.8774 pour Daloa')
-                            ->helperText('Coordonnée comprise entre -90.0 et +90.0 (en Côte d\'Ivoire : ~4.0 à ~11.0)')
                             ->nullable(),
                         Forms\Components\TextInput::make('center_lng')
                             ->label('Longitude GPS du centre')
@@ -62,8 +59,6 @@ class CityResource extends Resource
                             ->minValue(-180.0)
                             ->maxValue(180.0)
                             ->step(0.000001)
-                            ->placeholder('Ex: -5.0300 pour Bouaké, -6.4502 pour Daloa')
-                            ->helperText('Coordonnée comprise entre -180.0 et +180.0 (en Côte d\'Ivoire : ~-8.5 à ~-2.5)')
                             ->nullable(),
                     ])->columns(2),
 
@@ -96,6 +91,12 @@ class CityResource extends Resource
                     ->label('Ville')
                     ->searchable()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('neighborhoods_count')
+                    ->counts('neighborhoods')
+                    ->label('Quartiers')
+                    ->badge()
+                    ->color('info'),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Opérationnelle')
@@ -245,7 +246,9 @@ class CityResource extends Resource
 
     public static function getRelations(): array
     {
-        return [];
+        return [
+            \App\Filament\Resources\CityResource\RelationManagers\NeighborhoodsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

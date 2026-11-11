@@ -2,11 +2,13 @@
 
 namespace App\Http\Requests\Profile;
 
+use App\Http\Requests\Concerns\NormalizesIvorianPhone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 abstract class BaseProfileRequest extends FormRequest
 {
+    use NormalizesIvorianPhone;
     /**
      * Empêche la modification d'un autre utilisateur via un paramètre user_id usurpé.
      */
@@ -29,15 +31,7 @@ abstract class BaseProfileRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if ($this->has('phone') && is_string($this->input('phone'))) {
-            $cleaned = preg_replace('/[\s\.\-\(\)]+/', '', trim($this->input('phone')));
-            if (str_starts_with($cleaned, '+225')) {
-                $cleaned = substr($cleaned, 4);
-            } elseif (str_starts_with($cleaned, '00225')) {
-                $cleaned = substr($cleaned, 5);
-            } elseif (strlen($cleaned) === 13 && str_starts_with($cleaned, '225')) {
-                $cleaned = substr($cleaned, 3);
-            }
-            $this->merge(['phone' => $cleaned]);
+            $this->merge(['phone' => $this->normalizePhoneValue($this->input('phone'))]);
         }
 
         if ($this->has('email') && $this->input('email') === '') {
@@ -108,3 +102,4 @@ abstract class BaseProfileRequest extends FormRequest
         ];
     }
 }
+

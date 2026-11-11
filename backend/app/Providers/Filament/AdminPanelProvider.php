@@ -30,7 +30,14 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->brandLogo(fn () => view('filament.admin.logo'))
             ->brandLogoHeight('3rem')
-            ->favicon(asset('images/logo.png'))
+            ->favicon(function () {
+                try {
+                    return app(\App\Services\SettingsService::class)->getAppLogoUrl()
+                        ?? asset('images/logo.png');
+                } catch (\Throwable) {
+                    return asset('images/logo.png');
+                }
+            })
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
                 fn () => view('filament.admin.login-credentials'),
