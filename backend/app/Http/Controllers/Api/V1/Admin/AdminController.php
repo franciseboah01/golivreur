@@ -23,6 +23,18 @@ class AdminController extends Controller
         'city_manager',
     ];
 
+    private const ROLES_LECTURE_OPERATIONS = [
+        'super_admin',
+        'dg_national',
+        'national_finance',
+        'national_tech',
+        'national_support',
+        'city_manager',
+        'city_finance',
+        'city_support',
+        'admin',
+    ];
+
     private const PLAFONDS_REMBOURSEMENT = [
         'city_agent' => 0,
         'city_support' => 2000,
@@ -36,6 +48,11 @@ class AdminController extends Controller
     public function orders(Request $request): JsonResponse
     {
         $user = auth()->user();
+
+        if ($denied = $this->verifierAccesOperations($user)) {
+            return $denied;
+        }
+
         $query = Order::query()->latest();
 
         $cityId = $request->get('city_context_id') ?? $user->city_id;
@@ -232,6 +249,11 @@ class AdminController extends Controller
     public function dashboard(Request $request): JsonResponse
     {
         $user = auth()->user();
+
+        if ($denied = $this->verifierAccesOperations($user)) {
+            return $denied;
+        }
+
         $cityId = $request->get('city_context_id') ?? $user->city_id;
 
         $ordersCount = Order::when($cityId, fn ($q) => $q->where('city_id', $cityId))->count();
@@ -255,5 +277,17 @@ class AdminController extends Controller
         }
 
         return ! $user->city_id || $resourceCityId !== (int) $user->city_id;
+    }
+
+    private function verifierAccesOperations(?User $user): ?JsonResponse
+    {
+        if (! $user || ! in_array($user->role, self::ROLES_LECTURE_OPERATIONS, true)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Action non autorisée pour le rôle Agent de Terrain.',
+            ], 403);
+        }
+
+        return null;
     }
 }

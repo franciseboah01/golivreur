@@ -109,22 +109,26 @@ Route::middleware('auth:api')->group(function () {
     // ─── Merchant / Business (GoShop Business) ───────────────────────────────
     Route::prefix('business')->middleware('role:merchant')->group(function () {
         Route::get('profile', [ProfileController::class, 'showBusiness']);
-        Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateBusiness']);
+        Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateBusiness'])
+            ->middleware('active_merchant');
     });
 
     Route::prefix('merchant')->middleware('role:merchant')->group(function () {
         Route::get('profile', [ProfileController::class, 'showBusiness']);
-        Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateBusiness']);
         Route::get('status', [MerchantController::class, 'status']);
-        Route::post('status', [MerchantController::class, 'toggleStatus']);
-        Route::get('orders', [MerchantController::class, 'orders']);
-        Route::post('orders/{order}/accept', [MerchantController::class, 'acceptOrder']);
-        Route::post('orders/{order}/refuse', [MerchantController::class, 'refuseOrder']);
-        Route::post('orders/{order}/ready', [MerchantController::class, 'readyOrder']);
-        Route::get('products', [MerchantController::class, 'products']);
-        Route::post('products', [MerchantController::class, 'storeProduct']);
-        Route::put('products/{product}', [MerchantController::class, 'updateProduct']);
-        Route::delete('products/{product}', [MerchantController::class, 'deleteProduct']);
+
+        Route::middleware('active_merchant')->group(function () {
+            Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateBusiness']);
+            Route::post('status', [MerchantController::class, 'toggleStatus']);
+            Route::get('orders', [MerchantController::class, 'orders']);
+            Route::post('orders/{order}/accept', [MerchantController::class, 'acceptOrder']);
+            Route::post('orders/{order}/refuse', [MerchantController::class, 'refuseOrder']);
+            Route::post('orders/{order}/ready', [MerchantController::class, 'readyOrder']);
+            Route::get('products', [MerchantController::class, 'products']);
+            Route::post('products', [MerchantController::class, 'storeProduct']);
+            Route::put('products/{product}', [MerchantController::class, 'updateProduct']);
+            Route::delete('products/{product}', [MerchantController::class, 'deleteProduct']);
+        });
     });
 
     // ─── Driver (GoShop & GoColis Courier) ────────────────────────────────────

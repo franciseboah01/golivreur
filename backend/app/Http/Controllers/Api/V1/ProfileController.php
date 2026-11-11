@@ -148,7 +148,7 @@ class ProfileController extends Controller
             $userData = $this->extractCommonUserData($validated);
 
             $courierData = [];
-            foreach (['city_id', 'vehicle_type', 'vehicle_plate', 'id_card_number', 'driver_license_number'] as $field) {
+            foreach (['vehicle_type', 'vehicle_plate', 'id_card_number', 'driver_license_number'] as $field) {
                 if (array_key_exists($field, $validated)) {
                     $courierData[$field] = $validated[$field];
                 }
@@ -206,6 +206,13 @@ class ProfileController extends Controller
             ], 404);
         }
 
+        if (! $merchant->is_active) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Votre compte commerce est suspendu ou inactif.',
+            ], 403);
+        }
+
         $validated = $request->validated();
 
         DB::transaction(function () use ($user, $merchant, $validated, $request) {
@@ -230,7 +237,7 @@ class ProfileController extends Controller
                 $merchantData['name'] = $validated['merchant_name'];
             }
 
-            foreach (['city_id', 'category', 'emoji', 'address', 'description', 'prep_time_minutes'] as $field) {
+            foreach (['category', 'emoji', 'address', 'description', 'prep_time_minutes'] as $field) {
                 if (array_key_exists($field, $validated)) {
                     $merchantData[$field] = $validated[$field];
                 }
@@ -313,7 +320,7 @@ class ProfileController extends Controller
 
     private function extractCommonUserData(array $validated): array
     {
-        $fields = ['name', 'phone', 'email', 'city_id', 'language', 'notifications_enabled'];
+        $fields = ['name', 'phone', 'email', 'language', 'notifications_enabled'];
         $data = [];
 
         foreach ($fields as $field) {

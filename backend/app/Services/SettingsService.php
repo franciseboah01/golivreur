@@ -103,6 +103,8 @@ class SettingsService
             'logo_path' => null,
             'default_emoji' => '🛵',
         ],
+
+        'courses.max_actives' => 1,
     ];
 
     /**

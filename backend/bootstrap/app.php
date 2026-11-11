@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ActiveMerchantMiddleware;
 use App\Http\Middleware\CityContextMiddleware;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\SecurityHeadersMiddleware;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'city_context' => CityContextMiddleware::class,
+            'active_merchant' => ActiveMerchantMiddleware::class,
         ]);
 
         $middleware->append(SecurityHeadersMiddleware::class);
