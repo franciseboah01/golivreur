@@ -47,10 +47,10 @@ class OrderService
                 ]);
             }
 
-            // Calculer les montants
-            $cityId = $client->city_id ?? $merchant->city_id ?? 1;
+            // Calculer les montants selon la ville du commerce
+            $cityId = $merchant->city_id ?? $client->city_id ?? 1;
             $city = City::findOrFail($cityId);
-            $produitsTotal = $this->calculerTotalProduits($donnees['items']);
+            [$produitsTotal, $produitsResolus] = $this->resoudreProduitsEtTotal($merchant, $donnees['items']);
             $fraisLivraison = $this->commissionService->calculerFraisLivraison(
                 distance: $donnees['distance_km'],
                 city: $city,
@@ -88,8 +88,7 @@ class OrderService
 
             // Créer les lignes de commande avec snapshot des prix
             foreach ($donnees['items'] as $item) {
-                /** @var Product $product */
-                $product = $merchant->products()->findOrFail($item['product_id']);
+                $product = $produitsResolus[(int) $item['product_id']];
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $product->id,
@@ -329,15 +328,41 @@ class OrderService
 
     // ─── Méthodes privées ─────────────────────────────────────────────────────
 
-    private function calculerTotalProduits(array $items): float
+    /**
+     * Résout les produits du commerce et calcule le total côté serveur.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array{0: float, 1: array<int, Product>}
+     */
+    private function resoudreProduitsEtTotal(Merchant $merchant, array $items): array
     {
-        // Les prix sont récupérés depuis la BDD, jamais depuis le client
-        $total = 0;
+        $productIds = array_column($items, 'product_id');
+        /** @var array<int, Product> $resolved */
+        $resolved = Product::where('merchant_id', $merchant->id)
+            ->whereIn('id', $productIds)
+            ->get()
+            ->keyBy('id')
+            ->all();
+
+        $total = 0.0;
         foreach ($items as $item) {
-            $product = Product::findOrFail($item['product_id']);
-            $total += $product->price * $item['quantity'];
+            $productId = (int) $item['product_id'];
+            $product = $resolved[$productId] ?? null;
+            if (! $product) {
+                throw ValidationException::withMessages([
+                    'items' => ['Un ou plusieurs produits n\'appartiennent pas à ce commerce.'],
+                ]);
+            }
+
+            if (! $product->is_available) {
+                throw ValidationException::withMessages([
+                    'items' => ["Le produit « {$product->name} » n'est actuellement pas disponible."],
+                ]);
+            }
+
+            $total += (float) $product->price * (int) $item['quantity'];
         }
 
-        return $total;
+        return [$total, $resolved];
     }
 }

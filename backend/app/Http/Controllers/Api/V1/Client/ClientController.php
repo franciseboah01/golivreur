@@ -65,6 +65,13 @@ class ClientController extends Controller
 
     public function merchantCatalog(Merchant $merchant): JsonResponse
     {
+        if (! $merchant->is_active) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Commerce introuvable.',
+            ], 404);
+        }
+
         $merchant->load('categoryModel');
 
         $products = $merchant->products()
@@ -425,6 +432,13 @@ class ClientController extends Controller
 
     public function toggleFavorite(Merchant $merchant): JsonResponse
     {
+        if (! $merchant->is_active) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Commerce introuvable.',
+            ], 404);
+        }
+
         /** @var User $user */
         $user = auth()->user();
 
