@@ -28,6 +28,10 @@ class Order extends Model
         'delivered_at', 'cancelled_at', 'cancel_reason',
     ];
 
+    protected $hidden = [
+        'confirmation_code',
+    ];
+
     protected $casts = [
         'rain_mode_applied' => 'boolean',
         'peak_hours_applied' => 'boolean',

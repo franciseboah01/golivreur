@@ -8,6 +8,7 @@ use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Parcel;
+use App\Services\ActivityLogService;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -138,18 +139,21 @@ class AdminController extends Controller
         ]);
     }
 
-    public function unlockOrderCode(Request $request, Order $order): JsonResponse
+    public function unlockOrderCode(Request $request, Order $order, ActivityLogService $activityLogService): JsonResponse
     {
         $user = auth()->user();
-        $rolesAutorises = [
+        $localRoles = [
             'city_support',
             'city_finance',
             'city_manager',
+        ];
+        $nationalRoles = [
             'national_support',
             'national_finance',
             'dg_national',
             'super_admin',
         ];
+        $rolesAutorises = [...$localRoles, ...$nationalRoles];
 
         if (! in_array($user->role, $rolesAutorises, true)) {
             return response()->json([
@@ -158,15 +162,45 @@ class AdminController extends Controller
             ], 403);
         }
 
+        if (in_array($user->role, $localRoles, true)
+            && (! $user->city_id || (int) $order->city_id !== (int) $user->city_id)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Commande introuvable.',
+            ], 404);
+        }
+
+        if (in_array($order->status, [Order::STATUS_DELIVERED, Order::STATUS_CANCELLED, Order::STATUS_REFUSED], true)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Impossible de débloquer une commande clôturée.',
+            ], 422);
+        }
+
         $order->update([
             'confirmation_locked' => false,
             'confirmation_attempts' => 0,
             'confirmation_unlocked_by' => $user->id,
         ]);
 
+        $order->loadMissing('city');
+
+        $activityLogService->log(
+            userId: $user->id,
+            action: 'order_code_unlocked',
+            entityType: 'order',
+            entityId: $order->id,
+            properties: [
+                'order_id' => $order->id,
+                'city_id' => $order->city_id,
+                'ville' => $order->city?->name,
+            ],
+            severity: 'warning',
+        );
+
         return response()->json([
             'succes' => true,
-            'donnees' => $order,
+            'donnees' => $order->fresh(),
             'message' => 'Code de confirmation débloqué.',
         ]);
     }
