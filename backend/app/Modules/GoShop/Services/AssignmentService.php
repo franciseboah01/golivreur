@@ -9,6 +9,8 @@ use App\Models\Courier;
 use App\Models\Order;
 use App\Models\Parcel;
 use App\Services\NotificationService;
+use App\Services\SettingsService;
+use App\Services\WalletService;
 
 /**
  * Attribue les courses aux livreurs disponibles par proximité géographique.
@@ -28,20 +30,34 @@ class AssignmentService
 
     private const DELAI_ACCEPTATION_GOCOLIS = 30;
 
+    private readonly WalletService $walletService;
+
+    private readonly SettingsService $settingsService;
+
     public function __construct(
         private readonly NotificationService $notificationService,
-    ) {}
+        ?WalletService $walletService = null,
+        ?SettingsService $settingsService = null,
+    ) {
+        $this->walletService = $walletService ?? app(WalletService::class);
+        $this->settingsService = $settingsService ?? app(SettingsService::class);
+    }
 
     /**
      * Trouve le livreur le plus proche et lui propose la course GoShop.
      */
     public function attribuerLivreurGoShop(Order $order): void
     {
+        $montantRequisCash = $order->payment_method === 'cash'
+            ? $this->walletService->calculerMontantAReverserOrder($order)
+            : null;
+
         $livreur = $this->trouverLivreurProche(
             lat: $order->pickup_lat,
             lng: $order->pickup_lng,
             cityId: $order->city_id,
             excludeIds: [],
+            montantRequisCash: $montantRequisCash,
         );
 
         if (! $livreur) {
@@ -82,11 +98,16 @@ class AssignmentService
             return;
         }
 
+        $montantRequisCash = $parcel->payment_method === 'cash'
+            ? $this->walletService->calculerMontantAReverserParcel($parcel)
+            : null;
+
         $livreur = $this->trouverLivreurProche(
             lat: $parcel->pickup_lat,
             lng: $parcel->pickup_lng,
             cityId: $parcel->city_id,
             excludeIds: $exclusions,
+            montantRequisCash: $montantRequisCash,
         );
 
         if (! $livreur) {
@@ -111,13 +132,14 @@ class AssignmentService
 
     /**
      * Trouve le livreur en ligne le plus proche d'un point GPS dans une ville.
-     * Utilise la formule de distance haversine approximée (rapide, suffisante à l'échelle de Daloa).
+     * Pour les courses en espèces, exclut tout livreur dont le solde disponible est insuffisant.
      */
     private function trouverLivreurProche(
         ?float $lat,
         ?float $lng,
         int $cityId,
         array $excludeIds = [],
+        ?int $montantRequisCash = null,
     ): ?Courier {
         $baseQuery = Courier::where('city_id', $cityId)
             ->where('is_online', true)
@@ -128,18 +150,31 @@ class AssignmentService
             })
             ->whereNotIn('id', $excludeIds);
 
-        if (! $lat || ! $lng) {
+        if ($lat && $lng) {
+            $haversine = '(6371 * acos(least(1.0, greatest(-1.0, cos(radians(?)) * cos(radians(current_lat)) * cos(radians(current_lng) - radians(?)) + sin(radians(?)) * sin(radians(current_lat))))))';
+
+            $baseQuery = $baseQuery
+                ->whereNotNull('current_lat')
+                ->whereNotNull('current_lng')
+                ->selectRaw("*, {$haversine} AS distance", [$lat, $lng, $lat])
+                ->whereRaw("{$haversine} < ?", [$lat, $lng, $lat, self::RAYON_ETENDU_KM])
+                ->orderBy('distance');
+        }
+
+        if ($montantRequisCash === null) {
             return $baseQuery->first();
         }
 
-        $haversine = '(6371 * acos(least(1.0, greatest(-1.0, cos(radians(?)) * cos(radians(current_lat)) * cos(radians(current_lng) - radians(?)) + sin(radians(?)) * sin(radians(current_lat))))))';
+        /** @var Courier|null $eligible */
+        $eligible = $baseQuery->get()->first(
+            fn (Courier $candidat): bool => $this->walletService->verifierSoldeCashSuffisant(
+                courier: $candidat,
+                montantAReverser: $montantRequisCash,
+                settingsService: $this->settingsService,
+                lockWallet: false,
+            )['ok']
+        );
 
-        return $baseQuery
-            ->whereNotNull('current_lat')
-            ->whereNotNull('current_lng')
-            ->selectRaw("*, {$haversine} AS distance", [$lat, $lng, $lat])
-            ->whereRaw("{$haversine} < ?", [$lat, $lng, $lat, self::RAYON_ETENDU_KM])
-            ->orderBy('distance')
-            ->first();
+        return $eligible;
     }
 }

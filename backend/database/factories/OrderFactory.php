@@ -28,8 +28,8 @@ class OrderFactory extends Factory
             'courier_amount' => 640,
             'rain_mode_applied' => false,
             'peak_hours_applied' => false,
-            'payment_method' => 'cash',
-            'payment_status' => 'pending',
+            'payment_method' => 'orange_money',
+            'payment_status' => 'paid',
             'confirmation_code' => Hash::make('1234'),
             'delivery_address' => fake()->address(),
             'delivery_lat' => 6.8800,
@@ -37,5 +37,13 @@ class OrderFactory extends Factory
             'pickup_lat' => 6.8770,
             'pickup_lng' => -6.4502,
         ];
+    }
+
+    public function cash(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'payment_method' => 'cash',
+            'payment_status' => 'pending_cash',
+        ]);
     }
 }

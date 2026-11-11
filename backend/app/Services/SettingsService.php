@@ -105,6 +105,7 @@ class SettingsService
         ],
 
         'courses.max_actives' => 1,
+        'wallet.solde_minimum_cash' => 10000,
     ];
 
     /**

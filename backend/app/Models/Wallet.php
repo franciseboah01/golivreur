@@ -15,6 +15,8 @@ class Wallet extends Model
         'owner_type',
         'owner_id',
         'balance',
+        'total_earned',
+        'total_withdrawn',
         'currency',
         'is_locked',
         'locked_reason',
@@ -22,6 +24,8 @@ class Wallet extends Model
 
     protected $casts = [
         'balance' => 'integer',
+        'total_earned' => 'integer',
+        'total_withdrawn' => 'integer',
         'is_locked' => 'boolean',
     ];
 

@@ -95,8 +95,10 @@ class OrderResource extends Resource
                             ->label('Statut du paiement')
                             ->options(SearchableSelect::sortedOptions([
                                 'failed' => 'Échoué',
-                                'pending' => 'En attente',
                                 'paid' => 'Payé',
+                                'paid_cash' => 'Payé en espèces',
+                                'pending' => 'En attente',
+                                'pending_cash' => 'Espèces à encaisser',
                             ]))
                             ->required(),
                         Forms\Components\TextInput::make('payment_reference')

@@ -38,9 +38,17 @@ class ParcelFactory extends Factory
             'shipping_fee' => 1000,
             'platform_commission' => 250,
             'courier_amount' => 750,
-            'payment_method' => 'cash',
-            'payment_status' => 'pending',
+            'payment_method' => 'orange_money',
+            'payment_status' => 'paid',
             'assignment_attempts' => 0,
         ];
+    }
+
+    public function cash(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'payment_method' => 'cash',
+            'payment_status' => 'pending_cash',
+        ]);
     }
 }

@@ -10,6 +10,7 @@ use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Modules\GoShop\Services\OrderService;
 use App\Services\SettingsService;
+use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -155,11 +156,11 @@ class DriverController extends Controller
         ]);
     }
 
-    public function acceptOrder(Order $order, SettingsService $settingsService): JsonResponse
+    public function acceptOrder(Order $order, SettingsService $settingsService, WalletService $walletService): JsonResponse
     {
         $courier = $this->getCourier();
 
-        return DB::transaction(function () use ($order, $courier, $settingsService) {
+        return DB::transaction(function () use ($order, $courier, $settingsService, $walletService) {
             /** @var Order $lockedOrder */
             $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
             /** @var Courier $lockedCourier */
@@ -205,6 +206,23 @@ class DriverController extends Controller
                     'succes' => false,
                     'message' => 'Vous avez déjà une course active en cours. Terminez-la avant d\'en accepter une autre.',
                 ], 409);
+            }
+
+            if ($lockedOrder->payment_method === 'cash') {
+                $montantAReverser = $walletService->calculerMontantAReverserOrder($lockedOrder);
+                $controleSolde = $walletService->verifierSoldeCashSuffisant(
+                    courier: $lockedCourier,
+                    montantAReverser: $montantAReverser,
+                    settingsService: $settingsService,
+                    lockWallet: true,
+                );
+
+                if (! $controleSolde['ok']) {
+                    return response()->json([
+                        'succes' => false,
+                        'message' => $controleSolde['message'],
+                    ], 422);
+                }
             }
 
             $affected = Order::whereKey($lockedOrder->id)

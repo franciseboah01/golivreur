@@ -261,26 +261,55 @@ class OrderService
                 return "Code incorrect. {$restants} tentative(s) restante(s).";
             }
 
+            $estCash = $lockedOrder->payment_method === 'cash';
+
             $lockedOrder->update([
                 'status' => Order::STATUS_DELIVERED,
+                'payment_status' => $estCash ? 'paid_cash' : $lockedOrder->payment_status,
                 'delivered_at' => now(),
             ]);
 
-            // Créditer les wallets
-            $this->walletService->crediterLivreur($lockedOrder);
-            $this->walletService->crediterMerchant($lockedOrder);
+            if ($estCash) {
+                // Encaissement cash : le livreur garde sa part (640 F) et reverse (total - part livreur)
+                $this->walletService->debiterReversementCashOrder($lockedOrder);
+                $this->walletService->crediterMerchant($lockedOrder);
+            } else {
+                // Paiement électronique : crédit livreur + commerce inchangé
+                $this->walletService->crediterLivreur($lockedOrder);
+                $this->walletService->crediterMerchant($lockedOrder);
+            }
 
             // Notifier le client
             $this->notificationService->notifierCommandeLivree($lockedOrder);
 
+            $acteurId = $actor->id ?? $lockedOrder->courier?->user_id;
+
+            if ($estCash) {
+                $this->activityLogService->log(
+                    userId: $acteurId,
+                    action: 'cash_remittance_recorded',
+                    entityType: 'order',
+                    entityId: $lockedOrder->id,
+                    properties: [
+                        'order_id' => $lockedOrder->id,
+                        'cash_collected' => (int) round((float) $lockedOrder->products_total) + (int) round((float) $lockedOrder->delivery_fee),
+                        'courier_kept' => (int) round((float) $lockedOrder->courier_amount),
+                        'remitted_amount' => $this->walletService->calculerMontantAReverserOrder($lockedOrder),
+                        'merchant_amount' => (int) round((float) $lockedOrder->merchant_amount),
+                        'platform_commission' => (int) round((float) $lockedOrder->platform_commission),
+                    ],
+                );
+            }
+
             $this->activityLogService->log(
-                userId: $actor->id ?? $lockedOrder->courier?->user_id,
+                userId: $acteurId,
                 action: 'order_delivered',
                 entityType: 'order',
                 entityId: $lockedOrder->id,
                 properties: [
                     'courier_amount' => $lockedOrder->courier_amount,
                     'merchant_amount' => $lockedOrder->merchant_amount,
+                    'payment_method' => $lockedOrder->payment_method,
                 ],
             );
 

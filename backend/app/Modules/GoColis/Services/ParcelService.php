@@ -225,14 +225,22 @@ class ParcelService
 
             $this->verifierStatutLivraison($lockedParcel);
 
+            $estCash = $lockedParcel->payment_method === 'cash';
+
             $lockedParcel->update([
                 'status' => Parcel::STATUS_DELIVERED,
+                'payment_status' => $estCash ? 'paid_cash' : $lockedParcel->payment_status,
                 'delivered_at' => now(),
             ]);
 
             if ($lockedParcel->courier_id !== null) {
-                // Créditer le wallet du livreur (75% des frais)
-                $this->walletService->crediterLivreurGoColis($lockedParcel);
+                if ($estCash) {
+                    // Encaissement cash GoColis : livreur garde 75%, reverse 25% + assurance
+                    $this->walletService->debiterReversementCashParcel($lockedParcel);
+                } else {
+                    // Paiement électronique : crédit livreur (75% des frais)
+                    $this->walletService->crediterLivreurGoColis($lockedParcel);
+                }
             }
 
             // Notifier l'expéditeur
@@ -241,13 +249,34 @@ class ParcelService
             $courier = $lockedParcel->courier_id !== null
                 ? Courier::find($lockedParcel->courier_id)
                 : null;
+            $acteurId = $courier !== null ? (int) $courier->user_id : (int) auth()->id();
+
+            if ($estCash) {
+                $this->activityLogService->log(
+                    userId: $acteurId,
+                    action: 'cash_remittance_recorded',
+                    entityType: 'parcel',
+                    entityId: $lockedParcel->id,
+                    properties: [
+                        'parcel_id' => $lockedParcel->id,
+                        'shipping_fee' => (int) $lockedParcel->shipping_fee,
+                        'insurance_amount' => (int) $lockedParcel->insurance_amount,
+                        'courier_kept' => (int) $lockedParcel->courier_amount,
+                        'platform_commission' => (int) $lockedParcel->platform_commission,
+                        'remitted_amount' => $this->walletService->calculerMontantAReverserParcel($lockedParcel),
+                    ],
+                );
+            }
 
             $this->activityLogService->log(
-                userId: $courier !== null ? (int) $courier->user_id : (int) auth()->id(),
+                userId: $acteurId,
                 action: 'parcel_delivered',
                 entityType: 'parcel',
                 entityId: $lockedParcel->id,
-                properties: ['courier_amount' => $lockedParcel->courier_amount],
+                properties: [
+                    'courier_amount' => $lockedParcel->courier_amount,
+                    'payment_method' => $lockedParcel->payment_method,
+                ],
             );
 
             return $lockedParcel->fresh(['sender', 'courier', 'photos']);
