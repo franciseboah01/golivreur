@@ -101,6 +101,15 @@ class WebhookController extends Controller
      */
     public function rejouer(int $webhookLogId): JsonResponse
     {
+        $user = auth()->user();
+
+        if (! $user || ! in_array($user->role, ['super_admin', 'dg_national', 'national_tech'], true)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Action réservée au Super Admin, DG National ou Tech National.',
+            ], 403);
+        }
+
         $webhookLog = WebhookLog::findOrFail($webhookLogId);
 
         if (! $webhookLog->signature_valid) {
