@@ -102,24 +102,98 @@ class DriverController extends Controller
         $courier = $this->getCourier();
 
         return DB::transaction(function () use ($order, $courier) {
+            /** @var Order $lockedOrder */
             $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
+            /** @var Courier $lockedCourier */
+            $lockedCourier = Courier::with('user')->lockForUpdate()->findOrFail($courier->id);
 
-            if ($lockedOrder->courier_id && $lockedOrder->courier_id !== $courier->id) {
-                return response()->json(['succes' => false, 'message' => 'Course déjà assignée.'], 409);
+            if (! $lockedCourier->city_id || (int) $lockedOrder->city_id !== (int) $lockedCourier->city_id) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Course introuvable.',
+                ], 404);
             }
 
-            if ($lockedOrder->status === Order::STATUS_DELIVERED || $lockedOrder->status === Order::STATUS_CANCELLED) {
-                return response()->json(['succes' => false, 'message' => 'Cette course ne peut plus être acceptée.'], 422);
+            if (! $lockedCourier->is_active || ($lockedCourier->user && ! $lockedCourier->user->is_active)) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Votre compte livreur est suspendu ou inactif.',
+                ], 403);
             }
 
-            $lockedOrder->update([
-                'courier_id' => $courier->id,
-                'status' => Order::STATUS_ACCEPTED,
-            ]);
+            if ($lockedCourier->penalty_until !== null) {
+                if ($lockedCourier->penalty_until->isFuture()) {
+                    if ($lockedCourier->is_online) {
+                        $lockedCourier->update(['is_online' => false]);
+                    }
+
+                    return response()->json([
+                        'succes' => false,
+                        'message' => 'Votre compte est temporairement suspendu suite à des refus répétés.',
+                    ], 403);
+                }
+
+                $lockedCourier->update([
+                    'penalty_until' => null,
+                    'consecutive_refusals' => 0,
+                ]);
+            } elseif ($lockedCourier->consecutive_refusals >= 3) {
+                $lockedCourier->update([
+                    'penalty_until' => now()->addMinutes(15),
+                    'is_online' => false,
+                ]);
+
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Suite à 3 refus consécutifs, vous êtes hors ligne pour 15 minutes.',
+                ], 403);
+            }
+
+            if (! $lockedCourier->is_online) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Vous devez être en ligne pour accepter une course.',
+                ], 422);
+            }
+
+            if ($lockedOrder->courier_id !== null) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => (int) $lockedOrder->courier_id === (int) $lockedCourier->id
+                        ? 'Vous avez déjà accepté cette course.'
+                        : 'Course déjà assignée à un autre livreur.',
+                ], 409);
+            }
+
+            if (! in_array($lockedOrder->status, [Order::STATUS_ACCEPTED, Order::STATUS_READY], true)) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Cette course ne peut plus être acceptée.',
+                ], 422);
+            }
+
+            $affected = Order::whereKey($lockedOrder->id)
+                ->whereNull('courier_id')
+                ->whereIn('status', [Order::STATUS_ACCEPTED, Order::STATUS_READY])
+                ->update([
+                    'courier_id' => $lockedCourier->id,
+                    'accepted_at' => $lockedOrder->accepted_at ?? now(),
+                ]);
+
+            if ($affected === 0) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Course déjà assignée à un autre livreur.',
+                ], 409);
+            }
+
+            if ($lockedCourier->consecutive_refusals > 0) {
+                $lockedCourier->update(['consecutive_refusals' => 0]);
+            }
 
             return response()->json([
                 'succes' => true,
-                'donnees' => $lockedOrder,
+                'donnees' => $lockedOrder->fresh(),
                 'message' => 'Course acceptée.',
             ]);
         });
