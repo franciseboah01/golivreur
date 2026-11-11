@@ -15,6 +15,17 @@ use Illuminate\Validation\ValidationException;
  */
 class ParcelService
 {
+    private const PICKUP_CODE_STATUSES = [
+        Parcel::STATUS_ACCEPTED,
+        Parcel::STATUS_AT_SENDER,
+    ];
+
+    private const DELIVERY_CODE_STATUSES = [
+        Parcel::STATUS_PICKED_UP,
+        Parcel::STATUS_IN_TRANSIT,
+        Parcel::STATUS_AT_RECIPIENT,
+    ];
+
     public function __construct(
         private readonly CommissionService   $commissionService,
         private readonly AssignmentService   $assignmentService,
@@ -130,6 +141,8 @@ class ParcelService
      */
     public function validerCodeExpediteur(Parcel $parcel, string $codeSaisi): Parcel
     {
+        $this->verifierStatutRamassage($parcel);
+
         // Vérifier que la photo de ramassage existe
         if ($parcel->pickupPhoto()->doesntExist()) {
             throw ValidationException::withMessages([
@@ -137,46 +150,24 @@ class ParcelService
             ]);
         }
 
-        if ($parcel->sender_code_locked) {
-            throw ValidationException::withMessages([
-                'code' => ['Code expéditeur bloqué. Le support a été alerté.'],
-            ]);
-        }
-
-        if (!Hash::check($codeSaisi, $parcel->sender_code)) {
-            $parcel->increment('sender_code_attempts');
-
-            if ($parcel->sender_code_attempts >= 3) {
-                $parcel->update(['sender_code_locked' => true]);
-                \App\Jobs\AlerterAdminCodeBloque::dispatch($parcel, 'gocolis_sender')
-                    ->onQueue('high');
-
-                throw ValidationException::withMessages([
-                    'code' => ['Code incorrect. Expédition bloquée — le support a été alerté.'],
-                ]);
-            }
-
-            $restants = 3 - $parcel->sender_code_attempts;
-            throw ValidationException::withMessages([
-                'code' => ["Code expéditeur incorrect. {$restants} tentative(s) restante(s)."],
-            ]);
-        }
-
-        if ($parcel->status === Parcel::STATUS_PICKED_UP || $parcel->status === Parcel::STATUS_DELIVERED) {
-            throw ValidationException::withMessages([
-                'code' => ['Ce colis a déjà été pris en charge.'],
-            ]);
-        }
+        $this->verifierTentativeCode(
+            parcel: $parcel,
+            codeSaisi: $codeSaisi,
+            codeHash: (string) $parcel->sender_code,
+            isLocked: (bool) $parcel->sender_code_locked,
+            attemptsColumn: 'sender_code_attempts',
+            lockedColumn: 'sender_code_locked',
+            alertType: 'gocolis_sender',
+            label: 'expéditeur',
+            lockedMessage: 'Code expéditeur bloqué. Le support a été alerté.',
+            blockedOnFailureMessage: 'Code incorrect. Expédition bloquée — le support a été alerté.',
+        );
 
         // Code correct — ramassage validé
         return DB::transaction(function () use ($parcel) {
             $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
 
-            if ($lockedParcel->status === Parcel::STATUS_PICKED_UP || $lockedParcel->status === Parcel::STATUS_DELIVERED) {
-                throw ValidationException::withMessages([
-                    'code' => ['Ce colis a déjà été pris en charge.'],
-                ]);
-            }
+            $this->verifierStatutRamassage($lockedParcel);
 
             $lockedParcel->update([
                 'status'       => Parcel::STATUS_PICKED_UP,
@@ -195,6 +186,8 @@ class ParcelService
      */
     public function validerCodeDestinataire(Parcel $parcel, string $codeSaisi): Parcel
     {
+        $this->verifierStatutLivraison($parcel);
+
         // Vérifier que la photo de livraison existe
         if ($parcel->deliveryPhoto()->doesntExist()) {
             throw ValidationException::withMessages([
@@ -202,60 +195,44 @@ class ParcelService
             ]);
         }
 
-        if ($parcel->recipient_code_locked) {
-            throw ValidationException::withMessages([
-                'code' => ['Code destinataire bloqué. Le support a été alerté.'],
-            ]);
-        }
-
-        if (!Hash::check($codeSaisi, $parcel->recipient_code)) {
-            $parcel->increment('recipient_code_attempts');
-
-            if ($parcel->recipient_code_attempts >= 3) {
-                $parcel->update(['recipient_code_locked' => true]);
-                \App\Jobs\AlerterAdminCodeBloque::dispatch($parcel, 'gocolis_recipient')
-                    ->onQueue('high');
-
-                throw ValidationException::withMessages([
-                    'code' => ['Code incorrect. Livraison bloquée — le support a été alerté.'],
-                ]);
-            }
-
-            $restants = 3 - $parcel->recipient_code_attempts;
-            throw ValidationException::withMessages([
-                'code' => ["Code destinataire incorrect. {$restants} tentative(s) restante(s)."],
-            ]);
-        }
-
-        if ($parcel->status === Parcel::STATUS_DELIVERED) {
-            throw ValidationException::withMessages([
-                'code' => ['Ce colis a déjà été livré et validé.'],
-            ]);
-        }
+        $this->verifierTentativeCode(
+            parcel: $parcel,
+            codeSaisi: $codeSaisi,
+            codeHash: (string) $parcel->recipient_code,
+            isLocked: (bool) $parcel->recipient_code_locked,
+            attemptsColumn: 'recipient_code_attempts',
+            lockedColumn: 'recipient_code_locked',
+            alertType: 'gocolis_recipient',
+            label: 'destinataire',
+            lockedMessage: 'Code destinataire bloqué. Le support a été alerté.',
+            blockedOnFailureMessage: 'Code incorrect. Livraison bloquée — le support a été alerté.',
+        );
 
         // Code correct — livraison confirmée
         return DB::transaction(function () use ($parcel) {
             $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
 
-            if ($lockedParcel->status === Parcel::STATUS_DELIVERED) {
-                throw ValidationException::withMessages([
-                    'code' => ['Ce colis a déjà été livré et validé.'],
-                ]);
-            }
+            $this->verifierStatutLivraison($lockedParcel);
 
             $lockedParcel->update([
                 'status'       => Parcel::STATUS_DELIVERED,
                 'delivered_at' => now(),
             ]);
 
-            // Créditer le wallet du livreur (75% des frais)
-            $this->walletService->crediterLivreurGoColis($lockedParcel);
+            if ($lockedParcel->courier_id !== null) {
+                // Créditer le wallet du livreur (75% des frais)
+                $this->walletService->crediterLivreurGoColis($lockedParcel);
+            }
 
             // Notifier l'expéditeur
             $this->notificationService->notifierColisLivre($lockedParcel);
 
+            $courier = $lockedParcel->courier_id !== null
+                ? \App\Models\Courier::find($lockedParcel->courier_id)
+                : null;
+
             $this->activityLogService->log(
-                userId: $lockedParcel->courier->user_id,
+                userId: $courier !== null ? (int) $courier->user_id : (int) auth()->id(),
                 action: 'parcel_delivered',
                 entityType: 'parcel',
                 entityId: $lockedParcel->id,
@@ -264,6 +241,77 @@ class ParcelService
 
             return $lockedParcel->fresh(['sender', 'courier', 'photos']);
         });
+    }
+
+    private function verifierStatutRamassage(Parcel $parcel): void
+    {
+        if (in_array($parcel->status, [Parcel::STATUS_PICKED_UP, Parcel::STATUS_IN_TRANSIT, Parcel::STATUS_AT_RECIPIENT, Parcel::STATUS_DELIVERED], true)) {
+            throw ValidationException::withMessages([
+                'code' => ['Ce colis a déjà été pris en charge.'],
+            ]);
+        }
+
+        if (! in_array($parcel->status, self::PICKUP_CODE_STATUSES, true)) {
+            throw ValidationException::withMessages([
+                'status' => ['Le code expéditeur n\'est accepté qu\'au stade de ramassage.'],
+            ]);
+        }
+    }
+
+    private function verifierStatutLivraison(Parcel $parcel): void
+    {
+        if ($parcel->status === Parcel::STATUS_DELIVERED) {
+            throw ValidationException::withMessages([
+                'code' => ['Ce colis a déjà été livré et validé.'],
+            ]);
+        }
+
+        if (! in_array($parcel->status, self::DELIVERY_CODE_STATUSES, true)) {
+            throw ValidationException::withMessages([
+                'status' => ['Le code destinataire n\'est accepté qu\'au stade de livraison.'],
+            ]);
+        }
+    }
+
+    private function verifierTentativeCode(
+        Parcel $parcel,
+        string $codeSaisi,
+        string $codeHash,
+        bool $isLocked,
+        string $attemptsColumn,
+        string $lockedColumn,
+        string $alertType,
+        string $label,
+        string $lockedMessage,
+        string $blockedOnFailureMessage,
+    ): void {
+        if ($isLocked) {
+            throw ValidationException::withMessages([
+                'code' => [$lockedMessage],
+            ]);
+        }
+
+        if (! Hash::check($codeSaisi, $codeHash)) {
+            $parcel->increment($attemptsColumn);
+            $parcel->refresh();
+
+            $attempts = (int) $parcel->{$attemptsColumn};
+
+            if ($attempts >= 3) {
+                $parcel->update([$lockedColumn => true]);
+                \App\Jobs\AlerterAdminCodeBloque::dispatch($parcel, $alertType)
+                    ->onQueue('high');
+
+                throw ValidationException::withMessages([
+                    'code' => [$blockedOnFailureMessage],
+                ]);
+            }
+
+            $restants = 3 - $attempts;
+            throw ValidationException::withMessages([
+                'code' => ["Code {$label} incorrect. {$restants} tentative(s) restante(s)."],
+            ]);
+        }
     }
 
     /**
