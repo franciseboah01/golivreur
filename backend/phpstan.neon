@@ -10,17 +10,4 @@ parameters:
     level: 5
 
     treatPhpDocTypesAsCertain: false
-    reportUnmatchedIgnoredErrors: false
-
-    ignoreErrors:
-        # Filament components & resources
-        - '#Access to an undefined property Illuminate\\Database\\Eloquent\\Model::\$[a-zA-Z0-9\\_]+#'
-        - '#Access to an undefined property App\\Models\\[a-zA-Z0-9\\_]+::\$[a-zA-Z0-9\\_]+#'
-        - '#Call to an undefined method App\\Models\\[a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
-        - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Model::[a-zA-Z0-9\\_]+\(\)#'
-        - '#Property App\\Filament\\Resources\\[a-zA-Z0-9\\_]+::\$(navigationGroup|navigationIcon|modelLabel|pluralModelLabel) is never read#'
-        - '#Parameter \#1 \$forceForever of static method PHPOpenSourceSaver\\JWTAuth\\JWT::(refresh|invalidate)\(\) expects bool#'
-        - '#Static method Redis::set\(\) invoked with 5 parameters#'
-        - '#Parameter \#3 \$options of static method Redis::set\(\) expects array#'
-
-
+    reportUnmatchedIgnoredErrors: true

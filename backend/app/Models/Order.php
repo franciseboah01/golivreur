@@ -58,21 +58,33 @@ class Order extends Model
 
     // ─── Relations ────────────────────────────────────────────────────────────
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function client(): BelongsTo
     {
         return $this->belongsTo(User::class, 'client_id');
     }
 
+    /**
+     * @return BelongsTo<Merchant, $this>
+     */
     public function merchant(): BelongsTo
     {
         return $this->belongsTo(Merchant::class);
     }
 
+    /**
+     * @return BelongsTo<Courier, $this>
+     */
     public function courier(): BelongsTo
     {
         return $this->belongsTo(Courier::class);
     }
 
+    /**
+     * @return BelongsTo<City, $this>
+     */
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);

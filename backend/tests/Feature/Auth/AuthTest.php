@@ -175,11 +175,18 @@ it('un access token peut être renouvelé avec un refresh token valide', functio
     $user = User::factory()->create(['role' => 'client', 'is_active' => true]);
     $token = JWTAuth::fromUser($user);
 
-    $this->withHeader('Authorization', "Bearer {$token}")
+    $res = $this->withHeader('Authorization', "Bearer {$token}")
         ->postJson('/api/v1/auth/refresh')
         ->assertOk()
         ->assertJsonPath('succes', true)
         ->assertJsonStructure(['donnees' => ['access_token']]);
+
+    $newToken = $res->json('donnees.access_token');
+    expect($newToken)->not->toBe($token);
+
+    $this->withHeader('Authorization', "Bearer {$newToken}")
+        ->getJson('/api/v1/client/profile')
+        ->assertOk();
 });
 
 // ─── Logout ───────────────────────────────────────────────────────────────────

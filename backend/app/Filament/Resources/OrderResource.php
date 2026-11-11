@@ -323,7 +323,7 @@ class OrderResource extends Resource
                     ->icon('heroicon-m-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->modalHeading(fn (Order $record): string => "Annulation de la commande #{$record->order_number}")
+                    ->modalHeading(fn (Order $record): string => "Annulation de la commande #{$record->id}")
                     ->form([
                         Forms\Components\Textarea::make('cancellation_reason')
                             ->label('Motif d\'annulation obligatoire')
@@ -333,7 +333,8 @@ class OrderResource extends Resource
                     ->action(function (Order $record, array $data): void {
                         $record->update([
                             'status' => 'cancelled',
-                            'cancellation_reason' => $data['cancellation_reason'],
+                            'cancel_reason' => $data['cancellation_reason'],
+                            'cancelled_at' => now(),
                         ]);
 
                         ActivityLog::create([
@@ -347,7 +348,7 @@ class OrderResource extends Resource
                         ]);
 
                         Notification::make()
-                            ->title("Commande #{$record->order_number} annulée")
+                            ->title("Commande #{$record->id} annulée")
                             ->danger()
                             ->send();
                     }),
@@ -381,7 +382,7 @@ class OrderResource extends Resource
                         ]);
 
                         Notification::make()
-                            ->title("Commande #{$record->order_number} réassignée")
+                            ->title("Commande #{$record->id} réassignée")
                             ->success()
                             ->send();
                     }),
@@ -399,7 +400,7 @@ class OrderResource extends Resource
                         ]);
 
                         Notification::make()
-                            ->title("Code débloqué pour commande #{$record->order_number}")
+                            ->title("Code débloqué pour commande #{$record->id}")
                             ->success()
                             ->send();
                     }),

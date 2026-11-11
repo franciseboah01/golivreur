@@ -62,8 +62,9 @@ class DisputesPage extends Page implements HasTable
             ->heading('Commandes GoShop Bloquées (Échec de Code OTP Client)')
             ->description('Appelez le client pour confirmer son identité avant de débloquer la livraison.')
             ->columns([
-                Tables\Columns\TextColumn::make('order_number')
+                Tables\Columns\TextColumn::make('id')
                     ->label('N° Commande')
+                    ->formatStateUsing(fn ($state): string => "#{$state}")
                     ->weight('bold')
                     ->searchable(),
 
@@ -84,7 +85,7 @@ class DisputesPage extends Page implements HasTable
                     ->badge()
                     ->color('danger'),
 
-                Tables\Columns\TextColumn::make('total')
+                Tables\Columns\TextColumn::make('total_client')
                     ->label('Montant total')
                     ->money('XOF'),
 
@@ -99,7 +100,7 @@ class DisputesPage extends Page implements HasTable
                     ->color('success')
                     ->button()
                     ->requiresConfirmation()
-                    ->modalHeading(fn (Order $record): string => "Débloquer la commande #{$record->order_number}")
+                    ->modalHeading(fn (Order $record): string => "Débloquer la commande #{$record->id}")
                     ->modalDescription('Confirmez-vous avoir appelé le client et validé verbalement la réception de la livraison ?')
                     ->action(function (Order $record): void {
                         $record->update([
@@ -114,7 +115,7 @@ class DisputesPage extends Page implements HasTable
                             'entity_type' => 'order',
                             'entity_id' => $record->id,
                             'properties' => [
-                                'order_number' => $record->order_number,
+                                'order_id' => $record->id,
                                 'client_id' => $record->client_id,
                                 'courier_id' => $record->courier_id,
                             ],
@@ -123,7 +124,7 @@ class DisputesPage extends Page implements HasTable
                         ]);
 
                         Notification::make()
-                            ->title("Commande #{$record->order_number} débloquée")
+                            ->title("Commande #{$record->id} débloquée")
                             ->body('Le livreur peut de nouveau valider la course.')
                             ->success()
                             ->send();

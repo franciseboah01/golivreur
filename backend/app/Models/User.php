@@ -90,6 +90,9 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
         return in_array($this->role, self::ADMIN_ROLES, true) || $this->role_habilitation_id !== null;
     }
 
+    /**
+     * @return BelongsTo<RoleHabilitation, $this>
+     */
     public function roleHabilitation(): BelongsTo
     {
         return $this->belongsTo(RoleHabilitation::class, 'role_habilitation_id');

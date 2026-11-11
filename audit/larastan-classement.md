@@ -1,27 +1,50 @@
-# Classement & Traitement des 99 Erreurs Larastan (Niveau 5) — GoLivreur
+# Classement & Traitement des Erreurs Larastan (Niveau 5) — GoLivreur
 
-> **Outil :** `php vendor/bin/phpstan analyse` (`phpstan.neon`, `level: 5` sur `app/` — 149 fichiers).  
-> **Résultat avant :** `[ERROR] Found 99 errors`.  
-> **Résultat après :** `[OK] No errors` (`phpstan-baseline.neon` limité strictement aux **4 faux positifs** documentés).
-
----
-
-## Tableau de classement des 99 erreurs
-
-| # | Catégorie / Groupe d'erreurs | Nb | Classe | Action effectuée |
-|---|---|---|---|---|
-| 1 | `property.notFound` sur propriétés inexistantes (`$order->order_number`, `$parcel->tracking_number`) dans `Filament\Resources\RefundResource\Pages\ListRefunds` (+ libellés `# - total` du modal) | **2** *(+2 associées)* | **BUG RÉEL** *(libellés vides à l'exécution + description `wallet_transactions` sans n°)* | Remplacé par `$order->id`, `$order->total_client` et `$parcel->id` avec `@var Order` / `@var Parcel` dans `ListRefunds.php` + test Pest dans `RefundAndRoleValidationTest.php`. |
-| 2 | `arguments.count` : `CheckboxList::minItems(1, 'Veuillez cocher...')` appelé avec 2 arguments dans `RoleHabilitationResource.php:73` | **1** | **BUG RÉEL** *(Filament `CanLimitItemsLength::minItems()` ignore le 2e argument ; message français perdu)* | Remplacé par `->minItems(1)->validationMessages(['min' => ..., 'required' => ...])` + test Pest vérifiant l'affichage du message français. |
-| 3 | `property.notFound` sur propriétés de modèles accédées via `$this` dans 5 `JsonResource` (`BusinessProfileResource` 11, `DriverProfileResource` 11, `ClientProfileResource` 11, `MerchantCategoryResource` 8, `MerchantResource` 16) | **57** | **DETTE DE TYPAGE** | Ajout des annotations `@mixin` (`User`, `Merchant`, `MerchantCategory`) sur les 5 Resources + `@property-read` sur `User`, `Merchant`, `MerchantCategory`, `Order`. |
-| 4 | `nullsafe.neverNull` : usage redondant de `?->` juste à gauche de `??` (`BusinessProfileResource` 11, `DriverProfileResource` 7, `ClientController` 4, `OrderResource` 2, `CreateCourier` 2, `CreateMerchant` 2, `DisputesPage` 1, `ParcelResource` 1, `MerchantController` 1, `MerchantResource` 1, `ClientAddress` 1) | **33** | **DETTE DE TYPAGE** | Remplacement de `?->` par `->` juste à gauche de `??` (aucune alerte ni changement d'exécution en PHP 8, y compris sur valeurs `null`). |
-| 5 | `argument.type` sur `ClientAddress` dans `ClientController.php` (`User::addresses()->get()->map(...)` et `formatAddress($address)`) | **2** | **DETTE DE TYPAGE** | Ajout des generics `@return HasMany<..., $this>` / `HasOne` / `BelongsTo` sur `User`, `Merchant`, `Courier` + typage `: ClientAddress` dans `DB::transaction`. |
-| 6 | `property.notFound` sur `$this->form` dans `Filament\Pages\SettingsPage` (L66, L390) | **2** | **FAUX POSITIF** *(magie Filament / Livewire `InteractsWithForms::ResolvesDynamicLivewireProperties`)* | Conservé tel quel et ajouté dans `backend/phpstan-baseline.neon`. |
-| 7 | `rules.modelAppends` sur `'photo_url'` dans `$appends` de `Courier.php` et `Merchant.php` | **2** | **FAUX POSITIF** *(colonne DB historique `photo_url` surchargée par accesseur fallback `getPhotoUrlAttribute()`, conservée dans `$appends` pour préserver `toArray()`)* | Conservé dans `$appends` sans altérer le comportement JSON et ajouté dans `backend/phpstan-baseline.neon`. |
-| — | **TOTAL** | **99** | **3 Bugs réels / 92 Dette de typage / 4 Faux positifs** | **95 corrigées dans le code + 4 en `phpstan-baseline.neon` → `[OK] No errors`.** |
+> **Outil :** `php vendor/bin/phpstan analyse` (`backend/phpstan.neon`, `level: 5` sur `app/` — 149 fichiers, `reportUnmatchedIgnoredErrors: true`, **0** règle `ignoreErrors` restante).  
+> **Passe 1 (99 erreurs initiales) :** `95` corrigées + `4` faux positifs mis en [`phpstan-baseline.neon`](../backend/phpstan-baseline.neon).  
+> **Passe 2 (levée des 8 règles génériques `ignoreErrors` de `phpstan.neon`) :** `15` erreurs cachées révélées → `15` corrigées dans le code (`9` bugs réels PHPStan + `3` colonnes/champs compagnon inexistants, `6` dettes de typage), **0** nouvel ajout dans la baseline → **`[OK] No errors`**.
 
 ---
 
-## Note d'audit connexe (hors périmètre des 99 erreurs)
+## Partie A — Audit des 8 règles `ignoreErrors` supprimées de `backend/phpstan.neon`
 
-- Des mentions similaires à `order_number` existent dans les tables/actions Filament de `DisputesPage.php` (L65, L102, L117, L126) et `OrderResource.php` (L326, L350, L384, L402), masquées par le filtre générique `phpstan.neon` (`App\Models\*::$*`). Elles n'ont pas été touchées dans cette passe afin de ne pas modifier d'autres écrans hors cible.
+| # | Règle d'exclusion retirée | Ce qu'elle masquait | Erreurs cachées | Raison d'origine | Classification des erreurs | Action effectuée |
+|---|---|---|---|---|---|---|
+| 1 | `Access to an undefined property Illuminate\Database\Eloquent\Model::\$...` | Attributs lus sur des relations `BelongsTo` sans génériques (`Model` inféré) | **3** | Relations non typées sur `Order` (`ListRefunds.php:43`, `OrderService.php:233`, `NotificationService.php:53`) | **DETTE DE TYPAGE** (3) | Règle supprimée ; ajout de `@return BelongsTo<User\|Merchant\|Courier\|City, $this>` sur `Order.php`. |
+| 2 | `Access to an undefined property App\Models\...::\$...` | Tout attribut inexistant ou dynamique sur n'importe quel modèle Eloquent | **9** | Propriété dynamique `Parcel::$sender_code_plain` et masquage involontaire de `Order::$order_number` | **7 BUGS RÉELS** + **2 DETTE DE TYPAGE** | Règle supprimée ; correction de `DisputesPage.php` & `OrderResource.php` + `@property string\|null $sender_code_plain` sur `Parcel.php`. |
+| 3 | `Call to an undefined method App\Models\...::...()` | Appels de méthodes sur les modèles | **0** | Règle préventive obsolète | *(Aucune)* | Règle supprimée. |
+| 4 | `Call to an undefined method Illuminate\Database\Eloquent\Model::...()` | Appels de méthodes sur relations Eloquent sans génériques | **1** | Absence de `@return BelongsTo<RoleHabilitation, $this>` sur `User::roleHabilitation()` (`User.php:108`) | **DETTE DE TYPAGE** (1) | Règle supprimée ; ajout du générique `@return BelongsTo<RoleHabilitation, $this>` sur `User.php`. |
+| 5 | `Property App\Filament\Resources\...::\$(navigationGroup\|...) is never read` | Propriétés statiques Filament | **0** | Règle préventive obsolète | *(Aucune)* | Règle supprimée. |
+| 6 | `Parameter #1 $forceForever of static method JWT::(refresh\|invalidate)() expects bool` | Passage de `Token\|null` au paramètre booléen `$forceForever` | **2** | Appel `JWTAuth::refresh(JWTAuth::getToken())` / `invalidate(JWTAuth::getToken())` (`AuthController.php:357,381`) | **2 BUGS RÉELS** | Règle supprimée ; corrigé en `JWTAuth::parseToken()->refresh()` et `JWTAuth::parseToken()->invalidate()` + assertion `AuthTest.php`. |
+| 7 | `Static method Redis::set() invoked with 5 parameters` | Appel `Redis::set` à 5 paramètres | **0** | Règle héritée obsolète | *(Aucune)* | Règle supprimée. |
+| 8 | `Parameter #3 $options of static method Redis::set() expects array` | Type du 3e paramètre de `Redis::set` | **0** | Règle héritée obsolète | *(Aucune)* | Règle supprimée. |
+| — | **TOTAL passe 2** | **8 règles `ignoreErrors` supprimées** (`reportUnmatchedIgnoredErrors: true`) | **15** | — | **9 Bugs réels + 6 Dette de typage** | **`15` corrigées dans le code, `0` exclusion générique conservée.** |
 
+---
+
+## Partie B — Récapitulatif global des bugs réels corrigés (Passes 1 & 2)
+
+| Fichier | Erreur / Bug réel constaté | Correction appliquée | Test associé |
+|---|---|---|---|
+| `Filament/Resources/RefundResource/Pages/ListRefunds.php` | Lecture de `$order->order_number`, `$order->total`, `$parcel->tracking_number` (inexistants ; modal et `wallet_transactions.description` vides) | Utilisation de `$o->id`, `$o->total_client`, `$p->id` avec `@var Order` / `@var Parcel` | `RefundAndRoleValidationTest.php` |
+| `Filament/Resources/RoleHabilitationResource.php` | `minItems(1, 'Veuillez cocher...')` ignorait le 2e argument | `->minItems(1)->validationMessages(['min' => ..., 'required' => ...])` | `RefundAndRoleValidationTest.php` |
+| `Filament/Pages/DisputesPage.php` | Colonne `order_number` (vide + erreur SQL en recherche), colonne `total` (vide), modal/log/notif sur `$record->order_number` (`3` erreurs démasquées) | Colonne `id` formatée `#id` + `total_client` + `#{$record->id}` + `'order_id' => $record->id` | `DisputesAndOrderResourceTest.php` |
+| `Filament/Resources/OrderResource.php` | Notifications/modals `#{$record->order_number}` (`4` erreurs démasquées) + champ inexistant `cancellation_reason` (motif d'annulation perdu) | `#{$record->id}`, `'cancel_reason' => $data['cancellation_reason']`, `'cancelled_at' => now()` | `DisputesAndOrderResourceTest.php` |
+| `Http/Controllers/Api/V1/Auth/AuthController.php` | `JWTAuth::refresh(JWTAuth::getToken())` et `invalidate(JWTAuth::getToken())` passaient `Token\|null` à `$forceForever` (`bool`) (`2` erreurs démasquées) | `JWTAuth::parseToken()->refresh()` et `JWTAuth::parseToken()->invalidate()` | `AuthTest.php` |
+
+---
+
+## Partie C — Tableau synthétique des groupes (Passe 1 + Passe 2)
+
+| Groupe | Nb | Classe | Action |
+|---|---|---|---|
+| `RefundResource\Pages\ListRefunds` (`order_number`, `tracking_number`) | **2** | **BUG RÉEL** | Corrigé + test Pest Livewire |
+| `RoleHabilitationResource` (`minItems` 2 args) | **1** | **BUG RÉEL** | Corrigé + test Pest Livewire |
+| `DisputesPage` & `OrderResource` (`Order::$order_number` démasqué) | **7** *(+3 UI/champ compagnon)* | **BUG RÉEL** | Corrigé (`id`, `total_client`, `cancel_reason`) + tests Pest Livewire |
+| `AuthController` (`JWT::refresh` / `invalidate` `$forceForever` démasqué) | **2** | **BUG RÉEL** | Corrigé (`parseToken()->refresh()/invalidate()`) + test Pest JWT |
+| `JsonResource` `@mixin` (`Business`, `Driver`, `Client`, `Merchant`, `MerchantCategory`) | **57** | **DETTE DE TYPAGE** | `@mixin` + `@property-read` sur modèles |
+| `nullsafe.neverNull` (`?->` avant `??`) | **33** | **DETTE DE TYPAGE** | Remplacé par `->` devant `??` |
+| Relations `Order` / `User` sans génériques + `ClientAddress` + `Parcel::$sender_code_plain` | **8** *(2 + 3 + 1 + 2)* | **DETTE DE TYPAGE** | Génériques `BelongsTo`/`HasMany`/`HasOne` + `@property` |
+| `SettingsPage::$form` (magie Filament Livewire `InteractsWithForms`) | **2** | **FAUX POSITIF** | Conservé en `phpstan-baseline.neon` |
+| `Courier` & `Merchant` `$appends = ['photo_url']` (colonne + accesseur legacy) | **2** | **FAUX POSITIF** | Conservé en `phpstan-baseline.neon` |
+| **TOTAL cumulé traité (99 + 15)** | **114** | **12 Bugs réels / 98 Dette / 4 Faux positifs** | **110 corrigées dans le code + 4 ciblées dans `phpstan-baseline.neon` → `[OK] No errors`.** |

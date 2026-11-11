@@ -354,7 +354,7 @@ class AuthController extends Controller
     public function refresh(Request $request): JsonResponse
     {
         try {
-            $newToken = JWTAuth::refresh(JWTAuth::getToken());
+            $newToken = JWTAuth::parseToken()->refresh();
 
             return response()->json([
                 'succes' => true,
@@ -378,7 +378,7 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         try {
-            JWTAuth::invalidate(JWTAuth::getToken());
+            JWTAuth::parseToken()->invalidate();
             auth('api')->logout();
         } catch (\Exception $e) {
             // Token déjà invalidé ou expiré
