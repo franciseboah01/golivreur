@@ -123,9 +123,18 @@ class AssignmentService
         // Notifier le livreur avec la taille du colis visible
         $this->notificationService->proposerCourseGoColis($livreur, $parcel);
 
+        $delais = $this->settingsService->get('delais_regles', $parcel->city_id);
+        $delaiSecondes = max(1, (int) (is_array($delais) ? ($delais['acceptation_livreur_secondes'] ?? self::DELAI_ACCEPTATION_GOCOLIS) : self::DELAI_ACCEPTATION_GOCOLIS));
+
         if (class_exists(NotifierLivreurGoColis::class)) {
-            NotifierLivreurGoColis::dispatch($parcel->id, $livreur->id, $tentative, [...$exclusions, $livreur->id])
-                ->delay(now()->addSeconds(self::DELAI_ACCEPTATION_GOCOLIS))
+            NotifierLivreurGoColis::dispatch(
+                $parcel->id,
+                $livreur->id,
+                $tentative,
+                [...$exclusions, $livreur->id],
+                now()->toIso8601String(),
+            )
+                ->delay(now()->addSeconds($delaiSecondes))
                 ->onQueue('default');
         }
     }

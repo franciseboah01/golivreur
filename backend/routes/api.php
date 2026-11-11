@@ -142,6 +142,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('orders/{order}/confirm-pickup', [DriverController::class, 'confirmPickup']);
         Route::post('orders/{order}/confirm-delivery', [DriverController::class, 'confirmDelivery']);
         Route::get('parcels/{parcel}', [ParcelController::class, 'showDriver']);
+        Route::post('parcels/{parcel}/accept', [DriverController::class, 'acceptParcel']);
+        Route::post('parcels/{parcel}/refuse', [DriverController::class, 'refuseParcel']);
         Route::get('wallet', [DriverController::class, 'wallet']);
     });
 

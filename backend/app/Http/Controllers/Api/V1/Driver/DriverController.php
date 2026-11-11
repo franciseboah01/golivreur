@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Parcel;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use App\Modules\GoShop\Services\AssignmentService;
 use App\Modules\GoShop\Services\OrderService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
@@ -27,7 +28,7 @@ class DriverController extends Controller
         return $courier;
     }
 
-    private function verifierEligibiliteLivreur(Courier $courier): ?JsonResponse
+    private function verifierEligibiliteLivreur(Courier $courier, ?SettingsService $settingsService = null): ?JsonResponse
     {
         if (! $courier->is_active || ($courier->user && ! $courier->user->is_active)) {
             return response()->json([
@@ -52,15 +53,21 @@ class DriverController extends Controller
                 'penalty_until' => null,
                 'consecutive_refusals' => 0,
             ]);
-        } elseif ($courier->consecutive_refusals >= 3) {
+
+            return null;
+        }
+
+        [$seuilRefus, $dureePenalite] = $this->obtenirReglesPenaliteRefus($settingsService, $courier->city_id);
+
+        if ($courier->consecutive_refusals >= $seuilRefus) {
             $courier->update([
-                'penalty_until' => now()->addMinutes(15),
+                'penalty_until' => now()->addMinutes($dureePenalite),
                 'is_online' => false,
             ]);
 
             return response()->json([
                 'succes' => false,
-                'message' => 'Suite à 3 refus consécutifs, vous êtes hors ligne pour 15 minutes.',
+                'message' => "Suite à {$seuilRefus} refus consécutifs, vous êtes hors ligne pour {$dureePenalite} minutes.",
             ], 403);
         }
 
@@ -166,22 +173,15 @@ class DriverController extends Controller
             /** @var Courier $lockedCourier */
             $lockedCourier = Courier::with('user')->lockForUpdate()->findOrFail($courier->id);
 
-            if (! $lockedCourier->city_id || (int) $lockedOrder->city_id !== (int) $lockedCourier->city_id) {
-                return response()->json([
-                    'succes' => false,
-                    'message' => 'Course introuvable.',
-                ], 404);
-            }
-
-            if (($refusal = $this->verifierEligibiliteLivreur($lockedCourier)) !== null) {
-                return $refusal;
-            }
-
-            if (! $lockedCourier->is_online) {
-                return response()->json([
-                    'succes' => false,
-                    'message' => 'Vous devez être en ligne pour accepter une course.',
-                ], 422);
+            if ($denied = $this->verifierLivreurEnLigneEtEligible(
+                lockedCourier: $lockedCourier,
+                resourceCityId: (int) $lockedOrder->city_id,
+                notFoundMessage: 'Course introuvable.',
+                offlineStatus: 422,
+                offlineMessage: 'Vous devez être en ligne pour accepter une course.',
+                settingsService: $settingsService,
+            )) {
+                return $denied;
             }
 
             if ($lockedOrder->courier_id !== null) {
@@ -200,29 +200,18 @@ class DriverController extends Controller
                 ], 422);
             }
 
-            $maxActives = $this->obtenirMaxCoursesActives($settingsService, (int) $lockedCourier->city_id);
-            if ($this->compterCoursesActives($lockedCourier->id) >= $maxActives) {
-                return response()->json([
-                    'succes' => false,
-                    'message' => 'Vous avez déjà une course active en cours. Terminez-la avant d\'en accepter une autre.',
-                ], 409);
-            }
+            $montantAReverser = $lockedOrder->payment_method === 'cash'
+                ? $walletService->calculerMontantAReverserOrder($lockedOrder)
+                : 0;
 
-            if ($lockedOrder->payment_method === 'cash') {
-                $montantAReverser = $walletService->calculerMontantAReverserOrder($lockedOrder);
-                $controleSolde = $walletService->verifierSoldeCashSuffisant(
-                    courier: $lockedCourier,
-                    montantAReverser: $montantAReverser,
-                    settingsService: $settingsService,
-                    lockWallet: true,
-                );
-
-                if (! $controleSolde['ok']) {
-                    return response()->json([
-                        'succes' => false,
-                        'message' => $controleSolde['message'],
-                    ], 422);
-                }
+            if ($denied = $this->verifierPlafondEtSoldeCash(
+                lockedCourier: $lockedCourier,
+                paymentMethod: (string) $lockedOrder->payment_method,
+                montantAReverser: $montantAReverser,
+                settingsService: $settingsService,
+                walletService: $walletService,
+            )) {
+                return $denied;
             }
 
             $affected = Order::whereKey($lockedOrder->id)
@@ -250,6 +239,194 @@ class DriverController extends Controller
                 'message' => 'Course acceptée.',
             ]);
         });
+    }
+
+    public function acceptParcel(Parcel $parcel, SettingsService $settingsService, WalletService $walletService): JsonResponse
+    {
+        $courier = $this->getCourier();
+
+        return DB::transaction(function () use ($parcel, $courier, $settingsService, $walletService): JsonResponse {
+            /** @var Parcel $lockedParcel */
+            $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
+            /** @var Courier $lockedCourier */
+            $lockedCourier = Courier::with('user')->lockForUpdate()->findOrFail($courier->id);
+
+            if ($denied = $this->verifierLivreurEnLigneEtEligible(
+                lockedCourier: $lockedCourier,
+                resourceCityId: (int) $lockedParcel->city_id,
+                notFoundMessage: 'Expédition introuvable.',
+                offlineStatus: 403,
+                offlineMessage: 'Vous devez être en ligne pour accepter une expédition.',
+                settingsService: $settingsService,
+            )) {
+                return $denied;
+            }
+
+            if ($lockedParcel->courier_id !== null) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => (int) $lockedParcel->courier_id === (int) $lockedCourier->id
+                        ? 'Vous avez déjà accepté cette expédition.'
+                        : 'Expédition déjà assignée à un autre livreur.',
+                ], 409);
+            }
+
+            if (! in_array($lockedParcel->status, [Parcel::STATUS_PENDING, Parcel::STATUS_WAITING], true)) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Cette expédition n\'est plus disponible à l\'acceptation.',
+                ], 422);
+            }
+
+            $montantAReverser = $lockedParcel->payment_method === 'cash'
+                ? $walletService->calculerMontantAReverserParcel($lockedParcel)
+                : 0;
+
+            if ($denied = $this->verifierPlafondEtSoldeCash(
+                lockedCourier: $lockedCourier,
+                paymentMethod: (string) $lockedParcel->payment_method,
+                montantAReverser: $montantAReverser,
+                settingsService: $settingsService,
+                walletService: $walletService,
+            )) {
+                return $denied;
+            }
+
+            $affected = Parcel::whereKey($lockedParcel->id)
+                ->whereNull('courier_id')
+                ->whereIn('status', [Parcel::STATUS_PENDING, Parcel::STATUS_WAITING])
+                ->update([
+                    'courier_id' => $lockedCourier->id,
+                    'status' => Parcel::STATUS_ACCEPTED,
+                ]);
+
+            if ($affected === 0) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Expédition déjà assignée à un autre livreur.',
+                ], 409);
+            }
+
+            if ($lockedCourier->consecutive_refusals > 0) {
+                $lockedCourier->update(['consecutive_refusals' => 0]);
+            }
+
+            return response()->json([
+                'succes' => true,
+                'donnees' => $lockedParcel->fresh(),
+                'message' => 'Expédition acceptée.',
+            ]);
+        });
+    }
+
+    public function refuseParcel(
+        Request $request,
+        Parcel $parcel,
+        SettingsService $settingsService,
+        AssignmentService $assignmentService,
+    ): JsonResponse {
+        $request->validate([
+            'raison' => 'nullable|string|max:500',
+        ]);
+
+        $courier = $this->getCourier();
+
+        /** @var array{response: JsonResponse, reassign_tentative?: int, exclude_courier_id?: int} $outcome */
+        $outcome = DB::transaction(function () use ($parcel, $courier, $settingsService): array {
+            /** @var Parcel $lockedParcel */
+            $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
+            /** @var Courier $lockedCourier */
+            $lockedCourier = Courier::with('user')->lockForUpdate()->findOrFail($courier->id);
+
+            if ($denied = $this->verifierLivreurEnLigneEtEligible(
+                lockedCourier: $lockedCourier,
+                resourceCityId: (int) $lockedParcel->city_id,
+                notFoundMessage: 'Expédition introuvable.',
+                offlineStatus: 403,
+                offlineMessage: 'Vous devez être en ligne pour refuser une course.',
+                settingsService: $settingsService,
+            )) {
+                return ['response' => $denied];
+            }
+
+            if ($lockedParcel->courier_id !== null && (int) $lockedParcel->courier_id !== (int) $lockedCourier->id) {
+                return [
+                    'response' => response()->json([
+                        'succes' => false,
+                        'message' => 'Expédition déjà assignée à un autre livreur.',
+                    ], 409),
+                ];
+            }
+
+            // Refus au ramassage d'un colis suspect ou interdit déjà assigné au livreur (CDC 5.2 / Annexe B)
+            if (
+                $lockedParcel->courier_id !== null
+                && (int) $lockedParcel->courier_id === (int) $lockedCourier->id
+                && in_array($lockedParcel->status, [Parcel::STATUS_ACCEPTED, Parcel::STATUS_AT_SENDER], true)
+            ) {
+                $lockedParcel->update(['status' => Parcel::STATUS_REFUSED]);
+
+                return [
+                    'response' => response()->json([
+                        'succes' => true,
+                        'donnees' => $lockedParcel->fresh(),
+                        'message' => 'Expédition refusée.',
+                    ]),
+                ];
+            }
+
+            if ($lockedParcel->courier_id === null && in_array($lockedParcel->status, [Parcel::STATUS_PENDING, Parcel::STATUS_WAITING], true)) {
+                [$seuilRefus, $dureePenalite] = $this->obtenirReglesPenaliteRefus($settingsService, $lockedCourier->city_id);
+                $nouveauxRefus = (int) $lockedCourier->consecutive_refusals + 1;
+
+                if ($nouveauxRefus >= $seuilRefus) {
+                    $lockedCourier->update([
+                        'consecutive_refusals' => $nouveauxRefus,
+                        'penalty_until' => now()->addMinutes($dureePenalite),
+                        'is_online' => false,
+                    ]);
+                } else {
+                    $lockedCourier->update([
+                        'consecutive_refusals' => $nouveauxRefus,
+                    ]);
+                }
+
+                $tentativeSuivante = ((int) $lockedParcel->assignment_attempts) + 1;
+                $lockedParcel->update(['assignment_attempts' => $tentativeSuivante]);
+
+                return [
+                    'response' => response()->json([
+                        'succes' => true,
+                        'donnees' => $lockedParcel->fresh(),
+                        'message' => $nouveauxRefus >= $seuilRefus
+                            ? "Expédition refusée. Suite à {$seuilRefus} refus consécutifs, vous êtes hors ligne pour {$dureePenalite} minutes."
+                            : 'Expédition refusée et transmise au livreur suivant.',
+                    ]),
+                    'reassign_tentative' => $tentativeSuivante + 1,
+                    'exclude_courier_id' => $lockedCourier->id,
+                ];
+            }
+
+            return [
+                'response' => response()->json([
+                    'succes' => false,
+                    'message' => 'Cette expédition ne peut pas être refusée dans son statut actuel.',
+                ], 422),
+            ];
+        });
+
+        if (isset($outcome['reassign_tentative'], $outcome['exclude_courier_id'])) {
+            $freshParcel = $parcel->fresh();
+            if ($freshParcel && $freshParcel->courier_id === null) {
+                $assignmentService->attribuerLivreurGoColis(
+                    parcel: $freshParcel,
+                    tentative: $outcome['reassign_tentative'],
+                    exclusions: [$outcome['exclude_courier_id']],
+                );
+            }
+        }
+
+        return $outcome['response'];
     }
 
     public function confirmPickup(Order $order): JsonResponse
@@ -388,5 +565,82 @@ class DriverController extends Controller
             ->count();
 
         return $commandesActives + $colisActifs;
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    private function obtenirReglesPenaliteRefus(?SettingsService $settingsService, ?int $cityId): array
+    {
+        $service = $settingsService ?? app(SettingsService::class);
+        $delais = $service->get('delais_regles', $cityId);
+
+        $seuil = is_array($delais) ? (int) ($delais['refus_avant_penalite'] ?? 3) : 3;
+        $duree = is_array($delais) ? (int) ($delais['duree_penalite_minutes'] ?? 15) : 15;
+
+        return [max(1, $seuil), max(1, $duree)];
+    }
+
+    private function verifierLivreurEnLigneEtEligible(
+        Courier $lockedCourier,
+        int $resourceCityId,
+        string $notFoundMessage,
+        int $offlineStatus,
+        string $offlineMessage,
+        SettingsService $settingsService,
+    ): ?JsonResponse {
+        if (! $lockedCourier->city_id || $resourceCityId !== (int) $lockedCourier->city_id) {
+            return response()->json([
+                'succes' => false,
+                'message' => $notFoundMessage,
+            ], 404);
+        }
+
+        if (($refusal = $this->verifierEligibiliteLivreur($lockedCourier, $settingsService)) !== null) {
+            return $refusal;
+        }
+
+        if (! $lockedCourier->is_online) {
+            return response()->json([
+                'succes' => false,
+                'message' => $offlineMessage,
+            ], $offlineStatus);
+        }
+
+        return null;
+    }
+
+    private function verifierPlafondEtSoldeCash(
+        Courier $lockedCourier,
+        string $paymentMethod,
+        int $montantAReverser,
+        SettingsService $settingsService,
+        WalletService $walletService,
+    ): ?JsonResponse {
+        $maxActives = $this->obtenirMaxCoursesActives($settingsService, (int) $lockedCourier->city_id);
+        if ($this->compterCoursesActives($lockedCourier->id) >= $maxActives) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Vous avez déjà une course active en cours. Terminez-la avant d\'en accepter une autre.',
+            ], 409);
+        }
+
+        if ($paymentMethod === 'cash') {
+            $controleSolde = $walletService->verifierSoldeCashSuffisant(
+                courier: $lockedCourier,
+                montantAReverser: $montantAReverser,
+                settingsService: $settingsService,
+                lockWallet: true,
+            );
+
+            if (! $controleSolde['ok']) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => $controleSolde['message'],
+                ], 422);
+            }
+        }
+
+        return null;
     }
 }

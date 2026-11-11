@@ -52,4 +52,3 @@ it('compte correctement les commandes et colis en espèces, Orange Money (orange
         ->and($compteurs['Wave Mobile Money'] ?? null)->toBe(1)
         ->and($compteurs['MTN MoMo'] ?? null)->toBe(0);
 });
-
