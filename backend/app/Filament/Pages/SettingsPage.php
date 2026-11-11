@@ -244,13 +244,13 @@ class SettingsPage extends Page implements HasForms
                                             ->numeric()->suffix('%')->required()
                                             ->helperText('Prélevée sur le montant des produits vendus (ex: 15%).'),
                                         Forms\Components\TextInput::make('commissions.livreur_goshop')
-                                            ->label('Part plateforme sur livraison GoShop (%)')
+                                            ->label('Part retenue par la plateforme sur les frais de livraison (le livreur touche le reste : 100 − cette valeur)')
                                             ->numeric()->suffix('%')->required()
-                                            ->helperText('Pourcentage prélevé sur les frais de livraison (ex: 20%). Le livreur reçoit 80%.'),
+                                            ->helperText('Exemple (20 %) : course à 800 F → plateforme 160 F, livreur 640 F.'),
                                         Forms\Components\TextInput::make('commissions.plateforme_gocolis')
-                                            ->label('Commission plateforme GoColis (%)')
+                                            ->label('Part retenue par la plateforme sur les frais d\'expédition GoColis (le livreur touche le reste : 100 − cette valeur)')
                                             ->numeric()->suffix('%')->required()
-                                            ->helperText('Pourcentage prélevé sur les courses GoColis (ex: 25%). Le livreur reçoit 75%.'),
+                                            ->helperText('Exemple (25 %) : colis à 1 800 F → plateforme 450 F, livreur 1 350 F.'),
                                     ])->columns(3),
                             ]),
 
@@ -427,9 +427,12 @@ class SettingsPage extends Page implements HasForms
                 continue;
             }
 
+            $existing = $settingsService->get($key, $this->selectedCityId);
+            $mergedValue = $this->mergePreservingHiddenKeys($existing, $value);
+
             $settingsService->set(
                 key: $key,
-                value: $value,
+                value: $mergedValue,
                 cityId: $this->selectedCityId,
                 userId: auth()->id(),
                 description: 'Mise à jour via le panneau Filament Paramètres'
@@ -447,5 +450,21 @@ class SettingsPage extends Page implements HasForms
         if ($brandingChanged && ! app()->runningUnitTests()) {
             $this->redirect(static::getUrl(), navigate: false);
         }
+    }
+
+    private function mergePreservingHiddenKeys(mixed $existing, mixed $submitted): mixed
+    {
+        if (! is_array($existing) || ! is_array($submitted) || array_is_list($existing) || array_is_list($submitted)) {
+            return $submitted;
+        }
+
+        $merged = $existing;
+        foreach ($submitted as $subKey => $subVal) {
+            $merged[$subKey] = array_key_exists($subKey, $existing)
+                ? $this->mergePreservingHiddenKeys($existing[$subKey], $subVal)
+                : $subVal;
+        }
+
+        return $merged;
     }
 }
