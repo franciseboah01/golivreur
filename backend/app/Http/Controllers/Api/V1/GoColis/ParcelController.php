@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1\GoColis;
 
 use App\Http\Controllers\Controller;
+use App\Models\City;
+use App\Models\Neighborhood;
 use App\Models\Parcel;
 use App\Modules\GoColis\Services\ParcelService;
 use Illuminate\Http\JsonResponse;
@@ -109,14 +111,55 @@ class ParcelController extends Controller
     public function showDriver(Parcel $parcel): JsonResponse
     {
         $user = auth()->user();
-        $courier = $user->courier;
+        $courier = $user?->courier;
 
-        if (! $courier && ! in_array($user->role, ['super_admin', 'dg_national', 'city_manager'])) {
+        if (! $courier) {
             return response()->json(['succes' => false, 'message' => 'Accès réservé aux livreurs.'], 403);
         }
 
-        if ($courier && $parcel->courier_id !== null && $parcel->courier_id !== $courier->id && ! in_array($user->role, ['super_admin', 'dg_national', 'city_manager'])) {
+        if (! $courier->city_id || (int) $parcel->city_id !== (int) $courier->city_id) {
+            return response()->json(['succes' => false, 'message' => 'Expédition introuvable.'], 404);
+        }
+
+        if ($parcel->courier_id !== null && (int) $parcel->courier_id !== (int) $courier->id) {
             return response()->json(['succes' => false, 'message' => 'Ce colis est assigné à un autre livreur.'], 403);
+        }
+
+        if ($parcel->courier_id === null) {
+            if (! $courier->is_active || ($user && ! $user->is_active)) {
+                return response()->json(['succes' => false, 'message' => 'Votre compte livreur est suspendu ou inactif.'], 403);
+            }
+
+            if (! in_array($parcel->status, [Parcel::STATUS_PENDING, Parcel::STATUS_WAITING], true)) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Cette expédition n\'est plus disponible à l\'acceptation.',
+                ], 422);
+            }
+
+            return response()->json([
+                'succes' => true,
+                'donnees' => [
+                    'id' => $parcel->id,
+                    'size' => $parcel->size,
+                    'size_label' => $parcel->size_label,
+                    'status' => $parcel->status,
+                    'shipping_fee' => (float) $parcel->shipping_fee,
+                    'courier_amount' => (float) $parcel->courier_amount,
+                    'distance_km' => $this->estimerDistanceKm($parcel),
+                    'pickup_zone' => $this->resoudreZoneApproximative(
+                        $parcel,
+                        $parcel->pickup_lat !== null ? (float) $parcel->pickup_lat : null,
+                        $parcel->pickup_lng !== null ? (float) $parcel->pickup_lng : null,
+                    ),
+                    'delivery_zone' => $this->resoudreZoneApproximative(
+                        $parcel,
+                        $parcel->delivery_lat !== null ? (float) $parcel->delivery_lat : null,
+                        $parcel->delivery_lng !== null ? (float) $parcel->delivery_lng : null,
+                    ),
+                    'created_at' => $parcel->created_at,
+                ],
+            ]);
         }
 
         return response()->json([
@@ -139,6 +182,70 @@ class ParcelController extends Controller
                 'created_at' => $parcel->created_at,
             ],
         ]);
+    }
+
+    private function estimerDistanceKm(Parcel $parcel): ?float
+    {
+        if (
+            $parcel->pickup_lat === null
+            || $parcel->pickup_lng === null
+            || $parcel->delivery_lat === null
+            || $parcel->delivery_lng === null
+        ) {
+            return null;
+        }
+
+        return round(
+            $this->distanceHaversineKm(
+                (float) $parcel->pickup_lat,
+                (float) $parcel->pickup_lng,
+                (float) $parcel->delivery_lat,
+                (float) $parcel->delivery_lng
+            ),
+            1
+        );
+    }
+
+    private function resoudreZoneApproximative(Parcel $parcel, ?float $lat, ?float $lng): string
+    {
+        if ($lat !== null && $lng !== null) {
+            $quartiers = Neighborhood::query()
+                ->where('city_id', $parcel->city_id)
+                ->where('is_active', true)
+                ->whereNotNull('lat')
+                ->whereNotNull('lng')
+                ->get();
+
+            $plusProche = null;
+            $distanceMin = INF;
+            foreach ($quartiers as $quartier) {
+                $d = $this->distanceHaversineKm($lat, $lng, (float) $quartier->lat, (float) $quartier->lng);
+                if ($d < $distanceMin) {
+                    $distanceMin = $d;
+                    $plusProche = $quartier->name;
+                }
+            }
+
+            if ($plusProche !== null) {
+                return $plusProche;
+            }
+        }
+
+        $cityName = City::whereKey($parcel->city_id)->value('name');
+
+        return is_string($cityName) && $cityName !== '' ? "Secteur {$cityName}" : 'Zone urbaine';
+    }
+
+    private function distanceHaversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $terreKm = 6371.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+
+        $a = sin($dLat / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return 2 * $terreKm * asin(min(1.0, sqrt($a)));
     }
 
     public function showClient(Parcel $parcel): JsonResponse
