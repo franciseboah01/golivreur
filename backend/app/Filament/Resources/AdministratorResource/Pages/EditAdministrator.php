@@ -17,4 +17,3 @@ class EditAdministrator extends EditRecord
         ];
     }
 }
-

@@ -32,35 +32,46 @@ class Parcel extends Model
     ];
 
     protected $casts = [
-        'has_insurance'         => 'boolean',
-        'insurance_amount'      => 'integer',
-        'declared_value'        => 'integer',
-        'shipping_fee'          => 'integer',
-        'platform_commission'   => 'integer',
-        'courier_amount'        => 'integer',
-        'sender_code_locked'    => 'boolean',
+        'has_insurance' => 'boolean',
+        'insurance_amount' => 'integer',
+        'declared_value' => 'integer',
+        'shipping_fee' => 'integer',
+        'platform_commission' => 'integer',
+        'courier_amount' => 'integer',
+        'sender_code_locked' => 'boolean',
         'recipient_code_locked' => 'boolean',
-        'picked_up_at'          => 'datetime',
-        'delivered_at'          => 'datetime',
-        'cancelled_at'          => 'datetime',
+        'picked_up_at' => 'datetime',
+        'delivered_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     // Tailles acceptées
-    const SIZE_SMALL  = 'petit';
+    const SIZE_SMALL = 'petit';
+
     const SIZE_MEDIUM = 'moyen';
-    const SIZE_LARGE  = 'grand';
+
+    const SIZE_LARGE = 'grand';
 
     // Statuts
-    const STATUS_PENDING      = 'pending';
-    const STATUS_WAITING      = 'waiting';
-    const STATUS_ACCEPTED     = 'accepted';
-    const STATUS_AT_SENDER    = 'at_sender';
-    const STATUS_PICKED_UP    = 'picked_up';
-    const STATUS_IN_TRANSIT   = 'in_transit';
+    const STATUS_PENDING = 'pending';
+
+    const STATUS_WAITING = 'waiting';
+
+    const STATUS_ACCEPTED = 'accepted';
+
+    const STATUS_AT_SENDER = 'at_sender';
+
+    const STATUS_PICKED_UP = 'picked_up';
+
+    const STATUS_IN_TRANSIT = 'in_transit';
+
     const STATUS_AT_RECIPIENT = 'at_recipient';
-    const STATUS_DELIVERED    = 'delivered';
-    const STATUS_REFUSED      = 'refused';
-    const STATUS_CANCELLED    = 'cancelled';
+
+    const STATUS_DELIVERED = 'delivered';
+
+    const STATUS_REFUSED = 'refused';
+
+    const STATUS_CANCELLED = 'cancelled';
 
     // ─── Relations ────────────────────────────────────────────────────────────
 
@@ -126,10 +137,10 @@ class Parcel extends Model
     public function getSizeLabelAttribute(): string
     {
         return match ($this->size) {
-            self::SIZE_SMALL  => 'Petit (max 1 kg)',
+            self::SIZE_SMALL => 'Petit (max 1 kg)',
             self::SIZE_MEDIUM => 'Moyen (max 5 kg)',
-            self::SIZE_LARGE  => 'Grand (max 15 kg)',
-            default           => $this->size,
+            self::SIZE_LARGE => 'Grand (max 15 kg)',
+            default => $this->size,
         };
     }
 
@@ -140,9 +151,10 @@ class Parcel extends Model
 
     public function getDeliveryDurationMinutesAttribute(): ?int
     {
-        if (!$this->picked_up_at || !$this->delivered_at) {
+        if (! $this->picked_up_at || ! $this->delivered_at) {
             return null;
         }
+
         return (int) $this->picked_up_at->diffInMinutes($this->delivered_at);
     }
 }

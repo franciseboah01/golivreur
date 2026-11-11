@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1\Merchant;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Merchant, Order, Product};
+use App\Models\Merchant;
+use App\Models\Order;
+use App\Models\Product;
 use App\Modules\GoShop\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,9 +15,10 @@ class MerchantController extends Controller
     private function getMerchant(): Merchant
     {
         $merchant = Merchant::where('user_id', auth()->id())->first();
-        if (!$merchant) {
+        if (! $merchant) {
             abort(404, 'Profil commerce introuvable.');
         }
+
         return $merchant;
     }
 
@@ -24,18 +27,18 @@ class MerchantController extends Controller
         $merchant = $this->getMerchant()->load('categoryModel');
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => [
-                'id'                => $merchant->id,
-                'is_open'           => $merchant->is_open,
-                'is_active'         => $merchant->is_active,
+                'id' => $merchant->id,
+                'is_open' => $merchant->is_open,
+                'is_active' => $merchant->is_active,
                 'prep_time_minutes' => $merchant->prep_time_minutes,
-                'name'              => $merchant->name,
-                'category'          => $merchant->category,
-                'category_name'     => $merchant->categoryModel?->name ?? ucfirst((string) $merchant->category),
-                'emoji'             => $merchant->resolved_emoji,
-                'logo_url'          => $merchant->logo_url ?? $merchant->categoryModel?->logo_url,
-                'photo_url'         => $merchant->photo_url,
+                'name' => $merchant->name,
+                'category' => $merchant->category,
+                'category_name' => $merchant->categoryModel?->name ?? ucfirst((string) $merchant->category),
+                'emoji' => $merchant->resolved_emoji,
+                'logo_url' => $merchant->logo_url ?? $merchant->categoryModel?->logo_url,
+                'photo_url' => $merchant->photo_url,
             ],
         ]);
     }
@@ -43,12 +46,12 @@ class MerchantController extends Controller
     public function toggleStatus(Request $request): JsonResponse
     {
         $merchant = $this->getMerchant();
-        $isOpen = $request->boolean('is_open', !$merchant->is_open);
+        $isOpen = $request->boolean('is_open', ! $merchant->is_open);
 
         $merchant->update(['is_open' => $isOpen]);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $merchant,
             'message' => $isOpen ? 'Commerce ouvert.' : 'Commerce fermé.',
         ]);
@@ -71,7 +74,7 @@ class MerchantController extends Controller
             ->get();
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $orders,
         ]);
     }
@@ -87,7 +90,7 @@ class MerchantController extends Controller
         $updated = $orderService->accepterCommande($order, $merchant);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $updated,
             'message' => 'Commande acceptée avec succès.',
         ]);
@@ -105,7 +108,7 @@ class MerchantController extends Controller
         $updated = $orderService->refuserCommande($order, $reason);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $updated,
             'message' => 'Commande refusée.',
         ]);
@@ -122,7 +125,7 @@ class MerchantController extends Controller
         $updated = $orderService->signalerCommandePrete($order);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $updated,
             'message' => 'Commande signalée comme prête pour le livreur.',
         ]);
@@ -138,7 +141,7 @@ class MerchantController extends Controller
             ->get();
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $products,
         ]);
     }
@@ -148,10 +151,10 @@ class MerchantController extends Controller
         $merchant = $this->getMerchant();
 
         $validated = $request->validate([
-            'name'         => 'required|string|max:200',
-            'description'  => 'nullable|string',
-            'price'        => 'required|numeric|min:100',
-            'category'     => 'nullable|string|max:100',
+            'name' => 'required|string|max:200',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric|min:100',
+            'category' => 'nullable|string|max:100',
             'is_available' => 'boolean',
         ]);
 
@@ -161,7 +164,7 @@ class MerchantController extends Controller
         ]);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $product,
         ], 201);
     }
@@ -175,17 +178,17 @@ class MerchantController extends Controller
         }
 
         $validated = $request->validate([
-            'name'         => 'sometimes|required|string|max:200',
-            'description'  => 'nullable|string',
-            'price'        => 'sometimes|required|numeric|min:100',
-            'category'     => 'nullable|string|max:100',
+            'name' => 'sometimes|required|string|max:200',
+            'description' => 'nullable|string',
+            'price' => 'sometimes|required|numeric|min:100',
+            'category' => 'nullable|string|max:100',
             'is_available' => 'boolean',
         ]);
 
         $product->update($validated);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $product,
         ]);
     }
@@ -201,7 +204,7 @@ class MerchantController extends Controller
         $product->delete();
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Produit retiré du catalogue.',
         ]);
     }

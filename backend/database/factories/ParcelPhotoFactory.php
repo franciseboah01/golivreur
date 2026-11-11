@@ -14,11 +14,10 @@ class ParcelPhotoFactory extends Factory
     {
         return [
             'parcel_id' => Parcel::factory(),
-            'type'      => 'pickup',
+            'type' => 'pickup',
             'photo_url' => 'https://storage.golivreur.ci/parcels/test.jpg',
-            'lat'       => 6.8770,
-            'lng'       => -6.4502,
+            'lat' => 6.8770,
+            'lng' => -6.4502,
         ];
     }
 }
-

@@ -19,11 +19,11 @@ return new class extends Migration
         Schema::create('order_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('order_id')
-                  ->constrained('orders')
-                  ->cascadeOnDelete();
+                ->constrained('orders')
+                ->cascadeOnDelete();
             $table->foreignId('product_id')
-                  ->constrained('products')
-                  ->restrictOnDelete();
+                ->constrained('products')
+                ->restrictOnDelete();
             $table->unsignedSmallInteger('quantity');
             // Prix unitaire au moment de la commande (immuable)
             $table->decimal('unit_price', 10, 0);

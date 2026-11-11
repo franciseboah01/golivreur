@@ -166,6 +166,7 @@ class RoleHabilitation extends Model
         foreach (self::AVAILABLE_ONGLETS as $key => $meta) {
             $options[$key] = "{$meta['label']} ({$meta['group']})";
         }
+
         return $options;
     }
 
@@ -175,6 +176,7 @@ class RoleHabilitation extends Model
         foreach (self::AVAILABLE_ONGLETS as $key => $meta) {
             $descriptions[$key] = $meta['description'];
         }
+
         return $descriptions;
     }
 
@@ -183,4 +185,3 @@ class RoleHabilitation extends Model
         return array_keys(self::AVAILABLE_ONGLETS);
     }
 }
-

@@ -1,5 +1,8 @@
 <?php
 
+use PHPOpenSourceSaver\JWTAuth\Providers\Auth\Illuminate;
+use PHPOpenSourceSaver\JWTAuth\Providers\JWT\Lcobucci;
+
 // Config JWT — php-open-source-saver/jwt-auth (ADR-002).
 // Access token court (60 min), refresh token long (30 jours = 43200 min) avec rotation,
 // blacklist Redis activee pour permettre la revocation immediate (logout, blocage compte).
@@ -45,8 +48,8 @@ return [
     'decrypt_cookies' => false,
 
     'providers' => [
-        'jwt' => PHPOpenSourceSaver\JWTAuth\Providers\JWT\Lcobucci::class,
-        'auth' => PHPOpenSourceSaver\JWTAuth\Providers\Auth\Illuminate::class,
+        'jwt' => Lcobucci::class,
+        'auth' => Illuminate::class,
         'storage' => PHPOpenSourceSaver\JWTAuth\Providers\Storage\Illuminate::class,
     ],
 

@@ -9,4 +9,3 @@ class CreateAdministrator extends CreateRecord
 {
     protected static string $resource = AdministratorResource::class;
 }
-

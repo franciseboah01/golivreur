@@ -2,7 +2,9 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\{ActivityLog, Order, Parcel};
+use App\Models\ActivityLog;
+use App\Models\Order;
+use App\Models\Parcel;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Tables;
@@ -33,6 +35,7 @@ class DisputesPage extends Page implements HasTable
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('disputes');
     }
 
@@ -100,23 +103,23 @@ class DisputesPage extends Page implements HasTable
                     ->modalDescription('Confirmez-vous avoir appelé le client et validé verbalement la réception de la livraison ?')
                     ->action(function (Order $record): void {
                         $record->update([
-                            'confirmation_locked'      => false,
-                            'confirmation_attempts'    => 0,
+                            'confirmation_locked' => false,
+                            'confirmation_attempts' => 0,
                             'confirmation_unlocked_by' => auth()->id(),
                         ]);
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => 'order_code_unlocked',
+                            'user_id' => auth()->id(),
+                            'action' => 'order_code_unlocked',
                             'entity_type' => 'order',
-                            'entity_id'   => $record->id,
-                            'properties'  => [
+                            'entity_id' => $record->id,
+                            'properties' => [
                                 'order_number' => $record->order_number,
-                                'client_id'    => $record->client_id,
-                                'courier_id'   => $record->courier_id,
+                                'client_id' => $record->client_id,
+                                'courier_id' => $record->courier_id,
                             ],
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'warning',
+                            'ip_address' => request()->ip(),
+                            'severity' => 'warning',
                         ]);
 
                         Notification::make()
@@ -130,4 +133,3 @@ class DisputesPage extends Page implements HasTable
             ->emptyStateDescription('Toutes les livraisons se déroulent normalement.');
     }
 }
-

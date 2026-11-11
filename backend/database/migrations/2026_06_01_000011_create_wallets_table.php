@@ -33,7 +33,7 @@ return new class extends Migration
         });
 
         // Contrainte CHECK PostgreSQL : owner_type uniquement 'merchant' ou 'courier'
-        \DB::statement("ALTER TABLE wallets ADD CONSTRAINT wallets_owner_type_check CHECK (owner_type IN ('merchant', 'courier'))");
+        DB::statement("ALTER TABLE wallets ADD CONSTRAINT wallets_owner_type_check CHECK (owner_type IN ('merchant', 'courier'))");
     }
 
     public function down(): void

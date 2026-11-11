@@ -21,13 +21,13 @@ class ActivityLogService
         string $severity = 'info',
     ): ActivityLog {
         return ActivityLog::create([
-            'user_id'     => $userId,
-            'action'      => $action,
+            'user_id' => $userId,
+            'action' => $action,
             'entity_type' => $entityType,
-            'entity_id'   => $entityId,
-            'properties'  => $properties ?: null,
-            'ip_address'  => request()->ip(),
-            'severity'    => $severity,
+            'entity_id' => $entityId,
+            'properties' => $properties ?: null,
+            'ip_address' => request()->ip(),
+            'severity' => $severity,
         ]);
     }
 
@@ -43,13 +43,13 @@ class ActivityLogService
     ): void {
         try {
             ActivityLog::create([
-                'user_id'     => null,
-                'action'      => $action,
+                'user_id' => null,
+                'action' => $action,
                 'entity_type' => $entityType,
-                'entity_id'   => $entityId,
-                'properties'  => $properties ?: null,
-                'ip_address'  => null,
-                'severity'    => $severity,
+                'entity_id' => $entityId,
+                'properties' => $properties ?: null,
+                'ip_address' => null,
+                'severity' => $severity,
             ]);
         } catch (\Exception $e) {
             Log::error("ActivityLogService::logStatic échoué : {$e->getMessage()}");

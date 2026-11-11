@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Courier, Order, Parcel, Rating};
+use App\Models\Courier;
+use App\Models\Order;
+use App\Models\Parcel;
+use App\Models\Rating;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,10 +22,10 @@ class RatingController extends Controller
     {
         $validated = $request->validate([
             'courier_id' => 'required|exists:couriers,id',
-            'order_id'   => 'nullable|exists:orders,id',
-            'parcel_id'  => 'nullable|exists:parcels,id',
-            'rating'     => 'required|integer|min:1|max:5',
-            'comment'    => 'nullable|string|max:500',
+            'order_id' => 'nullable|exists:orders,id',
+            'parcel_id' => 'nullable|exists:parcels,id',
+            'rating' => 'required|integer|min:1|max:5',
+            'comment' => 'nullable|string|max:500',
         ]);
 
         if (empty($validated['order_id']) && empty($validated['parcel_id'])) {
@@ -34,21 +37,21 @@ class RatingController extends Controller
         $userId = auth()->id();
 
         // Vérifier que la commande ou le colis appartient bien à ce client
-        if (!empty($validated['order_id'])) {
+        if (! empty($validated['order_id'])) {
             $order = Order::findOrFail($validated['order_id']);
             if ($order->client_id !== $userId) {
                 return response()->json([
-                    'succes'  => false,
+                    'succes' => false,
                     'message' => 'Cette commande ne vous appartient pas.',
                 ], 403);
             }
         }
 
-        if (!empty($validated['parcel_id'])) {
+        if (! empty($validated['parcel_id'])) {
             $parcel = Parcel::findOrFail($validated['parcel_id']);
             if ($parcel->sender_id !== $userId) {
                 return response()->json([
-                    'succes'  => false,
+                    'succes' => false,
                     'message' => 'Cette expédition ne vous appartient pas.',
                 ], 403);
             }
@@ -56,13 +59,13 @@ class RatingController extends Controller
 
         return DB::transaction(function () use ($validated, $userId) {
             $rating = Rating::create([
-                'rater_id'    => $userId,
+                'rater_id' => $userId,
                 'rateable_id' => $validated['courier_id'],
-                'type'        => 'courier',
-                'rating'      => $validated['rating'],
-                'comment'     => $validated['comment'] ?? null,
-                'order_id'    => $validated['order_id'] ?? null,
-                'parcel_id'   => $validated['parcel_id'] ?? null,
+                'type' => 'courier',
+                'rating' => $validated['rating'],
+                'comment' => $validated['comment'] ?? null,
+                'order_id' => $validated['order_id'] ?? null,
+                'parcel_id' => $validated['parcel_id'] ?? null,
             ]);
 
             // Mettre à jour la moyenne du livreur
@@ -72,19 +75,18 @@ class RatingController extends Controller
 
             $courier->update([
                 'average_rating' => round($nouvelleMoyenne, 2),
-                'total_ratings'  => $nouveauTotal,
+                'total_ratings' => $nouveauTotal,
             ]);
 
             return response()->json([
-                'succes'  => true,
+                'succes' => true,
                 'donnees' => [
-                    'rating'         => $rating,
+                    'rating' => $rating,
                     'average_rating' => $courier->fresh()->average_rating,
-                    'total_ratings'  => $courier->fresh()->total_ratings,
+                    'total_ratings' => $courier->fresh()->total_ratings,
                 ],
                 'message' => 'Merci pour votre évaluation !',
             ], 201);
         });
     }
 }
-

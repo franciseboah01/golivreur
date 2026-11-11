@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\{Cache, Log, Mail};
+use App\Mail\SmsBudgetAlertMail;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Envoie les SMS via Twilio ou Orange API.
@@ -12,7 +15,8 @@ use Illuminate\Support\Facades\{Cache, Log, Mail};
 class SmsService
 {
     private const SEUIL_ALERTE = 2500;
-    private const CACHE_KEY    = 'sms_count_mensuel';
+
+    private const CACHE_KEY = 'sms_count_mensuel';
 
     public function __construct(
         private readonly ?object $twilioClient = null,
@@ -28,8 +32,8 @@ class SmsService
     {
         $message = match ($contexte) {
             'inscription' => "GoLivreur : Votre code d'inscription est {$code}. Valable 5 minutes.",
-            'connexion'   => "GoLivreur : Votre code de connexion est {$code}. Valable 5 minutes.",
-            default       => "GoLivreur : Votre code est {$code}. Valable 5 minutes.",
+            'connexion' => "GoLivreur : Votre code de connexion est {$code}. Valable 5 minutes.",
+            default => "GoLivreur : Votre code est {$code}. Valable 5 minutes.",
         };
 
         return $this->envoyer($phone, $message, type: 'otp');
@@ -42,8 +46,8 @@ class SmsService
     public function envoyerCodeDestinataire(string $phone, string $code, string $expediteurNom): bool
     {
         $message = "GoLivreur GoColis : {$expediteurNom} vous envoie un colis. "
-                 . "Votre code de reception : {$code}. "
-                 . "Donnez ce code uniquement au livreur.";
+                 ."Votre code de reception : {$code}. "
+                 .'Donnez ce code uniquement au livreur.';
 
         return $this->envoyer($phone, $message, type: 'gocolis_recipient');
     }
@@ -64,11 +68,12 @@ class SmsService
             // Normaliser le numéro ivoirien (+225 + numéro)
             $phoneInternational = $this->normaliserPhone($phone);
 
-            if (app()->environment('testing', 'local') || !$this->twilioClient) {
+            if (app()->environment('testing', 'local') || ! $this->twilioClient) {
                 $this->incrementerCompteur();
                 Log::info("SMS simulé ({$type})", [
-                    'phone_masked' => substr($phone, 0, 2) . '****' . substr($phone, -3),
+                    'phone_masked' => substr($phone, 0, 2).'****'.substr($phone, -3),
                 ]);
+
                 return true;
             }
 
@@ -81,20 +86,21 @@ class SmsService
             $this->incrementerCompteur();
 
             // Logger l'envoi SANS le code
-            Log::info("SMS envoyé", [
-                'phone_masked' => substr($phone, 0, 2) . '****' . substr($phone, -3),
-                'type'         => $type,
+            Log::info('SMS envoyé', [
+                'phone_masked' => substr($phone, 0, 2).'****'.substr($phone, -3),
+                'type' => $type,
                 // Le code n'est JAMAIS loggé
             ]);
 
             return true;
 
         } catch (\Exception $e) {
-            Log::error("Échec envoi SMS", [
-                'phone_masked' => substr($phone, 0, 2) . '****' . substr($phone, -3),
-                'type'         => $type,
-                'error'        => $e->getMessage(),
+            Log::error('Échec envoi SMS', [
+                'phone_masked' => substr($phone, 0, 2).'****'.substr($phone, -3),
+                'type' => $type,
+                'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -102,7 +108,7 @@ class SmsService
     private function incrementerCompteur(): void
     {
         // Clé de cache mensuelle : sms_count_mensuel_2026_06
-        $cle = self::CACHE_KEY . '_' . date('Y_m');
+        $cle = self::CACHE_KEY.'_'.date('Y_m');
 
         $compteur = Cache::increment($cle);
 
@@ -121,7 +127,7 @@ class SmsService
     {
         $mois = date('F Y');
         try {
-            Mail::to($this->alertEmail)->send(new \App\Mail\SmsBudgetAlertMail($compteur));
+            Mail::to($this->alertEmail)->send(new SmsBudgetAlertMail($compteur));
         } catch (\Exception $e) {
             Log::error("Impossible d'envoyer l'alerte budget SMS : {$e->getMessage()}");
         }
@@ -134,12 +140,12 @@ class SmsService
 
         // Si commence par 0, remplacer par +225
         if (str_starts_with($phone, '0')) {
-            return '+225' . $phone;
+            return '+225'.$phone;
         }
 
         // Si commence par 225, ajouter +
         if (str_starts_with($phone, '225')) {
-            return '+' . $phone;
+            return '+'.$phone;
         }
 
         return $phone;
@@ -150,7 +156,8 @@ class SmsService
      */
     public function compteurMensuel(): int
     {
-        $cle = self::CACHE_KEY . '_' . date('Y_m');
+        $cle = self::CACHE_KEY.'_'.date('Y_m');
+
         return (int) Cache::get($cle, 0);
     }
 }

@@ -2,9 +2,15 @@
 
 namespace Database\Seeders;
 
-use App\Models\{City, Courier, Merchant, Order, OrderItem, Product, User, Wallet};
+use App\Models\City;
+use App\Models\Courier;
+use App\Models\Merchant;
+use App\Models\Product;
+use App\Models\User;
+use App\Models\Wallet;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\{DB, Hash};
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * Seeder de démonstration pour Daloa.
@@ -19,8 +25,8 @@ class DaloaSeeder extends Seeder
     {
         // ── 1. Ville de Daloa ──────────────────────────────────────────────────
         $daloa = City::create([
-            'name'       => 'Daloa',
-            'is_active'  => true,
+            'name' => 'Daloa',
+            'is_active' => true,
             'center_lat' => 6.8770,
             'center_lng' => -6.4502,
         ]);
@@ -29,14 +35,14 @@ class DaloaSeeder extends Seeder
 
         // ── 2. Super Admin (Francis EBOAH) ─────────────────────────────────────
         $superAdmin = User::create([
-            'name'               => 'Francis EBOAH',
-            'phone'              => '0700000000',
-            'email'              => 'admin@golivreur.ci',
-            'password'           => Hash::make('GoLivreur2026!'),
-            'role'               => 'super_admin',
-            'city_id'            => null,
-            'is_active'          => true,
-            'phone_verified_at'  => now(),
+            'name' => 'Francis EBOAH',
+            'phone' => '0700000000',
+            'email' => 'admin@golivreur.ci',
+            'password' => Hash::make('GoLivreur2026!'),
+            'role' => 'super_admin',
+            'city_id' => null,
+            'is_active' => true,
+            'phone_verified_at' => now(),
         ]);
 
         $this->command->info('✅ Super Admin créé — Email: admin@golivreur.ci / MDP: GoLivreur2026!');
@@ -44,24 +50,24 @@ class DaloaSeeder extends Seeder
 
         // ── 3. Équipe opérationnelle Daloa ─────────────────────────────────────
         $cityManager = User::create([
-            'name'              => 'Kouadio Serge',
-            'phone'             => '0700000001',
-            'email'             => 'manager.daloa@golivreur.ci',
-            'password'          => Hash::make('ManagerDaloa2026!'),
-            'role'              => 'city_manager',
-            'city_id'           => $daloa->id,
-            'is_active'         => true,
+            'name' => 'Kouadio Serge',
+            'phone' => '0700000001',
+            'email' => 'manager.daloa@golivreur.ci',
+            'password' => Hash::make('ManagerDaloa2026!'),
+            'role' => 'city_manager',
+            'city_id' => $daloa->id,
+            'is_active' => true,
             'phone_verified_at' => now(),
         ]);
 
         $citySupport = User::create([
-            'name'              => 'Bamba Fatoumata',
-            'phone'             => '0700000002',
-            'email'             => 'support.daloa@golivreur.ci',
-            'password'          => Hash::make('SupportDaloa2026!'),
-            'role'              => 'city_support',
-            'city_id'           => $daloa->id,
-            'is_active'         => true,
+            'name' => 'Bamba Fatoumata',
+            'phone' => '0700000002',
+            'email' => 'support.daloa@golivreur.ci',
+            'password' => Hash::make('SupportDaloa2026!'),
+            'role' => 'city_support',
+            'city_id' => $daloa->id,
+            'is_active' => true,
             'phone_verified_at' => now(),
         ]);
 
@@ -73,9 +79,9 @@ class DaloaSeeder extends Seeder
         foreach ($agents as $agentData) {
             User::create([
                 ...$agentData,
-                'role'              => 'city_agent',
-                'city_id'           => $daloa->id,
-                'is_active'         => true,
+                'role' => 'city_agent',
+                'city_id' => $daloa->id,
+                'is_active' => true,
                 'phone_verified_at' => now(),
             ]);
         }
@@ -99,9 +105,9 @@ class DaloaSeeder extends Seeder
 
         $clients = collect($clientsData)->map(fn ($data) => User::create([
             ...$data,
-            'role'              => 'client',
-            'city_id'           => $daloa->id,
-            'is_active'         => true,
+            'role' => 'client',
+            'city_id' => $daloa->id,
+            'is_active' => true,
             'phone_verified_at' => now(),
         ]));
 
@@ -202,51 +208,51 @@ class DaloaSeeder extends Seeder
         $merchantUsers = collect();
 
         foreach ($commercesData as $index => $commerceData) {
-            $phoneIndex = str_pad((string)($index + 1), 2, '0', STR_PAD_LEFT);
+            $phoneIndex = str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT);
             $userMerchant = User::create([
-                'name'              => $commerceData['name'],
-                'phone'             => "0702{$phoneIndex}0001",
-                'role'              => 'merchant',
-                'city_id'           => $daloa->id,
-                'is_active'         => true,
+                'name' => $commerceData['name'],
+                'phone' => "0702{$phoneIndex}0001",
+                'role' => 'merchant',
+                'city_id' => $daloa->id,
+                'is_active' => true,
                 'phone_verified_at' => now(),
             ]);
 
             $merchant = Merchant::create([
-                'user_id'           => $userMerchant->id,
-                'city_id'           => $daloa->id,
-                'name'              => $commerceData['name'],
-                'category'          => $commerceData['category'],
-                'address'           => $commerceData['address'],
-                'lat'               => $commerceData['lat'],
-                'lng'               => $commerceData['lng'],
+                'user_id' => $userMerchant->id,
+                'city_id' => $daloa->id,
+                'name' => $commerceData['name'],
+                'category' => $commerceData['category'],
+                'address' => $commerceData['address'],
+                'lat' => $commerceData['lat'],
+                'lng' => $commerceData['lng'],
                 'prep_time_minutes' => $commerceData['prep_time_minutes'],
-                'is_open'           => $commerceData['is_open'] ?? true,
-                'is_active'         => true,
-                'activated_at'      => now(),
-                'activated_by'      => $citySupport->id,
-                'commission_rate'   => 15.00,
-                'average_rating'    => round(3.8 + (mt_rand(0, 14) / 10), 1),
+                'is_open' => $commerceData['is_open'] ?? true,
+                'is_active' => true,
+                'activated_at' => now(),
+                'activated_by' => $citySupport->id,
+                'commission_rate' => 15.00,
+                'average_rating' => round(3.8 + (mt_rand(0, 14) / 10), 1),
             ]);
 
             // Créer le wallet du merchant
             Wallet::create([
-                'owner_type'      => 'merchant',
-                'owner_id'        => $merchant->id,
-                'balance'         => mt_rand(5000, 50000),
-                'total_earned'    => mt_rand(50000, 500000),
+                'owner_type' => 'merchant',
+                'owner_id' => $merchant->id,
+                'balance' => mt_rand(5000, 50000),
+                'total_earned' => mt_rand(50000, 500000),
                 'total_withdrawn' => mt_rand(10000, 100000),
             ]);
 
             // Créer les produits du commerce
             foreach ($commerceData['produits'] as $sortOrder => $produit) {
                 Product::create([
-                    'merchant_id'  => $merchant->id,
-                    'name'         => $produit['name'],
-                    'price'        => $produit['price'],
-                    'category'     => $produit['category'],
+                    'merchant_id' => $merchant->id,
+                    'name' => $produit['name'],
+                    'price' => $produit['price'],
+                    'category' => $produit['category'],
                     'is_available' => $produit['is_available'] ?? true,
-                    'sort_order'   => $sortOrder,
+                    'sort_order' => $sortOrder,
                 ]);
             }
 
@@ -266,34 +272,34 @@ class DaloaSeeder extends Seeder
 
         foreach ($livreursData as $livreurData) {
             $userDriver = User::create([
-                'name'              => $livreurData['name'],
-                'phone'             => $livreurData['phone'],
-                'role'              => 'driver',
-                'city_id'           => $daloa->id,
-                'is_active'         => true,
+                'name' => $livreurData['name'],
+                'phone' => $livreurData['phone'],
+                'role' => 'driver',
+                'city_id' => $daloa->id,
+                'is_active' => true,
                 'phone_verified_at' => now(),
             ]);
 
             $courier = Courier::create([
-                'user_id'          => $userDriver->id,
-                'city_id'          => $daloa->id,
-                'is_online'        => true,
-                'current_lat'      => $livreurData['lat'],
-                'current_lng'      => $livreurData['lng'],
-                'vehicle_type'     => 'moto',
-                'is_active'        => true,
-                'activated_at'     => now(),
-                'activated_by'     => $citySupport->id,
-                'average_rating'   => round(3.9 + (mt_rand(0, 9) / 10), 1),
-                'total_ratings'    => mt_rand(10, 80),
+                'user_id' => $userDriver->id,
+                'city_id' => $daloa->id,
+                'is_online' => true,
+                'current_lat' => $livreurData['lat'],
+                'current_lng' => $livreurData['lng'],
+                'vehicle_type' => 'moto',
+                'is_active' => true,
+                'activated_at' => now(),
+                'activated_by' => $citySupport->id,
+                'average_rating' => round(3.9 + (mt_rand(0, 9) / 10), 1),
+                'total_ratings' => mt_rand(10, 80),
             ]);
 
             // Wallet livreur
             Wallet::create([
-                'owner_type'      => 'courier',
-                'owner_id'        => $courier->id,
-                'balance'         => mt_rand(2000, 20000),
-                'total_earned'    => mt_rand(20000, 200000),
+                'owner_type' => 'courier',
+                'owner_id' => $courier->id,
+                'balance' => mt_rand(2000, 20000),
+                'total_earned' => mt_rand(20000, 200000),
                 'total_withdrawn' => mt_rand(5000, 50000),
             ]);
         }

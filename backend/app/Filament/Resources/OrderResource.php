@@ -4,7 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\OrderResource\Pages;
-use App\Models\{ActivityLog, City, Courier, Order};
+use App\Models\ActivityLog;
+use App\Models\Courier;
+use App\Models\Order;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -32,6 +34,7 @@ class OrderResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('orders');
     }
 
@@ -71,7 +74,7 @@ class OrderResource extends Resource
                         SearchableSelect::make('courier_id')
                             ->label('Livreur')
                             ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => $query->with('user')->orderBy('id'))
-                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}") . ($record->user?->phone ? " ({$record->user->phone})" : '')),
+                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}").($record->user?->phone ? " ({$record->user->phone})" : '')),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Détails Financiers (F CFA)')
@@ -203,17 +206,17 @@ class OrderResource extends Resource
 
                 Tables\Columns\TextColumn::make('products_total')
                     ->label('Articles')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('delivery_fee')
                     ->label('Livraison')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('platform_commission')
                     ->label('Commission')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('payment_method')
@@ -326,21 +329,21 @@ class OrderResource extends Resource
                             ->label('Motif d\'annulation obligatoire')
                             ->required(),
                     ])
-                    ->visible(fn (Order $record): bool => !in_array($record->status, ['delivered', 'cancelled'], true))
+                    ->visible(fn (Order $record): bool => ! in_array($record->status, ['delivered', 'cancelled'], true))
                     ->action(function (Order $record, array $data): void {
                         $record->update([
-                            'status'              => 'cancelled',
+                            'status' => 'cancelled',
                             'cancellation_reason' => $data['cancellation_reason'],
                         ]);
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => 'order_cancelled_by_admin',
+                            'user_id' => auth()->id(),
+                            'action' => 'order_cancelled_by_admin',
                             'entity_type' => 'order',
-                            'entity_id'   => $record->id,
-                            'properties'  => ['reason' => $data['cancellation_reason']],
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'warning',
+                            'entity_id' => $record->id,
+                            'properties' => ['reason' => $data['cancellation_reason']],
+                            'ip_address' => request()->ip(),
+                            'severity' => 'warning',
                         ]);
 
                         Notification::make()
@@ -357,24 +360,24 @@ class OrderResource extends Resource
                         Forms\Components\Select::make('courier_id')
                             ->label('Nouveau livreur assigné')
                             ->options(fn () => Courier::where('is_active', true)->with('user')->get()->mapWithKeys(
-                                fn ($courier) => [$courier->id => ($courier->user?->name ?? "Livreur #{$courier->id}") . ($courier->vehicle_plate ? " ({$courier->vehicle_plate})" : '')]
+                                fn ($courier) => [$courier->id => ($courier->user?->name ?? "Livreur #{$courier->id}").($courier->vehicle_plate ? " ({$courier->vehicle_plate})" : '')]
                             ))
                             ->searchable()
                             ->required(),
                     ])
-                    ->visible(fn (Order $record): bool => !in_array($record->status, ['delivered', 'cancelled'], true))
+                    ->visible(fn (Order $record): bool => ! in_array($record->status, ['delivered', 'cancelled'], true))
                     ->action(function (Order $record, array $data): void {
                         $oldCourier = $record->courier_id;
                         $record->update(['courier_id' => $data['courier_id']]);
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => 'order_reassigned',
+                            'user_id' => auth()->id(),
+                            'action' => 'order_reassigned',
                             'entity_type' => 'order',
-                            'entity_id'   => $record->id,
-                            'properties'  => ['old_courier' => $oldCourier, 'new_courier' => $data['courier_id']],
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'info',
+                            'entity_id' => $record->id,
+                            'properties' => ['old_courier' => $oldCourier, 'new_courier' => $data['courier_id']],
+                            'ip_address' => request()->ip(),
+                            'severity' => 'info',
                         ]);
 
                         Notification::make()
@@ -390,8 +393,8 @@ class OrderResource extends Resource
                     ->visible(fn (Order $record): bool => (bool) $record->confirmation_locked)
                     ->action(function (Order $record): void {
                         $record->update([
-                            'confirmation_locked'      => false,
-                            'confirmation_attempts'    => 0,
+                            'confirmation_locked' => false,
+                            'confirmation_attempts' => 0,
                             'confirmation_unlocked_by' => auth()->id(),
                         ]);
 

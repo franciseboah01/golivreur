@@ -28,7 +28,7 @@ class VerifyOtpRequest extends FormRequest
             $updates['phone'] = $this->normalizePhoneValue($this->input('phone'));
         }
 
-        if (!empty($updates)) {
+        if (! empty($updates)) {
             $this->merge($updates);
         }
     }
@@ -36,11 +36,11 @@ class VerifyOtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'phone'        => ['required', 'string'],
-            'otp'          => ['nullable', 'string'],
-            'code'         => ['nullable', 'string'],
-            'name'         => ['nullable', 'string', 'max:255'],
-            'city_id'      => ['nullable', 'integer'],
+            'phone' => ['required', 'string'],
+            'otp' => ['nullable', 'string'],
+            'code' => ['nullable', 'string'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'city_id' => ['nullable', 'integer'],
             'device_token' => ['nullable', 'string'],
         ];
     }

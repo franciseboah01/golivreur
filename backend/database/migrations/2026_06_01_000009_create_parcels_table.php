@@ -21,15 +21,15 @@ return new class extends Migration
         Schema::create('parcels', function (Blueprint $table) {
             $table->id();
             $table->foreignId('sender_id')
-                  ->constrained('users')
-                  ->restrictOnDelete();
+                ->constrained('users')
+                ->restrictOnDelete();
             $table->foreignId('courier_id')
-                  ->nullable()
-                  ->constrained('couriers')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('couriers')
+                ->nullOnDelete();
             $table->foreignId('city_id')
-                  ->constrained('cities')
-                  ->restrictOnDelete();
+                ->constrained('cities')
+                ->restrictOnDelete();
 
             // Statuts : pending|waiting|accepted|at_sender|picked_up|in_transit|at_recipient|delivered|refused|cancelled
             $table->string('status', 30)->default('pending');
@@ -81,13 +81,13 @@ return new class extends Migration
 
             // Déblocage codes par City Support
             $table->foreignId('sender_code_unlocked_by')
-                  ->nullable()
-                  ->constrained('users')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
             $table->foreignId('recipient_code_unlocked_by')
-                  ->nullable()
-                  ->constrained('users')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
 
             // Horodatages des transitions clés
             $table->timestamp('picked_up_at')->nullable();

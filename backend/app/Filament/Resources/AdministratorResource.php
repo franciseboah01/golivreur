@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\AdministratorResource\Pages;
+use App\Models\RoleHabilitation;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -32,6 +33,7 @@ class AdministratorResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('administrators');
     }
 
@@ -63,7 +65,7 @@ class AdministratorResource extends Resource
                             ->live()
                             ->afterStateUpdated(function ($state, Forms\Set $set) {
                                 if ($state) {
-                                    $level = \App\Models\RoleHabilitation::find($state);
+                                    $level = RoleHabilitation::find($state);
                                     if ($level && $level->slug) {
                                         $set('role', $level->slug);
                                     }
@@ -75,11 +77,12 @@ class AdministratorResource extends Resource
                             ->dehydrateStateUsing(function ($state, Forms\Get $get) {
                                 $levelId = $get('role_habilitation_id');
                                 if ($levelId) {
-                                    $level = \App\Models\RoleHabilitation::find($levelId);
+                                    $level = RoleHabilitation::find($levelId);
                                     if ($level) {
                                         return $level->slug;
                                     }
                                 }
+
                                 return $state ?? 'admin';
                             }),
                         SearchableSelect::make('city_id')
@@ -230,4 +233,3 @@ class AdministratorResource extends Resource
         ];
     }
 }
-

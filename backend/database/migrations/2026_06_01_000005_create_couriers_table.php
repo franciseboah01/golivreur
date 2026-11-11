@@ -19,12 +19,12 @@ return new class extends Migration
         Schema::create('couriers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')
-                  ->unique()
-                  ->constrained('users')
-                  ->cascadeOnDelete();
+                ->unique()
+                ->constrained('users')
+                ->cascadeOnDelete();
             $table->foreignId('city_id')
-                  ->constrained('cities')
-                  ->restrictOnDelete();
+                ->constrained('cities')
+                ->restrictOnDelete();
             // Disponibilité temps réel (bouton En ligne / Hors ligne)
             $table->boolean('is_online')->default(false);
             // Position GPS actuelle (mise à jour via /api/v1/courier/location)
@@ -38,9 +38,9 @@ return new class extends Migration
             $table->boolean('is_active')->default(false);
             $table->timestamp('activated_at')->nullable();
             $table->foreignId('activated_by')
-                  ->nullable()
-                  ->constrained('users')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
             // Pièce d'identité (vérifiée en présentiel par City Agent)
             $table->string('id_card_number', 50)->nullable();
             $table->string('id_card_photo_url', 500)->nullable();

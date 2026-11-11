@@ -1,6 +1,12 @@
 <?php
 
-use App\Models\{City, Courier, Merchant, Order, Parcel, User, Wallet};
+use App\Models\City;
+use App\Models\Courier;
+use App\Models\Merchant;
+use App\Models\Order;
+use App\Models\Parcel;
+use App\Models\User;
+use App\Models\Wallet;
 use App\Modules\GoColis\Services\ParcelService;
 use App\Modules\GoShop\Services\OrderService;
 use App\Services\WalletService;
@@ -14,14 +20,14 @@ it('empêche un client d\'accéder aux détails du colis d\'un autre client (ant
     $clientB = User::factory()->create(['role' => 'client', 'city_id' => $city->id]);
 
     $parcel = Parcel::factory()->create([
-        'city_id'   => $city->id,
+        'city_id' => $city->id,
         'sender_id' => $clientA->id,
     ]);
 
     $tokenB = JWTAuth::fromUser($clientB);
 
     $response = $this->withHeader('Authorization', "Bearer {$tokenB}")
-                     ->getJson("/api/v1/client/parcels/{$parcel->id}");
+        ->getJson("/api/v1/client/parcels/{$parcel->id}");
 
     $response->assertStatus(403);
 });
@@ -36,7 +42,7 @@ it('un city manager ne peut pas consulter une commande d\'une autre ville (anti-
     $token = JWTAuth::fromUser($managerDaloa);
 
     $response = $this->withHeader('Authorization', "Bearer {$token}")
-                     ->getJson("/api/v1/client/orders/{$orderBouake->id}");
+        ->getJson("/api/v1/client/orders/{$orderBouake->id}");
 
     $response->assertStatus(403);
 });
@@ -51,15 +57,15 @@ it('empêche la double validation et le double crédit d\'une commande GoShop d�
     $courier = Courier::factory()->create(['user_id' => $driverUser->id, 'city_id' => $city->id]);
 
     $order = Order::factory()->create([
-        'city_id'              => $city->id,
-        'client_id'            => $client->id,
-        'merchant_id'          => $merchant->id,
-        'courier_id'           => $courier->id,
-        'status'               => Order::STATUS_ACCEPTED,
-        'confirmation_code'    => Hash::make('1234'),
-        'confirmation_locked'  => false,
-        'courier_amount'       => 1500,
-        'merchant_amount'      => 4000,
+        'city_id' => $city->id,
+        'client_id' => $client->id,
+        'merchant_id' => $merchant->id,
+        'courier_id' => $courier->id,
+        'status' => Order::STATUS_ACCEPTED,
+        'confirmation_code' => Hash::make('1234'),
+        'confirmation_locked' => false,
+        'courier_amount' => 1500,
+        'merchant_amount' => 4000,
     ]);
 
     $orderService = app(OrderService::class);
@@ -80,18 +86,18 @@ it('empêche la double validation et le double crédit d\'un colis GoColis déj�
     $courier = Courier::factory()->create(['user_id' => $driverUser->id, 'city_id' => $city->id]);
 
     $parcel = Parcel::factory()->create([
-        'city_id'                 => $city->id,
-        'sender_id'               => $sender->id,
-        'courier_id'              => $courier->id,
-        'status'                  => Parcel::STATUS_PICKED_UP,
-        'recipient_code'          => Hash::make('5678'),
-        'recipient_code_locked'   => false,
-        'courier_amount'          => 2000,
+        'city_id' => $city->id,
+        'sender_id' => $sender->id,
+        'courier_id' => $courier->id,
+        'status' => Parcel::STATUS_PICKED_UP,
+        'recipient_code' => Hash::make('5678'),
+        'recipient_code_locked' => false,
+        'courier_amount' => 2000,
     ]);
 
     // Ajouter photo de livraison factice
     $parcel->photos()->create([
-        'type'      => 'delivery',
+        'type' => 'delivery',
         'photo_url' => 'https://storage.golivreur.ci/test.jpg',
     ]);
 
@@ -113,16 +119,16 @@ it('empêche un solde négatif lors d\'un retrait sur wallet', function () {
     $courier = Courier::factory()->create(['user_id' => $driverUser->id, 'city_id' => $city->id]);
 
     $wallet = Wallet::create([
-        'owner_type'      => 'courier',
-        'owner_id'        => $courier->id,
-        'balance'         => 1000,
-        'total_earned'    => 1000,
+        'owner_type' => 'courier',
+        'owner_id' => $courier->id,
+        'balance' => 1000,
+        'total_earned' => 1000,
         'total_withdrawn' => 0,
     ]);
 
     // Tentative de retrait de 5000 alors que le solde est de 1000
     expect(function () use ($walletService, $wallet) {
-        $reflection = new \ReflectionClass($walletService);
+        $reflection = new ReflectionClass($walletService);
         $method = $reflection->getMethod('effectuerTransaction');
         $method->setAccessible(true);
         $method->invokeArgs($walletService, [
@@ -131,7 +137,7 @@ it('empêche un solde négatif lors d\'un retrait sur wallet', function () {
             -5000, // Débit de 5000
             'Retrait Wave',
         ]);
-    })->toThrow(\InvalidArgumentException::class, 'Solde insuffisant');
+    })->toThrow(InvalidArgumentException::class, 'Solde insuffisant');
 
     expect($wallet->fresh()->balance)->toEqual(1000);
 });

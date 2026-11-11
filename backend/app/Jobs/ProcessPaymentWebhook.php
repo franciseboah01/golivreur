@@ -2,13 +2,20 @@
 
 namespace App\Jobs;
 
-use App\Models\{Order, Parcel, WebhookLog};
-use App\Services\{ActivityLogService, NotificationService, WalletService};
+use App\Models\Order;
+use App\Models\Parcel;
+use App\Models\User;
+use App\Models\WebhookLog;
+use App\Services\ActivityLogService;
+use App\Services\NotificationService;
+use App\Services\WalletService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
-use Illuminate\Support\Facades\{DB, Log};
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Job de traitement des webhooks de paiement Hub2/CinetPay.
@@ -29,20 +36,20 @@ class ProcessPaymentWebhook implements ShouldQueue
     public int $timeout = 30;
 
     public function __construct(
-        private readonly int   $webhookLogId,
+        private readonly int $webhookLogId,
         private readonly array $payload,
     ) {
         $this->onQueue('high');
     }
 
     public function handle(
-        WalletService       $walletService,
+        WalletService $walletService,
         NotificationService $notificationService,
-        ActivityLogService  $activityLogService,
+        ActivityLogService $activityLogService,
     ): void {
         $webhookLog = WebhookLog::find($this->webhookLogId);
 
-        if (!$webhookLog || $webhookLog->status === 'processed') {
+        if (! $webhookLog || $webhookLog->status === 'processed') {
             return; // Déjà traité (idempotence)
         }
 
@@ -52,20 +59,21 @@ class ProcessPaymentWebhook implements ShouldQueue
 
                 // Extraire la référence de transaction et le statut
                 $reference = $payload['transaction_id'] ?? $payload['data']['transaction_id'] ?? null;
-                $statut    = $payload['status'] ?? $payload['data']['status'] ?? null;
+                $statut = $payload['status'] ?? $payload['data']['status'] ?? null;
 
-                if (!$reference) {
+                if (! $reference) {
                     throw new \RuntimeException('Référence de transaction manquante dans le payload.');
                 }
 
                 // Chercher la commande ou l'expédition associée
-                $order  = Order::where('payment_reference', $reference)->first();
-                $parcel = !$order ? Parcel::where('payment_reference', $reference)->first() : null;
+                $order = Order::where('payment_reference', $reference)->first();
+                $parcel = ! $order ? Parcel::where('payment_reference', $reference)->first() : null;
 
-                if (!$order && !$parcel) {
+                if (! $order && ! $parcel) {
                     // Référence inconnue — logguer mais ne pas échouer
                     Log::warning("Webhook : référence inconnue {$reference}");
                     $webhookLog->update(['status' => 'processed', 'error_message' => 'Référence inconnue.']);
+
                     return;
                 }
 
@@ -74,7 +82,7 @@ class ProcessPaymentWebhook implements ShouldQueue
                     if ($order) {
                         if ($order->payment_status !== 'paid') {
                             $order->update(['payment_status' => 'paid']);
-                            if ($order->client instanceof \App\Models\User) {
+                            if ($order->client instanceof User) {
                                 $notificationService->notifierPaiementConfirme($order->client, $order);
                             }
                             $activityLogService->log(
@@ -88,7 +96,7 @@ class ProcessPaymentWebhook implements ShouldQueue
                     } elseif ($parcel) {
                         if ($parcel->payment_status !== 'paid') {
                             $parcel->update(['payment_status' => 'paid']);
-                            if ($parcel->sender instanceof \App\Models\User) {
+                            if ($parcel->sender instanceof User) {
                                 $notificationService->notifierPaiementConfirme($parcel->sender, null, $parcel);
                             }
                         }
@@ -98,38 +106,38 @@ class ProcessPaymentWebhook implements ShouldQueue
                     if ($order) {
                         $order->update([
                             'payment_status' => 'failed',
-                            'status'         => Order::STATUS_CANCELLED,
-                            'cancel_reason'  => 'Paiement Mobile Money échoué.',
-                            'cancelled_at'   => now(),
+                            'status' => Order::STATUS_CANCELLED,
+                            'cancel_reason' => 'Paiement Mobile Money échoué.',
+                            'cancelled_at' => now(),
                         ]);
-                        if ($order->client instanceof \App\Models\User) {
+                        if ($order->client instanceof User) {
                             $notificationService->notifierPaiementEchoue($order->client, $order);
                         }
                     } elseif ($parcel) {
                         $parcel->update([
                             'payment_status' => 'failed',
-                            'status'         => Parcel::STATUS_CANCELLED,
-                            'cancelled_at'   => now(),
+                            'status' => Parcel::STATUS_CANCELLED,
+                            'cancelled_at' => now(),
                         ]);
                     }
                 }
 
                 $webhookLog->update([
-                    'status'       => 'processed',
+                    'status' => 'processed',
                     'processed_at' => now(),
                     'horizon_job_id' => $this->job?->getJobId(),
                 ]);
             });
         } catch (\Exception $e) {
             $webhookLog->update([
-                'status'        => 'failed',
+                'status' => 'failed',
                 'error_message' => $e->getMessage(),
             ]);
 
             Log::error('ProcessPaymentWebhook échoué', [
                 'webhook_log_id' => $this->webhookLogId,
-                'error'          => $e->getMessage(),
-                'attempt'        => $this->attempts(),
+                'error' => $e->getMessage(),
+                'attempt' => $this->attempts(),
             ]);
 
             // Relancer l'exception pour déclencher le backoff
@@ -143,12 +151,12 @@ class ProcessPaymentWebhook implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         WebhookLog::find($this->webhookLogId)?->update([
-            'status'        => 'failed',
+            'status' => 'failed',
             'error_message' => "Échec définitif après {$this->tries} tentatives : {$exception->getMessage()}",
         ]);
 
         // Alerte critique au Fondateur
-        \App\Services\ActivityLogService::logStatic(
+        ActivityLogService::logStatic(
             action: 'webhook_job_failed_permanently',
             entityType: 'webhook_log',
             entityId: $this->webhookLogId,
@@ -158,7 +166,7 @@ class ProcessPaymentWebhook implements ShouldQueue
 
         Log::critical('Webhook paiement échoué définitivement', [
             'webhook_log_id' => $this->webhookLogId,
-            'error'          => $exception->getMessage(),
+            'error' => $exception->getMessage(),
         ]);
     }
 }

@@ -6,7 +6,10 @@ use App\Filament\Components\EmojiSelectField;
 use App\Filament\Components\ImageUploadField;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\MerchantResource\Pages;
-use App\Models\{ActivityLog, Merchant, MerchantCategory, User};
+use App\Models\ActivityLog;
+use App\Models\Merchant;
+use App\Models\MerchantCategory;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -15,6 +18,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class MerchantResource extends Resource
 {
@@ -35,6 +39,7 @@ class MerchantResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('merchants');
     }
 
@@ -49,7 +54,7 @@ class MerchantResource extends Resource
                         SearchableSelect::make('user_id')
                             ->label('Compte Gestionnaire')
                             ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->where('role', 'merchant')->orWhereDoesntHave('merchant')->orderBy('name'))
-                            ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} (" . ($record->phone ?? 'Sans téléphone') . ")")
+                            ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} (".($record->phone ?? 'Sans téléphone').')')
                             ->required()
                             ->helperText('Sélectionnez un compte gestionnaire ou créez-en un nouveau via le bouton +.')
                             ->createOptionForm([
@@ -86,6 +91,7 @@ class MerchantResource extends Resource
                                     'is_active' => true,
                                     'phone_verified_at' => now(),
                                 ]);
+
                                 return $user->id;
                             }),
 
@@ -122,7 +128,7 @@ class MerchantResource extends Resource
                                     ->label('Description'),
                             ])
                             ->createOptionUsing(function (array $data): string {
-                                $slug = \Illuminate\Support\Str::slug($data['slug'] ?? $data['name']);
+                                $slug = Str::slug($data['slug'] ?? $data['name']);
                                 $cat = MerchantCategory::create([
                                     'name' => $data['name'],
                                     'slug' => $slug,
@@ -131,6 +137,7 @@ class MerchantResource extends Resource
                                     'description' => $data['description'] ?? null,
                                     'is_active' => true,
                                 ]);
+
                                 return $cat->slug;
                             }),
 
@@ -260,17 +267,17 @@ class MerchantResource extends Resource
 
                 Tables\Columns\TextColumn::make('commission_rate')
                     ->label('Commission')
-                    ->formatStateUsing(fn ($state) => $state . ' %')
+                    ->formatStateUsing(fn ($state) => $state.' %')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('prep_time_minutes')
                     ->label('Préparation')
-                    ->formatStateUsing(fn ($state) => $state . ' min')
+                    ->formatStateUsing(fn ($state) => $state.' min')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('average_rating')
                     ->label('Note')
-                    ->formatStateUsing(fn ($state) => '★ ' . number_format((float) $state, 1))
+                    ->formatStateUsing(fn ($state) => '★ '.number_format((float) $state, 1))
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('total_ratings')
@@ -347,17 +354,17 @@ class MerchantResource extends Resource
                         $record->update($updateData);
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => $newStatus ? 'merchant_activated' : 'merchant_deactivated',
+                            'user_id' => auth()->id(),
+                            'action' => $newStatus ? 'merchant_activated' : 'merchant_deactivated',
                             'entity_type' => 'merchant',
-                            'entity_id'   => $record->id,
-                            'properties'  => $updateData,
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'warning',
+                            'entity_id' => $record->id,
+                            'properties' => $updateData,
+                            'ip_address' => request()->ip(),
+                            'severity' => 'warning',
                         ]);
 
                         Notification::make()
-                            ->title("Commerce {$record->name} " . ($newStatus ? 'activé' : 'désactivé'))
+                            ->title("Commerce {$record->name} ".($newStatus ? 'activé' : 'désactivé'))
                             ->color($newStatus ? 'success' : 'danger')
                             ->send();
                     }),

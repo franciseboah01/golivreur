@@ -6,7 +6,6 @@ Route::get('/', function () {
     return response()->json([
         'service' => 'GoLivreur API',
         'version' => '5.0',
-        'status'  => 'operational',
+        'status' => 'operational',
     ]);
 });
-

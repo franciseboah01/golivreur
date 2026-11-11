@@ -14,7 +14,7 @@ class EditNeighborhood extends EditRecord
     public function getBreadcrumbs(): array
     {
         return [
-            CityResource::getUrl('index')         => 'Villes & Zones d\'Opération',
+            CityResource::getUrl('index') => 'Villes & Zones d\'Opération',
             NeighborhoodResource::getUrl('index') => 'Quartiers & Zones',
             'Modifier',
         ];
@@ -27,4 +27,3 @@ class EditNeighborhood extends EditRecord
         ];
     }
 }
-

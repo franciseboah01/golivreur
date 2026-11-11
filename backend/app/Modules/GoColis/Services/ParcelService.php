@@ -2,11 +2,22 @@
 
 namespace App\Modules\GoColis\Services;
 
-use App\Models\{City, Parcel, ParcelPhoto, User};
-use App\Modules\GoShop\Services\{AssignmentService, CommissionService};
-use App\Services\{ActivityLogService, NotificationService, SmsService, WalletService};
+use App\Jobs\AlerterAdminCodeBloque;
+use App\Models\City;
+use App\Models\Courier;
+use App\Models\Parcel;
+use App\Models\ParcelPhoto;
+use App\Models\User;
+use App\Modules\GoShop\Services\AssignmentService;
+use App\Modules\GoShop\Services\CommissionService;
+use App\Services\ActivityLogService;
+use App\Services\NotificationService;
+use App\Services\SmsService;
+use App\Services\WalletService;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\{DB, Hash, Storage};
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -27,12 +38,12 @@ class ParcelService
     ];
 
     public function __construct(
-        private readonly CommissionService   $commissionService,
-        private readonly AssignmentService   $assignmentService,
-        private readonly WalletService       $walletService,
+        private readonly CommissionService $commissionService,
+        private readonly AssignmentService $assignmentService,
+        private readonly WalletService $walletService,
         private readonly NotificationService $notificationService,
-        private readonly SmsService          $smsService,
-        private readonly ActivityLogService  $activityLogService,
+        private readonly SmsService $smsService,
+        private readonly ActivityLogService $activityLogService,
     ) {}
 
     /**
@@ -50,42 +61,42 @@ class ParcelService
             );
 
             // Calculer l'assurance si applicable
-            $valeurDeclaree  = $donnees['declared_value'] ?? 0;
+            $valeurDeclaree = $donnees['declared_value'] ?? 0;
             $montantAssurance = $this->commissionService->calculerAssurance($valeurDeclaree);
-            $aAssurance       = $montantAssurance > 0;
+            $aAssurance = $montantAssurance > 0;
 
             // Commissions
             $commissions = $this->commissionService->calculerCommissionsGoColis($fraisExpedition);
 
             // Générer les codes (jamais stockés en clair)
-            $codeExpediteur  = (string) random_int(1000, 9999);
+            $codeExpediteur = (string) random_int(1000, 9999);
             $codeDestinataire = (string) random_int(1000, 9999);
 
             $parcel = Parcel::create([
-                'sender_id'           => $expediteur->id,
-                'city_id'             => $expediteur->city_id,
-                'status'              => Parcel::STATUS_PENDING,
-                'size'                => $donnees['size'],
-                'weight_kg'           => $donnees['weight_kg'] ?? null,
-                'declared_value'      => $valeurDeclaree,
-                'has_insurance'       => $aAssurance,
-                'insurance_amount'    => $montantAssurance,
-                'sender_code'         => Hash::make($codeExpediteur),
-                'recipient_code'      => Hash::make($codeDestinataire),
-                'recipient_name'      => $donnees['recipient_name'],
-                'recipient_phone'     => $donnees['recipient_phone'],
-                'delivery_address'    => $donnees['delivery_address'],
-                'delivery_lat'        => $donnees['delivery_lat'] ?? null,
-                'delivery_lng'        => $donnees['delivery_lng'] ?? null,
-                'pickup_address'      => $donnees['pickup_address'] ?? null,
-                'pickup_lat'          => $donnees['pickup_lat'] ?? null,
-                'pickup_lng'          => $donnees['pickup_lng'] ?? null,
-                'description'         => $donnees['description'] ?? null,
-                'shipping_fee'        => $fraisExpedition,
+                'sender_id' => $expediteur->id,
+                'city_id' => $expediteur->city_id,
+                'status' => Parcel::STATUS_PENDING,
+                'size' => $donnees['size'],
+                'weight_kg' => $donnees['weight_kg'] ?? null,
+                'declared_value' => $valeurDeclaree,
+                'has_insurance' => $aAssurance,
+                'insurance_amount' => $montantAssurance,
+                'sender_code' => Hash::make($codeExpediteur),
+                'recipient_code' => Hash::make($codeDestinataire),
+                'recipient_name' => $donnees['recipient_name'],
+                'recipient_phone' => $donnees['recipient_phone'],
+                'delivery_address' => $donnees['delivery_address'],
+                'delivery_lat' => $donnees['delivery_lat'] ?? null,
+                'delivery_lng' => $donnees['delivery_lng'] ?? null,
+                'pickup_address' => $donnees['pickup_address'] ?? null,
+                'pickup_lat' => $donnees['pickup_lat'] ?? null,
+                'pickup_lng' => $donnees['pickup_lng'] ?? null,
+                'description' => $donnees['description'] ?? null,
+                'shipping_fee' => $fraisExpedition,
                 'platform_commission' => $commissions['plateforme'],
-                'courier_amount'      => $commissions['livreur'],
-                'payment_method'      => $donnees['payment_method'],
-                'payment_status'      => $donnees['payment_method'] === 'cash'
+                'courier_amount' => $commissions['livreur'],
+                'payment_method' => $donnees['payment_method'],
+                'payment_status' => $donnees['payment_method'] === 'cash'
                                             ? 'pending_cash' : 'pending',
             ]);
 
@@ -128,10 +139,10 @@ class ParcelService
 
         return ParcelPhoto::create([
             'parcel_id' => $parcel->id,
-            'type'      => $type,
+            'type' => $type,
             'photo_url' => Storage::disk('s3')->url($chemin),
-            'lat'       => $lat,
-            'lng'       => $lng,
+            'lat' => $lat,
+            'lng' => $lng,
         ]);
     }
 
@@ -170,7 +181,7 @@ class ParcelService
             $this->verifierStatutRamassage($lockedParcel);
 
             $lockedParcel->update([
-                'status'       => Parcel::STATUS_PICKED_UP,
+                'status' => Parcel::STATUS_PICKED_UP,
                 'picked_up_at' => now(),
             ]);
 
@@ -215,7 +226,7 @@ class ParcelService
             $this->verifierStatutLivraison($lockedParcel);
 
             $lockedParcel->update([
-                'status'       => Parcel::STATUS_DELIVERED,
+                'status' => Parcel::STATUS_DELIVERED,
                 'delivered_at' => now(),
             ]);
 
@@ -228,7 +239,7 @@ class ParcelService
             $this->notificationService->notifierColisLivre($lockedParcel);
 
             $courier = $lockedParcel->courier_id !== null
-                ? \App\Models\Courier::find($lockedParcel->courier_id)
+                ? Courier::find($lockedParcel->courier_id)
                 : null;
 
             $this->activityLogService->log(
@@ -299,7 +310,7 @@ class ParcelService
 
             if ($attempts >= 3) {
                 $parcel->update([$lockedColumn => true]);
-                \App\Jobs\AlerterAdminCodeBloque::dispatch($parcel, $alertType)
+                AlerterAdminCodeBloque::dispatch($parcel, $alertType)
                     ->onQueue('high');
 
                 throw ValidationException::withMessages([
@@ -321,14 +332,14 @@ class ParcelService
     {
         if ($typeCode === 'sender') {
             $parcel->update([
-                'sender_code_locked'    => false,
-                'sender_code_attempts'  => 0,
+                'sender_code_locked' => false,
+                'sender_code_attempts' => 0,
                 'sender_code_unlocked_by' => $admin->id,
             ]);
         } else {
             $parcel->update([
-                'recipient_code_locked'    => false,
-                'recipient_code_attempts'  => 0,
+                'recipient_code_locked' => false,
+                'recipient_code_attempts' => 0,
                 'recipient_code_unlocked_by' => $admin->id,
             ]);
         }

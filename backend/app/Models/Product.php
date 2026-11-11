@@ -24,9 +24,9 @@ class Product extends Model
     ];
 
     protected $casts = [
-        'price'        => 'integer',
+        'price' => 'integer',
         'is_available' => 'boolean',
-        'options'      => 'array',
+        'options' => 'array',
     ];
 
     public function merchant(): BelongsTo
@@ -39,4 +39,3 @@ class Product extends Model
         return $this->belongsTo(City::class);
     }
 }
-

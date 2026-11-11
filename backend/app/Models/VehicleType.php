@@ -26,4 +26,3 @@ class VehicleType extends Model
         return $this->hasMany(Courier::class, 'vehicle_type', 'slug');
     }
 }
-

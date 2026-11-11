@@ -13,14 +13,13 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name'              => fake()->name(),
-            'phone'             => '07' . fake()->numerify('########'),
-            'role'              => 'client',
-            'city_id'           => null,
-            'is_active'         => true,
+            'name' => fake()->name(),
+            'phone' => '07'.fake()->numerify('########'),
+            'role' => 'client',
+            'city_id' => null,
+            'is_active' => true,
             'phone_verified_at' => now(),
-            'password'          => Hash::make('password'),
+            'password' => Hash::make('password'),
         ];
     }
 }
-

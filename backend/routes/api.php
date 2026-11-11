@@ -9,6 +9,9 @@ use App\Http\Controllers\Api\V1\Merchant\MerchantController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RatingController;
 use App\Http\Controllers\Api\V1\WebhookController;
+use App\Models\City;
+use App\Models\VehicleType;
+use App\Services\SettingsService;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,25 +24,25 @@ use Illuminate\Support\Facades\Route;
 
 // ─── Health check (public) ────────────────────────────────────────────────────
 Route::get('/health', fn () => response()->json([
-    'status'    => 'ok',
-    'version'   => '5.0',
+    'status' => 'ok',
+    'version' => '5.0',
     'timestamp' => now()->toIso8601String(),
-    'service'   => 'GoLivreur API',
+    'service' => 'GoLivreur API',
 ]));
-Route::get('/branding', fn (\App\Services\SettingsService $settingsService) => response()->json([
-    'succes'  => true,
+Route::get('/branding', fn (SettingsService $settingsService) => response()->json([
+    'succes' => true,
     'donnees' => $settingsService->getBranding(),
 ]));
 
 // ─── Authentification (public) ───────────────────────────────────────────────
 Route::prefix('auth')->group(function () {
-    Route::post('register',        [AuthController::class, 'register']);
+    Route::post('register', [AuthController::class, 'register']);
     Route::post('verify-register', [AuthController::class, 'verifierOtpInscription']);
-    Route::post('login',           [AuthController::class, 'login']);
-    Route::post('login-password',  [AuthController::class, 'loginPassword']);
-    Route::post('verify-login',    [AuthController::class, 'verifierOtpConnexion']);
-    Route::post('refresh',         [AuthController::class, 'refresh'])->middleware('auth:api');
-    Route::post('logout',          [AuthController::class, 'logout'])->middleware('auth:api');
+    Route::post('login', [AuthController::class, 'login']);
+    Route::post('login-password', [AuthController::class, 'loginPassword']);
+    Route::post('verify-login', [AuthController::class, 'verifierOtpConnexion']);
+    Route::post('refresh', [AuthController::class, 'refresh'])->middleware('auth:api');
+    Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:api');
 });
 
 // ─── Catalogue GoShop Public (Accessible avec ou sans connexion) ──────────────
@@ -51,12 +54,12 @@ Route::prefix('client')->group(function () {
 });
 Route::get('categories', [ClientController::class, 'categories']);
 Route::get('vehicle-types', fn () => response()->json([
-    'succes'  => true,
-    'donnees' => \App\Models\VehicleType::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'description']),
+    'succes' => true,
+    'donnees' => VehicleType::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'description']),
 ]));
 Route::get('cities', fn () => response()->json([
-    'succes'  => true,
-    'donnees' => \App\Models\City::where('is_active', true)->orderBy('name')->get([
+    'succes' => true,
+    'donnees' => City::where('is_active', true)->orderBy('name')->get([
         'id',
         'name',
         'center_lat',
@@ -70,7 +73,7 @@ Route::get('cities', fn () => response()->json([
 // ─── Webhooks ────────────────────────────────────────────────────────────────
 Route::prefix('webhooks')->group(function () {
     Route::post('payment', [WebhookController::class, 'paiement'])
-         ->middleware('throttle:60,1');
+        ->middleware('throttle:60,1');
 });
 
 // ─── Routes protégées par JWT ─────────────────────────────────────────────────

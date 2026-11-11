@@ -34,6 +34,7 @@ class RefundResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('refunds');
     }
 
@@ -118,4 +119,3 @@ class RefundResource extends Resource
         ];
     }
 }
-

@@ -3,31 +3,37 @@
 namespace App\Http\Controllers\Api\V1\Driver;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Courier, Order, Parcel, Wallet, WalletTransaction};
+use App\Models\Courier;
+use App\Models\Order;
+use App\Models\Parcel;
+use App\Models\Wallet;
+use App\Models\WalletTransaction;
 use App\Modules\GoShop\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DriverController extends Controller
 {
     private function getCourier(): Courier
     {
         $courier = Courier::where('user_id', auth()->id())->first();
-        if (!$courier) {
+        if (! $courier) {
             abort(404, 'Profil livreur introuvable.');
         }
+
         return $courier;
     }
 
     public function availability(Request $request): JsonResponse
     {
         $courier = $this->getCourier();
-        $isOnline = $request->boolean('is_online', !$courier->is_online);
+        $isOnline = $request->boolean('is_online', ! $courier->is_online);
 
         $courier->update(['is_online' => $isOnline]);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $courier,
             'message' => $isOnline ? 'Vous êtes en ligne.' : 'Vous êtes hors ligne.',
         ]);
@@ -42,16 +48,16 @@ class DriverController extends Controller
 
         $courier = $this->getCourier();
         $courier->update([
-            'current_lat'         => $validated['lat'],
-            'current_lng'         => $validated['lng'],
+            'current_lat' => $validated['lat'],
+            'current_lng' => $validated['lng'],
             'location_updated_at' => now(),
         ]);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => [
-                'lat'        => $courier->current_lat,
-                'lng'        => $courier->current_lng,
+                'lat' => $courier->current_lat,
+                'lng' => $courier->current_lng,
                 'updated_at' => $courier->location_updated_at,
             ],
         ]);
@@ -83,9 +89,9 @@ class DriverController extends Controller
             ->get();
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => [
-                'orders'  => $orders,
+                'orders' => $orders,
                 'parcels' => $parcels,
             ],
         ]);
@@ -95,7 +101,7 @@ class DriverController extends Controller
     {
         $courier = $this->getCourier();
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($order, $courier) {
+        return DB::transaction(function () use ($order, $courier) {
             $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
 
             if ($lockedOrder->courier_id && $lockedOrder->courier_id !== $courier->id) {
@@ -108,11 +114,11 @@ class DriverController extends Controller
 
             $lockedOrder->update([
                 'courier_id' => $courier->id,
-                'status'     => Order::STATUS_ACCEPTED,
+                'status' => Order::STATUS_ACCEPTED,
             ]);
 
             return response()->json([
-                'succes'  => true,
+                'succes' => true,
                 'donnees' => $lockedOrder,
                 'message' => 'Course acceptée.',
             ]);
@@ -128,12 +134,12 @@ class DriverController extends Controller
         }
 
         $order->update([
-            'status'       => 'picked_up',
+            'status' => 'picked_up',
             'picked_up_at' => now(),
         ]);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $order,
             'message' => 'Commande récupérée chez le commerce.',
         ]);
@@ -152,7 +158,7 @@ class DriverController extends Controller
         $updated = $orderService->validerCodeConfirmation($order, $request->input('code'));
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $updated,
             'message' => 'Livraison confirmée avec succès.',
         ]);
@@ -172,9 +178,9 @@ class DriverController extends Controller
             ->paginate(20);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => [
-                'wallet'       => $wallet,
+                'wallet' => $wallet,
                 'transactions' => $transactions,
             ],
         ]);

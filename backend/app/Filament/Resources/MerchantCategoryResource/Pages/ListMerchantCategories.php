@@ -49,4 +49,3 @@ class ListMerchantCategories extends ListRecords
         ];
     }
 }
-

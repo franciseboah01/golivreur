@@ -25,8 +25,8 @@ class AnnulerCommandeTimeout implements ShouldQueue
         if ($order && $order->status === Order::STATUS_PENDING) {
             if ($order->created_at && $order->created_at->diffInSeconds(now()) >= 40) {
                 $order->update([
-                    'status'        => 'cancelled',
-                    'cancelled_at'  => now(),
+                    'status' => 'cancelled',
+                    'cancelled_at' => now(),
                     'cancel_reason' => 'Délai d\'acceptation dépassé (45s).',
                 ]);
                 $notificationService->notifierCommandeRefusee($order);

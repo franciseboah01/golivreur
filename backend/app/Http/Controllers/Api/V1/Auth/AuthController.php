@@ -3,18 +3,28 @@
 namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\{LoginRequest, RegisterRequest, VerifyOtpRequest};
-use App\Models\{City, OtpCode, User};
-use App\Services\{ActivityLogService, SmsService};
-use Illuminate\Http\{JsonResponse, Request};
-use Illuminate\Support\Facades\{Cache, Hash, RateLimiter};
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\VerifyOtpRequest;
+use App\Jobs\SendPushNotification;
+use App\Models\City;
+use App\Models\OtpCode;
+use App\Models\User;
+use App\Services\ActivityLogService;
+use App\Services\SmsService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
     public function __construct(
-        private readonly SmsService          $smsService,
-        private readonly ActivityLogService  $activityLogService,
+        private readonly SmsService $smsService,
+        private readonly ActivityLogService $activityLogService,
     ) {}
 
     /**
@@ -28,9 +38,10 @@ class AuthController extends Controller
         $rateLimitKey = "otp_register:{$phone}";
         if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
             $secondes = RateLimiter::availableIn($rateLimitKey);
+
             return response()->json([
-                'succes'  => false,
-                'message' => "Trop de tentatives. Réessayez dans " . ceil($secondes / 60) . " minute(s).",
+                'succes' => false,
+                'message' => 'Trop de tentatives. Réessayez dans '.ceil($secondes / 60).' minute(s).',
             ], 429);
         }
         RateLimiter::hit($rateLimitKey, 3600); // Blocage 1h après 3 échecs
@@ -38,7 +49,7 @@ class AuthController extends Controller
         // Vérifier que le numéro n'est pas déjà utilisé
         if (User::where('phone', $phone)->exists()) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Ce numéro est déjà associé à un compte.',
             ], 409);
         }
@@ -46,9 +57,9 @@ class AuthController extends Controller
         // Générer et envoyer l'OTP (jamais loggé)
         $code = (string) random_int(1000, 9999);
         OtpCode::create([
-            'phone'     => $phone,
+            'phone' => $phone,
             'code_hash' => Hash::make($code),
-            'purpose'   => 'register',
+            'purpose' => 'register',
             'expires_at' => now()->addMinutes(5),
         ]);
 
@@ -57,7 +68,7 @@ class AuthController extends Controller
         $pendingCityId = $request->input('city_id');
         if ($pendingName !== '' || $pendingCityId !== null) {
             Cache::put("register_meta:{$phone}", [
-                'name'    => $pendingName,
+                'name' => $pendingName,
                 'city_id' => $pendingCityId,
             ], now()->addMinutes(15));
         }
@@ -65,7 +76,7 @@ class AuthController extends Controller
         $this->smsService->envoyerOtp($phone, $code, 'inscription');
 
         $responseData = [
-            'succes'  => true,
+            'succes' => true,
             'message' => "Code envoyé au {$this->masquerTelephone($phone)}.",
         ];
 
@@ -82,10 +93,10 @@ class AuthController extends Controller
     public function verifierOtpInscription(VerifyOtpRequest $request): JsonResponse
     {
         $phone = (string) $request->input('phone');
-        $otp   = (string) ($request->input('otp') ?? $request->input('code'));
-        $meta  = Cache::get("register_meta:{$phone}", []);
+        $otp = (string) ($request->input('otp') ?? $request->input('code'));
+        $meta = Cache::get("register_meta:{$phone}", []);
         $rawName = trim((string) ($request->input('name') ?: ($meta['name'] ?? '')));
-        $name    = $rawName !== '' ? $rawName : 'Client';
+        $name = $rawName !== '' ? $rawName : 'Client';
 
         $otpRecord = OtpCode::where('phone', $phone)
             ->where('purpose', 'register')
@@ -96,16 +107,16 @@ class AuthController extends Controller
 
         $isMasterDevOtp = app()->environment('local', 'testing') && $otp === '1234';
 
-        if (!$isMasterDevOtp && (!$otpRecord || !Hash::check($otp, $otpRecord->code_hash))) {
+        if (! $isMasterDevOtp && (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash))) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Code incorrect ou expiré.',
             ], 422);
         }
 
         if (User::where('phone', $phone)->exists()) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Ce numéro est déjà associé à un compte.',
             ], 409);
         }
@@ -124,25 +135,25 @@ class AuthController extends Controller
 
         // Créer l'utilisateur
         $user = User::create([
-            'name'               => $name,
-            'phone'              => $phone,
-            'role'               => 'client',
-            'city_id'            => $validCityId,
-            'is_active'          => true,
-            'phone_verified_at'  => now(),
+            'name' => $name,
+            'phone' => $phone,
+            'role' => 'client',
+            'city_id' => $validCityId,
+            'is_active' => true,
+            'phone_verified_at' => now(),
         ]);
         $user->load('city');
 
         $token = JWTAuth::fromUser($user);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Compte créé avec succès. Bienvenue sur GoLivreur !',
             'donnees' => [
-                'access_token'  => $token,
+                'access_token' => $token,
                 'refresh_token' => $this->genererRefreshToken($user),
-                'token_type'    => 'bearer',
-                'user'          => $this->formatUserPayload($user),
+                'token_type' => 'bearer',
+                'user' => $this->formatUserPayload($user),
             ],
         ], 201);
     }
@@ -158,9 +169,10 @@ class AuthController extends Controller
         $maxLoginAttempts = app()->environment('local', 'testing') ? 10 : 3;
         if (RateLimiter::tooManyAttempts($rateLimitKey, $maxLoginAttempts)) {
             $secondes = RateLimiter::availableIn($rateLimitKey);
+
             return response()->json([
-                'succes'  => false,
-                'message' => "Trop de tentatives. Réessayez dans " . ceil($secondes / 60) . " minute(s).",
+                'succes' => false,
+                'message' => 'Trop de tentatives. Réessayez dans '.ceil($secondes / 60).' minute(s).',
             ], 429);
         }
         RateLimiter::hit($rateLimitKey, 600);
@@ -170,25 +182,25 @@ class AuthController extends Controller
             ->whereNull('deleted_at')
             ->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Numéro non reconnu ou compte désactivé.',
             ], 404);
         }
 
         $code = (string) random_int(1000, 9999);
         OtpCode::create([
-            'phone'      => $phone,
-            'code_hash'  => Hash::make($code),
-            'purpose'    => 'login',
+            'phone' => $phone,
+            'code_hash' => Hash::make($code),
+            'purpose' => 'login',
             'expires_at' => now()->addMinutes(5),
         ]);
 
         $this->smsService->envoyerOtp($phone, $code, 'connexion');
 
         $responseData = [
-            'succes'  => true,
+            'succes' => true,
             'message' => "Code envoyé au {$this->masquerTelephone($phone)}.",
         ];
 
@@ -205,7 +217,7 @@ class AuthController extends Controller
     public function loginPassword(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'phone'    => 'required|string',
+            'phone' => 'required|string',
             'password' => 'required|string',
         ]);
 
@@ -217,9 +229,9 @@ class AuthController extends Controller
             ->whereNull('deleted_at')
             ->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Numéro de téléphone non reconnu ou compte désactivé.',
             ], 404);
         }
@@ -229,9 +241,9 @@ class AuthController extends Controller
         $passwordMatches = ($user->password && Hash::check($password, $user->password)) ||
                            ($isDev && in_array($password, $validDevPasswords));
 
-        if (!$passwordMatches) {
+        if (! $passwordMatches) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Mot de passe ou identifiant incorrect.',
             ], 422);
         }
@@ -244,14 +256,14 @@ class AuthController extends Controller
         $user->load('city');
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Connexion réussie.',
             'donnees' => [
-                'access_token'  => $token,
+                'access_token' => $token,
                 'refresh_token' => $this->genererRefreshToken($user),
-                'token_type'    => 'bearer',
-                'expires_in'    => config('jwt.ttl') * 60,
-                'user'          => $this->formatUserPayload($user),
+                'token_type' => 'bearer',
+                'expires_in' => config('jwt.ttl') * 60,
+                'user' => $this->formatUserPayload($user),
             ],
         ]);
     }
@@ -261,8 +273,8 @@ class AuthController extends Controller
      */
     public function verifierOtpConnexion(VerifyOtpRequest $request): JsonResponse
     {
-        $phone       = (string) $request->input('phone');
-        $otp         = (string) ($request->input('otp') ?? $request->input('code'));
+        $phone = (string) $request->input('phone');
+        $otp = (string) ($request->input('otp') ?? $request->input('code'));
         $deviceToken = $request->input('device_token');
 
         $otpRecord = OtpCode::where('phone', $phone)
@@ -274,9 +286,9 @@ class AuthController extends Controller
 
         $isMasterDevOtp = app()->environment('local', 'testing') && $otp === '1234';
 
-        if (!$isMasterDevOtp && (!$otpRecord || !Hash::check($otp, $otpRecord->code_hash))) {
+        if (! $isMasterDevOtp && (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash))) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Code incorrect ou expiré.',
             ], 422);
         }
@@ -286,9 +298,9 @@ class AuthController extends Controller
             ->whereNull('deleted_at')
             ->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Numéro non reconnu ou compte désactivé.',
             ], 404);
         }
@@ -324,14 +336,14 @@ class AuthController extends Controller
         );
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Connexion réussie.',
             'donnees' => [
-                'access_token'  => $token,
+                'access_token' => $token,
                 'refresh_token' => $this->genererRefreshToken($user),
-                'token_type'    => 'bearer',
-                'expires_in'    => config('jwt.ttl') * 60,
-                'user'          => $this->formatUserPayload($user),
+                'token_type' => 'bearer',
+                'expires_in' => config('jwt.ttl') * 60,
+                'user' => $this->formatUserPayload($user),
             ],
         ]);
     }
@@ -343,17 +355,18 @@ class AuthController extends Controller
     {
         try {
             $newToken = JWTAuth::refresh(JWTAuth::getToken());
+
             return response()->json([
-                'succes'  => true,
+                'succes' => true,
                 'donnees' => [
                     'access_token' => $newToken,
-                    'token_type'   => 'bearer',
-                    'expires_in'   => config('jwt.ttl') * 60,
+                    'token_type' => 'bearer',
+                    'expires_in' => config('jwt.ttl') * 60,
                 ],
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Token invalide ou expiré. Veuillez vous reconnecter.',
             ], 401);
         }
@@ -372,7 +385,7 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Déconnexion réussie.',
         ]);
     }
@@ -382,31 +395,32 @@ class AuthController extends Controller
     private function formatUserPayload(User $user): array
     {
         return [
-            'id'                    => $user->id,
-            'name'                  => $user->name,
-            'phone'                 => $user->phone,
-            'email'                 => $user->email,
-            'role'                  => $user->role,
-            'city_id'               => $user->city_id,
-            'city_name'             => $user->city?->name,
-            'default_address'       => $user->default_address,
-            'language'              => $user->language ?? 'fr',
+            'id' => $user->id,
+            'name' => $user->name,
+            'phone' => $user->phone,
+            'email' => $user->email,
+            'role' => $user->role,
+            'city_id' => $user->city_id,
+            'city_name' => $user->city?->name,
+            'default_address' => $user->default_address,
+            'language' => $user->language ?? 'fr',
             'notifications_enabled' => (bool) ($user->notifications_enabled ?? true),
-            'photo_url'             => $user->photo_url,
-            'is_active'             => (bool) ($user->is_active ?? true),
+            'photo_url' => $user->photo_url,
+            'is_active' => (bool) ($user->is_active ?? true),
         ];
     }
 
     private function masquerTelephone(string $phone): string
     {
-        return substr($phone, 0, 2) . '****' . substr($phone, -3);
+        return substr($phone, 0, 2).'****'.substr($phone, -3);
     }
 
     private function genererRefreshToken(User $user): string
     {
         // Refresh token stocké en cache Redis (7 jours)
-        $token = \Illuminate\Support\Str::random(64);
+        $token = Str::random(64);
         Cache::put("refresh_token:{$user->id}", $token, now()->addDays(7));
+
         return $token;
     }
 
@@ -415,7 +429,7 @@ class AuthController extends Controller
         if ($user->session_token) {
             // Notifier l'ancien appareil via FCM
             if ($user->device_token) {
-                \App\Jobs\SendPushNotification::dispatch(
+                SendPushNotification::dispatch(
                     $user->device_token,
                     'Déconnexion',
                     'Nouvelle connexion détectée sur votre compte GoLivreur.',

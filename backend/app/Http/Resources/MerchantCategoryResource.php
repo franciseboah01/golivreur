@@ -23,15 +23,14 @@ class MerchantCategoryResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'          => $this->id,
-            'name'        => $this->name,
-            'slug'        => $this->slug,
+            'id' => $this->id,
+            'name' => $this->name,
+            'slug' => $this->slug,
             'description' => $this->description,
-            'icon'        => $this->icon,
-            'emoji'       => $this->emoji ?: '🏪',
-            'logo_url'    => $this->logo_url,
-            'is_active'   => (bool) $this->is_active,
+            'icon' => $this->icon,
+            'emoji' => $this->emoji ?: '🏪',
+            'logo_url' => $this->logo_url,
+            'is_active' => (bool) $this->is_active,
         ];
     }
 }
-

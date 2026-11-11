@@ -1,7 +1,15 @@
 <?php
 
-use App\Models\{Courier, Merchant, Order, Parcel, User, Wallet, WalletTransaction};
+use App\Models\City;
+use App\Models\Courier;
+use App\Models\Merchant;
+use App\Models\Order;
+use App\Models\Parcel;
+use App\Models\User;
+use App\Models\Wallet;
+use App\Models\WalletTransaction;
 use App\Services\WalletService;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -9,14 +17,14 @@ uses(RefreshDatabase::class);
 // ─── Créditement livreur GoShop ───────────────────────────────────────────────
 
 it('crédite correctement le wallet du livreur après une livraison GoShop', function () {
-    $city    = \App\Models\City::factory()->create();
-    $driver  = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
+    $city = City::factory()->create();
+    $driver = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
     $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
 
     $order = Order::factory()->create([
-        'courier_id'     => $courier->id,
+        'courier_id' => $courier->id,
         'courier_amount' => 640, // 800 F CFA - 20%
-        'status'         => 'delivered',
+        'status' => 'delivered',
     ]);
 
     $service = app(WalletService::class);
@@ -29,14 +37,14 @@ it('crédite correctement le wallet du livreur après une livraison GoShop', fun
 
     $this->assertDatabaseHas('wallets', [
         'owner_type' => 'courier',
-        'owner_id'   => $courier->id,
-        'balance'    => 640,
+        'owner_id' => $courier->id,
+        'balance' => 640,
     ]);
 });
 
 it('accumule correctement plusieurs crédits sur le même wallet', function () {
-    $city    = \App\Models\City::factory()->create();
-    $driver  = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
+    $city = City::factory()->create();
+    $driver = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
     $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
 
     $order1 = Order::factory()->create(['courier_id' => $courier->id, 'courier_amount' => 640]);
@@ -55,12 +63,12 @@ it('accumule correctement plusieurs crédits sur le même wallet', function () {
 // ─── Créditement merchant GoShop ──────────────────────────────────────────────
 
 it('crédite correctement le wallet du merchant après une livraison GoShop', function () {
-    $city     = \App\Models\City::factory()->create();
-    $user     = User::factory()->create(['role' => 'merchant', 'city_id' => $city->id]);
+    $city = City::factory()->create();
+    $user = User::factory()->create(['role' => 'merchant', 'city_id' => $city->id]);
     $merchant = Merchant::factory()->create(['user_id' => $user->id, 'city_id' => $city->id]);
 
     $order = Order::factory()->create([
-        'merchant_id'     => $merchant->id,
+        'merchant_id' => $merchant->id,
         'merchant_amount' => 3400, // 4000 F CFA - 15%
     ]);
 
@@ -69,20 +77,20 @@ it('crédite correctement le wallet du merchant après une livraison GoShop', fu
 
     $this->assertDatabaseHas('wallets', [
         'owner_type' => 'merchant',
-        'owner_id'   => $merchant->id,
-        'balance'    => 3400,
+        'owner_id' => $merchant->id,
+        'balance' => 3400,
     ]);
 });
 
 // ─── Créditement livreur GoColis ──────────────────────────────────────────────
 
 it('crédite correctement le wallet du livreur après une livraison GoColis', function () {
-    $city    = \App\Models\City::factory()->create();
-    $driver  = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
+    $city = City::factory()->create();
+    $driver = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
     $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
 
     $parcel = Parcel::factory()->create([
-        'courier_id'     => $courier->id,
+        'courier_id' => $courier->id,
         'courier_amount' => 1125, // 1500 F CFA × 75%
     ]);
 
@@ -98,10 +106,10 @@ it('crédite correctement le wallet du livreur après une livraison GoColis', fu
 // ─── Atomicité des transactions ───────────────────────────────────────────────
 
 it('crée exactement une WalletTransaction par opération', function () {
-    $city    = \App\Models\City::factory()->create();
-    $driver  = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
+    $city = City::factory()->create();
+    $driver = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
     $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
-    $order   = Order::factory()->create(['courier_id' => $courier->id, 'courier_amount' => 640]);
+    $order = Order::factory()->create(['courier_id' => $courier->id, 'courier_amount' => 640]);
 
     $countAvant = WalletTransaction::count();
 
@@ -111,8 +119,8 @@ it('crée exactement une WalletTransaction par opération', function () {
 });
 
 it('chaque transaction a une référence unique', function () {
-    $city    = \App\Models\City::factory()->create();
-    $driver  = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
+    $city = City::factory()->create();
+    $driver = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
     $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
 
     $order1 = Order::factory()->create(['courier_id' => $courier->id, 'courier_amount' => 640]);
@@ -130,16 +138,16 @@ it('chaque transaction a une référence unique', function () {
 it('ne crée pas de wallet pour un client', function () {
     // Le WalletService ne peut être appelé qu'avec owner_type 'merchant' ou 'courier'
     // Cette contrainte est validée par la contrainte CHECK PostgreSQL
-    $this->expectException(\Illuminate\Database\QueryException::class);
+    $this->expectException(QueryException::class);
 
-    \DB::table('wallets')->insert([
-        'owner_type'   => 'client', // Violera la contrainte CHECK
-        'owner_id'     => 1,
-        'balance'      => 0,
+    DB::table('wallets')->insert([
+        'owner_type' => 'client', // Violera la contrainte CHECK
+        'owner_id' => 1,
+        'balance' => 0,
         'total_earned' => 0,
         'total_withdrawn' => 0,
-        'created_at'   => now(),
-        'updated_at'   => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 });
 
@@ -147,12 +155,12 @@ it('ne crée pas de wallet pour un client', function () {
 
 it('un City Support peut valider un remboursement inférieur à 2000 F CFA', function () {
     $citySupport = User::factory()->create(['role' => 'city_support']);
-    $city        = \App\Models\City::factory()->create();
-    $driver      = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
-    $courier     = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
+    $city = City::factory()->create();
+    $driver = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
+    $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
 
     // Pré-alimenter le wallet
-    \DB::table('wallets')->insert([
+    DB::table('wallets')->insert([
         'owner_type' => 'courier', 'owner_id' => $courier->id,
         'balance' => 5000, 'total_earned' => 5000, 'total_withdrawn' => 0,
         'created_at' => now(), 'updated_at' => now(),

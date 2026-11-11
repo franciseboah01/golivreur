@@ -2,6 +2,14 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Widgets\BlockedCodesAlertWidget;
+use App\Filament\Widgets\HorizonQueueWidget;
+use App\Filament\Widgets\LatestOrdersWidget;
+use App\Filament\Widgets\PaymentMethodsChart;
+use App\Filament\Widgets\StatsOverview;
+use App\Filament\Widgets\WeeklyOrdersChart;
+use App\Filament\Widgets\WeeklyRevenueChart;
+use App\Services\SettingsService;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -11,7 +19,6 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
-use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -32,7 +39,7 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogoHeight('3rem')
             ->favicon(function () {
                 try {
-                    return app(\App\Services\SettingsService::class)->getAppLogoUrl()
+                    return app(SettingsService::class)->getAppLogoUrl()
                         ?? asset('images/logo.png');
                 } catch (\Throwable) {
                     return asset('images/logo.png');
@@ -61,13 +68,13 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                \App\Filament\Widgets\StatsOverview::class,
-                \App\Filament\Widgets\HorizonQueueWidget::class,
-                \App\Filament\Widgets\WeeklyOrdersChart::class,
-                \App\Filament\Widgets\WeeklyRevenueChart::class,
-                \App\Filament\Widgets\PaymentMethodsChart::class,
-                \App\Filament\Widgets\LatestOrdersWidget::class,
-                \App\Filament\Widgets\BlockedCodesAlertWidget::class,
+                StatsOverview::class,
+                HorizonQueueWidget::class,
+                WeeklyOrdersChart::class,
+                WeeklyRevenueChart::class,
+                PaymentMethodsChart::class,
+                LatestOrdersWidget::class,
+                BlockedCodesAlertWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

@@ -33,6 +33,7 @@ class ActivityLogResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('activity_logs');
     }
 
@@ -82,9 +83,9 @@ class ActivityLogResource extends Resource
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'critical' => 'danger',
-                        'warning'  => 'warning',
-                        'info'     => 'info',
-                        default    => 'gray',
+                        'warning' => 'warning',
+                        'info' => 'info',
+                        default => 'gray',
                     }),
 
                 Tables\Columns\TextColumn::make('action')
@@ -111,8 +112,8 @@ class ActivityLogResource extends Resource
                     ->label('Niveau de Sévérité')
                     ->options([
                         'critical' => '🚨 Critique (Finances / Sécurité)',
-                        'warning'  => '⚠️ Avertissement (Modifications)',
-                        'info'     => 'ℹ️ Information',
+                        'warning' => '⚠️ Avertissement (Modifications)',
+                        'info' => 'ℹ️ Information',
                     ]),
             ])
             ->actions([

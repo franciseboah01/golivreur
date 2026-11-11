@@ -2,8 +2,13 @@
 
 namespace App\Services;
 
-use App\Models\{Courier, Merchant, Notification, Order, Parcel, User};
 use App\Jobs\SendPushNotification;
+use App\Models\Courier;
+use App\Models\Merchant;
+use App\Models\Notification;
+use App\Models\Order;
+use App\Models\Parcel;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
 class NotificationService
@@ -122,7 +127,7 @@ class NotificationService
 
     public function notifierPaiementConfirme(?User $user, ?Order $order = null, ?Parcel $parcel = null): void
     {
-        if (!$user) {
+        if (! $user) {
             return;
         }
 
@@ -137,7 +142,7 @@ class NotificationService
 
     public function notifierPaiementEchoue(?User $user, ?Order $order = null, ?Parcel $parcel = null): void
     {
-        if (!$user) {
+        if (! $user) {
             return;
         }
 
@@ -154,10 +159,10 @@ class NotificationService
     {
         $notification = Notification::create([
             'user_id' => $userId,
-            'type'    => $type,
-            'title'   => $title,
-            'body'    => $body,
-            'data'    => $data,
+            'type' => $type,
+            'title' => $title,
+            'body' => $body,
+            'data' => $data,
             'is_read' => false,
         ]);
 

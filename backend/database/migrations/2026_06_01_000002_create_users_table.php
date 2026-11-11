@@ -28,9 +28,9 @@ return new class extends Migration
             $table->string('role', 50);
             // NULL pour admins nationaux, obligatoire pour admins locaux et opérationnels
             $table->foreignId('city_id')
-                  ->nullable()
-                  ->constrained('cities')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('cities')
+                ->nullOnDelete();
             // Token FCM pour push notifications Firebase
             $table->string('device_token', 255)->nullable();
             // Session unique pour merchants et drivers (révoquée à chaque nouvelle connexion)

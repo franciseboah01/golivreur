@@ -34,11 +34,11 @@ class ProfileController extends Controller
         $user = $request->user();
 
         return match ($user->role) {
-            'client'            => $this->showClient($request),
+            'client' => $this->showClient($request),
             'driver', 'courier' => $this->showDriver($request),
-            'merchant'          => $this->showBusiness($request),
-            default             => response()->json([
-                'succes'  => true,
+            'merchant' => $this->showBusiness($request),
+            default => response()->json([
+                'succes' => true,
                 'donnees' => new ClientProfileResource($user->load('city')),
             ]),
         };
@@ -62,11 +62,11 @@ class ProfileController extends Controller
         Gate::authorize('updateSelfProfile', $user);
 
         return match ($user->role) {
-            'client'            => $this->updateClient(app(UpdateClientProfileRequest::class)),
+            'client' => $this->updateClient(app(UpdateClientProfileRequest::class)),
             'driver', 'courier' => $this->updateDriver(app(UpdateDriverProfileRequest::class)),
-            'merchant'          => $this->updateBusiness(app(UpdateBusinessProfileRequest::class)),
-            default             => response()->json([
-                'succes'  => false,
+            'merchant' => $this->updateBusiness(app(UpdateBusinessProfileRequest::class)),
+            default => response()->json([
+                'succes' => false,
                 'message' => 'Rôle non supporté pour cet endpoint.',
             ], 403),
         };
@@ -79,7 +79,7 @@ class ProfileController extends Controller
         $user = $request->user()->fresh(['city']);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => new ClientProfileResource($user),
         ]);
     }
@@ -104,7 +104,7 @@ class ProfileController extends Controller
                 );
             }
 
-            if (!empty($userData)) {
+            if (! empty($userData)) {
                 $user->update($userData);
             }
 
@@ -112,7 +112,7 @@ class ProfileController extends Controller
         });
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Profil client mis à jour avec succès.',
             'donnees' => new ClientProfileResource($user->fresh()->load('city')),
         ]);
@@ -125,7 +125,7 @@ class ProfileController extends Controller
         $user = $request->user()->fresh(['city', 'courier.city']);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => new DriverProfileResource($user),
         ]);
     }
@@ -135,9 +135,9 @@ class ProfileController extends Controller
         $user = $request->user();
         $courier = $user->courier;
 
-        if (!$courier) {
+        if (! $courier) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Fiche livreur introuvable pour ce compte.',
             ], 404);
         }
@@ -164,11 +164,11 @@ class ProfileController extends Controller
                 $userData['photo_path'] = $newPath;
             }
 
-            if (!empty($userData)) {
+            if (! empty($userData)) {
                 $user->update($userData);
             }
 
-            if (!empty($courierData)) {
+            if (! empty($courierData)) {
                 $courier->update($courierData);
             }
 
@@ -176,7 +176,7 @@ class ProfileController extends Controller
         });
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Profil livreur mis à jour avec succès.',
             'donnees' => new DriverProfileResource($user->fresh()->load(['city', 'courier.city'])),
         ]);
@@ -189,7 +189,7 @@ class ProfileController extends Controller
         $user = $request->user()->fresh(['city', 'merchant.city', 'merchant.categoryModel']);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => new BusinessProfileResource($user),
         ]);
     }
@@ -199,9 +199,9 @@ class ProfileController extends Controller
         $user = $request->user();
         $merchant = $user->merchant;
 
-        if (!$merchant) {
+        if (! $merchant) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Fiche commerce introuvable pour ce compte.',
             ], 404);
         }
@@ -219,7 +219,7 @@ class ProfileController extends Controller
                 );
             }
 
-            if (!empty($userData)) {
+            if (! empty($userData)) {
                 $user->update($userData);
             }
 
@@ -264,7 +264,7 @@ class ProfileController extends Controller
                 );
             }
 
-            if (!empty($merchantData)) {
+            if (! empty($merchantData)) {
                 $merchant->update($merchantData);
             }
 
@@ -272,7 +272,7 @@ class ProfileController extends Controller
         });
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Profil commerce mis à jour avec succès.',
             'donnees' => new BusinessProfileResource(
                 $user->fresh()->load(['city', 'merchant.city', 'merchant.categoryModel'])
@@ -287,11 +287,11 @@ class ProfileController extends Controller
         $user = $request->user();
         $currentPassword = (string) $request->validated('current_password');
 
-        if (!$user->password || !Hash::check($currentPassword, $user->password)) {
+        if (! $user->password || ! Hash::check($currentPassword, $user->password)) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Le mot de passe actuel est incorrect.',
-                'errors'  => [
+                'errors' => [
                     'current_password' => ['Le mot de passe actuel est incorrect.'],
                 ],
             ], 422);
@@ -304,7 +304,7 @@ class ProfileController extends Controller
         $this->logProfileUpdate($user, 'profile_password_updated', $request->ip());
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Mot de passe modifié avec succès.',
         ]);
     }
@@ -342,13 +342,13 @@ class ProfileController extends Controller
     private function logProfileUpdate(User $user, string $action, ?string $ipAddress): void
     {
         ActivityLog::create([
-            'user_id'     => $user->id,
-            'action'      => $action,
+            'user_id' => $user->id,
+            'action' => $action,
             'entity_type' => 'user',
-            'entity_id'   => $user->id,
-            'properties'  => ['role' => $user->role],
-            'ip_address'  => $ipAddress,
-            'severity'    => 'info',
+            'entity_id' => $user->id,
+            'properties' => ['role' => $user->role],
+            'ip_address' => $ipAddress,
+            'severity' => 'info',
         ]);
     }
 }

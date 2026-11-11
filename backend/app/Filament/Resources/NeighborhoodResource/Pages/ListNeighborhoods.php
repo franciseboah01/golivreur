@@ -49,4 +49,3 @@ class ListNeighborhoods extends ListRecords
         ];
     }
 }
-

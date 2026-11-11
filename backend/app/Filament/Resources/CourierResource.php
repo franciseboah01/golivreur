@@ -5,7 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Components\ImageUploadField;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\CourierResource\Pages;
-use App\Models\{ActivityLog, Courier, User, VehicleType};
+use App\Models\ActivityLog;
+use App\Models\Courier;
+use App\Models\User;
+use App\Models\VehicleType;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -14,6 +17,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class CourierResource extends Resource
 {
@@ -34,6 +38,7 @@ class CourierResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('couriers');
     }
 
@@ -48,7 +53,7 @@ class CourierResource extends Resource
                         SearchableSelect::make('user_id')
                             ->label('Compte Utilisateur (Livreur)')
                             ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->whereIn('role', ['driver', 'courier'])->orWhereDoesntHave('courier')->orderBy('name'))
-                            ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} (" . ($record->phone ?? 'Sans téléphone') . ")")
+                            ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} (".($record->phone ?? 'Sans téléphone').')')
                             ->required()
                             ->helperText('Sélectionnez un livreur existant ou créez-en un nouveau via le bouton +.')
                             ->createOptionForm([
@@ -85,6 +90,7 @@ class CourierResource extends Resource
                                     'is_active' => true,
                                     'phone_verified_at' => now(),
                                 ]);
+
                                 return $user->id;
                             }),
 
@@ -110,13 +116,14 @@ class CourierResource extends Resource
                                     ->label('Description'),
                             ])
                             ->createOptionUsing(function (array $data): string {
-                                $slug = \Illuminate\Support\Str::slug($data['slug'] ?? $data['name']);
+                                $slug = Str::slug($data['slug'] ?? $data['name']);
                                 $vt = VehicleType::create([
                                     'name' => $data['name'],
                                     'slug' => $slug,
                                     'description' => $data['description'] ?? null,
                                     'is_active' => true,
                                 ]);
+
                                 return $vt->slug;
                             }),
 
@@ -212,7 +219,7 @@ class CourierResource extends Resource
 
                 Tables\Columns\TextColumn::make('average_rating')
                     ->label('Note')
-                    ->formatStateUsing(fn ($state) => '★ ' . number_format((float) $state, 1))
+                    ->formatStateUsing(fn ($state) => '★ '.number_format((float) $state, 1))
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('total_ratings')
@@ -276,23 +283,23 @@ class CourierResource extends Resource
                     ->action(function (Courier $record): void {
                         $newStatus = ! $record->is_active;
                         $record->update([
-                            'is_active'    => $newStatus,
+                            'is_active' => $newStatus,
                             'activated_at' => $newStatus ? now() : null,
                             'activated_by' => $newStatus ? auth()->id() : null,
                         ]);
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => $newStatus ? 'courier_activated' : 'courier_suspended',
+                            'user_id' => auth()->id(),
+                            'action' => $newStatus ? 'courier_activated' : 'courier_suspended',
                             'entity_type' => 'courier',
-                            'entity_id'   => $record->id,
-                            'properties'  => ['courier_id' => $record->id, 'new_status' => $newStatus],
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'warning',
+                            'entity_id' => $record->id,
+                            'properties' => ['courier_id' => $record->id, 'new_status' => $newStatus],
+                            'ip_address' => request()->ip(),
+                            'severity' => 'warning',
                         ]);
 
                         Notification::make()
-                            ->title("Livreur {$record->user?->name} " . ($newStatus ? 'validé et activé' : 'suspendu'))
+                            ->title("Livreur {$record->user?->name} ".($newStatus ? 'validé et activé' : 'suspendu'))
                             ->color($newStatus ? 'success' : 'danger')
                             ->send();
                     }),
@@ -315,21 +322,21 @@ class CourierResource extends Resource
                         $penaltyUntil = now()->addMinutes((int) $data['minutes']);
                         $record->update([
                             'penalty_until' => $penaltyUntil,
-                            'is_online'     => false,
+                            'is_online' => false,
                         ]);
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => 'courier_penalty_applied',
+                            'user_id' => auth()->id(),
+                            'action' => 'courier_penalty_applied',
                             'entity_type' => 'courier',
-                            'entity_id'   => $record->id,
-                            'properties'  => [
-                                'minutes'       => $data['minutes'],
+                            'entity_id' => $record->id,
+                            'properties' => [
+                                'minutes' => $data['minutes'],
                                 'penalty_until' => $penaltyUntil->toDateTimeString(),
-                                'reason'        => $data['reason'],
+                                'reason' => $data['reason'],
                             ],
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'warning',
+                            'ip_address' => request()->ip(),
+                            'severity' => 'warning',
                         ]);
 
                         Notification::make()

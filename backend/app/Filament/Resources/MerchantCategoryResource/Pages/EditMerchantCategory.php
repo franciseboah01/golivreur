@@ -17,4 +17,3 @@ class EditMerchantCategory extends EditRecord
         ];
     }
 }
-

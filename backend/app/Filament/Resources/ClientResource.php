@@ -5,7 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Components\ImageUploadField;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ClientResource\Pages;
-use App\Models\{ActivityLog, User};
+use App\Models\ActivityLog;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -37,6 +38,7 @@ class ClientResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('clients');
     }
 
@@ -162,17 +164,17 @@ class ClientResource extends Resource
                         $record->update(['is_active' => $newStatus]);
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => $newStatus ? 'client_activated' : 'client_deactivated',
+                            'user_id' => auth()->id(),
+                            'action' => $newStatus ? 'client_activated' : 'client_deactivated',
                             'entity_type' => 'user',
-                            'entity_id'   => $record->id,
-                            'properties'  => ['phone' => $record->phone, 'new_status' => $newStatus],
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'warning',
+                            'entity_id' => $record->id,
+                            'properties' => ['phone' => $record->phone, 'new_status' => $newStatus],
+                            'ip_address' => request()->ip(),
+                            'severity' => 'warning',
                         ]);
 
                         Notification::make()
-                            ->title("Client {$record->name} " . ($newStatus ? 'réactivé' : 'désactivé'))
+                            ->title("Client {$record->name} ".($newStatus ? 'réactivé' : 'désactivé'))
                             ->color($newStatus ? 'success' : 'danger')
                             ->send();
                     }),
@@ -186,4 +188,3 @@ class ClientResource extends Resource
         ];
     }
 }
-

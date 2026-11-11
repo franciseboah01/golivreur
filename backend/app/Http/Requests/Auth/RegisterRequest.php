@@ -24,10 +24,9 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'phone'   => ['required', 'string'],
-            'name'    => ['nullable', 'string', 'max:255'],
+            'phone' => ['required', 'string'],
+            'name' => ['nullable', 'string', 'max:255'],
             'city_id' => ['nullable', 'integer'],
         ];
     }
 }
-

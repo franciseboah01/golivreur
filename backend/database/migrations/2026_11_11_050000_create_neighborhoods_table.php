@@ -11,8 +11,8 @@ return new class extends Migration
         Schema::create('neighborhoods', function (Blueprint $table) {
             $table->id();
             $table->foreignId('city_id')
-                  ->constrained('cities')
-                  ->cascadeOnDelete();
+                ->constrained('cities')
+                ->cascadeOnDelete();
             $table->string('name', 120);
             $table->boolean('is_active')->default(false);
             $table->decimal('distance_km', 6, 2)->nullable();
@@ -30,4 +30,3 @@ return new class extends Migration
         Schema::dropIfExists('neighborhoods');
     }
 };
-

@@ -5,7 +5,14 @@ namespace App\Http\Controllers\Api\V1\Client;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\MerchantCategoryResource;
 use App\Http\Resources\MerchantResource;
-use App\Models\{City, ClientAddress, Merchant, MerchantCategory, Neighborhood, Notification, Order, User};
+use App\Models\City;
+use App\Models\ClientAddress;
+use App\Models\Merchant;
+use App\Models\MerchantCategory;
+use App\Models\Neighborhood;
+use App\Models\Notification;
+use App\Models\Order;
+use App\Models\User;
 use App\Modules\GoShop\Services\OrderService;
 use App\Services\SettingsService;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +32,7 @@ class ClientController extends Controller
             ->get();
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => MerchantCategoryResource::collection($categories),
         ]);
     }
@@ -51,7 +58,7 @@ class ClientController extends Controller
             ->get();
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => MerchantResource::collection($merchants),
         ]);
     }
@@ -67,10 +74,10 @@ class ClientController extends Controller
             ->groupBy('category');
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => [
                 'merchant' => new MerchantResource($merchant),
-                'catalog'  => $products,
+                'catalog' => $products,
             ],
         ]);
     }
@@ -78,22 +85,22 @@ class ClientController extends Controller
     public function createOrder(Request $request, OrderService $orderService): JsonResponse
     {
         $validated = $request->validate([
-            'merchant_id'          => 'required|exists:merchants,id',
-            'items'                => 'required|array|min:1',
-            'items.*.product_id'   => 'required|exists:products,id',
-            'items.*.quantity'     => 'required|integer|min:1',
-            'delivery_address'     => 'required|string',
-            'delivery_lat'         => 'nullable|numeric',
-            'delivery_lng'         => 'nullable|numeric',
-            'payment_method'       => 'required|in:cash,orange_money,wave,mtn,moov',
-            'distance_km'          => 'required|numeric|min:0.1',
+            'merchant_id' => 'required|exists:merchants,id',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'delivery_address' => 'required|string',
+            'delivery_lat' => 'nullable|numeric',
+            'delivery_lng' => 'nullable|numeric',
+            'payment_method' => 'required|in:cash,orange_money,wave,mtn,moov',
+            'distance_km' => 'required|numeric|min:0.1',
             'special_instructions' => 'nullable|string',
         ]);
 
         $order = $orderService->creerCommande(auth()->user(), $validated);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $order,
             'message' => 'Commande passée avec succès.',
         ], 201);
@@ -107,7 +114,7 @@ class ClientController extends Controller
             ->paginate(15);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $orders,
         ]);
     }
@@ -116,7 +123,7 @@ class ClientController extends Controller
     {
         $user = auth()->user();
 
-        if ($order->client_id !== $user->id && !in_array($user->role, ['super_admin', 'dg_national', 'city_manager'])) {
+        if ($order->client_id !== $user->id && ! in_array($user->role, ['super_admin', 'dg_national', 'city_manager'])) {
             return response()->json(['succes' => false, 'message' => 'Accès refusé.'], 403);
         }
 
@@ -127,7 +134,7 @@ class ClientController extends Controller
         $order->load(['merchant', 'courier.user', 'items.product']);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $order,
         ]);
     }
@@ -140,7 +147,7 @@ class ClientController extends Controller
             ->get();
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $notifications,
         ]);
     }
@@ -157,7 +164,7 @@ class ClientController extends Controller
         ]);
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $notification,
         ]);
     }
@@ -173,7 +180,7 @@ class ClientController extends Controller
             ? City::find($requestedCityId)
             : City::where('is_active', true)->orderBy('id')->first();
 
-        if (!$city) {
+        if (! $city) {
             $city = City::orderBy('id')->first();
         }
 
@@ -195,30 +202,30 @@ class ClientController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'distance_km', 'lat', 'lng'])
                 ->map(fn (Neighborhood $n) => [
-                    'id'          => $n->id,
-                    'name'        => $n->name,
+                    'id' => $n->id,
+                    'name' => $n->name,
                     'distance_km' => $n->distance_km,
-                    'lat'         => $n->lat,
-                    'lng'         => $n->lng,
+                    'lat' => $n->lat,
+                    'lng' => $n->lng,
                 ])
                 ->values()
             : collect();
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => [
-                'city_id'                => $city?->id,
-                'city_name'              => $city?->name,
-                'rain_mode_active'       => $isRainMode,
-                'rain_delay_minutes'     => $isRainMode ? 15 : 0,
-                'emergency_mode_active'  => (bool) ($city?->emergency_mode_active ?? false),
+                'city_id' => $city?->id,
+                'city_name' => $city?->name,
+                'rain_mode_active' => $isRainMode,
+                'rain_delay_minutes' => $isRainMode ? 15 : 0,
+                'emergency_mode_active' => (bool) ($city?->emergency_mode_active ?? false),
                 'emergency_mode_message' => $city?->emergency_mode_message,
-                'center_lat'             => $city?->center_lat !== null ? (float) $city->center_lat : null,
-                'center_lng'             => $city?->center_lng !== null ? (float) $city->center_lng : null,
-                'bareme'                 => $tarifs['bareme'] ?? $defaultBareme,
-                'neighborhoods'          => $neighborhoods,
-                'app_logo_url'           => $branding['logo_url'],
-                'app_default_emoji'      => $branding['default_emoji'],
+                'center_lat' => $city?->center_lat !== null ? (float) $city->center_lat : null,
+                'center_lng' => $city?->center_lng !== null ? (float) $city->center_lng : null,
+                'bareme' => $tarifs['bareme'] ?? $defaultBareme,
+                'neighborhoods' => $neighborhoods,
+                'app_logo_url' => $branding['logo_url'],
+                'app_default_emoji' => $branding['default_emoji'],
             ],
         ]);
     }
@@ -238,7 +245,7 @@ class ClientController extends Controller
             ->map(fn (ClientAddress $addr) => $this->formatAddress($addr));
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => $addresses,
         ]);
     }
@@ -249,36 +256,36 @@ class ClientController extends Controller
         $user = auth()->user();
 
         $validated = $request->validate([
-            'label'        => ['required', 'string', 'min:2', 'max:60'],
+            'label' => ['required', 'string', 'min:2', 'max:60'],
             'neighborhood' => ['required', 'string', 'min:2', 'max:100'],
             'address_line' => ['required', 'string', 'min:3', 'max:255'],
-            'city_id'      => ['nullable', 'integer', 'exists:cities,id'],
-            'lat'          => ['nullable', 'numeric'],
-            'lng'          => ['nullable', 'numeric'],
-            'is_default'   => ['sometimes', 'boolean'],
+            'city_id' => ['nullable', 'integer', 'exists:cities,id'],
+            'lat' => ['nullable', 'numeric'],
+            'lng' => ['nullable', 'numeric'],
+            'is_default' => ['sometimes', 'boolean'],
         ]);
 
         $address = DB::transaction(function () use ($user, $validated) {
             $hasExisting = $user->addresses()->exists();
-            $makeDefault = (bool) ($validated['is_default'] ?? !$hasExisting);
+            $makeDefault = (bool) ($validated['is_default'] ?? ! $hasExisting);
 
             if ($makeDefault) {
                 $user->addresses()->update(['is_default' => false]);
             }
 
             $cityId = $validated['city_id'] ?? $user->city_id;
-            if (!$cityId || !City::whereKey($cityId)->exists()) {
+            if (! $cityId || ! City::whereKey($cityId)->exists()) {
                 $cityId = City::where('is_active', true)->value('id');
             }
 
             $addr = $user->addresses()->create([
-                'city_id'      => $cityId,
-                'label'        => trim($validated['label']),
+                'city_id' => $cityId,
+                'label' => trim($validated['label']),
                 'neighborhood' => trim($validated['neighborhood']),
                 'address_line' => trim($validated['address_line']),
-                'lat'          => $validated['lat'] ?? null,
-                'lng'          => $validated['lng'] ?? null,
-                'is_default'   => $makeDefault,
+                'lat' => $validated['lat'] ?? null,
+                'lng' => $validated['lng'] ?? null,
+                'is_default' => $makeDefault,
             ]);
 
             $this->syncUserDefaultAddress($user);
@@ -287,7 +294,7 @@ class ClientController extends Controller
         });
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Adresse de livraison ajoutée avec succès.',
             'donnees' => $this->formatAddress($address),
         ], 201);
@@ -303,28 +310,28 @@ class ClientController extends Controller
         }
 
         $validated = $request->validate([
-            'label'        => ['sometimes', 'required', 'string', 'min:2', 'max:60'],
+            'label' => ['sometimes', 'required', 'string', 'min:2', 'max:60'],
             'neighborhood' => ['sometimes', 'required', 'string', 'min:2', 'max:100'],
             'address_line' => ['sometimes', 'required', 'string', 'min:3', 'max:255'],
-            'city_id'      => ['sometimes', 'nullable', 'integer', 'exists:cities,id'],
-            'lat'          => ['sometimes', 'nullable', 'numeric'],
-            'lng'          => ['sometimes', 'nullable', 'numeric'],
-            'is_default'   => ['sometimes', 'boolean'],
+            'city_id' => ['sometimes', 'nullable', 'integer', 'exists:cities,id'],
+            'lat' => ['sometimes', 'nullable', 'numeric'],
+            'lng' => ['sometimes', 'nullable', 'numeric'],
+            'is_default' => ['sometimes', 'boolean'],
         ]);
 
         $updated = DB::transaction(function () use ($user, $address, $validated) {
-            if (!empty($validated['is_default'])) {
+            if (! empty($validated['is_default'])) {
                 $user->addresses()->where('id', '!=', $address->id)->update(['is_default' => false]);
             }
 
             $address->update([
-                'label'        => array_key_exists('label', $validated) ? trim($validated['label']) : $address->label,
+                'label' => array_key_exists('label', $validated) ? trim($validated['label']) : $address->label,
                 'neighborhood' => array_key_exists('neighborhood', $validated) ? trim($validated['neighborhood']) : $address->neighborhood,
                 'address_line' => array_key_exists('address_line', $validated) ? trim($validated['address_line']) : $address->address_line,
-                'city_id'      => $validated['city_id'] ?? $address->city_id,
-                'lat'          => array_key_exists('lat', $validated) ? $validated['lat'] : $address->lat,
-                'lng'          => array_key_exists('lng', $validated) ? $validated['lng'] : $address->lng,
-                'is_default'   => array_key_exists('is_default', $validated) ? (bool) $validated['is_default'] : $address->is_default,
+                'city_id' => $validated['city_id'] ?? $address->city_id,
+                'lat' => array_key_exists('lat', $validated) ? $validated['lat'] : $address->lat,
+                'lng' => array_key_exists('lng', $validated) ? $validated['lng'] : $address->lng,
+                'is_default' => array_key_exists('is_default', $validated) ? (bool) $validated['is_default'] : $address->is_default,
             ]);
 
             $this->syncUserDefaultAddress($user);
@@ -333,7 +340,7 @@ class ClientController extends Controller
         });
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Adresse mise à jour.',
             'donnees' => $this->formatAddress($updated),
         ]);
@@ -357,7 +364,7 @@ class ClientController extends Controller
         });
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Adresse par défaut mise à jour.',
             'donnees' => $this->formatAddress($updated),
         ]);
@@ -387,7 +394,7 @@ class ClientController extends Controller
         });
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Adresse supprimée.',
         ]);
     }
@@ -409,7 +416,7 @@ class ClientController extends Controller
             ->get();
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'donnees' => MerchantResource::collection($merchants),
         ]);
     }
@@ -424,12 +431,12 @@ class ClientController extends Controller
         $favoriteIds = $user->favoriteMerchants()->pluck('merchants.id')->values();
 
         return response()->json([
-            'succes'  => true,
+            'succes' => true,
             'message' => $isFavorite
                 ? "{$merchant->name} ajouté aux favoris."
                 : "{$merchant->name} retiré des favoris.",
             'donnees' => [
-                'is_favorite'  => $isFavorite,
+                'is_favorite' => $isFavorite,
                 'favorite_ids' => $favoriteIds,
             ],
         ]);
@@ -438,16 +445,16 @@ class ClientController extends Controller
     private function formatAddress(ClientAddress $address): array
     {
         return [
-            'id'                => $address->id,
-            'city_id'           => $address->city_id,
-            'city_name'         => $address->city?->name ?? 'Daloa',
-            'label'             => $address->label,
-            'neighborhood'      => $address->neighborhood,
-            'address_line'      => $address->address_line,
+            'id' => $address->id,
+            'city_id' => $address->city_id,
+            'city_name' => $address->city?->name ?? 'Daloa',
+            'label' => $address->label,
+            'neighborhood' => $address->neighborhood,
+            'address_line' => $address->address_line,
             'formatted_address' => $address->formattedFullAddress(),
-            'lat'               => $address->lat,
-            'lng'               => $address->lng,
-            'is_default'        => (bool) $address->is_default,
+            'lat' => $address->lat,
+            'lng' => $address->lng,
+            'is_default' => (bool) $address->is_default,
         ];
     }
 
@@ -459,7 +466,7 @@ class ClientController extends Controller
             ->latest('id')
             ->first();
 
-        if ($default && !$default->is_default) {
+        if ($default && ! $default->is_default) {
             $default->update(['is_default' => true]);
         }
 

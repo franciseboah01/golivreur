@@ -2,8 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Pages\Widgets\PendingCouriersWidget;
-use App\Filament\Pages\Widgets\PendingMerchantsWidget;
 use App\Models\Courier;
 use App\Models\Merchant;
 use Filament\Pages\Page;
@@ -45,12 +43,14 @@ class PendingValidationsPage extends Page
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('pending_validations');
     }
 
     public static function getNavigationBadge(): ?string
     {
         $count = Merchant::where('is_active', false)->count() + Courier::where('is_active', false)->count();
+
         return $count > 0 ? (string) $count : null;
     }
 

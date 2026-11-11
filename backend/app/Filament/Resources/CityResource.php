@@ -3,14 +3,15 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CityResource\Pages;
-use App\Models\{ActivityLog, City};
+use App\Filament\Resources\CityResource\RelationManagers\NeighborhoodsRelationManager;
+use App\Models\ActivityLog;
+use App\Models\City;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 
 class CityResource extends Resource
 {
@@ -31,6 +32,7 @@ class CityResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('cities');
     }
 
@@ -175,22 +177,22 @@ class CityResource extends Resource
                     ->action(function (City $record): void {
                         $newStatus = ! $record->rain_mode_active;
                         $record->update([
-                            'rain_mode_active'       => $newStatus,
+                            'rain_mode_active' => $newStatus,
                             'rain_mode_activated_at' => $newStatus ? now() : null,
                         ]);
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => $newStatus ? 'rain_mode_activated' : 'rain_mode_deactivated',
+                            'user_id' => auth()->id(),
+                            'action' => $newStatus ? 'rain_mode_activated' : 'rain_mode_deactivated',
                             'entity_type' => 'city',
-                            'entity_id'   => $record->id,
-                            'properties'  => ['city_name' => $record->name, 'new_status' => $newStatus],
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'info',
+                            'entity_id' => $record->id,
+                            'properties' => ['city_name' => $record->name, 'new_status' => $newStatus],
+                            'ip_address' => request()->ip(),
+                            'severity' => 'info',
                         ]);
 
                         Notification::make()
-                            ->title("Mode Pluie {$record->name} : " . ($newStatus ? 'Activé (+20%)' : 'Désactivé'))
+                            ->title("Mode Pluie {$record->name} : ".($newStatus ? 'Activé (+20%)' : 'Désactivé'))
                             ->color($newStatus ? 'warning' : 'success')
                             ->send();
                     }),
@@ -210,27 +212,27 @@ class CityResource extends Resource
                     ->action(function (City $record, array $data): void {
                         $newStatus = ! $record->emergency_mode_active;
                         $record->update([
-                            'emergency_mode_active'       => $newStatus,
+                            'emergency_mode_active' => $newStatus,
                             'emergency_mode_activated_at' => $newStatus ? now() : null,
-                            'emergency_mode_message'      => $newStatus ? ($data['message'] ?? 'Service temporairement interrompu') : null,
+                            'emergency_mode_message' => $newStatus ? ($data['message'] ?? 'Service temporairement interrompu') : null,
                         ]);
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => $newStatus ? 'emergency_mode_activated' : 'emergency_mode_deactivated',
+                            'user_id' => auth()->id(),
+                            'action' => $newStatus ? 'emergency_mode_activated' : 'emergency_mode_deactivated',
                             'entity_type' => 'city',
-                            'entity_id'   => $record->id,
-                            'properties'  => [
-                                'city_name'  => $record->name,
+                            'entity_id' => $record->id,
+                            'properties' => [
+                                'city_name' => $record->name,
                                 'new_status' => $newStatus,
-                                'message'    => $data['message'] ?? null,
+                                'message' => $data['message'] ?? null,
                             ],
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'critical',
+                            'ip_address' => request()->ip(),
+                            'severity' => 'critical',
                         ]);
 
                         Notification::make()
-                            ->title("Mode Urgence {$record->name} : " . ($newStatus ? 'Enclenché' : 'Levé'))
+                            ->title("Mode Urgence {$record->name} : ".($newStatus ? 'Enclenché' : 'Levé'))
                             ->color($newStatus ? 'danger' : 'success')
                             ->send();
                     }),
@@ -247,7 +249,7 @@ class CityResource extends Resource
     public static function getRelations(): array
     {
         return [
-            \App\Filament\Resources\CityResource\RelationManagers\NeighborhoodsRelationManager::class,
+            NeighborhoodsRelationManager::class,
         ];
     }
 

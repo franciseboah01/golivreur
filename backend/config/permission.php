@@ -1,5 +1,8 @@
 <?php
 
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+
 // Config Spatie Laravel Permission.
 // teams=false : le cloisonnement multi-etablissement n'est PAS gere par le mecanisme "teams"
 // de Spatie mais explicitement par establishment_id dans chaque Service/Policy (voir
@@ -9,8 +12,8 @@
 return [
 
     'models' => [
-        'permission' => Spatie\Permission\Models\Permission::class,
-        'role' => Spatie\Permission\Models\Role::class,
+        'permission' => Permission::class,
+        'role' => Role::class,
     ],
 
     'table_names' => [
@@ -37,7 +40,7 @@ return [
     'enable_wildcard_permission' => false,
 
     'cache' => [
-        'expiration_time' => \DateInterval::createFromDateString('24 hours'),
+        'expiration_time' => DateInterval::createFromDateString('24 hours'),
         'key' => 'spatie.permission.cache',
         'store' => 'default',
     ],

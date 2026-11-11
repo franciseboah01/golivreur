@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
-use App\Models\{ActivityLog, Setting};
-use Illuminate\Support\Facades\{Cache, Log, Storage};
+use App\Models\ActivityLog;
+use App\Models\Setting;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Service centralisé de gestion des Paramètres GoLivreur.
- * 
+ *
  * - Lecture ultra-rapide via Cache (Redis)
  * - Support de la surcharge locale par ville (city_id nullable)
  * - Traçabilité obligatoire dans activity_logs à chaque modification
@@ -34,45 +37,45 @@ class SettingsService
 
         'tarifs_gocolis' => [
             'bareme' => [
-                'petit'  => ['base' => 800,  'par_km' => 200],
-                'moyen'  => ['base' => 1200, 'par_km' => 300],
-                'grand'  => ['base' => 2000, 'par_km' => 400],
+                'petit' => ['base' => 800,  'par_km' => 200],
+                'moyen' => ['base' => 1200, 'par_km' => 300],
+                'grand' => ['base' => 2000, 'par_km' => 400],
             ],
             'seuil_assurance' => 20000,
-            'taux_assurance'  => 3.0, // 3%
+            'taux_assurance' => 3.0, // 3%
         ],
 
         'commissions' => [
-            'merchant_defaut'     => 15.0, // 15% sur produits
-            'livreur_goshop'       => 20.0, // Plateforme garde 20% frais livraison
-            'plateforme_gocolis'  => 25.0, // 25% des frais d'expédition
+            'merchant_defaut' => 15.0, // 15% sur produits
+            'livreur_goshop' => 20.0, // Plateforme garde 20% frais livraison
+            'plateforme_gocolis' => 25.0, // 25% des frais d'expédition
         ],
 
         'delais_regles' => [
             'acceptation_commerce_secondes' => 45,
-            'acceptation_livreur_secondes'  => 30,
-            'refus_avant_penalite'          => 3,
-            'duree_penalite_minutes'        => 15,
-            'erreurs_code_avant_blocage'    => 3,
-            'rayon_recherche_livreur_km'    => 5.0,
+            'acceptation_livreur_secondes' => 30,
+            'refus_avant_penalite' => 3,
+            'duree_penalite_minutes' => 15,
+            'erreurs_code_avant_blocage' => 3,
+            'rayon_recherche_livreur_km' => 5.0,
         ],
 
         'remboursements' => [
             'plafonds' => [
-                'city_support'     => 2000,
-                'city_finance'     => 10000,
-                'city_manager'     => 10000,
+                'city_support' => 2000,
+                'city_finance' => 10000,
+                'city_manager' => 10000,
                 'national_support' => 2000,
                 'national_finance' => 50000,
-                'super_admin'      => 50000,
-                'dg_national'      => 50000,
+                'super_admin' => 50000,
+                'dg_national' => 50000,
             ],
         ],
 
         'modes_speciaux' => [
-            'pluie_automatique'            => true,
+            'pluie_automatique' => true,
             'meteo_check_interval_minutes' => 15,
-            'urgence_bandeau_message'      => "⚠️ Mode Urgence activé. Les livraisons peuvent être ralenties.",
+            'urgence_bandeau_message' => '⚠️ Mode Urgence activé. Les livraisons peuvent être ralenties.',
         ],
 
         'paiements' => [
@@ -81,23 +84,23 @@ class SettingsService
 
         'sms' => [
             'seuil_alerte_mensuel' => 2500,
-            'alert_email'          => 'francis@golivreur.ci',
+            'alert_email' => 'francis@golivreur.ci',
         ],
 
         'securite' => [
             'session_duree_minutes' => 120,
-            'tentatives_otp_max'    => 3,
-            'otp_validite_minutes'  => 5,
+            'tentatives_otp_max' => 3,
+            'otp_validite_minutes' => 5,
         ],
 
         'contenus' => [
             'support_whatsapp' => '+2250700000002',
-            'faq_url'          => 'https://golivreur.ci/faq',
-            'app_version_min'  => '1.0.0',
+            'faq_url' => 'https://golivreur.ci/faq',
+            'app_version_min' => '1.0.0',
         ],
 
         'branding' => [
-            'logo_path'     => null,
+            'logo_path' => null,
             'default_emoji' => '🛵',
         ],
     ];
@@ -151,14 +154,14 @@ class SettingsService
 
         if ($setting) {
             $setting->update([
-                'value'       => $value,
+                'value' => $value,
                 'description' => $description ?? $setting->description,
             ]);
         } else {
             $setting = Setting::create([
-                'key'         => $key,
-                'value'       => $value,
-                'city_id'     => $cityId,
+                'key' => $key,
+                'value' => $value,
+                'city_id' => $cityId,
                 'description' => $description,
             ]);
         }
@@ -169,23 +172,23 @@ class SettingsService
         // Journaliser la modification dans activity_logs
         try {
             ActivityLog::create([
-                'user_id'     => $userId ?? auth()->id(),
-                'action'      => 'setting_updated',
+                'user_id' => $userId ?? auth()->id(),
+                'action' => 'setting_updated',
                 'entity_type' => 'setting',
-                'entity_id'   => $setting->id,
-                'properties'  => [
-                    'key'       => $key,
-                    'city_id'   => $cityId,
+                'entity_id' => $setting->id,
+                'properties' => [
+                    'key' => $key,
+                    'city_id' => $cityId,
                     'old_value' => $oldValue,
                     'new_value' => $value,
                 ],
-                'ip_address'  => request()->ip(),
-                'severity'    => in_array($key, ['tarifs_goshop', 'tarifs_gocolis', 'commissions', 'remboursements'], true)
+                'ip_address' => request()->ip(),
+                'severity' => in_array($key, ['tarifs_goshop', 'tarifs_gocolis', 'commissions', 'remboursements'], true)
                     ? 'critical'
                     : 'warning',
             ]);
         } catch (\Exception $e) {
-            Log::warning("Impossible d'écrire l'activité setting_updated : " . $e->getMessage());
+            Log::warning("Impossible d'écrire l'activité setting_updated : ".$e->getMessage());
         }
 
         return $setting;
@@ -209,7 +212,7 @@ class SettingsService
             && $logoPath !== ''
             && Storage::disk('public')->exists($logoPath);
 
-        $defaultEmoji = is_array($branding) && !empty($branding['default_emoji'])
+        $defaultEmoji = is_array($branding) && ! empty($branding['default_emoji'])
             ? trim((string) $branding['default_emoji'])
             : '🛵';
 
@@ -218,8 +221,8 @@ class SettingsService
         }
 
         return [
-            'logo_path'     => $hasLogo ? $logoPath : null,
-            'logo_url'      => $hasLogo ? url('storage/' . $logoPath) : null,
+            'logo_path' => $hasLogo ? $logoPath : null,
+            'logo_url' => $hasLogo ? url('storage/'.$logoPath) : null,
             'default_emoji' => $defaultEmoji,
         ];
     }
@@ -243,6 +246,7 @@ class SettingsService
         foreach (array_keys(self::DEFAULTS) as $key) {
             $result[$key] = $this->get($key, $cityId);
         }
+
         return $result;
     }
 
@@ -260,7 +264,6 @@ class SettingsService
 
     private function buildCacheKey(string $key, ?int $cityId): string
     {
-        return 'golivreur_setting_' . $key . '_' . ($cityId ?? 'global');
+        return 'golivreur_setting_'.$key.'_'.($cityId ?? 'global');
     }
 }
-

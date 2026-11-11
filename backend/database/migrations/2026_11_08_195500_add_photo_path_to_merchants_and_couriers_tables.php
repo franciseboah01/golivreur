@@ -12,13 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('merchants', function (Blueprint $table) {
-            if (!Schema::hasColumn('merchants', 'photo_path')) {
+            if (! Schema::hasColumn('merchants', 'photo_path')) {
                 $table->string('photo_path')->nullable()->after('address');
             }
         });
 
         Schema::table('couriers', function (Blueprint $table) {
-            if (!Schema::hasColumn('couriers', 'photo_path')) {
+            if (! Schema::hasColumn('couriers', 'photo_path')) {
                 $table->string('photo_path')->nullable()->after('photo_url');
             }
         });
@@ -42,4 +42,3 @@ return new class extends Migration
         });
     }
 };
-

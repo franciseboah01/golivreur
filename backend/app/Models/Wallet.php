@@ -21,7 +21,7 @@ class Wallet extends Model
     ];
 
     protected $casts = [
-        'balance'   => 'integer',
+        'balance' => 'integer',
         'is_locked' => 'boolean',
     ];
 
@@ -35,4 +35,3 @@ class Wallet extends Model
         return $this->hasMany(WalletTransaction::class);
     }
 }
-

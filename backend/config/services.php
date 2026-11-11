@@ -2,8 +2,8 @@
 
 return [
     'hub2' => [
-        'api_key'        => env('HUB2_API_KEY', ''),
-        'merchant_id'    => env('HUB2_MERCHANT_ID', ''),
+        'api_key' => env('HUB2_API_KEY', ''),
+        'merchant_id' => env('HUB2_MERCHANT_ID', ''),
         'webhook_secret' => env('HUB2_WEBHOOK_SECRET', 'test-hub2-webhook-secret'),
     ],
 
@@ -18,9 +18,9 @@ return [
     ],
 
     'twilio' => [
-        'sid'   => env('TWILIO_SID', ''),
+        'sid' => env('TWILIO_SID', ''),
         'token' => env('TWILIO_AUTH_TOKEN', ''),
-        'from'  => env('TWILIO_FROM', ''),
+        'from' => env('TWILIO_FROM', ''),
     ],
 
     'admin_alert_email' => env('ADMIN_ALERT_EMAIL', 'admin@golivreur.ci'),
@@ -29,4 +29,3 @@ return [
         'token' => env('HEALTH_CHECK_TOKEN', 'golivreur-secret-health-token'),
     ],
 ];
-

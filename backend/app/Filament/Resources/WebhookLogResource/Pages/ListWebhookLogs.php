@@ -14,4 +14,3 @@ class ListWebhookLogs extends ListRecords
         return [];
     }
 }
-

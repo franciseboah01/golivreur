@@ -36,16 +36,16 @@ class Courier extends Model
     ];
 
     protected $casts = [
-        'is_active'            => 'boolean',
-        'is_online'            => 'boolean',
-        'activated_at'         => 'datetime',
-        'location_updated_at'  => 'datetime',
-        'penalty_until'        => 'datetime',
-        'current_lat'          => 'float',
-        'current_lng'          => 'float',
+        'is_active' => 'boolean',
+        'is_online' => 'boolean',
+        'activated_at' => 'datetime',
+        'location_updated_at' => 'datetime',
+        'penalty_until' => 'datetime',
+        'current_lat' => 'float',
+        'current_lng' => 'float',
         'consecutive_refusals' => 'integer',
-        'average_rating'       => 'float',
-        'total_ratings'        => 'integer',
+        'average_rating' => 'float',
+        'total_ratings' => 'integer',
     ];
 
     protected $appends = [
@@ -54,11 +54,11 @@ class Courier extends Model
 
     public function getPhotoUrlAttribute(): ?string
     {
-        if (!empty($this->attributes['photo_path'])) {
-            return url('storage/' . $this->attributes['photo_path']);
+        if (! empty($this->attributes['photo_path'])) {
+            return url('storage/'.$this->attributes['photo_path']);
         }
 
-        if (!empty($this->attributes['photo_url'])) {
+        if (! empty($this->attributes['photo_url'])) {
             return $this->attributes['photo_url'];
         }
 
@@ -87,4 +87,3 @@ class Courier extends Model
         return $this->hasMany(Parcel::class);
     }
 }
-

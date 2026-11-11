@@ -9,4 +9,3 @@ class CreateMerchantCategory extends CreateRecord
 {
     protected static string $resource = MerchantCategoryResource::class;
 }
-

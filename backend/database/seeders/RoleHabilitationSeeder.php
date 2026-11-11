@@ -54,7 +54,7 @@ class RoleHabilitationSeeder extends Seeder
                 'onglets' => [
                     'dashboard', 'orders', 'parcels', 'merchants', 'couriers',
                     'clients', 'pending_validations', 'disputes', 'emergency_center',
-                    'administrators', 'cities'
+                    'administrators', 'cities',
                 ],
                 'is_system' => true,
             ]
@@ -68,7 +68,7 @@ class RoleHabilitationSeeder extends Seeder
                 'description' => 'Résolution des incidents de livraison, validation de preuves et déblocage de codes.',
                 'onglets' => [
                     'dashboard', 'orders', 'parcels', 'merchants', 'couriers',
-                    'clients', 'pending_validations', 'disputes', 'refunds'
+                    'clients', 'pending_validations', 'disputes', 'refunds',
                 ],
                 'is_system' => true,
             ]
@@ -111,4 +111,3 @@ class RoleHabilitationSeeder extends Seeder
             ->update(['role_habilitation_id' => $limitedRole->id]);
     }
 }
-

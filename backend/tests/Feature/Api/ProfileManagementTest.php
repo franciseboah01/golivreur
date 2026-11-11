@@ -17,9 +17,9 @@ it('client : peut lire, mettre à jour son profil, uploader une photo et remplac
 
     $city = City::factory()->create(['name' => 'Daloa']);
     $client = User::factory()->create([
-        'name'  => 'Client Initial',
+        'name' => 'Client Initial',
         'phone' => '0701000010',
-        'role'  => 'client',
+        'role' => 'client',
         'city_id' => $city->id,
     ]);
 
@@ -37,14 +37,14 @@ it('client : peut lire, mettre à jour son profil, uploader une photo et remplac
 
     $res1 = $this->withHeader('Authorization', "Bearer {$token}")
         ->post('/api/v1/client/profile', [
-            '_method'               => 'PUT',
-            'name'                  => 'Client Modifié',
-            'phone'                 => '+225 07 01 00 00 99',
-            'email'                 => 'client.modifie@golivreur.ci',
-            'default_address'       => 'Quartier Lobia, Rue 4',
-            'language'              => 'en',
+            '_method' => 'PUT',
+            'name' => 'Client Modifié',
+            'phone' => '+225 07 01 00 00 99',
+            'email' => 'client.modifie@golivreur.ci',
+            'default_address' => 'Quartier Lobia, Rue 4',
+            'language' => 'en',
             'notifications_enabled' => '0',
-            'photo'                 => $photo1,
+            'photo' => $photo1,
         ]);
 
     $res1->assertOk()
@@ -66,7 +66,7 @@ it('client : peut lire, mettre à jour son profil, uploader une photo et remplac
     $this->withHeader('Authorization', "Bearer {$token}")
         ->post('/api/v1/client/profile', [
             '_method' => 'PUT',
-            'photo'   => $photo2,
+            'photo' => $photo2,
         ])
         ->assertOk();
 
@@ -87,7 +87,7 @@ it('client : rejette les données invalides (422) et bloque la modification d\'u
     $city = City::factory()->create();
     $client1 = User::factory()->create(['role' => 'client', 'email' => 'c1@golivreur.ci', 'phone' => '0701000021', 'city_id' => $city->id]);
     $client2 = User::factory()->create(['role' => 'client', 'email' => 'c2@golivreur.ci', 'phone' => '0701000022', 'city_id' => $city->id]);
-    $driver  = User::factory()->create(['role' => 'driver', 'phone' => '0703000022', 'city_id' => $city->id]);
+    $driver = User::factory()->create(['role' => 'driver', 'phone' => '0703000022', 'city_id' => $city->id]);
 
     $token1 = JWTAuth::fromUser($client1);
     $tokenDriver = JWTAuth::fromUser($driver);
@@ -130,9 +130,9 @@ it('driver : peut lire, mettre à jour véhicule/permis/photo et rejette accès 
     $city = City::factory()->create();
     $driverUser = User::factory()->create(['role' => 'driver', 'phone' => '0703000010', 'city_id' => $city->id]);
     $courier = Courier::factory()->create([
-        'user_id'       => $driverUser->id,
-        'city_id'       => $city->id,
-        'vehicle_type'  => 'moto',
+        'user_id' => $driverUser->id,
+        'city_id' => $city->id,
+        'vehicle_type' => 'moto',
         'vehicle_plate' => '1111 AB 01',
     ]);
     $otherClient = User::factory()->create(['role' => 'client', 'phone' => '0701000098', 'city_id' => $city->id]);
@@ -150,13 +150,13 @@ it('driver : peut lire, mettre à jour véhicule/permis/photo et rejette accès 
     $photo = UploadedFile::fake()->image('driver.webp', 350, 350);
     $this->withHeader('Authorization', "Bearer {$tokenDriver}")
         ->post('/api/v1/driver/profile', [
-            '_method'               => 'PUT',
-            'name'                  => 'Koffi Livreur Pro',
-            'phone'                 => '0703000088',
-            'vehicle_type'          => 'tricycle',
-            'vehicle_plate'         => '9999 XY 01',
+            '_method' => 'PUT',
+            'name' => 'Koffi Livreur Pro',
+            'phone' => '0703000088',
+            'vehicle_type' => 'tricycle',
+            'vehicle_plate' => '9999 XY 01',
             'driver_license_number' => 'CI-PERM-2026',
-            'photo'                 => $photo,
+            'photo' => $photo,
         ])
         ->assertOk()
         ->assertJsonPath('donnees.name', 'Koffi Livreur Pro')
@@ -198,17 +198,17 @@ it('business : peut lire, modifier boutique/catégorie/emoji/logo/horaires et bl
 
     $merchantUser = User::factory()->create(['role' => 'merchant', 'phone' => '0702000010', 'city_id' => $city->id]);
     $merchant = Merchant::create([
-        'user_id'           => $merchantUser->id,
-        'city_id'           => $city->id,
-        'name'              => 'Ancien Maquis',
-        'category'          => 'maquis',
-        'emoji'             => '🍖',
-        'address'           => 'Rue 1, Daloa',
-        'lat'               => 6.88,
-        'lng'               => -6.45,
+        'user_id' => $merchantUser->id,
+        'city_id' => $city->id,
+        'name' => 'Ancien Maquis',
+        'category' => 'maquis',
+        'emoji' => '🍖',
+        'address' => 'Rue 1, Daloa',
+        'lat' => 6.88,
+        'lng' => -6.45,
         'prep_time_minutes' => 20,
-        'is_active'         => true,
-        'is_open'           => true,
+        'is_active' => true,
+        'is_open' => true,
     ]);
     $otherUser = User::factory()->create(['role' => 'driver', 'phone' => '0703000077', 'city_id' => $city->id]);
 
@@ -227,15 +227,15 @@ it('business : peut lire, modifier boutique/catégorie/emoji/logo/horaires et bl
 
     $this->withHeader('Authorization', "Bearer {$tokenBiz}")
         ->post('/api/v1/merchant/profile', [
-            '_method'        => 'PUT',
-            'name'           => 'Adjoua Gérante',
-            'business_name'  => 'Palais du Gâteau',
-            'category'       => 'patisserie',
-            'emoji'          => '🧁',
-            'address'        => 'Avenue Centrale, Daloa',
-            'description'    => 'Gâteaux et viennoiseries maison',
-            'open_hours'     => '07h00 - 21h00',
-            'logo'           => $logo,
+            '_method' => 'PUT',
+            'name' => 'Adjoua Gérante',
+            'business_name' => 'Palais du Gâteau',
+            'category' => 'patisserie',
+            'emoji' => '🧁',
+            'address' => 'Avenue Centrale, Daloa',
+            'description' => 'Gâteaux et viennoiseries maison',
+            'open_hours' => '07h00 - 21h00',
+            'logo' => $logo,
             'merchant_photo' => $storePhoto,
         ])
         ->assertOk()
@@ -271,8 +271,8 @@ it('business : un driver ne peut pas modifier le profil business (403)', functio
 
 it('profil : permet de changer son mot de passe après vérification de l\'ancien', function () {
     $user = User::factory()->create([
-        'role'     => 'client',
-        'phone'    => '0701000055',
+        'role' => 'client',
+        'phone' => '0701000055',
         'password' => Hash::make('AncienPass2026'),
     ]);
 
@@ -281,8 +281,8 @@ it('profil : permet de changer son mot de passe après vérification de l\'ancie
     // Mauvais mot de passe actuel -> 422
     $this->withHeader('Authorization', "Bearer {$token}")
         ->putJson('/api/v1/profile/password', [
-            'current_password'      => 'MauvaisMotDePasse',
-            'password'              => 'NouveauPass2026',
+            'current_password' => 'MauvaisMotDePasse',
+            'password' => 'NouveauPass2026',
             'password_confirmation' => 'NouveauPass2026',
         ])
         ->assertStatus(422);
@@ -290,8 +290,8 @@ it('profil : permet de changer son mot de passe après vérification de l\'ancie
     // Bon mot de passe actuel -> 200
     $this->withHeader('Authorization', "Bearer {$token}")
         ->putJson('/api/v1/profile/password', [
-            'current_password'      => 'AncienPass2026',
-            'password'              => 'NouveauPass2026',
+            'current_password' => 'AncienPass2026',
+            'password' => 'NouveauPass2026',
             'password_confirmation' => 'NouveauPass2026',
         ])
         ->assertOk();

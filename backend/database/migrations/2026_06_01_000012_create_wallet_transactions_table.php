@@ -19,8 +19,8 @@ return new class extends Migration
         Schema::create('wallet_transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('wallet_id')
-                  ->constrained('wallets')
-                  ->restrictOnDelete();
+                ->constrained('wallets')
+                ->restrictOnDelete();
             // Type : credit_delivery | credit_shipping | withdrawal | refund | adjustment
             $table->string('type', 50);
             $table->decimal('amount', 12, 0);
@@ -34,18 +34,18 @@ return new class extends Migration
             $table->string('status', 30)->default('completed');
             // Liens vers la commande ou l'expédition source (nullable)
             $table->foreignId('order_id')
-                  ->nullable()
-                  ->constrained('orders')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('orders')
+                ->nullOnDelete();
             $table->foreignId('parcel_id')
-                  ->nullable()
-                  ->constrained('parcels')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('parcels')
+                ->nullOnDelete();
             // Admin ayant effectué l'ajustement manuel si applicable
             $table->foreignId('processed_by')
-                  ->nullable()
-                  ->constrained('users')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
             $table->timestamps();
 
             $table->index(['wallet_id', 'type']);

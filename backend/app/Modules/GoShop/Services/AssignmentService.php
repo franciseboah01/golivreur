@@ -2,10 +2,13 @@
 
 namespace App\Modules\GoShop\Services;
 
-use App\Models\{Courier, Order, Parcel};
-use App\Jobs\{NotifierLivreurGoShop, NotifierLivreurGoColis};
-use App\Services\{ActivityLogService, NotificationService};
-use Illuminate\Support\Facades\DB;
+use App\Jobs\AlerterAdminPasDelivreur;
+use App\Jobs\NotifierLivreurGoColis;
+use App\Jobs\NotifierLivreurGoShop;
+use App\Models\Courier;
+use App\Models\Order;
+use App\Models\Parcel;
+use App\Services\NotificationService;
 
 /**
  * Attribue les courses aux livreurs disponibles par proximité géographique.
@@ -15,10 +18,14 @@ use Illuminate\Support\Facades\DB;
 class AssignmentService
 {
     public const RAYON_INITIAL_KM = 5;
-    private const RAYON_ETENDU_KM  = 10;
-    private const MAX_TENTATIVES   = 3;
+
+    private const RAYON_ETENDU_KM = 10;
+
+    private const MAX_TENTATIVES = 3;
+
     // Délai d'acceptation en secondes
-    private const DELAI_ACCEPTATION_GOSHOP  = 30;
+    private const DELAI_ACCEPTATION_GOSHOP = 30;
+
     private const DELAI_ACCEPTATION_GOCOLIS = 30;
 
     public function __construct(
@@ -37,11 +44,12 @@ class AssignmentService
             excludeIds: [],
         );
 
-        if (!$livreur) {
-            if (class_exists(\App\Jobs\AlerterAdminPasDelivreur::class)) {
-                \App\Jobs\AlerterAdminPasDelivreur::dispatch($order, 'goshop')
+        if (! $livreur) {
+            if (class_exists(AlerterAdminPasDelivreur::class)) {
+                AlerterAdminPasDelivreur::dispatch($order, 'goshop')
                     ->onQueue('high');
             }
+
             return;
         }
 
@@ -65,11 +73,12 @@ class AssignmentService
         if ($tentative > self::MAX_TENTATIVES) {
             // 3 tentatives échouées → statut waiting + alerte Admin
             $parcel->update(['status' => Parcel::STATUS_WAITING]);
-            if (class_exists(\App\Jobs\AlerterAdminPasDelivreur::class)) {
-                \App\Jobs\AlerterAdminPasDelivreur::dispatch($parcel, 'gocolis')
+            if (class_exists(AlerterAdminPasDelivreur::class)) {
+                AlerterAdminPasDelivreur::dispatch($parcel, 'gocolis')
                     ->onQueue('high');
             }
             $this->notificationService->notifierClientAttenteGoColis($parcel);
+
             return;
         }
 
@@ -80,12 +89,13 @@ class AssignmentService
             excludeIds: $exclusions,
         );
 
-        if (!$livreur) {
+        if (! $livreur) {
             $parcel->update(['status' => Parcel::STATUS_WAITING]);
-            if (class_exists(\App\Jobs\AlerterAdminPasDelivreur::class)) {
-                \App\Jobs\AlerterAdminPasDelivreur::dispatch($parcel, 'gocolis')
+            if (class_exists(AlerterAdminPasDelivreur::class)) {
+                AlerterAdminPasDelivreur::dispatch($parcel, 'gocolis')
                     ->onQueue('high');
             }
+
             return;
         }
 
@@ -109,7 +119,7 @@ class AssignmentService
         int $cityId,
         array $excludeIds = [],
     ): ?Courier {
-        if (!$lat || !$lng) {
+        if (! $lat || ! $lng) {
             return Courier::where('city_id', $cityId)
                 ->where('is_online', true)
                 ->where('is_active', true)
@@ -126,7 +136,7 @@ class AssignmentService
             ->where('is_active', true)
             ->where(function ($q) {
                 $q->whereNull('penalty_until')
-                  ->orWhere('penalty_until', '<', now());
+                    ->orWhere('penalty_until', '<', now());
             })
             ->whereNotIn('id', $excludeIds)
             ->whereNotNull('current_lat')

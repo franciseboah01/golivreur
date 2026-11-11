@@ -24,4 +24,3 @@ class ImageUploadField
             ->helperText('Formats acceptés : JPG, PNG, WEBP (Max : 2 Mo). Aperçu instantané avant validation.');
     }
 }
-

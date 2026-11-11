@@ -13,7 +13,6 @@ use App\Models\Product;
 use App\Models\Rating;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 
 class DemoOrdersAndParcelsSeeder extends Seeder
@@ -236,7 +235,7 @@ class DemoOrdersAndParcelsSeeder extends Seeder
                 'peak_hours_applied' => false,
                 'payment_method' => $t['payment_method'],
                 'payment_status' => $t['payment_status'],
-                'payment_reference' => 'PAY-GOSHOP-' . rand(100000, 999999),
+                'payment_reference' => 'PAY-GOSHOP-'.rand(100000, 999999),
                 'confirmation_code' => $t['confirmation_code'],
                 'confirmation_attempts' => $t['attempts'] ?? 0,
                 'confirmation_locked' => $t['locked'] ?? false,
@@ -586,7 +585,7 @@ class DemoOrdersAndParcelsSeeder extends Seeder
                 'courier_amount' => $courierAmount,
                 'payment_method' => $t['payment_method'],
                 'payment_status' => $t['payment_status'],
-                'payment_reference' => 'PAY-GOCOLIS-' . rand(100000, 999999),
+                'payment_reference' => 'PAY-GOCOLIS-'.rand(100000, 999999),
                 'delivered_at' => $t['status'] === Parcel::STATUS_DELIVERED ? $createdAt->copy()->addMinutes(35) : null,
                 'cancelled_at' => $t['status'] === Parcel::STATUS_CANCELLED ? $createdAt->copy()->addMinutes(15) : null,
                 'created_at' => $createdAt,
@@ -653,4 +652,3 @@ class DemoOrdersAndParcelsSeeder extends Seeder
         }
     }
 }
-

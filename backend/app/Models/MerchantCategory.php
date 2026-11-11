@@ -33,8 +33,8 @@ class MerchantCategory extends Model
      */
     public function getLogoUrlAttribute(): ?string
     {
-        if (!empty($this->attributes['logo_path'])) {
-            return url('storage/' . $this->attributes['logo_path']);
+        if (! empty($this->attributes['logo_path'])) {
+            return url('storage/'.$this->attributes['logo_path']);
         }
 
         return null;

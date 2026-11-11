@@ -19,9 +19,8 @@ class OtpCode extends Model
     ];
 
     protected $casts = [
-        'attempts'   => 'integer',
-        'is_used'    => 'boolean',
+        'attempts' => 'integer',
+        'is_used' => 'boolean',
         'expires_at' => 'datetime',
     ];
 }
-

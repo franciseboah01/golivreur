@@ -42,4 +42,3 @@ class EmergencyStatsWidget extends BaseWidget
         ];
     }
 }
-

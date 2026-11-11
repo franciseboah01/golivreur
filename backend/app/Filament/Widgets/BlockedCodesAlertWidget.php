@@ -15,7 +15,7 @@ class BlockedCodesAlertWidget extends BaseWidget
 
     protected static ?int $sort = 6;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public static function canView(): bool
     {
@@ -81,4 +81,3 @@ class BlockedCodesAlertWidget extends BaseWidget
             ->paginated(false);
     }
 }
-

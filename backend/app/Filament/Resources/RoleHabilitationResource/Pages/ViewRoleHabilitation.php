@@ -22,4 +22,3 @@ class ViewRoleHabilitation extends ViewRecord
         ];
     }
 }
-

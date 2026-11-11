@@ -84,17 +84,17 @@ class StatsOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-shopping-bag')
                 ->color('primary'),
 
-            Stat::make('Chiffre d\'Affaires Plateforme', number_format($totalCA, 0, ',', ' ') . ' F CFA')
+            Stat::make('Chiffre d\'Affaires Plateforme', number_format($totalCA, 0, ',', ' ').' F CFA')
                 ->description('Commissions nettes encaissées')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('success'),
 
-            Stat::make('Volume d\'Affaires Brut (GMV)', number_format($totalGMV, 0, ',', ' ') . ' F CFA')
+            Stat::make('Volume d\'Affaires Brut (GMV)', number_format($totalGMV, 0, ',', ' ').' F CFA')
                 ->description('Paniers marchands + livraisons')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('info'),
 
-            Stat::make('Trésorerie Portefeuilles', number_format($totalWalletBalance, 0, ',', ' ') . ' F CFA')
+            Stat::make('Trésorerie Portefeuilles', number_format($totalWalletBalance, 0, ',', ' ').' F CFA')
                 ->description('Solde total marchands & livreurs')
                 ->descriptionIcon('heroicon-m-wallet')
                 ->color('warning'),

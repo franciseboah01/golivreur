@@ -33,6 +33,7 @@ class VehicleTypeResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('couriers');
     }
 
@@ -150,4 +151,3 @@ class VehicleTypeResource extends Resource
         ];
     }
 }
-

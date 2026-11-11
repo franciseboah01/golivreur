@@ -13,14 +13,13 @@ class ProductFactory extends Factory
     public function definition(): array
     {
         return [
-            'merchant_id'  => Merchant::factory(),
-            'name'         => fake()->words(2, true),
-            'description'  => fake()->sentence(),
-            'price'        => fake()->numberBetween(1000, 10000),
+            'merchant_id' => Merchant::factory(),
+            'name' => fake()->words(2, true),
+            'description' => fake()->sentence(),
+            'price' => fake()->numberBetween(1000, 10000),
             'is_available' => true,
-            'category'     => 'Plats',
-            'sort_order'   => 0,
+            'category' => 'Plats',
+            'sort_order' => 0,
         ];
     }
 }
-

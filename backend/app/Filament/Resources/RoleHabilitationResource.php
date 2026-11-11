@@ -34,6 +34,7 @@ class RoleHabilitationResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->role === 'super_admin';
     }
 
@@ -109,6 +110,7 @@ class RoleHabilitationResource extends Resource
                                         if ($meta) {
                                             return "{$meta['label']} — [{$meta['group']}] : {$meta['description']}";
                                         }
+
                                         return (string) $state;
                                     })
                                     ->badge()
@@ -197,4 +199,3 @@ class RoleHabilitationResource extends Resource
         ];
     }
 }
-

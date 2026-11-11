@@ -23,10 +23,10 @@ class Neighborhood extends Model
     ];
 
     protected $casts = [
-        'is_active'   => 'boolean',
+        'is_active' => 'boolean',
         'distance_km' => 'float',
-        'lat'         => 'float',
-        'lng'         => 'float',
+        'lat' => 'float',
+        'lng' => 'float',
     ];
 
     public function city(): BelongsTo
@@ -34,4 +34,3 @@ class Neighborhood extends Model
         return $this->belongsTo(City::class);
     }
 }
-

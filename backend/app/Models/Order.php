@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'client_id', 'merchant_id', 'courier_id', 'city_id',
         'status', 'products_total', 'delivery_fee',
@@ -26,25 +26,32 @@ class Order extends Model
     ];
 
     protected $casts = [
-        'rain_mode_applied'    => 'boolean',
-        'peak_hours_applied'   => 'boolean',
-        'confirmation_locked'  => 'boolean',
-        'accepted_at'          => 'datetime',
-        'ready_at'             => 'datetime',
-        'picked_up_at'         => 'datetime',
-        'delivered_at'         => 'datetime',
-        'cancelled_at'         => 'datetime',
+        'rain_mode_applied' => 'boolean',
+        'peak_hours_applied' => 'boolean',
+        'confirmation_locked' => 'boolean',
+        'accepted_at' => 'datetime',
+        'ready_at' => 'datetime',
+        'picked_up_at' => 'datetime',
+        'delivered_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     // Statuts possibles
-    const STATUS_PENDING    = 'pending';
-    const STATUS_ACCEPTED   = 'accepted';
-    const STATUS_REFUSED    = 'refused';
-    const STATUS_READY      = 'ready';
-    const STATUS_PICKED_UP  = 'picked_up';
+    const STATUS_PENDING = 'pending';
+
+    const STATUS_ACCEPTED = 'accepted';
+
+    const STATUS_REFUSED = 'refused';
+
+    const STATUS_READY = 'ready';
+
+    const STATUS_PICKED_UP = 'picked_up';
+
     const STATUS_IN_TRANSIT = 'in_transit';
-    const STATUS_DELIVERED  = 'delivered';
-    const STATUS_CANCELLED  = 'cancelled';
+
+    const STATUS_DELIVERED = 'delivered';
+
+    const STATUS_CANCELLED = 'cancelled';
 
     // ─── Relations ────────────────────────────────────────────────────────────
 
@@ -134,9 +141,10 @@ class Order extends Model
 
     public function getDeliveryDurationMinutesAttribute(): ?int
     {
-        if (!$this->picked_up_at || !$this->delivered_at) {
+        if (! $this->picked_up_at || ! $this->delivered_at) {
             return null;
         }
+
         return (int) $this->picked_up_at->diffInMinutes($this->delivered_at);
     }
 
@@ -145,4 +153,3 @@ class Order extends Model
         return $this->products_total + $this->delivery_fee;
     }
 }
-

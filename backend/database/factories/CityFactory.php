@@ -12,13 +12,12 @@ class CityFactory extends Factory
     public function definition(): array
     {
         return [
-            'name'                  => fake()->unique()->city(),
-            'is_active'             => true,
-            'center_lat'            => 6.8770,
-            'center_lng'            => -6.4502,
-            'rain_mode_active'      => false,
+            'name' => fake()->unique()->city(),
+            'is_active' => true,
+            'center_lat' => 6.8770,
+            'center_lng' => -6.4502,
+            'rain_mode_active' => false,
             'emergency_mode_active' => false,
         ];
     }
 }
-

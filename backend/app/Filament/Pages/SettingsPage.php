@@ -43,6 +43,7 @@ class SettingsPage extends Page implements HasForms
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('settings');
     }
 
@@ -107,22 +108,22 @@ class SettingsPage extends Page implements HasForms
                                                 $branding = $settingsService->getBranding();
                                                 $emoji = trim((string) ($get('branding.default_emoji') ?? $branding['default_emoji'] ?? '🛵')) ?: '🛵';
 
-                                                if (!empty($branding['logo_url'])) {
+                                                if (! empty($branding['logo_url'])) {
                                                     $url = e($branding['logo_url']);
 
                                                     return new HtmlString(
                                                         '<div style="display:flex;align-items:center;gap:12px;">'
-                                                        . '<img src="' . $url . '" alt="GoLivreur" style="height:48px;width:48px;object-fit:contain;border-radius:12px;border:1px solid #e5e7eb;background:#fff;padding:4px;" />'
-                                                        . '<span style="font-weight:700;">Logo personnalisé actif (affiché partout)</span>'
-                                                        . '</div>'
+                                                        .'<img src="'.$url.'" alt="GoLivreur" style="height:48px;width:48px;object-fit:contain;border-radius:12px;border:1px solid #e5e7eb;background:#fff;padding:4px;" />'
+                                                        .'<span style="font-weight:700;">Logo personnalisé actif (affiché partout)</span>'
+                                                        .'</div>'
                                                     );
                                                 }
 
                                                 return new HtmlString(
                                                     '<div style="display:flex;align-items:center;gap:12px;">'
-                                                    . '<span style="display:inline-flex;align-items:center;justify-content:center;height:48px;width:48px;border-radius:12px;background:#fef3c7;font-size:28px;">' . e($emoji) . '</span>'
-                                                    . '<span>Aucun logo — emoji par défaut actif</span>'
-                                                    . '</div>'
+                                                    .'<span style="display:inline-flex;align-items:center;justify-content:center;height:48px;width:48px;border-radius:12px;background:#fef3c7;font-size:28px;">'.e($emoji).'</span>'
+                                                    .'<span>Aucun logo — emoji par défaut actif</span>'
+                                                    .'</div>'
                                                 );
                                             }),
                                     ])->columns(2),
@@ -326,9 +327,9 @@ class SettingsPage extends Page implements HasForms
                                     ->label('Moyens de paiement activés pour les clients')
                                     ->options([
                                         'orange_money' => 'Orange Money Côte d\'Ivoire',
-                                        'cash'         => 'Espèces à la livraison (Cash)',
-                                        'wave'         => 'Wave Côte d\'Ivoire',
-                                        'mtn_momo'     => 'MTN Mobile Money',
+                                        'cash' => 'Espèces à la livraison (Cash)',
+                                        'wave' => 'Wave Côte d\'Ivoire',
+                                        'mtn_momo' => 'MTN Mobile Money',
                                     ])
                                     ->columns(2),
                             ]),
@@ -403,7 +404,7 @@ class SettingsPage extends Page implements HasForms
 
                 $newEmoji = trim((string) ($value['default_emoji'] ?? '')) ?: '🛵';
                 $normalizedBranding = [
-                    'logo_path'     => $newLogoPath,
+                    'logo_path' => $newLogoPath,
                     'default_emoji' => $newEmoji,
                 ];
 
@@ -422,6 +423,7 @@ class SettingsPage extends Page implements HasForms
                     userId: auth()->id(),
                     description: 'Mise à jour identité visuelle via le panneau Filament Paramètres'
                 );
+
                 continue;
             }
 
@@ -442,9 +444,8 @@ class SettingsPage extends Page implements HasForms
             ->success()
             ->send();
 
-        if ($brandingChanged && !app()->runningUnitTests()) {
+        if ($brandingChanged && ! app()->runningUnitTests()) {
             $this->redirect(static::getUrl(), navigate: false);
         }
     }
 }
-

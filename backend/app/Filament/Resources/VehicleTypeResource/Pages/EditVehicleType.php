@@ -17,4 +17,3 @@ class EditVehicleType extends EditRecord
         ];
     }
 }
-

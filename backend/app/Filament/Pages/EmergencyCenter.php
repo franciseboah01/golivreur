@@ -37,6 +37,7 @@ class EmergencyCenter extends Page implements HasForms, HasTable
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('emergency_center');
     }
 
@@ -223,7 +224,7 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                             'rain_mode_activated_at' => $newStatus ? now() : null,
                         ]);
                         Notification::make()
-                            ->title("Mode Pluie {$record->name} : " . ($newStatus ? 'Activé (+20%)' : 'Désactivé'))
+                            ->title("Mode Pluie {$record->name} : ".($newStatus ? 'Activé (+20%)' : 'Désactivé'))
                             ->color($newStatus ? 'warning' : 'success')
                             ->send();
                     }),
@@ -249,7 +250,7 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                             'emergency_mode_message' => $newStatus ? ($data['message'] ?? 'Service temporairement interrompu') : null,
                         ]);
                         Notification::make()
-                            ->title("Mode Urgence {$record->name} : " . ($newStatus ? 'Enclenché' : 'Levé'))
+                            ->title("Mode Urgence {$record->name} : ".($newStatus ? 'Enclenché' : 'Levé'))
                             ->color($newStatus ? 'danger' : 'success')
                             ->send();
                     }),

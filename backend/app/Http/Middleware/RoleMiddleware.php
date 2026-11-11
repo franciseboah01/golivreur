@@ -23,9 +23,9 @@ class RoleMiddleware
     {
         $user = auth()->user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Non authentifié.',
             ], 401);
         }
@@ -43,7 +43,7 @@ class RoleMiddleware
         }
 
         return response()->json([
-            'succes'  => false,
+            'succes' => false,
             'message' => 'Accès non autorisé pour ce profil.',
         ], 403);
     }

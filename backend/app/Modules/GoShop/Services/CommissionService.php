@@ -2,14 +2,15 @@
 
 namespace App\Modules\GoShop\Services;
 
-use App\Models\{City, Courier, Merchant, Order, Parcel};
+use App\Models\City;
+use App\Models\Merchant;
 use App\Services\SettingsService;
 use Carbon\Carbon;
 
 /**
  * Calcule tous les montants financiers GoShop et GoColis :
  * frais de livraison (barème + majorations), commissions plateforme/merchant/livreur, assurance.
- * 
+ *
  * Les tarifs et commissions sont désormais configurables dynamiquement via SettingsService (table settings).
  */
 class CommissionService
@@ -28,17 +29,20 @@ class CommissionService
     ];
 
     private const COMMISSION_MERCHANT_DEFAUT = 15.0; // 15% du prix des produits
-    private const COMMISSION_LIVREUR         = 20.0; // 20% des frais de livraison (plateforme garde 20%)
+
+    private const COMMISSION_LIVREUR = 20.0; // 20% des frais de livraison (plateforme garde 20%)
 
     private const BAREME_GOCOLIS = [
-        'petit'  => ['base' => 800,  'par_km' => 200],
-        'moyen'  => ['base' => 1200, 'par_km' => 300],
-        'grand'  => ['base' => 2000, 'par_km' => 400],
+        'petit' => ['base' => 800,  'par_km' => 200],
+        'moyen' => ['base' => 1200, 'par_km' => 300],
+        'grand' => ['base' => 2000, 'par_km' => 400],
     ];
 
     private const COMMISSION_GOCOLIS_PLATEFORME = 25.0; // 25% des frais d'expédition
-    private const SEUIL_ASSURANCE               = 20000;
-    private const TAUX_ASSURANCE                = 3.0;  // 3% de la valeur déclarée
+
+    private const SEUIL_ASSURANCE = 20000;
+
+    private const TAUX_ASSURANCE = 3.0;  // 3% de la valeur déclarée
 
     private readonly SettingsService $settingsService;
 
@@ -73,14 +77,14 @@ class CommissionService
         $tauxCommission = $merchant->commission_rate ?? ($commissions['merchant_defaut'] ?? self::COMMISSION_MERCHANT_DEFAUT);
         $tauxLivreur = $commissions['livreur_goshop'] ?? self::COMMISSION_LIVREUR;
 
-        $commissionMerchant  = round($produitsTotal * ($tauxCommission / 100));
-        $commissionLivreur   = round($fraisLivraison * ($tauxLivreur / 100));
+        $commissionMerchant = round($produitsTotal * ($tauxCommission / 100));
+        $commissionLivreur = round($fraisLivraison * ($tauxLivreur / 100));
         $commissionPlateforme = $commissionMerchant + $commissionLivreur;
 
         return [
             'plateforme' => $commissionPlateforme,
-            'merchant'   => $produitsTotal - $commissionMerchant,
-            'livreur'    => $fraisLivraison - $commissionLivreur,
+            'merchant' => $produitsTotal - $commissionMerchant,
+            'livreur' => $fraisLivraison - $commissionLivreur,
         ];
     }
 
@@ -95,6 +99,7 @@ class CommissionService
                 return true;
             }
         }
+
         return false;
     }
 
@@ -106,6 +111,7 @@ class CommissionService
                 return $tranche;
             }
         }
+
         return end($bareme);
     }
 
@@ -130,6 +136,7 @@ class CommissionService
         if ($valeurDeclaree <= $seuil) {
             return 0.0;
         }
+
         return round($valeurDeclaree * ($taux / 100));
     }
 
@@ -139,9 +146,10 @@ class CommissionService
         $tauxPlateforme = $commissions['plateforme_gocolis'] ?? self::COMMISSION_GOCOLIS_PLATEFORME;
 
         $commissionPlateforme = round($fraisExpedition * ($tauxPlateforme / 100));
+
         return [
             'plateforme' => $commissionPlateforme,
-            'livreur'    => $fraisExpedition - $commissionPlateforme, // Ex: 75%
+            'livreur' => $fraisExpedition - $commissionPlateforme, // Ex: 75%
         ];
     }
 }

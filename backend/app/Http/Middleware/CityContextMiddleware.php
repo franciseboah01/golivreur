@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Scopes\CityScope;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -25,7 +26,7 @@ class CityContextMiddleware
     {
         $user = auth()->user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['succes' => false, 'message' => 'Non authentifié.'], 401);
         }
 
@@ -35,9 +36,9 @@ class CityContextMiddleware
         }
 
         // Admin local — city_id obligatoire
-        if (!$user->city_id) {
+        if (! $user->city_id) {
             return response()->json([
-                'succes'  => false,
+                'succes' => false,
                 'message' => 'Aucune ville assignée à ce compte.',
             ], 403);
         }
@@ -47,7 +48,7 @@ class CityContextMiddleware
         $request->merge(['city_context_id' => $user->city_id]);
 
         // Injecter le scope Eloquent global pour cette requête
-        \App\Models\Scopes\CityScope::setCurrentCityId($user->city_id);
+        CityScope::setCurrentCityId($user->city_id);
 
         return $next($request);
     }

@@ -9,4 +9,3 @@ class CreateVehicleType extends CreateRecord
 {
     protected static string $resource = VehicleTypeResource::class;
 }
-

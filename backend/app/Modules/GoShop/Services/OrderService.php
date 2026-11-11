@@ -2,9 +2,20 @@
 
 namespace App\Modules\GoShop\Services;
 
-use App\Models\{City, Courier, Merchant, Order, OrderItem, User};
-use App\Services\{ActivityLogService, NotificationService, WalletService};
-use Illuminate\Support\Facades\{DB, Hash, Log};
+use App\Jobs\AlerterAdminCodeBloque;
+use App\Jobs\AnnulerCommandeTimeout;
+use App\Models\City;
+use App\Models\Merchant;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
+use App\Models\User;
+use App\Services\ActivityLogService;
+use App\Services\NotificationService;
+use App\Services\WalletService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -14,9 +25,9 @@ use Illuminate\Validation\ValidationException;
 class OrderService
 {
     public function __construct(
-        private readonly AssignmentService  $assignmentService,
-        private readonly CommissionService  $commissionService,
-        private readonly WalletService      $walletService,
+        private readonly AssignmentService $assignmentService,
+        private readonly CommissionService $commissionService,
+        private readonly WalletService $walletService,
         private readonly NotificationService $notificationService,
         private readonly ActivityLogService $activityLogService,
     ) {}
@@ -30,15 +41,15 @@ class OrderService
             $merchant = Merchant::findOrFail($donnees['merchant_id']);
 
             // Vérifier que le commerce est ouvert
-            if (!$merchant->is_open || !$merchant->is_active) {
+            if (! $merchant->is_open || ! $merchant->is_active) {
                 throw ValidationException::withMessages([
                     'merchant_id' => ['Ce commerce est actuellement fermé.'],
                 ]);
             }
 
             // Calculer les montants
-            $cityId        = $client->city_id ?? $merchant->city_id ?? 1;
-            $city          = City::findOrFail($cityId);
+            $cityId = $client->city_id ?? $merchant->city_id ?? 1;
+            $city = City::findOrFail($cityId);
             $produitsTotal = $this->calculerTotalProduits($donnees['items']);
             $fraisLivraison = $this->commissionService->calculerFraisLivraison(
                 distance: $donnees['distance_km'],
@@ -52,38 +63,38 @@ class OrderService
 
             // Créer la commande
             $order = Order::create([
-                'client_id'           => $client->id,
-                'merchant_id'         => $merchant->id,
-                'city_id'             => $city->id,
-                'status'              => Order::STATUS_PENDING,
-                'products_total'      => $produitsTotal,
-                'delivery_fee'        => $fraisLivraison,
+                'client_id' => $client->id,
+                'merchant_id' => $merchant->id,
+                'city_id' => $city->id,
+                'status' => Order::STATUS_PENDING,
+                'products_total' => $produitsTotal,
+                'delivery_fee' => $fraisLivraison,
                 'platform_commission' => $commissions['plateforme'],
-                'merchant_amount'     => $commissions['merchant'],
-                'courier_amount'      => $commissions['livreur'],
-                'rain_mode_applied'   => $city->rain_mode_active,
-                'peak_hours_applied'  => $this->commissionService->estHeureDePointe(),
-                'payment_method'      => $donnees['payment_method'],
-                'payment_status'      => $donnees['payment_method'] === 'cash'
+                'merchant_amount' => $commissions['merchant'],
+                'courier_amount' => $commissions['livreur'],
+                'rain_mode_applied' => $city->rain_mode_active,
+                'peak_hours_applied' => $this->commissionService->estHeureDePointe(),
+                'payment_method' => $donnees['payment_method'],
+                'payment_status' => $donnees['payment_method'] === 'cash'
                                             ? 'pending_cash' : 'pending',
-                'confirmation_code'   => Hash::make((string) random_int(1000, 9999)),
-                'delivery_address'    => $donnees['delivery_address'],
-                'delivery_lat'        => $donnees['delivery_lat'] ?? null,
-                'delivery_lng'        => $donnees['delivery_lng'] ?? null,
-                'pickup_lat'          => $merchant->lat,
-                'pickup_lng'          => $merchant->lng,
+                'confirmation_code' => Hash::make((string) random_int(1000, 9999)),
+                'delivery_address' => $donnees['delivery_address'],
+                'delivery_lat' => $donnees['delivery_lat'] ?? null,
+                'delivery_lng' => $donnees['delivery_lng'] ?? null,
+                'pickup_lat' => $merchant->lat,
+                'pickup_lng' => $merchant->lng,
                 'special_instructions' => $donnees['special_instructions'] ?? null,
             ]);
 
             // Créer les lignes de commande avec snapshot des prix
             foreach ($donnees['items'] as $item) {
-                /** @var \App\Models\Product $product */
+                /** @var Product $product */
                 $product = $merchant->products()->findOrFail($item['product_id']);
                 OrderItem::create([
-                    'order_id'             => $order->id,
-                    'product_id'           => $product->id,
-                    'quantity'             => $item['quantity'],
-                    'unit_price'           => $product->price,
+                    'order_id' => $order->id,
+                    'product_id' => $product->id,
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $product->price,
                     'product_name_snapshot' => $product->name,
                 ]);
             }
@@ -101,7 +112,7 @@ class OrderService
             );
 
             // Timeout 45 secondes : planifier l'annulation automatique
-            \App\Jobs\AnnulerCommandeTimeout::dispatch($order->id)
+            AnnulerCommandeTimeout::dispatch($order->id)
                 ->delay(now()->addSeconds(45))
                 ->onQueue('default');
 
@@ -122,7 +133,7 @@ class OrderService
 
         return DB::transaction(function () use ($order) {
             $order->update([
-                'status'      => Order::STATUS_ACCEPTED,
+                'status' => Order::STATUS_ACCEPTED,
                 'accepted_at' => now(),
             ]);
 
@@ -148,8 +159,8 @@ class OrderService
         }
 
         $order->update([
-            'status'        => Order::STATUS_REFUSED,
-            'cancelled_at'  => now(),
+            'status' => Order::STATUS_REFUSED,
+            'cancelled_at' => now(),
             'cancel_reason' => $raison ?: 'Refusé par le commerce.',
         ]);
 
@@ -171,13 +182,13 @@ class OrderService
         }
 
         // Vérifier le code (hashé bcrypt)
-        if (!Hash::check($codeSaisi, $order->confirmation_code)) {
+        if (! Hash::check($codeSaisi, $order->confirmation_code)) {
             $order->increment('confirmation_attempts');
 
             if ($order->confirmation_attempts >= 3) {
                 $order->update(['confirmation_locked' => true]);
                 // Alerte Admin en queue haute priorité
-                \App\Jobs\AlerterAdminCodeBloque::dispatch($order, 'goshop')
+                AlerterAdminCodeBloque::dispatch($order, 'goshop')
                     ->onQueue('high');
 
                 throw ValidationException::withMessages([
@@ -207,7 +218,7 @@ class OrderService
             }
 
             $lockedOrder->update([
-                'status'       => Order::STATUS_DELIVERED,
+                'status' => Order::STATUS_DELIVERED,
                 'delivered_at' => now(),
             ]);
 
@@ -224,7 +235,7 @@ class OrderService
                 entityType: 'order',
                 entityId: $lockedOrder->id,
                 properties: [
-                    'courier_amount'  => $lockedOrder->courier_amount,
+                    'courier_amount' => $lockedOrder->courier_amount,
                     'merchant_amount' => $lockedOrder->merchant_amount,
                 ],
             );
@@ -245,7 +256,7 @@ class OrderService
         }
 
         $order->update([
-            'status'   => Order::STATUS_READY,
+            'status' => Order::STATUS_READY,
             'ready_at' => now(),
         ]);
 
@@ -264,9 +275,10 @@ class OrderService
         // Les prix sont récupérés depuis la BDD, jamais depuis le client
         $total = 0;
         foreach ($items as $item) {
-            $product = \App\Models\Product::findOrFail($item['product_id']);
+            $product = Product::findOrFail($item['product_id']);
             $total += $product->price * $item['quantity'];
         }
+
         return $total;
     }
 }

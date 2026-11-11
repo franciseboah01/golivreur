@@ -23,13 +23,13 @@ class City extends Model
     ];
 
     protected $casts = [
-        'is_active'                   => 'boolean',
-        'rain_mode_active'            => 'boolean',
-        'rain_mode_activated_at'      => 'datetime',
-        'emergency_mode_active'       => 'boolean',
+        'is_active' => 'boolean',
+        'rain_mode_active' => 'boolean',
+        'rain_mode_activated_at' => 'datetime',
+        'emergency_mode_active' => 'boolean',
         'emergency_mode_activated_at' => 'datetime',
-        'center_lat'                  => 'float',
-        'center_lng'                  => 'float',
+        'center_lat' => 'float',
+        'center_lng' => 'float',
     ];
 
     public function users(): HasMany
@@ -62,4 +62,3 @@ class City extends Model
         return $this->hasMany(Neighborhood::class);
     }
 }
-

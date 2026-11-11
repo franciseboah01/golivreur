@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -10,10 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
 
-class User extends Authenticatable implements JWTSubject, FilamentUser
+class User extends Authenticatable implements FilamentUser, JWTSubject
 {
     use HasFactory, SoftDeletes;
 
@@ -51,11 +51,11 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
     ];
 
     protected $casts = [
-        'is_active'              => 'boolean',
-        'two_factor_enabled'     => 'boolean',
-        'notifications_enabled'  => 'boolean',
-        'phone_verified_at'      => 'datetime',
-        'last_login_at'          => 'datetime',
+        'is_active' => 'boolean',
+        'two_factor_enabled' => 'boolean',
+        'notifications_enabled' => 'boolean',
+        'phone_verified_at' => 'datetime',
+        'last_login_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -67,8 +67,8 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
      */
     public function getPhotoUrlAttribute(): ?string
     {
-        if (!empty($this->attributes['photo_path'])) {
-            return url('storage/' . $this->attributes['photo_path']);
+        if (! empty($this->attributes['photo_path'])) {
+            return url('storage/'.$this->attributes['photo_path']);
         }
 
         return $this->attributes['avatar_url'] ?? null;
@@ -76,7 +76,7 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        if (!$this->is_active) {
+        if (! $this->is_active) {
             return false;
         }
 
@@ -126,7 +126,7 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
     public function getJWTCustomClaims(): array
     {
         return [
-            'role'    => $this->role,
+            'role' => $this->role,
             'city_id' => $this->city_id,
         ];
     }
@@ -247,8 +247,8 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
     public function getMaskedPhoneAttribute(): string
     {
         return substr($this->phone, 0, 2)
-            . '****'
-            . substr($this->phone, -3);
+            .'****'
+            .substr($this->phone, -3);
     }
 
     public function getUnreadNotificationsCountAttribute(): int
@@ -269,6 +269,7 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
         if ($this->is_national_admin) {
             return true;
         }
+
         return $this->city_id === $cityId;
     }
 
@@ -277,9 +278,9 @@ class User extends Authenticatable implements JWTSubject, FilamentUser
         return match ($this->role) {
             'super_admin', 'national_dg', 'national_finance',
             'national_tech', 'national_support' => 120, // 2 heures en minutes
-            'city_manager', 'city_finance'       => 240, // 4 heures
-            'city_support', 'city_agent'         => 480, // 8 heures
-            default                              => 60,  // 1 heure (JWT)
+            'city_manager', 'city_finance' => 240, // 4 heures
+            'city_support', 'city_agent' => 480, // 8 heures
+            default => 60,  // 1 heure (JWT)
         };
     }
 }

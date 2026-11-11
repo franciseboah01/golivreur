@@ -31,6 +31,7 @@ class UserResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('clients');
     }
 

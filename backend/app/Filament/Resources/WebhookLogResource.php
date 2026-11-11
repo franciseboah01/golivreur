@@ -34,6 +34,7 @@ class WebhookLogResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('webhook_logs');
     }
 
@@ -109,10 +110,10 @@ class WebhookLogResource extends Resource
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'processed' => 'success',
-                        'pending'   => 'warning',
-                        'failed'    => 'danger',
-                        'rejected'  => 'danger',
-                        default     => 'gray',
+                        'pending' => 'warning',
+                        'failed' => 'danger',
+                        'rejected' => 'danger',
+                        default => 'gray',
                     }),
 
                 Tables\Columns\TextColumn::make('retry_count')
@@ -129,14 +130,14 @@ class WebhookLogResource extends Resource
                     ->label('Statut')
                     ->options([
                         'processed' => 'Traité avec succès',
-                        'pending'   => 'En attente',
-                        'failed'    => 'Échoué',
-                        'rejected'  => 'Rejeté (signature invalide)',
+                        'pending' => 'En attente',
+                        'failed' => 'Échoué',
+                        'rejected' => 'Rejeté (signature invalide)',
                     ]),
                 Tables\Filters\SelectFilter::make('source')
                     ->label('Source')
                     ->options([
-                        'hub2'     => 'Hub2',
+                        'hub2' => 'Hub2',
                         'cinetpay' => 'CinetPay',
                     ]),
             ])
@@ -154,9 +155,9 @@ class WebhookLogResource extends Resource
                     ->action(function (WebhookLog $record): void {
                         $record->increment('retry_count');
                         $record->update([
-                            'status'        => 'processed',
+                            'status' => 'processed',
                             'error_message' => null,
-                            'processed_at'  => now(),
+                            'processed_at' => now(),
                         ]);
 
                         Notification::make()

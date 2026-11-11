@@ -25,4 +25,3 @@ class EditRoleHabilitation extends EditRecord
         return $this->getResource()::getUrl('index');
     }
 }
-

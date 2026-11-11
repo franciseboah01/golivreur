@@ -33,13 +33,13 @@ class Merchant extends Model
     ];
 
     protected $casts = [
-        'is_active'         => 'boolean',
-        'is_open'           => 'boolean',
-        'open_hours'        => 'array',
+        'is_active' => 'boolean',
+        'is_open' => 'boolean',
+        'open_hours' => 'array',
         'prep_time_minutes' => 'integer',
-        'commission_rate'   => 'float',
-        'lat'               => 'float',
-        'lng'               => 'float',
+        'commission_rate' => 'float',
+        'lat' => 'float',
+        'lng' => 'float',
     ];
 
     protected $appends = [
@@ -52,11 +52,11 @@ class Merchant extends Model
      */
     public function getPhotoUrlAttribute(): ?string
     {
-        if (!empty($this->attributes['photo_path'])) {
-            return url('storage/' . $this->attributes['photo_path']);
+        if (! empty($this->attributes['photo_path'])) {
+            return url('storage/'.$this->attributes['photo_path']);
         }
 
-        if (!empty($this->attributes['photo_url'])) {
+        if (! empty($this->attributes['photo_url'])) {
             return $this->attributes['photo_url'];
         }
 
@@ -68,8 +68,8 @@ class Merchant extends Model
      */
     public function getLogoUrlAttribute(): ?string
     {
-        if (!empty($this->attributes['logo_path'])) {
-            return url('storage/' . $this->attributes['logo_path']);
+        if (! empty($this->attributes['logo_path'])) {
+            return url('storage/'.$this->attributes['logo_path']);
         }
 
         return null;
@@ -80,7 +80,7 @@ class Merchant extends Model
      */
     public function getResolvedEmojiAttribute(): string
     {
-        if (!empty($this->attributes['emoji'])) {
+        if (! empty($this->attributes['emoji'])) {
             return $this->attributes['emoji'];
         }
 

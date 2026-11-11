@@ -32,6 +32,7 @@ class SearchableSelect
         uasort($options, function (string $a, string $b): int {
             if (class_exists(\Collator::class)) {
                 $collator = new \Collator('fr_FR');
+
                 return (int) $collator->compare($a, $b);
             }
 

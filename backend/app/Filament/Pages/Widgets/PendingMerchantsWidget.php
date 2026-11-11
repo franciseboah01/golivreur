@@ -14,7 +14,7 @@ class PendingMerchantsWidget extends BaseWidget
 {
     protected static ?string $heading = 'Commerces Partenaires en Attente de Validation';
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
@@ -75,9 +75,9 @@ class PendingMerchantsWidget extends BaseWidget
                     ->modalDescription('Le commerce apparaîtra immédiatement dans l\'application GoLivreur Client pour recevoir des commandes.')
                     ->action(function (Merchant $record): void {
                         $record->update([
-                            'is_active'     => true,
-                            'activated_at'  => now(),
-                            'activated_by'  => auth()->id(),
+                            'is_active' => true,
+                            'activated_at' => now(),
+                            'activated_by' => auth()->id(),
                         ]);
 
                         if ($record->user) {
@@ -85,16 +85,16 @@ class PendingMerchantsWidget extends BaseWidget
                         }
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => 'merchant_validated_from_pending',
+                            'user_id' => auth()->id(),
+                            'action' => 'merchant_validated_from_pending',
                             'entity_type' => 'merchant',
-                            'entity_id'   => $record->id,
-                            'properties'  => [
+                            'entity_id' => $record->id,
+                            'properties' => [
                                 'merchant_id' => $record->id,
                                 'merchant_name' => $record->name,
                             ],
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'info',
+                            'ip_address' => request()->ip(),
+                            'severity' => 'info',
                         ]);
 
                         Notification::make()
@@ -114,4 +114,3 @@ class PendingMerchantsWidget extends BaseWidget
             ->emptyStateDescription('Tous les commerces partenaires enregistrés ont été validés et activés.');
     }
 }
-

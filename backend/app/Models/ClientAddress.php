@@ -20,8 +20,8 @@ class ClientAddress extends Model
 
     protected $casts = [
         'is_default' => 'boolean',
-        'lat'        => 'float',
-        'lng'        => 'float',
+        'lat' => 'float',
+        'lng' => 'float',
     ];
 
     public function user(): BelongsTo
@@ -49,4 +49,3 @@ class ClientAddress extends Model
         return "{$cityName}, {$this->neighborhood} — {$details}";
     }
 }
-

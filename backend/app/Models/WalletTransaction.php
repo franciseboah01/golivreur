@@ -26,10 +26,10 @@ class WalletTransaction extends Model
     ];
 
     protected $casts = [
-        'amount'         => 'float',
+        'amount' => 'float',
         'balance_before' => 'float',
-        'balance_after'  => 'float',
-        'metadata'       => 'array',
+        'balance_after' => 'float',
+        'metadata' => 'array',
     ];
 
     public function wallet(): BelongsTo

@@ -36,6 +36,7 @@ class NeighborhoodResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('cities');
     }
 
@@ -160,10 +161,9 @@ class NeighborhoodResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListNeighborhoods::route('/'),
+            'index' => Pages\ListNeighborhoods::route('/'),
             'create' => Pages\CreateNeighborhood::route('/create'),
-            'edit'   => Pages\EditNeighborhood::route('/{record}/edit'),
+            'edit' => Pages\EditNeighborhood::route('/{record}/edit'),
         ];
     }
 }
-

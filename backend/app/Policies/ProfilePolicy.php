@@ -54,4 +54,3 @@ class ProfilePolicy
         return $authUser->id === $targetUser->id;
     }
 }
-

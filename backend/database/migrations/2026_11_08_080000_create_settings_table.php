@@ -13,9 +13,9 @@ return new class extends Migration
             $table->string('key', 100);
             $table->json('value');
             $table->foreignId('city_id')
-                  ->nullable()
-                  ->constrained('cities')
-                  ->cascadeOnDelete();
+                ->nullable()
+                ->constrained('cities')
+                ->cascadeOnDelete();
             $table->string('description', 255)->nullable();
             $table->timestamps();
 
@@ -29,4 +29,3 @@ return new class extends Migration
         Schema::dropIfExists('settings');
     }
 };
-

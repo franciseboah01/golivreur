@@ -14,4 +14,3 @@ class ListClients extends ListRecords
         return [];
     }
 }
-

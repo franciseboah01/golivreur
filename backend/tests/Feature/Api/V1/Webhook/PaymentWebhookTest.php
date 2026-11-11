@@ -1,11 +1,14 @@
 <?php
 
-use App\Jobs\ProcessPaymentWebhook;
 use App\Mail\SmsBudgetAlertMail;
-use App\Models\{City, Order, Parcel, User, WebhookLog};
+use App\Models\City;
+use App\Models\Order;
+use App\Models\User;
+use App\Models\WebhookLog;
 use App\Services\SmsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\{Cache, Mail, Queue};
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Mail;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 uses(RefreshDatabase::class);
@@ -16,8 +19,8 @@ beforeEach(function () {
     $this->city = City::factory()->create(['name' => 'Daloa']);
     $this->client = User::factory()->create([
         'city_id' => $this->city->id,
-        'role'    => 'client',
-        'phone'   => '0700000001',
+        'role' => 'client',
+        'phone' => '0700000001',
     ]);
 
     config(['services.hub2.webhook_secret' => 'test-hub2-webhook-secret']);
@@ -25,9 +28,9 @@ beforeEach(function () {
 
 test('un webhook avec signature HMAC invalide est rejeté avec HTTP 401', function () {
     $payload = [
-        'event'          => 'payment.success',
+        'event' => 'payment.success',
         'transaction_id' => 'TXN-INVALID-123',
-        'status'         => 'SUCCESS',
+        'status' => 'SUCCESS',
     ];
 
     $response = $this->postJson(
@@ -38,29 +41,29 @@ test('un webhook avec signature HMAC invalide est rejeté avec HTTP 401', functi
 
     $response->assertStatus(401)
         ->assertJson([
-            'succes'  => false,
+            'succes' => false,
             'message' => 'Signature invalide.',
         ]);
 
     $this->assertDatabaseHas('webhook_logs', [
-        'source'          => 'hub2',
+        'source' => 'hub2',
         'signature_valid' => false,
-        'status'          => 'rejected',
+        'status' => 'rejected',
     ]);
 });
 
 test('un webhook Hub2 valide passe le statut du paiement en paid', function () {
     $order = Order::factory()->create([
-        'client_id'         => $this->client->id,
-        'city_id'           => $this->city->id,
-        'payment_status'    => 'pending',
+        'client_id' => $this->client->id,
+        'city_id' => $this->city->id,
+        'payment_status' => 'pending',
         'payment_reference' => 'TXN-HUB2-SUCCESS-999',
     ]);
 
     $payload = [
-        'event'          => 'payment.success',
+        'event' => 'payment.success',
         'transaction_id' => 'TXN-HUB2-SUCCESS-999',
-        'status'         => 'SUCCESS',
+        'status' => 'SUCCESS',
     ];
 
     $rawContent = json_encode($payload);
@@ -73,7 +76,7 @@ test('un webhook Hub2 valide passe le statut du paiement en paid', function () {
         [],
         [],
         [
-            'CONTENT_TYPE'          => 'application/json',
+            'CONTENT_TYPE' => 'application/json',
             'HTTP_X_HUB2_SIGNATURE' => $signature,
         ],
         $rawContent
@@ -81,14 +84,14 @@ test('un webhook Hub2 valide passe le statut du paiement en paid', function () {
 
     $response->assertStatus(200)
         ->assertJson([
-            'succes'  => true,
+            'succes' => true,
             'message' => 'Webhook reçu.',
         ]);
 
     $this->assertDatabaseHas('webhook_logs', [
-        'source'          => 'hub2',
+        'source' => 'hub2',
         'signature_valid' => true,
-        'status'          => 'processed',
+        'status' => 'processed',
     ]);
 
     expect($order->fresh()->payment_status)->toBe('paid');
@@ -96,17 +99,17 @@ test('un webhook Hub2 valide passe le statut du paiement en paid', function () {
 
 test('un paiement échoué passe la commande en cancelled avec motif', function () {
     $order = Order::factory()->create([
-        'client_id'         => $this->client->id,
-        'city_id'           => $this->city->id,
-        'status'            => Order::STATUS_PENDING,
-        'payment_status'    => 'pending',
+        'client_id' => $this->client->id,
+        'city_id' => $this->city->id,
+        'status' => Order::STATUS_PENDING,
+        'payment_status' => 'pending',
         'payment_reference' => 'TXN-FAILED-001',
     ]);
 
     $payload = [
-        'event'          => 'payment.failed',
+        'event' => 'payment.failed',
         'transaction_id' => 'TXN-FAILED-001',
-        'status'         => 'FAILED',
+        'status' => 'FAILED',
     ];
 
     $rawContent = json_encode($payload);
@@ -119,7 +122,7 @@ test('un paiement échoué passe la commande en cancelled avec motif', function 
         [],
         [],
         [
-            'CONTENT_TYPE'          => 'application/json',
+            'CONTENT_TYPE' => 'application/json',
             'HTTP_X_HUB2_SIGNATURE' => $signature,
         ],
         $rawContent
@@ -135,16 +138,16 @@ test('un paiement échoué passe la commande en cancelled avec motif', function 
 
 test('le traitement des webhooks est idempotent face aux doublons', function () {
     $order = Order::factory()->create([
-        'client_id'         => $this->client->id,
-        'city_id'           => $this->city->id,
-        'payment_status'    => 'pending',
+        'client_id' => $this->client->id,
+        'city_id' => $this->city->id,
+        'payment_status' => 'pending',
         'payment_reference' => 'TXN-IDEMPOTENT-456',
     ]);
 
     $payload = [
-        'event'          => 'payment.success',
+        'event' => 'payment.success',
         'transaction_id' => 'TXN-IDEMPOTENT-456',
-        'status'         => 'SUCCESS',
+        'status' => 'SUCCESS',
     ];
 
     $rawContent = json_encode($payload);
@@ -180,35 +183,35 @@ test('le traitement des webhooks est idempotent face aux doublons', function () 
 test('un admin peut rejouer un webhook valide échoué', function () {
     $admin = User::factory()->create([
         'city_id' => $this->city->id,
-        'role'    => 'super_admin',
-        'email'   => 'admin-test@golivreur.ci',
+        'role' => 'super_admin',
+        'email' => 'admin-test@golivreur.ci',
     ]);
 
     $order = Order::factory()->create([
-        'client_id'         => $this->client->id,
-        'city_id'           => $this->city->id,
-        'payment_status'    => 'pending',
+        'client_id' => $this->client->id,
+        'city_id' => $this->city->id,
+        'payment_status' => 'pending',
         'payment_reference' => 'TXN-REPLAY-777',
     ]);
 
     $webhookLog = WebhookLog::create([
-        'source'             => 'hub2',
-        'event_type'         => 'payment',
-        'payload'            => [
+        'source' => 'hub2',
+        'event_type' => 'payment',
+        'payload' => [
             'transaction_id' => 'TXN-REPLAY-777',
-            'status'         => 'SUCCESS',
+            'status' => 'SUCCESS',
         ],
         'signature_received' => 'valid-sig',
-        'signature_valid'    => true,
-        'status'             => 'failed',
-        'error_message'      => 'Erreur temporaire réseau simulée',
+        'signature_valid' => true,
+        'status' => 'failed',
+        'error_message' => 'Erreur temporaire réseau simulée',
     ]);
 
     $token = JWTAuth::fromUser($admin);
 
     $response = $this->withHeaders([
         'Authorization' => "Bearer {$token}",
-        'X-City-ID'     => $this->city->id,
+        'X-City-ID' => $this->city->id,
     ])->postJson("/api/v1/admin/webhooks/{$webhookLog->id}/replay");
 
     $response->assertStatus(200)
@@ -222,24 +225,24 @@ test('un admin peut rejouer un webhook valide échoué', function () {
 test('un webhook avec signature invalide ne peut pas être rejoué', function () {
     $admin = User::factory()->create([
         'city_id' => $this->city->id,
-        'role'    => 'super_admin',
-        'email'   => 'admin-test2@golivreur.ci',
+        'role' => 'super_admin',
+        'email' => 'admin-test2@golivreur.ci',
     ]);
 
     $webhookLog = WebhookLog::create([
-        'source'             => 'hub2',
-        'event_type'         => 'payment',
-        'payload'            => ['transaction_id' => 'TXN-INVALID'],
+        'source' => 'hub2',
+        'event_type' => 'payment',
+        'payload' => ['transaction_id' => 'TXN-INVALID'],
         'signature_received' => 'bad-sig',
-        'signature_valid'    => false,
-        'status'             => 'rejected',
+        'signature_valid' => false,
+        'status' => 'rejected',
     ]);
 
     $token = JWTAuth::fromUser($admin);
 
     $response = $this->withHeaders([
         'Authorization' => "Bearer {$token}",
-        'X-City-ID'     => $this->city->id,
+        'X-City-ID' => $this->city->id,
     ])->postJson("/api/v1/admin/webhooks/{$webhookLog->id}/replay");
 
     $response->assertStatus(422)
@@ -263,7 +266,7 @@ test('le compteur mensuel SMS s\'incrémente et alerte au seuil de 2500', functi
     expect($smsService->compteurMensuel())->toBe(1);
 
     // Forcer le cache à 2499
-    $cle = 'sms_count_mensuel_' . date('Y_m');
+    $cle = 'sms_count_mensuel_'.date('Y_m');
     Cache::put($cle, 2499);
 
     // Le 2500ème SMS doit déclencher l'alerte email

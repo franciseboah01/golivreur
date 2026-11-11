@@ -15,7 +15,7 @@ class WeeklyOrdersChart extends ChartWidget
 
     protected static ?string $maxHeight = '280px';
 
-    protected int | string | array $columnSpan = 1;
+    protected int|string|array $columnSpan = 1;
 
     protected function getData(): array
     {
@@ -51,4 +51,3 @@ class WeeklyOrdersChart extends ChartWidget
         return 'bar';
     }
 }
-

@@ -54,9 +54,10 @@ class EmojiSelectField
             ->label($label)
             ->options(function (?string $state): array {
                 $options = self::presetOptions();
-                if (!empty($state) && !isset($options[$state])) {
+                if (! empty($state) && ! isset($options[$state])) {
                     $options = [$state => "{$state} Emoji personnalisé"] + $options;
                 }
+
                 return $options;
             })
             ->searchable()

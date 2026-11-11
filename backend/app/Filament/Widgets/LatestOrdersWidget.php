@@ -14,7 +14,7 @@ class LatestOrdersWidget extends BaseWidget
 
     protected static ?int $sort = 5;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
@@ -61,11 +61,11 @@ class LatestOrdersWidget extends BaseWidget
 
                 Tables\Columns\TextColumn::make('products_total')
                     ->label('Total Articles')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA'),
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA'),
 
                 Tables\Columns\TextColumn::make('delivery_fee')
                     ->label('Frais Livraison')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA'),
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA'),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Heure')
@@ -80,4 +80,3 @@ class LatestOrdersWidget extends BaseWidget
             ->paginated(false);
     }
 }
-

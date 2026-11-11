@@ -22,10 +22,9 @@ class SendPushNotification implements ShouldQueue
 
     public function handle(): void
     {
-        Log::info("Push notification envoyée", [
-            'token' => substr($this->deviceToken, 0, 6) . '...',
+        Log::info('Push notification envoyée', [
+            'token' => substr($this->deviceToken, 0, 6).'...',
             'title' => $this->title,
         ]);
     }
 }
-

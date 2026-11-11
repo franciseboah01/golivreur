@@ -4,8 +4,10 @@ namespace App\Filament\Resources\RefundResource\Pages;
 
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\RefundResource;
-use App\Models\{ActivityLog, Order, Parcel, User};
-use App\Services\{SettingsService, WalletService};
+use App\Models\Order;
+use App\Models\Parcel;
+use App\Services\SettingsService;
+use App\Services\WalletService;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -28,7 +30,7 @@ class ListRefunds extends ListRecords
                     SearchableSelect::make('contexte')
                         ->label('Type d\'opération')
                         ->options(SearchableSelect::sortedOptions([
-                            'order'  => 'Commande GoShop (Repas / Courses)',
+                            'order' => 'Commande GoShop (Repas / Courses)',
                             'parcel' => 'Expédition GoColis (Colis endommagé / retard)',
                         ]))
                         ->required()
@@ -66,9 +68,10 @@ class ListRefunds extends ListRecords
                                 'city_support' => 2000,
                                 'city_finance' => 10000,
                                 'city_manager' => 10000,
-                                'super_admin'  => 50000,
+                                'super_admin' => 50000,
                             ];
                             $monPlafond = $plafonds[$user->role] ?? 0;
+
                             return "Votre rôle ({$user->role}) vous autorise un plafond maximal de {$monPlafond} F CFA.";
                         }),
 
@@ -84,7 +87,7 @@ class ListRefunds extends ListRecords
                         'city_support' => 2000,
                         'city_finance' => 10000,
                         'city_manager' => 10000,
-                        'super_admin'  => 50000,
+                        'super_admin' => 50000,
                     ];
                     $monPlafond = $plafonds[$user->role] ?? 0;
                     $montant = (float) $data['montant'];
@@ -95,6 +98,7 @@ class ListRefunds extends ListRecords
                             ->body("Vous ne pouvez pas valider un montant supérieur à {$monPlafond} F CFA pour votre rôle.")
                             ->danger()
                             ->send();
+
                         return;
                     }
 
@@ -105,12 +109,12 @@ class ListRefunds extends ListRecords
                         $order = Order::findOrFail($data['order_id']);
                         $ownerType = 'courier';
                         $ownerId = $order->courier_id ?? $order->client_id;
-                        $desc = "Remboursement commande #{$order->order_number} : " . $data['motif'];
+                        $desc = "Remboursement commande #{$order->order_number} : ".$data['motif'];
                     } else {
                         $parcel = Parcel::findOrFail($data['parcel_id']);
                         $ownerType = 'courier';
                         $ownerId = $parcel->courier_id ?? $parcel->sender_id;
-                        $desc = "Indemnisation colis #{$parcel->tracking_number} : " . $data['motif'];
+                        $desc = "Indemnisation colis #{$parcel->tracking_number} : ".$data['motif'];
                         $parcel->update(['status' => 'refunded']);
                     }
 
@@ -131,4 +135,3 @@ class ListRefunds extends ListRecords
         ];
     }
 }
-

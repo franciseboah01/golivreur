@@ -30,6 +30,7 @@ class WalletTransactionResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('finances');
     }
 
@@ -118,13 +119,13 @@ class WalletTransactionResource extends Resource
 
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Montant')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA')
                     ->color(fn ($state) => (float) $state >= 0 ? 'success' : 'danger')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('balance_after')
                     ->label('Nouveau Solde')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('status')

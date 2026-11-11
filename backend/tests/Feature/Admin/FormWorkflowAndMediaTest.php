@@ -57,12 +57,12 @@ it('permet de créer une catégorie d\'activité avec emoji et logo uploadé exp
 
     Livewire::test(CreateMerchantCategory::class)
         ->fillForm([
-            'emoji'       => '🍨',
-            'name'        => 'Glacier Test Live',
-            'slug'        => 'glacier-test-live',
-            'logo_path'   => $logo,
+            'emoji' => '🍨',
+            'name' => 'Glacier Test Live',
+            'slug' => 'glacier-test-live',
+            'logo_path' => $logo,
             'description' => 'Glaces et sorbets maison',
-            'is_active'   => true,
+            'is_active' => true,
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -79,7 +79,7 @@ it('permet de créer une catégorie d\'activité avec emoji et logo uploadé exp
     expect($found)->not->toBeNull();
     expect($found['name'])->toBe('Glacier Test Live');
     expect($found['emoji'])->toBe('🍨');
-    expect($found['logo_url'])->toContain('storage/' . $cat->logo_path);
+    expect($found['logo_url'])->toContain('storage/'.$cat->logo_path);
 });
 
 it('permet de créer un commerce avec nouveau gestionnaire, photo, logo et emoji puis l\'expose à l\'app mobile', function () {
@@ -91,32 +91,32 @@ it('permet de créer un commerce avec nouveau gestionnaire, photo, logo et emoji
 
     // Simulation création du compte gestionnaire depuis le formulaire commerce
     $manager = User::create([
-        'name'              => 'Gérant Boutique Test',
-        'phone'             => '0709998877',
-        'email'             => 'gerant.test@golivreur.ci',
-        'password'          => Hash::make('Secret2026!'),
-        'role'              => 'merchant',
-        'is_active'         => true,
+        'name' => 'Gérant Boutique Test',
+        'phone' => '0709998877',
+        'email' => 'gerant.test@golivreur.ci',
+        'password' => Hash::make('Secret2026!'),
+        'role' => 'merchant',
+        'is_active' => true,
         'phone_verified_at' => now(),
     ]);
 
     $photo = UploadedFile::fake()->image('vitrine.jpg', 800, 600);
-    $logo  = UploadedFile::fake()->image('logo.png', 300, 300);
+    $logo = UploadedFile::fake()->image('logo.png', 300, 300);
 
     Livewire::test(CreateMerchant::class)
         ->fillForm([
-            'user_id'           => $manager->id,
-            'city_id'           => $city->id,
-            'category'          => 'restaurant',
-            'emoji'             => '🍗',
-            'name'              => 'Rôtisserie Abidjanaise',
-            'photo_path'        => $photo,
-            'logo_path'         => $logo,
-            'address'           => 'Boulevard Principal, Daloa',
-            'commission_rate'   => 15,
+            'user_id' => $manager->id,
+            'city_id' => $city->id,
+            'category' => 'restaurant',
+            'emoji' => '🍗',
+            'name' => 'Rôtisserie Abidjanaise',
+            'photo_path' => $photo,
+            'logo_path' => $logo,
+            'address' => 'Boulevard Principal, Daloa',
+            'commission_rate' => 15,
             'prep_time_minutes' => 20,
-            'is_open'           => true,
-            'is_active'         => true,
+            'is_open' => true,
+            'is_active' => true,
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -135,8 +135,8 @@ it('permet de créer un commerce avec nouveau gestionnaire, photo, logo et emoji
     $found = collect($apiRes->json('donnees'))->firstWhere('name', 'Rôtisserie Abidjanaise');
     expect($found)->not->toBeNull();
     expect($found['emoji'])->toBe('🍗');
-    expect($found['logo_url'])->toContain('storage/' . $merchant->logo_path);
-    expect($found['photo_url'])->toContain('storage/' . $merchant->photo_path);
+    expect($found['logo_url'])->toContain('storage/'.$merchant->logo_path);
+    expect($found['photo_url'])->toContain('storage/'.$merchant->photo_path);
 });
 
 it('permet de créer un livreur avec upload photo réel', function () {
@@ -151,12 +151,12 @@ it('permet de créer un livreur avec upload photo réel', function () {
 
     Livewire::test(CreateCourier::class)
         ->fillForm([
-            'user_id'       => $driver->id,
-            'city_id'       => $city->id,
-            'vehicle_type'  => 'moto',
-            'photo_path'    => $portrait,
+            'user_id' => $driver->id,
+            'city_id' => $city->id,
+            'vehicle_type' => 'moto',
+            'photo_path' => $portrait,
             'vehicle_plate' => '4567 CD 01',
-            'is_active'     => true,
+            'is_active' => true,
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -185,4 +185,3 @@ it('charge tous les formulaires harmonisés avec listes déroulantes sans erreur
         Livewire::test($pageClass)->assertSuccessful();
     }
 });
-

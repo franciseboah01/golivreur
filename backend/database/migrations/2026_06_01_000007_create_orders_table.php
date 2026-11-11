@@ -19,18 +19,18 @@ return new class extends Migration
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
             $table->foreignId('client_id')
-                  ->constrained('users')
-                  ->restrictOnDelete();
+                ->constrained('users')
+                ->restrictOnDelete();
             $table->foreignId('merchant_id')
-                  ->constrained('merchants')
-                  ->restrictOnDelete();
+                ->constrained('merchants')
+                ->restrictOnDelete();
             $table->foreignId('courier_id')
-                  ->nullable()
-                  ->constrained('couriers')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('couriers')
+                ->nullOnDelete();
             $table->foreignId('city_id')
-                  ->constrained('cities')
-                  ->restrictOnDelete();
+                ->constrained('cities')
+                ->restrictOnDelete();
 
             // Statuts : pending | accepted | refused | ready | picked_up | in_transit | delivered | cancelled
             $table->string('status', 30)->default('pending');
@@ -54,9 +54,9 @@ return new class extends Migration
             $table->unsignedTinyInteger('confirmation_attempts')->default(0);
             $table->boolean('confirmation_locked')->default(false);
             $table->foreignId('confirmation_unlocked_by')
-                  ->nullable()
-                  ->constrained('users')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
 
             // Adresse de livraison
             $table->text('delivery_address');

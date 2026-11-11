@@ -2,7 +2,11 @@
 
 namespace App\Services;
 
-use App\Models\{Courier, Merchant, Order, Parcel, Wallet, WalletTransaction};
+use App\Models\Merchant;
+use App\Models\Order;
+use App\Models\Parcel;
+use App\Models\Wallet;
+use App\Models\WalletTransaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -141,8 +145,8 @@ class WalletService
 
             // Mise à jour du wallet
             $wallet->update([
-                'balance'       => $balanceApres,
-                'total_earned'  => $type !== 'withdrawal'
+                'balance' => $balanceApres,
+                'total_earned' => $type !== 'withdrawal'
                     ? $wallet->total_earned + $montant
                     : $wallet->total_earned,
                 'total_withdrawn' => $type === 'withdrawal'
@@ -152,17 +156,17 @@ class WalletService
 
             // Ligne de transaction immuable
             return WalletTransaction::create([
-                'wallet_id'      => $wallet->id,
-                'type'           => $type,
-                'amount'         => $montant,
+                'wallet_id' => $wallet->id,
+                'type' => $type,
+                'amount' => $montant,
                 'balance_before' => $balanceAvant,
-                'balance_after'  => $balanceApres,
-                'reference'      => 'TXN-' . strtoupper(Str::random(12)),
-                'description'    => $description,
-                'status'         => 'completed',
-                'order_id'       => $orderId,
-                'parcel_id'      => $parcelId,
-                'processed_by'   => $processedBy,
+                'balance_after' => $balanceApres,
+                'reference' => 'TXN-'.strtoupper(Str::random(12)),
+                'description' => $description,
+                'status' => 'completed',
+                'order_id' => $orderId,
+                'parcel_id' => $parcelId,
+                'processed_by' => $processedBy,
             ]);
         });
     }

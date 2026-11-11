@@ -3,7 +3,8 @@
 namespace Tests\Feature\Settings;
 
 use App\Filament\Pages\SettingsPage;
-use App\Models\{ActivityLog, City, Setting, User};
+use App\Models\City;
+use App\Models\User;
 use App\Modules\GoShop\Services\CommissionService;
 use App\Services\SettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,8 +18,11 @@ class SettingsTest extends TestCase
     use RefreshDatabase;
 
     private SettingsService $settingsService;
+
     private CommissionService $commissionService;
+
     private City $daloa;
+
     private User $admin;
 
     protected function setUp(): void
@@ -29,18 +33,18 @@ class SettingsTest extends TestCase
         $this->commissionService = app(CommissionService::class);
 
         $this->daloa = City::create([
-            'name'       => 'Daloa',
-            'is_active'  => true,
+            'name' => 'Daloa',
+            'is_active' => true,
             'center_lat' => 6.8770,
             'center_lng' => -6.4502,
         ]);
 
         $this->admin = User::create([
-            'name'      => 'Francis Admin',
-            'phone'     => '0700000000',
-            'email'     => 'admin@golivreur.ci',
-            'password'  => bcrypt('Secret123!'),
-            'role'      => 'super_admin',
+            'name' => 'Francis Admin',
+            'phone' => '0700000000',
+            'email' => 'admin@golivreur.ci',
+            'password' => bcrypt('Secret123!'),
+            'role' => 'super_admin',
             'is_active' => true,
         ]);
     }
@@ -64,8 +68,8 @@ class SettingsTest extends TestCase
         $this->settingsService->set(
             key: 'commissions',
             value: [
-                'merchant_defaut'    => 18.0,
-                'livreur_goshop'      => 22.0,
+                'merchant_defaut' => 18.0,
+                'livreur_goshop' => 22.0,
                 'plateforme_gocolis' => 30.0,
             ],
             userId: $this->admin->id,
@@ -78,10 +82,10 @@ class SettingsTest extends TestCase
 
         // Vérifie l'écriture dans activity_logs
         $this->assertDatabaseHas('activity_logs', [
-            'action'      => 'setting_updated',
+            'action' => 'setting_updated',
             'entity_type' => 'setting',
-            'severity'    => 'critical',
-            'user_id'     => $this->admin->id,
+            'severity' => 'critical',
+            'user_id' => $this->admin->id,
         ]);
     }
 
@@ -93,8 +97,8 @@ class SettingsTest extends TestCase
         $this->settingsService->set(
             key: 'commissions',
             value: [
-                'merchant_defaut'    => 12.0,
-                'livreur_goshop'      => 15.0,
+                'merchant_defaut' => 12.0,
+                'livreur_goshop' => 15.0,
                 'plateforme_gocolis' => 20.0,
             ],
             cityId: $this->daloa->id,
@@ -200,4 +204,3 @@ class SettingsTest extends TestCase
         $this->assertNull($this->settingsService->getAppLogoUrl());
     }
 }
-

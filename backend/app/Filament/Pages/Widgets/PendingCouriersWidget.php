@@ -15,7 +15,7 @@ class PendingCouriersWidget extends BaseWidget
 {
     protected static ?string $heading = 'Livreurs Partenaires en Attente de Validation';
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
@@ -73,7 +73,7 @@ class PendingCouriersWidget extends BaseWidget
                     ->modalDescription('Le livreur sera immédiatement activé et pourra se connecter à l\'application GoLivreur Driver pour accepter des courses.')
                     ->action(function (Courier $record): void {
                         $record->update([
-                            'is_active'    => true,
+                            'is_active' => true,
                             'activated_at' => now(),
                             'activated_by' => auth()->id(),
                         ]);
@@ -83,16 +83,16 @@ class PendingCouriersWidget extends BaseWidget
                         }
 
                         ActivityLog::create([
-                            'user_id'     => auth()->id(),
-                            'action'      => 'courier_validated_from_pending',
+                            'user_id' => auth()->id(),
+                            'action' => 'courier_validated_from_pending',
                             'entity_type' => 'courier',
-                            'entity_id'   => $record->id,
-                            'properties'  => [
+                            'entity_id' => $record->id,
+                            'properties' => [
                                 'courier_id' => $record->id,
-                                'user_name'  => $record->user?->name,
+                                'user_name' => $record->user?->name,
                             ],
-                            'ip_address'  => request()->ip(),
-                            'severity'    => 'info',
+                            'ip_address' => request()->ip(),
+                            'severity' => 'info',
                         ]);
 
                         Notification::make()
@@ -112,4 +112,3 @@ class PendingCouriersWidget extends BaseWidget
             ->emptyStateDescription('Tous les profils de livreurs enregistrés ont été validés et activés.');
     }
 }
-

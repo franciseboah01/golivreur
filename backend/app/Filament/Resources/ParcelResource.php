@@ -4,7 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ParcelResource\Pages;
-use App\Models\{Courier, Parcel};
+use App\Models\Courier;
+use App\Models\Parcel;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -32,6 +33,7 @@ class ParcelResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user !== null && $user->hasHabilitationTab('parcels');
     }
 
@@ -61,7 +63,7 @@ class ParcelResource extends Resource
                         SearchableSelect::make('courier_id')
                             ->label('Livreur assigné')
                             ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => $query->with('user')->orderBy('id'))
-                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}") . ($record->user?->phone ? " ({$record->user->phone})" : '')),
+                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}").($record->user?->phone ? " ({$record->user->phone})" : '')),
                         Forms\Components\TextInput::make('recipient_name')
                             ->label('Nom du Destinataire')
                             ->required(),
@@ -109,13 +111,13 @@ class ParcelResource extends Resource
                         SearchableSelect::make('status')
                             ->label('Statut d\'acheminement')
                             ->options(SearchableSelect::sortedOptions([
-                                'assigned'   => 'Livreur en route vers la collecte',
-                                'cancelled'  => 'Annulé',
-                                'delivered'  => 'Colis livré avec succès',
+                                'assigned' => 'Livreur en route vers la collecte',
+                                'cancelled' => 'Annulé',
+                                'delivered' => 'Colis livré avec succès',
                                 'in_transit' => 'Colis récupéré - En transit',
-                                'pending'    => 'En attente de livreur',
-                                'refused'    => 'Refusé',
-                                'waiting'    => 'En attente de ramassage',
+                                'pending' => 'En attente de livreur',
+                                'refused' => 'Refusé',
+                                'waiting' => 'En attente de ramassage',
                             ]))
                             ->required()
                             ->columnSpanFull(),
@@ -221,17 +223,17 @@ class ParcelResource extends Resource
 
                 Tables\Columns\TextColumn::make('shipping_fee')
                     ->label('Frais de Course')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' F CFA')
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('declared_value')
                     ->label('Valeur Déclarée')
-                    ->formatStateUsing(fn ($state) => (float) $state > 0 ? number_format((float) $state, 0, ',', ' ') . ' F CFA' : '-')
+                    ->formatStateUsing(fn ($state) => (float) $state > 0 ? number_format((float) $state, 0, ',', ' ').' F CFA' : '-')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('insurance_amount')
                     ->label('Assurance')
-                    ->formatStateUsing(fn ($state) => (float) $state > 0 ? number_format((float) $state, 0, ',', ' ') . ' F CFA' : 'Non assurée'),
+                    ->formatStateUsing(fn ($state) => (float) $state > 0 ? number_format((float) $state, 0, ',', ' ').' F CFA' : 'Non assurée'),
 
                 Tables\Columns\IconColumn::make('sender_code_locked')
                     ->label('Enlèv. Bloqué')
@@ -259,14 +261,14 @@ class ParcelResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Filtrer par Statut')
                     ->options([
-                        'pending'    => 'En attente de livreur',
-                        'waiting'    => 'En attente de ramassage',
-                        'assigned'   => 'Livreur assigné',
+                        'pending' => 'En attente de livreur',
+                        'waiting' => 'En attente de ramassage',
+                        'assigned' => 'Livreur assigné',
                         'in_transit' => 'En transit',
-                        'delivered'  => 'Livré avec succès',
-                        'cancelled'  => 'Annulé',
-                        'refused'    => 'Refusé',
-                        'refunded'   => 'Indemnisé / Remboursé',
+                        'delivered' => 'Livré avec succès',
+                        'cancelled' => 'Annulé',
+                        'refused' => 'Refusé',
+                        'refunded' => 'Indemnisé / Remboursé',
                     ]),
 
                 Tables\Filters\SelectFilter::make('size')
@@ -327,8 +329,8 @@ class ParcelResource extends Resource
                     ->visible(fn (Parcel $record): bool => (bool) $record->sender_code_locked)
                     ->action(function (Parcel $record): void {
                         $record->update([
-                            'sender_code_locked'      => false,
-                            'sender_code_attempts'    => 0,
+                            'sender_code_locked' => false,
+                            'sender_code_attempts' => 0,
                             'sender_code_unlocked_by' => auth()->id(),
                         ]);
 
@@ -345,8 +347,8 @@ class ParcelResource extends Resource
                     ->visible(fn (Parcel $record): bool => (bool) $record->recipient_code_locked)
                     ->action(function (Parcel $record): void {
                         $record->update([
-                            'recipient_code_locked'      => false,
-                            'recipient_code_attempts'    => 0,
+                            'recipient_code_locked' => false,
+                            'recipient_code_attempts' => 0,
                             'recipient_code_unlocked_by' => auth()->id(),
                         ]);
 

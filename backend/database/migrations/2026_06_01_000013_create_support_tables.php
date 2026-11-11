@@ -20,21 +20,21 @@ return new class extends Migration
         Schema::create('ratings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('rater_id')
-                  ->constrained('users')
-                  ->restrictOnDelete();
+                ->constrained('users')
+                ->restrictOnDelete();
             $table->string('type', 30); // goshop_merchant | goshop_courier | gocolis_courier
             // ID de l'entité notée (merchant.id ou courier.id selon le type)
             $table->unsignedBigInteger('rateable_id');
             $table->unsignedTinyInteger('rating'); // 1 à 5
             $table->text('comment')->nullable();
             $table->foreignId('order_id')
-                  ->nullable()
-                  ->constrained('orders')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('orders')
+                ->nullOnDelete();
             $table->foreignId('parcel_id')
-                  ->nullable()
-                  ->constrained('parcels')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('parcels')
+                ->nullOnDelete();
             $table->timestamps();
 
             $table->index(['type', 'rateable_id']);
@@ -54,8 +54,8 @@ return new class extends Migration
         Schema::create('notifications', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')
-                  ->constrained('users')
-                  ->cascadeOnDelete();
+                ->constrained('users')
+                ->cascadeOnDelete();
             // Type : order_accepted | order_delivered | promo | system | gocolis_delivered
             $table->string('type', 60);
             $table->string('title', 255);
@@ -114,8 +114,8 @@ return new class extends Migration
         Schema::create('admin_sessions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')
-                  ->constrained('users')
-                  ->cascadeOnDelete();
+                ->constrained('users')
+                ->cascadeOnDelete();
             $table->string('ip_address', 45);
             $table->string('device_info', 500)->nullable(); // User-Agent navigateur
             $table->string('session_token', 255)->unique();
@@ -141,9 +141,9 @@ return new class extends Migration
         Schema::create('activity_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')
-                  ->nullable()
-                  ->constrained('users')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
             // Action : order_created | refund_validated | admin_new_ip_login | invalid_webhook_signature ...
             $table->string('action', 100);
             // Entité concernée (ex: 'order', 'parcel', 'user', 'merchant')

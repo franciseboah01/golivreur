@@ -63,4 +63,3 @@ class StoreMerchantRequest extends FormRequest
         ];
     }
 }
-

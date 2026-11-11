@@ -19,8 +19,8 @@ return new class extends Migration
         Schema::create('products', function (Blueprint $table) {
             $table->id();
             $table->foreignId('merchant_id')
-                  ->constrained('merchants')
-                  ->cascadeOnDelete();
+                ->constrained('merchants')
+                ->cascadeOnDelete();
             $table->string('name', 200);
             $table->text('description')->nullable();
             // Prix en francs CFA (pas de décimales en pratique, mais DECIMAL pour cohérence)

@@ -1,15 +1,21 @@
 <?php
 
-use App\Filament\Resources\CityResource\Pages\{CreateCity, ListCities};
-use App\Filament\Resources\NeighborhoodResource\Pages\{CreateNeighborhood, ListNeighborhoods};
-use App\Models\{City, ClientAddress, Merchant, Neighborhood, User};
+use App\Filament\Resources\CityResource\Pages\CreateCity;
+use App\Filament\Resources\CityResource\Pages\ListCities;
+use App\Filament\Resources\NeighborhoodResource\Pages\CreateNeighborhood;
+use App\Filament\Resources\NeighborhoodResource\Pages\ListNeighborhoods;
+use App\Models\City;
+use App\Models\ClientAddress;
+use App\Models\Merchant;
+use App\Models\Neighborhood;
+use App\Models\User;
 use Livewire\Livewire;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 it('reflète l\'état réel du mode pluie de la ville dans city-status', function () {
     $city = City::factory()->create([
-        'name'             => 'Daloa Test',
-        'is_active'        => true,
+        'name' => 'Daloa Test',
+        'is_active' => true,
         'rain_mode_active' => false,
     ]);
 
@@ -32,7 +38,7 @@ it('reflète l\'état réel du mode pluie de la ville dans city-status', functio
 it('permet à un client d\'ajouter, modifier, choisir par défaut et supprimer ses adresses de livraison', function () {
     $city = City::factory()->create(['name' => 'Daloa', 'is_active' => true]);
     $client = User::factory()->create([
-        'role'    => 'client',
+        'role' => 'client',
         'city_id' => $city->id,
     ]);
     $token = JWTAuth::fromUser($client);
@@ -40,7 +46,7 @@ it('permet à un client d\'ajouter, modifier, choisir par défaut et supprimer s
     // 1. Créer une première adresse -> devient automatiquement adresse par défaut
     $create1 = $this->withHeader('Authorization', "Bearer {$token}")
         ->postJson('/api/v1/client/addresses', [
-            'label'        => 'Maison',
+            'label' => 'Maison',
             'neighborhood' => 'Lobia',
             'address_line' => 'Face Grande Mosquée, portail bleu',
         ])
@@ -54,10 +60,10 @@ it('permet à un client d\'ajouter, modifier, choisir par défaut et supprimer s
     // 2. Créer une seconde adresse marquée par défaut
     $create2 = $this->withHeader('Authorization', "Bearer {$token}")
         ->postJson('/api/v1/client/addresses', [
-            'label'        => 'Bureau',
+            'label' => 'Bureau',
             'neighborhood' => 'Quartier Commerce',
             'address_line' => 'Immeuble Palmier',
-            'is_default'   => true,
+            'is_default' => true,
         ])
         ->assertCreated()
         ->assertJsonPath('donnees.is_default', true);
@@ -69,7 +75,7 @@ it('permet à un client d\'ajouter, modifier, choisir par défaut et supprimer s
     // 3. Modifier la première adresse et la remettre par défaut
     $this->withHeader('Authorization', "Bearer {$token}")
         ->putJson("/api/v1/client/addresses/{$addr1Id}", [
-            'label'        => 'Domicile',
+            'label' => 'Domicile',
             'neighborhood' => 'Kennedy',
             'address_line' => 'Carrefour Pharmacie',
         ])
@@ -98,12 +104,12 @@ it('bloque la modification d\'une adresse appartenant à un autre client (403)',
     $attacker = User::factory()->create(['role' => 'client', 'city_id' => $city->id]);
 
     $address = ClientAddress::create([
-        'user_id'      => $owner->id,
-        'city_id'      => $city->id,
-        'label'        => 'Maison',
+        'user_id' => $owner->id,
+        'city_id' => $city->id,
+        'label' => 'Maison',
         'neighborhood' => 'Hublot',
         'address_line' => 'Rue 12',
-        'is_default'   => true,
+        'is_default' => true,
     ]);
 
     $attackerToken = JWTAuth::fromUser($attacker);
@@ -121,9 +127,9 @@ it('permet à un client d\'ajouter et retirer un commerce de ses favoris', funct
     $city = City::factory()->create(['is_active' => true]);
     $merchantUser = User::factory()->create(['role' => 'merchant', 'city_id' => $city->id]);
     $merchant = Merchant::factory()->create([
-        'user_id'   => $merchantUser->id,
-        'city_id'   => $city->id,
-        'name'      => 'Maquis Le Baoulé',
+        'user_id' => $merchantUser->id,
+        'city_id' => $city->id,
+        'name' => 'Maquis Le Baoulé',
         'is_active' => true,
     ]);
 
@@ -149,7 +155,7 @@ it('permet à un client d\'ajouter et retirer un commerce de ses favoris', funct
 
 it('retourne une liste de quartiers vide si aucun quartier en base et expose uniquement les quartiers actifs créés', function () {
     $city = City::factory()->create([
-        'name'      => 'Bouaké Test',
+        'name' => 'Bouaké Test',
         'is_active' => true,
     ]);
 
@@ -160,15 +166,15 @@ it('retourne une liste de quartiers vide si aucun quartier en base et expose uni
         ->assertJsonCount(0, 'donnees.neighborhoods');
 
     Neighborhood::create([
-        'city_id'     => $city->id,
-        'name'        => 'Zone Active Test',
-        'is_active'   => true,
+        'city_id' => $city->id,
+        'name' => 'Zone Active Test',
+        'is_active' => true,
         'distance_km' => 2.4,
     ]);
 
     Neighborhood::create([
-        'city_id'   => $city->id,
-        'name'      => 'Zone Inactive Test',
+        'city_id' => $city->id,
+        'name' => 'Zone Inactive Test',
         'is_active' => false,
     ]);
 
@@ -180,13 +186,13 @@ it('retourne une liste de quartiers vide si aucun quartier en base et expose uni
 
 it('expose photo_url et city_name issus de la relation ville dans le profil client', function () {
     $city = City::factory()->create([
-        'name'      => 'Yamoussoukro',
+        'name' => 'Yamoussoukro',
         'is_active' => true,
     ]);
 
     $client = User::factory()->create([
-        'role'       => 'client',
-        'city_id'    => $city->id,
+        'role' => 'client',
+        'city_id' => $city->id,
         'photo_path' => 'profils/avatar_test_client.png',
     ]);
 
@@ -202,8 +208,8 @@ it('expose photo_url et city_name issus de la relation ville dans le profil clie
 
 it('expose un fallback null propre si photo ou ville est absente du profil client', function () {
     $client = User::factory()->create([
-        'role'       => 'client',
-        'city_id'    => null,
+        'role' => 'client',
+        'city_id' => null,
         'photo_path' => null,
         'avatar_url' => null,
     ]);
@@ -220,7 +226,7 @@ it('expose un fallback null propre si photo ou ville est absente du profil clien
 
 it('permet à un admin de gérer Villes et Quartiers avec formulaires vides sans préremplissage', function () {
     $admin = User::factory()->create([
-        'role'      => 'super_admin',
+        'role' => 'super_admin',
         'is_active' => true,
     ]);
 
@@ -233,7 +239,7 @@ it('permet à un admin de gérer Villes et Quartiers avec formulaires vides sans
         ->assertSet('data.center_lng', null);
 
     $city = City::factory()->create([
-        'name'      => 'San Pedro',
+        'name' => 'San Pedro',
         'is_active' => true,
     ]);
 
@@ -243,16 +249,16 @@ it('permet à un admin de gérer Villes et Quartiers avec formulaires vides sans
         ->assertSet('data.name', null)
         ->assertSet('data.distance_km', null)
         ->fillForm([
-            'city_id'   => $city->id,
-            'name'      => 'Cité Balmer',
+            'city_id' => $city->id,
+            'name' => 'Cité Balmer',
             'is_active' => true,
         ])
         ->call('create')
         ->assertHasNoFormErrors();
 
     $this->assertDatabaseHas('neighborhoods', [
-        'city_id'   => $city->id,
-        'name'      => 'Cité Balmer',
+        'city_id' => $city->id,
+        'name' => 'Cité Balmer',
         'is_active' => true,
     ]);
 
@@ -264,4 +270,3 @@ it('permet à un admin de gérer Villes et Quartiers avec formulaires vides sans
         ->assertOk()
         ->assertCanSeeTableRecords(Neighborhood::where('city_id', $city->id)->get());
 });
-

@@ -7,9 +7,9 @@ use App\Models\User;
 
 it('expose les noms, emojis et logos des catégories via l\'API client', function () {
     MerchantCategory::create([
-        'name'      => 'Glacier Artisanal',
-        'slug'      => 'glacier',
-        'emoji'     => '🍨',
+        'name' => 'Glacier Artisanal',
+        'slug' => 'glacier',
+        'emoji' => '🍨',
         'logo_path' => 'categories/logos/glacier.png',
         'is_active' => true,
     ]);
@@ -36,19 +36,19 @@ it('expose les noms, emojis, logo_url et photo_url des commerces via l\'API clie
     );
 
     Merchant::create([
-        'user_id'           => $owner->id,
-        'city_id'           => $city->id,
-        'name'              => 'Maison Délice Daloa',
-        'category'          => 'patisserie_fine',
-        'emoji'             => '🧁',
-        'logo_path'         => 'commerces/logos/delice.png',
-        'photo_path'        => 'commerces/vitrine-delice.jpg',
-        'address'           => 'Quartier Lobia, Daloa',
-        'lat'               => 6.88,
-        'lng'               => -6.45,
+        'user_id' => $owner->id,
+        'city_id' => $city->id,
+        'name' => 'Maison Délice Daloa',
+        'category' => 'patisserie_fine',
+        'emoji' => '🧁',
+        'logo_path' => 'commerces/logos/delice.png',
+        'photo_path' => 'commerces/vitrine-delice.jpg',
+        'address' => 'Quartier Lobia, Daloa',
+        'lat' => 6.88,
+        'lng' => -6.45,
         'prep_time_minutes' => 15,
-        'is_active'         => true,
-        'is_open'           => true,
+        'is_active' => true,
+        'is_open' => true,
     ]);
 
     $response = $this->getJson("/api/v1/client/merchants?city_id={$city->id}");
@@ -63,4 +63,3 @@ it('expose les noms, emojis, logo_url et photo_url des commerces via l\'API clie
     expect($merchant['logo_url'])->toContain('storage/commerces/logos/delice.png');
     expect($merchant['photo_url'])->toContain('storage/commerces/vitrine-delice.jpg');
 });
-

@@ -19,8 +19,8 @@ return new class extends Migration
         Schema::create('parcel_photos', function (Blueprint $table) {
             $table->id();
             $table->foreignId('parcel_id')
-                  ->constrained('parcels')
-                  ->cascadeOnDelete();
+                ->constrained('parcels')
+                ->cascadeOnDelete();
             $table->string('type', 20); // pickup | delivery
             $table->string('photo_url', 500);
             // Position GPS au moment de la photo (preuve géolocalisée)

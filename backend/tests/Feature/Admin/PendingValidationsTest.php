@@ -2,10 +2,8 @@
 
 use App\Filament\Pages\PendingValidationsPage;
 use App\Filament\Pages\Widgets\PendingCouriersWidget;
-use App\Filament\Pages\Widgets\PendingMerchantsWidget;
 use App\Models\City;
 use App\Models\Courier;
-use App\Models\Merchant;
 use App\Models\User;
 use Livewire\Livewire;
 

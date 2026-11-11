@@ -19,10 +19,10 @@ class OrderItem extends Model
     ];
 
     protected $casts = [
-        'unit_price'  => 'integer',
-        'quantity'    => 'integer',
+        'unit_price' => 'integer',
+        'quantity' => 'integer',
         'total_price' => 'integer',
-        'options'     => 'array',
+        'options' => 'array',
     ];
 
     public function order(): BelongsTo
@@ -35,4 +35,3 @@ class OrderItem extends Model
         return $this->belongsTo(Product::class);
     }
 }
-

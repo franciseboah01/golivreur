@@ -40,4 +40,3 @@ class Rating extends Model
         return $this->belongsTo(Parcel::class);
     }
 }
-

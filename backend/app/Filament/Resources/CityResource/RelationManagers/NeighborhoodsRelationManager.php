@@ -83,4 +83,3 @@ class NeighborhoodsRelationManager extends RelationManager
             ]);
     }
 }
-
