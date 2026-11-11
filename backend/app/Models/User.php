@@ -231,7 +231,7 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     public function scopeAdmins($query)
     {
         return $query->whereIn('role', [
-            'super_admin', 'national_dg', 'national_finance',
+            'super_admin', 'dg_national', 'national_finance',
             'national_tech', 'national_support',
             'city_manager', 'city_finance', 'city_support', 'city_agent',
         ]);
@@ -249,7 +249,7 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     public function getIsAdminAttribute(): bool
     {
         return in_array($this->role, [
-            'super_admin', 'national_dg', 'national_finance',
+            'super_admin', 'dg_national', 'national_finance',
             'national_tech', 'national_support',
             'city_manager', 'city_finance', 'city_support', 'city_agent',
         ]);
@@ -265,7 +265,7 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     public function getIsNationalAdminAttribute(): bool
     {
         return in_array($this->role, [
-            'super_admin', 'national_dg', 'national_finance',
+            'super_admin', 'dg_national', 'national_finance',
             'national_tech', 'national_support',
         ]);
     }
@@ -303,7 +303,7 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     public function getSessionTimeout(): int
     {
         return match ($this->role) {
-            'super_admin', 'national_dg', 'national_finance',
+            'super_admin', 'dg_national', 'national_finance',
             'national_tech', 'national_support' => 120, // 2 heures en minutes
             'city_manager', 'city_finance' => 240, // 4 heures
             'city_support', 'city_agent' => 480, // 8 heures

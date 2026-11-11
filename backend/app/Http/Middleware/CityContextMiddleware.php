@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
 class CityContextMiddleware
 {
     private const ROLES_NATIONAUX = [
-        'super_admin', 'national_dg', 'national_finance',
+        'super_admin', 'dg_national', 'national_finance',
         'national_tech', 'national_support',
     ];
 
