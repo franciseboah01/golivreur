@@ -138,10 +138,10 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
                   children: [
                     const Icon(Icons.storefront, color: Color(0xFF2E75B6), size: 28),
                     const SizedBox(width: 10),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Maquis Chez Tantie Adjoua (Daloa)',
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2E75B6)),

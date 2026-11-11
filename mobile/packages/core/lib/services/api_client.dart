@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
@@ -14,31 +15,43 @@ import '../config/env_config.dart';
 ///   - Masquage des tokens dans les logs
 
 class ApiClient {
-  static const int _timeoutSecondes = 8;
+  static const int timeoutSecondes = 8;
 
   final Dio _dio;
   final FlutterSecureStorage _storage;
   final void Function() _onDeconnexionForcee;
+  final HttpClientAdapter? _httpClientAdapter;
+  final Dio Function()? _refreshDioBuilder;
+
+  @visibleForTesting
+  Dio get dioForTest => _dio;
 
   ApiClient({
     required String baseUrl,
     required FlutterSecureStorage storage,
     required void Function() onDeconnexionForcee,
+    HttpClientAdapter? httpClientAdapter,
+    Dio Function()? refreshDioBuilder,
   })  : _storage = storage,
         _onDeconnexionForcee = onDeconnexionForcee,
+        _httpClientAdapter = httpClientAdapter,
+        _refreshDioBuilder = refreshDioBuilder,
         _dio = Dio(
           BaseOptions(
             baseUrl: baseUrl,
             // Timeout 8 secondes — au-delà, message "Connexion lente"
-            connectTimeout: const Duration(seconds: _timeoutSecondes),
-            receiveTimeout: const Duration(seconds: _timeoutSecondes),
-            sendTimeout: const Duration(seconds: _timeoutSecondes),
+            connectTimeout: const Duration(seconds: timeoutSecondes),
+            receiveTimeout: const Duration(seconds: timeoutSecondes),
+            sendTimeout: const Duration(seconds: timeoutSecondes),
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
           ),
         ) {
+    if (httpClientAdapter != null) {
+      _dio.httpClientAdapter = httpClientAdapter;
+    }
     _configurerIntercepteurs();
   }
 
@@ -74,7 +87,11 @@ class ApiClient {
 
             try {
               // Appel direct sans intercepteur pour éviter la boucle infinie
-              final dioRefresh = Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
+              final dioRefresh = _refreshDioBuilder?.call() ??
+                  Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
+              if (_refreshDioBuilder == null && _httpClientAdapter != null) {
+                dioRefresh.httpClientAdapter = _httpClientAdapter;
+              }
               final response = await dioRefresh.post(
                 '/auth/refresh',
                 options: Options(

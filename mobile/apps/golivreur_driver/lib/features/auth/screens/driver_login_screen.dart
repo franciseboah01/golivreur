@@ -138,10 +138,10 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
                   children: [
                     const Icon(Icons.two_wheeler, color: Color(0xFF1B5E20), size: 28),
                     const SizedBox(width: 10),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Ouattara Seydou (Moto Daloa)',
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1B5E20)),

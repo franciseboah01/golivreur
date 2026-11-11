@@ -165,7 +165,7 @@ class MockGoColisApi {
     paymentMethod: 'orange_money',
     senderCodeLocked: false,
     recipientCodeLocked: false,
-    courier: CourierModel(
+    courier: const CourierModel(
       id: 1,
       name: 'Ouattara Seydou',
       photoUrl: null,
@@ -175,12 +175,12 @@ class MockGoColisApi {
       isOnline: true,
     ),
     photos: [
-      ParcelPhotoModel(
+      const ParcelPhotoModel(
         id: 1,
         type: 'pickup',
         photoUrl: 'https://via.placeholder.com/400x300/1B5E20/FFFFFF?text=Ramassage',
       ),
-      ParcelPhotoModel(
+      const ParcelPhotoModel(
         id: 2,
         type: 'delivery',
         photoUrl: 'https://via.placeholder.com/400x300/4CAF50/FFFFFF?text=Livraison',
@@ -205,7 +205,7 @@ class MockGoColisApi {
     paymentMethod: 'cash',
     senderCodeLocked: false,
     recipientCodeLocked: false,
-    courier: CourierModel(
+    courier: const CourierModel(
       id: 2,
       name: 'Coulibaly Issouf',
       photoUrl: null,
@@ -215,7 +215,7 @@ class MockGoColisApi {
       isOnline: true,
     ),
     photos: [
-      ParcelPhotoModel(
+      const ParcelPhotoModel(
         id: 3,
         type: 'pickup',
         photoUrl: 'https://via.placeholder.com/400x300/F4A623/FFFFFF?text=Ramassage',
