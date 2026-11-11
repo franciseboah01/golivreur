@@ -25,18 +25,67 @@ class DriverController extends Controller
         return $courier;
     }
 
+    private function verifierEligibiliteLivreur(Courier $courier): ?JsonResponse
+    {
+        if (! $courier->is_active || ($courier->user && ! $courier->user->is_active)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Votre compte livreur est suspendu ou inactif.',
+            ], 403);
+        }
+
+        if ($courier->penalty_until !== null) {
+            if ($courier->penalty_until->isFuture()) {
+                if ($courier->is_online) {
+                    $courier->update(['is_online' => false]);
+                }
+
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Votre compte est temporairement suspendu suite à des refus répétés.',
+                ], 403);
+            }
+
+            $courier->update([
+                'penalty_until' => null,
+                'consecutive_refusals' => 0,
+            ]);
+        } elseif ($courier->consecutive_refusals >= 3) {
+            $courier->update([
+                'penalty_until' => now()->addMinutes(15),
+                'is_online' => false,
+            ]);
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Suite à 3 refus consécutifs, vous êtes hors ligne pour 15 minutes.',
+            ], 403);
+        }
+
+        return null;
+    }
+
     public function availability(Request $request): JsonResponse
     {
         $courier = $this->getCourier();
-        $isOnline = $request->boolean('is_online', ! $courier->is_online);
 
-        $courier->update(['is_online' => $isOnline]);
+        return DB::transaction(function () use ($request, $courier): JsonResponse {
+            /** @var Courier $lockedCourier */
+            $lockedCourier = Courier::with('user')->lockForUpdate()->findOrFail($courier->id);
+            $isOnline = $request->boolean('is_online', ! $lockedCourier->is_online);
 
-        return response()->json([
-            'succes' => true,
-            'donnees' => $courier,
-            'message' => $isOnline ? 'Vous êtes en ligne.' : 'Vous êtes hors ligne.',
-        ]);
+            if ($isOnline && ($refusal = $this->verifierEligibiliteLivreur($lockedCourier)) !== null) {
+                return $refusal;
+            }
+
+            $lockedCourier->update(['is_online' => $isOnline]);
+
+            return response()->json([
+                'succes' => true,
+                'donnees' => $lockedCourier->fresh(),
+                'message' => $isOnline ? 'Vous êtes en ligne.' : 'Vous êtes hors ligne.',
+            ]);
+        });
     }
 
     public function updateLocation(Request $request): JsonResponse
@@ -46,7 +95,15 @@ class DriverController extends Controller
             'lng' => 'required|numeric',
         ]);
 
-        $courier = $this->getCourier();
+        $courier = $this->getCourier()->load('user');
+
+        if (! $courier->is_active || ($courier->user && ! $courier->user->is_active)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Votre compte livreur est suspendu ou inactif.',
+            ], 403);
+        }
+
         $courier->update([
             'current_lat' => $validated['lat'],
             'current_lng' => $validated['lng'],
@@ -114,39 +171,8 @@ class DriverController extends Controller
                 ], 404);
             }
 
-            if (! $lockedCourier->is_active || ($lockedCourier->user && ! $lockedCourier->user->is_active)) {
-                return response()->json([
-                    'succes' => false,
-                    'message' => 'Votre compte livreur est suspendu ou inactif.',
-                ], 403);
-            }
-
-            if ($lockedCourier->penalty_until !== null) {
-                if ($lockedCourier->penalty_until->isFuture()) {
-                    if ($lockedCourier->is_online) {
-                        $lockedCourier->update(['is_online' => false]);
-                    }
-
-                    return response()->json([
-                        'succes' => false,
-                        'message' => 'Votre compte est temporairement suspendu suite à des refus répétés.',
-                    ], 403);
-                }
-
-                $lockedCourier->update([
-                    'penalty_until' => null,
-                    'consecutive_refusals' => 0,
-                ]);
-            } elseif ($lockedCourier->consecutive_refusals >= 3) {
-                $lockedCourier->update([
-                    'penalty_until' => now()->addMinutes(15),
-                    'is_online' => false,
-                ]);
-
-                return response()->json([
-                    'succes' => false,
-                    'message' => 'Suite à 3 refus consécutifs, vous êtes hors ligne pour 15 minutes.',
-                ], 403);
+            if (($refusal = $this->verifierEligibiliteLivreur($lockedCourier)) !== null) {
+                return $refusal;
             }
 
             if (! $lockedCourier->is_online) {
