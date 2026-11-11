@@ -138,6 +138,7 @@ it('le livreur ne peut pas valider le code expéditeur sans avoir pris la photo'
     $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
     $parcel = Parcel::factory()->create([
         'courier_id' => $courier->id,
+        'city_id' => $courier->city_id,
         'status' => Parcel::STATUS_AT_SENDER,
         'sender_code' => Hash::make('1234'),
     ]);
@@ -158,6 +159,7 @@ it('bloque l\'expédition après 3 codes expéditeur incorrects', function () {
     $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
     $parcel = Parcel::factory()->create([
         'courier_id' => $courier->id,
+        'city_id' => $courier->city_id,
         'status' => Parcel::STATUS_AT_SENDER,
         'sender_code' => Hash::make('9999'),
         'sender_code_attempts' => 2, // Déjà 2 tentatives

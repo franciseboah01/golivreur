@@ -192,17 +192,16 @@ class OrderService
             /** @var Order $lockedOrder */
             $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
 
-            // (a) Statut livrable vérifié AVANT toute tentative (DefensiveSecurityTest:64 passe STATUS_ACCEPTED en appel direct ; confirmDelivery API exige picked_up/in_transit)
+            // (a) Statut livrable strict (CDC Annexe A) vérifié AVANT toute tentative
             if ($lockedOrder->status === Order::STATUS_DELIVERED) {
                 throw ValidationException::withMessages([
                     'code' => ['Cette commande a déjà été livrée et validée.'],
                 ]);
             }
 
-            if (in_array($lockedOrder->status, [
-                Order::STATUS_PENDING,
-                Order::STATUS_REFUSED,
-                Order::STATUS_CANCELLED,
+            if (! in_array($lockedOrder->status, [
+                Order::STATUS_PICKED_UP,
+                Order::STATUS_IN_TRANSIT,
             ], true)) {
                 throw ValidationException::withMessages([
                     'status' => ['Cette commande n\'est pas dans un statut livrable.'],

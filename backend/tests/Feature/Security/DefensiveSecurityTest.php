@@ -61,22 +61,27 @@ it('empêche la double validation et le double crédit d\'une commande GoShop d�
         'client_id' => $client->id,
         'merchant_id' => $merchant->id,
         'courier_id' => $courier->id,
-        'status' => Order::STATUS_ACCEPTED,
+        'status' => Order::STATUS_PICKED_UP,
         'confirmation_code' => Hash::make('1234'),
         'confirmation_locked' => false,
         'courier_amount' => 1500,
         'merchant_amount' => 4000,
     ]);
 
+    $this->actingAs($driverUser, 'api');
     $orderService = app(OrderService::class);
 
     // 1ère validation -> OK
     $validated = $orderService->validerCodeConfirmation($order, '1234');
     expect($validated->status)->toBe(Order::STATUS_DELIVERED);
+    expect((float) Wallet::where('owner_type', 'courier')->where('owner_id', $courier->id)->value('balance'))->toBe(1500.0)
+        ->and((float) Wallet::where('owner_type', 'merchant')->where('owner_id', $merchant->id)->value('balance'))->toBe(4000.0);
 
-    // 2ème validation (tentative de double validation ou race condition) -> doit lever ValidationException
+    // 2ème validation (tentative de double validation ou race condition) -> doit lever ValidationException sans double crédit
     expect(fn () => $orderService->validerCodeConfirmation($order, '1234'))
         ->toThrow(ValidationException::class);
+    expect((float) Wallet::where('owner_type', 'courier')->where('owner_id', $courier->id)->value('balance'))->toBe(1500.0)
+        ->and((float) Wallet::where('owner_type', 'merchant')->where('owner_id', $merchant->id)->value('balance'))->toBe(4000.0);
 });
 
 it('empêche la double validation et le double crédit d\'un colis GoColis déjà livré', function () {

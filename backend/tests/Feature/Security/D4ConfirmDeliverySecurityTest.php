@@ -126,6 +126,8 @@ it('D4 service direct non livrable + mauvais code: confirmation_attempts reste I
         ->and($order->fresh()->confirmation_locked)->toBeFalse();
 })->with([
     Order::STATUS_PENDING,
+    Order::STATUS_ACCEPTED,
+    Order::STATUS_READY,
     Order::STATUS_REFUSED,
     Order::STATUS_DELIVERED,
     Order::STATUS_CANCELLED,

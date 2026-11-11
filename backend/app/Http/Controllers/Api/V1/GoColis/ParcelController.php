@@ -97,6 +97,10 @@ class ParcelController extends Controller
             return response()->json(['succes' => false, 'message' => 'Accès réservé aux livreurs.'], 403);
         }
 
+        if (! $courier->city_id || (int) $parcel->city_id !== (int) $courier->city_id) {
+            return response()->json(['succes' => false, 'message' => 'Expédition introuvable.'], 404);
+        }
+
         if ($parcel->courier_id === null) {
             return response()->json(['succes' => false, 'message' => 'Ce colis n\'est attribué à aucun livreur.'], 403);
         }
