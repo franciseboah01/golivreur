@@ -156,6 +156,11 @@ Route::middleware('auth:api')->group(function () {
         Route::get('orders', [AdminController::class, 'orders']);
         Route::post('orders/{order}/refund', [AdminController::class, 'refund']);
         Route::post('parcels/{parcel}/refund', [AdminController::class, 'parcelRefund']);
+        Route::post('parcels/{parcel}/declare-lost', [AdminController::class, 'declareParcelLost']);
+        Route::post('refunds', [AdminController::class, 'requestRefund']);
+        Route::post('refunds/{refund}/approve', [AdminController::class, 'approveRefund']);
+        Route::post('refunds/{refund}/mark-paid', [AdminController::class, 'markRefundPaid']);
+        Route::post('refunds/{refund}/reject', [AdminController::class, 'rejectRefund']);
         Route::post('cities/{city}/emergency-mode', [AdminController::class, 'emergencyMode']);
         Route::post('webhooks/{id}/replay', [WebhookController::class, 'rejouer']);
     });

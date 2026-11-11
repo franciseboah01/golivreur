@@ -4,7 +4,10 @@ use App\Models\City;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\Parcel;
+use App\Models\Refund;
 use App\Models\User;
+use App\Models\Wallet;
+use App\Models\WalletTransaction;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 it('S2 autre ville (order refund): refuse 404 sans fuite si un rôle local tente de rembourser une commande d\'une autre ville', function (string $role) {
@@ -75,15 +78,49 @@ it('S2 national (order et parcel refund): autorise un rôle financier national s
     $orderBouake = Order::factory()->create([
         'city_id' => $cityBouake->id,
         'courier_id' => $courierBouake->id,
+        'status' => Order::STATUS_DELIVERED,
+        'payment_status' => 'paid',
+        'products_total' => 5000,
+        'delivery_fee' => 800,
     ]);
 
     $this->withHeader('Authorization', 'Bearer '.JWTAuth::fromUser($natFinance))
         ->postJson("/api/v1/admin/orders/{$orderBouake->id}/refund", [
             'montant' => 5000,
             'raison' => 'Accord national',
-            'owner_type' => 'courier',
-            'owner_id' => $courierBouake->id,
         ])
         ->assertOk()
         ->assertJsonPath('succes', true);
+
+    expect(Refund::where('order_id', $orderBouake->id)->where('city_id', $cityBouake->id)->where('amount', 5000)->exists())->toBeTrue()
+        ->and(WalletTransaction::where('type', 'refund')->count())->toBe(0)
+        ->and(Wallet::count())->toBe(0);
+});
+
+it('S2 national refuse 422 si la commande est en statut pending ou non payée', function () {
+    $cityBouake = City::factory()->create(['name' => 'Bouaké']);
+    $natFinance = User::factory()->create(['role' => 'national_finance', 'city_id' => null]);
+
+    $pendingOrder = Order::factory()->create([
+        'city_id' => $cityBouake->id,
+        'status' => Order::STATUS_PENDING,
+        'payment_status' => 'paid',
+    ]);
+    $unpaidOrder = Order::factory()->create([
+        'city_id' => $cityBouake->id,
+        'status' => Order::STATUS_DELIVERED,
+        'payment_status' => 'pending',
+    ]);
+
+    $token = JWTAuth::fromUser($natFinance);
+
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson("/api/v1/admin/orders/{$pendingOrder->id}/refund", ['montant' => 3000, 'raison' => 'Pending'])
+        ->assertStatus(422);
+
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson("/api/v1/admin/orders/{$unpaidOrder->id}/refund", ['montant' => 3000, 'raison' => 'Non payé'])
+        ->assertStatus(422);
+
+    expect(Refund::count())->toBe(0);
 });

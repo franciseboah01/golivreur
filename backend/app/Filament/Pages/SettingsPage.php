@@ -300,7 +300,12 @@ class SettingsPage extends Page implements HasForms
                                         Forms\Components\TextInput::make('remboursements.plafonds.national_finance')
                                             ->label('Finance National')->numeric()->prefix('F')->required(),
                                         Forms\Components\TextInput::make('remboursements.plafonds.super_admin')
-                                            ->label('Super Admin / DG')->numeric()->prefix('F')->required(),
+                                            ->label('Super Admin / DG')
+                                            ->numeric()
+                                            ->prefix('F')
+                                            ->nullable()
+                                            ->placeholder('Illimité (> 50 000)')
+                                            ->helperText('Laisser vide pour illimité (CDC > 50 000 F CFA).'),
                                     ])->columns(3),
                             ]),
 

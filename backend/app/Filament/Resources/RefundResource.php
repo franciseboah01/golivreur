@@ -3,21 +3,24 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\RefundResource\Pages;
-use App\Models\WalletTransaction;
+use App\Models\Refund;
+use App\Models\User;
+use App\Services\RefundService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Ressource Filament dédiée aux Remboursements & Indemnisations clients/partenaires.
- * Conforme au CDC avec respect des plafonds par rôle (2 000 / 10 000 / 50 000 F CFA).
+ * Ressource Filament dédiée aux Remboursements & Indemnisations clients (table refunds).
+ * Source unique des plafonds : SettingsService / RefundService (CDC 8.5).
  */
 class RefundResource extends Resource
 {
-    protected static ?string $model = WalletTransaction::class;
+    protected static ?string $model = Refund::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-receipt-refund';
 
@@ -40,22 +43,38 @@ class RefundResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
-            ->where('type', 'refund')
+        $user = auth()->user();
+        $query = parent::getEloquentQuery()
+            ->with(['city', 'order', 'parcel', 'client'])
             ->latest();
+
+        if ($user && in_array($user->role, RefundService::LOCAL_ROLES, true) && $user->city_id) {
+            $query->where('city_id', $user->city_id);
+        }
+
+        return $query;
     }
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('reference')
-                    ->label('Référence opération')
+                Forms\Components\TextInput::make('id')
+                    ->label('N° Remboursement')
                     ->disabled(),
                 Forms\Components\TextInput::make('amount')
-                    ->label('Montant remboursé (F CFA)')
+                    ->label('Montant (F CFA)')
                     ->disabled(),
-                Forms\Components\Textarea::make('description')
+                Forms\Components\TextInput::make('status')
+                    ->label('Statut')
+                    ->disabled(),
+                Forms\Components\TextInput::make('cost_bearer')
+                    ->label('Imputation')
+                    ->disabled(),
+                Forms\Components\TextInput::make('payment_reference')
+                    ->label('Référence Mobile Money')
+                    ->disabled(),
+                Forms\Components\Textarea::make('reason')
                     ->label('Motif du remboursement')
                     ->disabled()
                     ->columnSpanFull(),
@@ -66,48 +85,118 @@ class RefundResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('reference')
-                    ->label('Référence')
-                    ->searchable()
-                    ->weight('bold'),
+                Tables\Columns\TextColumn::make('id')
+                    ->label('Réf.')
+                    ->formatStateUsing(fn ($state): string => "#{$state}")
+                    ->weight('bold')
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Date & Heure')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
 
+                Tables\Columns\TextColumn::make('city.name')
+                    ->label('Ville')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('client.name')
+                    ->label('Client')
+                    ->searchable(),
+
                 Tables\Columns\TextColumn::make('amount')
-                    ->label('Montant Remboursé')
+                    ->label('Montant')
                     ->money('XOF')
                     ->color('danger')
                     ->weight('bold')
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('description')
-                    ->label('Motif / Contexte')
-                    ->limit(45)
-                    ->searchable(),
-
-                Tables\Columns\TextColumn::make('wallet.owner_type')
-                    ->label('Bénéficiaire')
+                Tables\Columns\TextColumn::make('status')
+                    ->label('Statut')
                     ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        Refund::STATUS_REQUESTED => 'warning',
+                        Refund::STATUS_APPROVED => 'info',
+                        Refund::STATUS_PAID => 'success',
+                        Refund::STATUS_REJECTED => 'danger',
+                        default => 'gray',
+                    })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'courier' => 'Livreur',
-                        'merchant' => 'Commerce',
-                        'user', 'client' => 'Client',
+                        Refund::STATUS_REQUESTED => 'Demandé',
+                        Refund::STATUS_APPROVED => 'Approuvé',
+                        Refund::STATUS_PAID => 'Payé',
+                        Refund::STATUS_REJECTED => 'Rejeté',
                         default => $state,
                     }),
 
-                Tables\Columns\TextColumn::make('balance_after')
-                    ->label('Solde final')
-                    ->money('XOF'),
+                Tables\Columns\TextColumn::make('cost_bearer')
+                    ->label('Support financier')
+                    ->badge(),
+
+                Tables\Columns\TextColumn::make('payment_reference')
+                    ->label('Réf. Paiement')
+                    ->placeholder('-'),
+
+                Tables\Columns\TextColumn::make('reason')
+                    ->label('Motif')
+                    ->limit(40)
+                    ->searchable(),
             ])
             ->filters([
-                Tables\Filters\Filter::make('recent')
-                    ->label('Aujourd\'hui')
-                    ->query(fn (Builder $query): Builder => $query->whereDate('created_at', today())),
+                Tables\Filters\SelectFilter::make('status')
+                    ->label('Statut')
+                    ->options([
+                        Refund::STATUS_REQUESTED => 'Demandé',
+                        Refund::STATUS_APPROVED => 'Approuvé',
+                        Refund::STATUS_PAID => 'Payé',
+                        Refund::STATUS_REJECTED => 'Rejeté',
+                    ]),
             ])
             ->actions([
+                Tables\Actions\Action::make('approve')
+                    ->label('Approuver')
+                    ->icon('heroicon-m-check-circle')
+                    ->color('info')
+                    ->visible(fn (Refund $record): bool => $record->status === Refund::STATUS_REQUESTED)
+                    ->action(function (Refund $record): void {
+                        /** @var User $user */
+                        $user = auth()->user();
+                        $res = app(RefundService::class)->approuverRemboursement($record, $user);
+
+                        if (! $res['ok']) {
+                            Notification::make()->title($res['message'] ?? 'Erreur')->danger()->send();
+
+                            return;
+                        }
+
+                        Notification::make()->title('Remboursement approuvé')->success()->send();
+                    }),
+
+                Tables\Actions\Action::make('markPaid')
+                    ->label('Marquer payé')
+                    ->icon('heroicon-m-banknotes')
+                    ->color('success')
+                    ->visible(fn (Refund $record): bool => $record->status === Refund::STATUS_APPROVED)
+                    ->form([
+                        Forms\Components\TextInput::make('payment_reference')
+                            ->label('Référence virement Mobile Money')
+                            ->required()
+                            ->maxLength(100),
+                    ])
+                    ->action(function (Refund $record, array $data): void {
+                        /** @var User $user */
+                        $user = auth()->user();
+                        $res = app(RefundService::class)->marquerPayeRemboursement($record, $user, (string) $data['payment_reference']);
+
+                        if (! $res['ok']) {
+                            Notification::make()->title($res['message'] ?? 'Erreur')->danger()->send();
+
+                            return;
+                        }
+
+                        Notification::make()->title('Remboursement marqué payé')->success()->send();
+                    }),
+
                 Tables\Actions\ViewAction::make(),
             ]);
     }

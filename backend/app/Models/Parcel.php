@@ -76,6 +76,10 @@ class Parcel extends Model
 
     const STATUS_CANCELLED = 'cancelled';
 
+    const STATUS_LOST = 'lost';
+
+    const STATUS_DISPUTED = 'disputed';
+
     // ─── Relations ────────────────────────────────────────────────────────────
 
     public function sender(): BelongsTo

@@ -4,7 +4,10 @@ use App\Models\City;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\Parcel;
+use App\Models\Refund;
 use App\Models\User;
+use App\Models\Wallet;
+use App\Models\WalletTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -105,10 +108,18 @@ test('un admin habilité peut valider le remboursement de l\'assurance d\'un col
         'declared_value' => 35000,
         'has_insurance' => true,
         'insurance_amount' => 1050,
+        'payment_status' => 'paid',
         'status' => Parcel::STATUS_IN_TRANSIT,
     ]);
 
     $token = JWTAuth::fromUser($cityManager);
+
+    $this->withHeaders([
+        'Authorization' => "Bearer {$token}",
+        'X-City-ID' => $this->city->id,
+    ])->postJson("/api/v1/admin/parcels/{$parcel->id}/declare-lost", [
+        'raison' => 'Colis déclaré perdu en transit',
+    ])->assertOk();
 
     $response = $this->withHeaders([
         'Authorization' => "Bearer {$token}",
@@ -116,8 +127,6 @@ test('un admin habilité peut valider le remboursement de l\'assurance d\'un col
     ])->postJson("/api/v1/admin/parcels/{$parcel->id}/refund", [
         'montant' => 35000,
         'raison' => 'Colis égaré durant le trajet - couverture assurance activée',
-        'owner_type' => 'courier',
-        'owner_id' => $this->courier->id,
     ]);
 
     $response->assertStatus(200)
@@ -125,5 +134,49 @@ test('un admin habilité peut valider le remboursement de l\'assurance d\'un col
             'succes' => true,
         ]);
 
-    expect($parcel->fresh()->status)->toBe('refunded');
+    expect($parcel->fresh()->status)->toBe('refunded')
+        ->and(Refund::where('parcel_id', $parcel->id)->where('amount', 35000)->where('cost_bearer', 'platform')->exists())->toBeTrue()
+        ->and(WalletTransaction::where('type', 'refund')->count())->toBe(0)
+        ->and(Wallet::count())->toBe(0);
+});
+
+test('un colis assuré simplement in_transit non déclaré perdu ou non payé est refusé 422 au remboursement', function () {
+    $cityManager = User::factory()->create([
+        'city_id' => $this->city->id,
+        'role' => 'city_manager',
+    ]);
+
+    $inTransitParcel = Parcel::factory()->create([
+        'sender_id' => $this->client->id,
+        'courier_id' => $this->courier->id,
+        'city_id' => $this->city->id,
+        'declared_value' => 35000,
+        'has_insurance' => true,
+        'insurance_amount' => 1050,
+        'payment_status' => 'paid',
+        'status' => Parcel::STATUS_IN_TRANSIT,
+    ]);
+
+    $unpaidLostParcel = Parcel::factory()->create([
+        'sender_id' => $this->client->id,
+        'courier_id' => $this->courier->id,
+        'city_id' => $this->city->id,
+        'declared_value' => 35000,
+        'has_insurance' => true,
+        'insurance_amount' => 1050,
+        'payment_status' => 'pending',
+        'status' => Parcel::STATUS_LOST,
+    ]);
+
+    $token = JWTAuth::fromUser($cityManager);
+
+    $this->withHeaders(['Authorization' => "Bearer {$token}", 'X-City-ID' => $this->city->id])
+        ->postJson("/api/v1/admin/parcels/{$inTransitParcel->id}/refund", ['montant' => 35000, 'raison' => 'Non perdu'])
+        ->assertStatus(422);
+
+    $this->withHeaders(['Authorization' => "Bearer {$token}", 'X-City-ID' => $this->city->id])
+        ->postJson("/api/v1/admin/parcels/{$unpaidLostParcel->id}/refund", ['montant' => 35000, 'raison' => 'Non payé'])
+        ->assertStatus(422);
+
+    expect(Refund::count())->toBe(0);
 });

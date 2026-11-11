@@ -6,8 +6,8 @@ use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\RefundResource;
 use App\Models\Order;
 use App\Models\Parcel;
-use App\Services\SettingsService;
-use App\Services\WalletService;
+use App\Models\User;
+use App\Services\RefundService;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -25,13 +25,13 @@ class ListRefunds extends ListRecords
                 ->icon('heroicon-m-plus-circle')
                 ->color('danger')
                 ->modalHeading('Validation d\'un Remboursement ou d\'une Indemnisation')
-                ->modalDescription('Contrôle strict des plafonds selon votre rôle (CDC Ch. 8.5 & 10).')
+                ->modalDescription('Contrôle strict des plafonds depuis settings (CDC Ch. 8.5) sans mouvement wallet livreur.')
                 ->form([
                     SearchableSelect::make('contexte')
                         ->label('Type d\'opération')
                         ->options(SearchableSelect::sortedOptions([
                             'order' => 'Commande GoShop (Repas / Courses)',
-                            'parcel' => 'Expédition GoColis (Colis endommagé / retard)',
+                            'parcel' => 'Expédition GoColis (Colis perdu / endommagé)',
                         ]))
                         ->required()
                         ->reactive(),
@@ -61,18 +61,14 @@ class ListRefunds extends ListRecords
                         ->numeric()
                         ->prefix('F CFA')
                         ->required()
-                        ->helperText(function () {
+                        ->helperText(function (): string {
+                            /** @var User|null $user */
                             $user = auth()->user();
-                            $settingsService = app(SettingsService::class);
-                            $plafonds = $settingsService->get('remboursements')['plafonds'] ?? [
-                                'city_support' => 2000,
-                                'city_finance' => 10000,
-                                'city_manager' => 10000,
-                                'super_admin' => 50000,
-                            ];
-                            $monPlafond = $plafonds[$user->role] ?? 0;
+                            $role = (string) ($user->role ?? 'city_agent');
+                            $monPlafond = app(RefundService::class)->plafondPourRole($role);
+                            $labelPlafond = $monPlafond === PHP_INT_MAX ? 'illimité' : "{$monPlafond} F CFA";
 
-                            return "Votre rôle ({$user->role}) vous autorise un plafond maximal de {$monPlafond} F CFA.";
+                            return "Votre rôle ({$role}) vous autorise un plafond maximal de {$labelPlafond}.";
                         }),
 
                     Forms\Components\Textarea::make('motif')
@@ -81,55 +77,45 @@ class ListRefunds extends ListRecords
                         ->rows(3),
                 ])
                 ->action(function (array $data): void {
+                    /** @var User $user */
                     $user = auth()->user();
-                    $settingsService = app(SettingsService::class);
-                    $plafonds = $settingsService->get('remboursements')['plafonds'] ?? [
-                        'city_support' => 2000,
-                        'city_finance' => 10000,
-                        'city_manager' => 10000,
-                        'super_admin' => 50000,
-                    ];
-                    $monPlafond = $plafonds[$user->role] ?? 0;
-                    $montant = (float) $data['montant'];
+                    $refundService = app(RefundService::class);
+                    $montant = (int) round((float) $data['montant']);
+                    $motif = (string) $data['motif'];
 
-                    if ($montant > $monPlafond) {
+                    $order = null;
+                    $parcel = null;
+
+                    if ($data['contexte'] === 'order') {
+                        /** @var Order $order */
+                        $order = Order::findOrFail($data['order_id']);
+                        $desc = "Remboursement commande #{$order->id} : {$motif}";
+                    } else {
+                        /** @var Parcel $parcel */
+                        $parcel = Parcel::findOrFail($data['parcel_id']);
+                        $desc = "Indemnisation colis #{$parcel->id} : {$motif}";
+                    }
+
+                    $res = $refundService->creerEtApprouverDirect(
+                        order: $order,
+                        parcel: $parcel,
+                        montant: $montant,
+                        raison: $desc,
+                        admin: $user,
+                    );
+
+                    if (! $res['ok']) {
                         Notification::make()
-                            ->title('Plafond d\'autorisation dépassé')
-                            ->body("Vous ne pouvez pas valider un montant supérieur à {$monPlafond} F CFA pour votre rôle.")
+                            ->title('Remboursement refusé')
+                            ->body($res['message'] ?? 'Opération impossible.')
                             ->danger()
                             ->send();
 
                         return;
                     }
 
-                    $walletService = app(WalletService::class);
-
-                    // Traitement selon contexte
-                    if ($data['contexte'] === 'order') {
-                        /** @var Order $order */
-                        $order = Order::findOrFail($data['order_id']);
-                        $ownerType = 'courier';
-                        $ownerId = $order->courier_id ?? $order->client_id;
-                        $desc = "Remboursement commande #{$order->id} : ".$data['motif'];
-                    } else {
-                        /** @var Parcel $parcel */
-                        $parcel = Parcel::findOrFail($data['parcel_id']);
-                        $ownerType = 'courier';
-                        $ownerId = $parcel->courier_id ?? $parcel->sender_id;
-                        $desc = "Indemnisation colis #{$parcel->id} : ".$data['motif'];
-                        $parcel->update(['status' => 'refunded']);
-                    }
-
-                    $walletService->effectuerRemboursement(
-                        ownerType: $ownerType,
-                        ownerId: (int) $ownerId,
-                        montant: $montant,
-                        description: $desc,
-                        adminId: $user->id,
-                    );
-
                     Notification::make()
-                        ->title('Remboursement validé et crédité avec succès')
+                        ->title('Remboursement enregistré et approuvé')
                         ->body("Montant : {$montant} F CFA")
                         ->success()
                         ->send();

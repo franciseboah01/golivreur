@@ -3,7 +3,9 @@
 use App\Models\City;
 use App\Models\Courier;
 use App\Models\Order;
+use App\Models\Refund;
 use App\Models\User;
+use App\Models\WalletTransaction;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 // ─── City Context — isolation par ville ───────────────────────────────────────
@@ -48,7 +50,14 @@ it('un City Finance peut valider un remboursement entre 2000 et 10000 F CFA', fu
     $finance = User::factory()->create(['role' => 'city_finance', 'city_id' => $city->id]);
     $driver = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
     $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
-    $order = Order::factory()->create(['city_id' => $city->id, 'courier_id' => $courier->id]);
+    $order = Order::factory()->create([
+        'city_id' => $city->id,
+        'courier_id' => $courier->id,
+        'status' => Order::STATUS_DELIVERED,
+        'payment_status' => 'paid',
+        'products_total' => 5000,
+        'delivery_fee' => 800,
+    ]);
 
     DB::table('wallets')->insert([
         'owner_type' => 'courier', 'owner_id' => $courier->id,
@@ -62,10 +71,31 @@ it('un City Finance peut valider un remboursement entre 2000 et 10000 F CFA', fu
         ->postJson("/api/v1/admin/orders/{$order->id}/refund", [
             'montant' => 5000,
             'raison' => 'Commande non livrée confirmée',
-            'owner_type' => 'courier',
-            'owner_id' => $courier->id,
         ])->assertOk()
         ->assertJsonPath('succes', true);
+
+    expect(Refund::where('order_id', $order->id)->where('amount', 5000)->exists())->toBeTrue()
+        ->and(WalletTransaction::where('type', 'refund')->count())->toBe(0)
+        ->and((int) DB::table('wallets')->where('owner_type', 'courier')->where('owner_id', $courier->id)->value('balance'))->toBe(15000);
+});
+
+it('un City Finance reçoit 422 si la commande est en statut non éligible ou non payée', function () {
+    $city = City::factory()->create();
+    $finance = User::factory()->create(['role' => 'city_finance', 'city_id' => $city->id]);
+    $pendingOrder = Order::factory()->create(['city_id' => $city->id, 'status' => Order::STATUS_PENDING, 'payment_status' => 'paid']);
+    $unpaidOrder = Order::factory()->create(['city_id' => $city->id, 'status' => Order::STATUS_DELIVERED, 'payment_status' => 'pending']);
+
+    $token = JWTAuth::fromUser($finance);
+
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson("/api/v1/admin/orders/{$pendingOrder->id}/refund", ['montant' => 2500, 'raison' => 'Statut invalide'])
+        ->assertStatus(422);
+
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson("/api/v1/admin/orders/{$unpaidOrder->id}/refund", ['montant' => 2500, 'raison' => 'Non payée'])
+        ->assertStatus(422);
+
+    expect(Refund::count())->toBe(0);
 });
 
 it('un City Finance ne peut PAS valider un remboursement supérieur à 10000 F CFA', function () {

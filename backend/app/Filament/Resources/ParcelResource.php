@@ -6,6 +6,8 @@ use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ParcelResource\Pages;
 use App\Models\Courier;
 use App\Models\Parcel;
+use App\Models\User;
+use App\Services\RefundService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -113,11 +115,18 @@ class ParcelResource extends Resource
                         SearchableSelect::make('status')
                             ->label('Statut d\'acheminement')
                             ->options(SearchableSelect::sortedOptions([
+                                'accepted' => 'Accepté par livreur',
                                 'assigned' => 'Livreur en route vers la collecte',
+                                'at_recipient' => 'Arrivé chez le destinataire',
+                                'at_sender' => 'Arrivé chez l\'expéditeur',
                                 'cancelled' => 'Annulé',
                                 'delivered' => 'Colis livré avec succès',
+                                'disputed' => 'En litige',
                                 'in_transit' => 'Colis récupéré - En transit',
+                                'lost' => 'Déclaré perdu',
                                 'pending' => 'En attente de livreur',
+                                'picked_up' => 'Ramassé',
+                                'refunded' => 'Indemnisé / Remboursé',
                                 'refused' => 'Refusé',
                                 'waiting' => 'En attente de ramassage',
                             ]))
@@ -357,6 +366,40 @@ class ParcelResource extends Resource
                         Notification::make()
                             ->title("Code destinataire débloqué pour le colis #{$record->id}")
                             ->success()
+                            ->send();
+                    }),
+
+                Tables\Actions\Action::make('declareLost')
+                    ->label('Déclarer perdu')
+                    ->icon('heroicon-m-exclamation-triangle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->visible(fn (Parcel $record): bool => in_array($record->status, [
+                        Parcel::STATUS_ACCEPTED,
+                        Parcel::STATUS_AT_SENDER,
+                        Parcel::STATUS_PICKED_UP,
+                        Parcel::STATUS_IN_TRANSIT,
+                        Parcel::STATUS_AT_RECIPIENT,
+                    ], true))
+                    ->form([
+                        Forms\Components\Textarea::make('raison')
+                            ->label('Circonstances de la perte')
+                            ->required(),
+                    ])
+                    ->action(function (Parcel $record, array $data): void {
+                        /** @var User $user */
+                        $user = auth()->user();
+                        $res = app(RefundService::class)->declarerColisPerdu($record, $user, (string) $data['raison']);
+
+                        if (! $res['ok']) {
+                            Notification::make()->title($res['message'] ?? 'Erreur')->danger()->send();
+
+                            return;
+                        }
+
+                        Notification::make()
+                            ->title("Colis #{$record->id} déclaré perdu")
+                            ->warning()
                             ->send();
                     }),
 

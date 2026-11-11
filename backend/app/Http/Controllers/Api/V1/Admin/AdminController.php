@@ -8,21 +8,15 @@ use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Parcel;
+use App\Models\Refund;
 use App\Models\User;
 use App\Services\ActivityLogService;
-use App\Services\WalletService;
+use App\Services\RefundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
 {
-    private const LOCAL_ROLES = [
-        'city_agent',
-        'city_support',
-        'city_finance',
-        'city_manager',
-    ];
-
     private const ROLES_LECTURE_OPERATIONS = [
         'super_admin',
         'dg_national',
@@ -33,16 +27,6 @@ class AdminController extends Controller
         'city_finance',
         'city_support',
         'admin',
-    ];
-
-    private const PLAFONDS_REMBOURSEMENT = [
-        'city_agent' => 0,
-        'city_support' => 2000,
-        'city_finance' => 10000,
-        'city_manager' => 50000,
-        'national_finance' => PHP_INT_MAX,
-        'dg_national' => PHP_INT_MAX,
-        'super_admin' => PHP_INT_MAX,
     ];
 
     public function orders(Request $request): JsonResponse
@@ -68,90 +52,212 @@ class AdminController extends Controller
         ]);
     }
 
-    public function refund(Request $request, Order $order, WalletService $walletService): JsonResponse
+    public function refund(Request $request, Order $order, RefundService $refundService): JsonResponse
     {
         $request->validate([
-            'montant' => 'required|numeric|min:1',
-            'raison' => 'nullable|string',
-            'owner_type' => 'nullable|string',
-            'owner_id' => 'nullable|integer',
+            'montant' => 'required|numeric|gt:0',
+            'raison' => 'nullable|string|max:1000',
         ]);
 
+        /** @var User $user */
         $user = auth()->user();
+        $montant = (int) round((float) $request->input('montant'));
+        $raison = (string) $request->input('raison', 'Remboursement commande #'.$order->id);
 
-        if ($this->estHorsVilleLocale($user, (int) $order->city_id)) {
-            return response()->json([
-                'succes' => false,
-                'message' => 'Commande introuvable.',
-            ], 404);
-        }
-
-        $montant = (float) $request->input('montant');
-        $plafond = self::PLAFONDS_REMBOURSEMENT[$user->role] ?? 0;
-
-        if ($montant > $plafond || $plafond === 0) {
-            return response()->json([
-                'succes' => false,
-                'message' => 'Plafond de remboursement insuffisant pour votre rôle.',
-            ], 403);
-        }
-
-        $ownerType = $request->input('owner_type', 'courier');
-        $ownerId = $request->input('owner_id', $order->courier_id ?? $order->client_id);
-
-        $tx = $walletService->effectuerRemboursement(
-            ownerType: $ownerType,
-            ownerId: (int) $ownerId,
+        $res = $refundService->creerEtApprouverDirect(
+            order: $order,
+            parcel: null,
             montant: $montant,
-            description: $request->input('raison', 'Remboursement commande #'.$order->id),
-            adminId: $user->id,
+            raison: $raison,
+            admin: $user,
         );
+
+        if (! $res['ok']) {
+            return response()->json([
+                'succes' => false,
+                'message' => $res['message'],
+            ], $res['status']);
+        }
 
         return response()->json([
             'succes' => true,
-            'donnees' => $tx,
-            'message' => 'Remboursement effectué avec succès.',
+            'donnees' => $res['refund'],
+            'message' => 'Remboursement validé avec succès.',
         ]);
     }
 
-    public function parcelRefund(Request $request, Parcel $parcel, WalletService $walletService): JsonResponse
+    public function parcelRefund(Request $request, Parcel $parcel, RefundService $refundService): JsonResponse
     {
+        $request->validate([
+            'montant' => 'nullable|numeric|gt:0',
+            'raison' => 'nullable|string|max:1000',
+        ]);
+
+        /** @var User $user */
         $user = auth()->user();
-
-        if ($this->estHorsVilleLocale($user, (int) $parcel->city_id)) {
+        $rawMontant = $request->input('montant', $parcel->declared_value);
+        $montant = (int) round((float) $rawMontant);
+        if ($montant <= 0) {
             return response()->json([
                 'succes' => false,
-                'message' => 'Expédition introuvable.',
-            ], 404);
+                'message' => 'Le montant du remboursement doit être supérieur à 0 F CFA.',
+            ], 422);
         }
 
-        $montant = (float) $request->input('montant', $parcel->declared_value);
-        $plafond = self::PLAFONDS_REMBOURSEMENT[$user->role] ?? 0;
+        $raison = (string) $request->input('raison', 'Indemnisation assurance GoColis #'.$parcel->id);
 
-        if ($montant > $plafond || $plafond === 0) {
-            return response()->json([
-                'succes' => false,
-                'message' => 'Plafond de remboursement insuffisant pour votre rôle.',
-            ], 403);
-        }
-
-        $ownerType = $request->input('owner_type', 'courier');
-        $ownerId = $request->input('owner_id', $parcel->courier_id ?? $parcel->sender_id);
-
-        $tx = $walletService->effectuerRemboursement(
-            ownerType: $ownerType,
-            ownerId: (int) $ownerId,
+        $res = $refundService->creerEtApprouverDirect(
+            order: null,
+            parcel: $parcel,
             montant: $montant,
-            description: $request->input('raison', 'Indemnisation assurance GoColis #'.$parcel->id),
-            adminId: $user->id,
+            raison: $raison,
+            admin: $user,
         );
 
-        $parcel->update(['status' => 'refunded']);
+        if (! $res['ok']) {
+            return response()->json([
+                'succes' => false,
+                'message' => $res['message'],
+            ], $res['status']);
+        }
 
         return response()->json([
             'succes' => true,
-            'donnees' => $tx,
-            'message' => 'Indemnisation assurance effectuée avec succès.',
+            'donnees' => $res['refund'],
+            'message' => 'Indemnisation assurance validée avec succès.',
+        ]);
+    }
+
+    public function requestRefund(Request $request, RefundService $refundService): JsonResponse
+    {
+        $validated = $request->validate([
+            'order_id' => 'nullable|integer|exists:orders,id|required_without:parcel_id',
+            'parcel_id' => 'nullable|integer|exists:parcels,id|required_without:order_id',
+            'montant' => 'required|integer|min:1',
+            'raison' => 'required|string|max:1000',
+        ]);
+
+        if (! empty($validated['order_id']) && ! empty($validated['parcel_id'])) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Un remboursement ne peut cibler qu\'une seule commande ou expédition.',
+            ], 422);
+        }
+
+        /** @var User $user */
+        $user = auth()->user();
+        $order = ! empty($validated['order_id']) ? Order::findOrFail((int) $validated['order_id']) : null;
+        $parcel = ! empty($validated['parcel_id']) ? Parcel::findOrFail((int) $validated['parcel_id']) : null;
+
+        $res = $refundService->demanderRemboursement(
+            order: $order,
+            parcel: $parcel,
+            montant: (int) $validated['montant'],
+            raison: (string) $validated['raison'],
+            demandeur: $user,
+        );
+
+        if (! $res['ok']) {
+            return response()->json([
+                'succes' => false,
+                'message' => $res['message'],
+            ], $res['status']);
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $res['refund'],
+            'message' => 'Demande de remboursement enregistrée.',
+        ], 201);
+    }
+
+    public function approveRefund(Refund $refund, RefundService $refundService): JsonResponse
+    {
+        /** @var User $user */
+        $user = auth()->user();
+        $res = $refundService->approuverRemboursement($refund, $user);
+
+        if (! $res['ok']) {
+            return response()->json([
+                'succes' => false,
+                'message' => $res['message'],
+            ], $res['status']);
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $res['refund'],
+            'message' => 'Remboursement approuvé.',
+        ]);
+    }
+
+    public function markRefundPaid(Request $request, Refund $refund, RefundService $refundService): JsonResponse
+    {
+        /** @var User $user */
+        $user = auth()->user();
+        $reference = (string) $request->input('payment_reference', '');
+
+        $res = $refundService->marquerPayeRemboursement($refund, $user, $reference);
+
+        if (! $res['ok']) {
+            return response()->json([
+                'succes' => false,
+                'message' => $res['message'],
+            ], $res['status']);
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $res['refund'],
+            'message' => 'Remboursement marqué payé.',
+        ]);
+    }
+
+    public function rejectRefund(Request $request, Refund $refund, RefundService $refundService): JsonResponse
+    {
+        /** @var User $user */
+        $user = auth()->user();
+        $motif = $request->input('raison');
+
+        $res = $refundService->rejeterRemboursement(
+            refund: $refund,
+            admin: $user,
+            motifRejet: is_string($motif) ? $motif : null,
+        );
+
+        if (! $res['ok']) {
+            return response()->json([
+                'succes' => false,
+                'message' => $res['message'],
+            ], $res['status']);
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $res['refund'],
+            'message' => 'Remboursement rejeté.',
+        ]);
+    }
+
+    public function declareParcelLost(Request $request, Parcel $parcel, RefundService $refundService): JsonResponse
+    {
+        /** @var User $user */
+        $user = auth()->user();
+        $raison = (string) $request->input('raison', '');
+
+        $res = $refundService->declarerColisPerdu($parcel, $user, $raison);
+
+        if (! $res['ok']) {
+            return response()->json([
+                'succes' => false,
+                'message' => $res['message'],
+            ], $res['status']);
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $res['parcel'],
+            'message' => 'Colis déclaré perdu et journalisé.',
         ]);
     }
 
@@ -268,15 +374,6 @@ class AdminController extends Controller
                 'couriers_online' => $couriersOnline,
             ],
         ]);
-    }
-
-    private function estHorsVilleLocale(?User $user, int $resourceCityId): bool
-    {
-        if (! $user || ! in_array($user->role, self::LOCAL_ROLES, true)) {
-            return false;
-        }
-
-        return ! $user->city_id || $resourceCityId !== (int) $user->city_id;
     }
 
     private function verifierAccesOperations(?User $user): ?JsonResponse

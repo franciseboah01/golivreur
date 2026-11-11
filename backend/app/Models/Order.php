@@ -60,6 +60,8 @@ class Order extends Model
 
     const STATUS_CANCELLED = 'cancelled';
 
+    const STATUS_DISPUTED = 'disputed';
+
     /**
      * Graphe strict des transitions d'états GoShop selon le CDC v5.0 (Annexe A).
      *

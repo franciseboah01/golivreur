@@ -62,13 +62,14 @@ class SettingsService
 
         'remboursements' => [
             'plafonds' => [
+                'city_agent' => 0,
                 'city_support' => 2000,
                 'city_finance' => 10000,
-                'city_manager' => 10000,
+                'city_manager' => 50000,
                 'national_support' => 2000,
                 'national_finance' => 50000,
-                'super_admin' => 50000,
-                'dg_national' => 50000,
+                'super_admin' => null,
+                'dg_national' => null,
             ],
         ],
 
