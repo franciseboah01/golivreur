@@ -34,30 +34,77 @@ class RatingController extends Controller
             ]);
         }
 
+        if (! empty($validated['order_id']) && ! empty($validated['parcel_id'])) {
+            throw ValidationException::withMessages([
+                'order_id' => ['Une évaluation doit concerner soit une commande, soit un colis.'],
+            ]);
+        }
+
         $userId = auth()->id();
 
-        // Vérifier que la commande ou le colis appartient bien à ce client
         if (! empty($validated['order_id'])) {
             $order = Order::findOrFail($validated['order_id']);
-            if ($order->client_id !== $userId) {
+            if ((int) $order->client_id !== (int) $userId) {
                 return response()->json([
                     'succes' => false,
                     'message' => 'Cette commande ne vous appartient pas.',
                 ], 403);
             }
+
+            if ($order->status !== Order::STATUS_DELIVERED) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Vous ne pouvez noter une commande qu\'après sa livraison.',
+                ], 422);
+            }
+
+            if (! $order->courier_id || (int) $order->courier_id !== (int) $validated['courier_id']) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Le livreur spécifié ne correspond pas à cette commande.',
+                ], 422);
+            }
         }
 
         if (! empty($validated['parcel_id'])) {
             $parcel = Parcel::findOrFail($validated['parcel_id']);
-            if ($parcel->sender_id !== $userId) {
+            if ((int) $parcel->sender_id !== (int) $userId) {
                 return response()->json([
                     'succes' => false,
                     'message' => 'Cette expédition ne vous appartient pas.',
                 ], 403);
             }
+
+            if ($parcel->status !== Parcel::STATUS_DELIVERED) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Vous ne pouvez noter une expédition qu\'après sa livraison.',
+                ], 422);
+            }
+
+            if (! $parcel->courier_id || (int) $parcel->courier_id !== (int) $validated['courier_id']) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Le livreur spécifié ne correspond pas à cette expédition.',
+                ], 422);
+            }
         }
 
         return DB::transaction(function () use ($validated, $userId) {
+            if (! empty($validated['order_id']) && Rating::where('rater_id', $userId)->where('order_id', $validated['order_id'])->exists()) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Vous avez déjà évalué cette commande.',
+                ], 409);
+            }
+
+            if (! empty($validated['parcel_id']) && Rating::where('rater_id', $userId)->where('parcel_id', $validated['parcel_id'])->exists()) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Vous avez déjà évalué cette expédition.',
+                ], 409);
+            }
+
             $rating = Rating::create([
                 'rater_id' => $userId,
                 'rateable_id' => $validated['courier_id'],
@@ -68,8 +115,9 @@ class RatingController extends Controller
                 'parcel_id' => $validated['parcel_id'] ?? null,
             ]);
 
-            // Mettre à jour la moyenne du livreur
-            $courier = Courier::findOrFail($validated['courier_id']);
+            // Mettre à jour la moyenne du livreur de façon atomique
+            /** @var Courier $courier */
+            $courier = Courier::lockForUpdate()->findOrFail($validated['courier_id']);
             $nouveauTotal = $courier->total_ratings + 1;
             $nouvelleMoyenne = (($courier->average_rating * $courier->total_ratings) + $validated['rating']) / $nouveauTotal;
 
