@@ -153,3 +153,39 @@ Ces décisions ont été validées par Francis pendant la phase de cadrage. Elle
 **Impact :** Sprint 10 validé et testé de bout en bout.
 **Réversible ?** Oui.
 
+### [2026-11-11] — D-LIVREUR-1 : Course active unique paramétrable par livreur (`courses.max_actives`)
+
+**Contexte :** Le CDC (sections `7.4.1`, `7.4.2`, `Annexe C`) ne tranchait pas formellement le cumul de courses simultanées, tandis que `DriverController::acceptOrder` laissait un livreur accumuler plusieurs courses actives. Arbitrage produit requis (`D2`).
+**Options considérées :** Plafond codé en dur à 1 course / Aucune limite / Plafond piloté dynamiquement par `SettingsService` (`courses.max_actives`, défaut `1`).
+**Décision retenue :** Ajout de la clé de configuration `'courses.max_actives' => 1` dans `SettingsService::DEFAULTS` et vérification atomique dans `DriverController::acceptOrder` (sous transaction + `lockForUpdate`) comptant les courses GoShop actives (`accepted`, `ready`, `picked_up`, `in_transit`) et GoColis actives (`accepted`, `at_sender`, `picked_up`, `in_transit`, `at_recipient`) : rejet HTTP `409` avec message français dès que le plafond `courses.max_actives` est atteint.
+**Raison :** Protège la ponctualité des livraisons en lancement tout en permettant d'ouvrir le multi-course par configuration admin sans déploiement de code.
+**Impact :** `SettingsService`, `DriverController::acceptOrder`, suite `P2aSingleActiveCourseSecurityTest` et `Point3DecisionsLockTest`.
+**Réversible ?** Oui (modification de la clé `courses.max_actives` en base via `SettingsService`).
+
+### [2026-11-11] — D-VILLE-1 : Verrouillage de `city_id` sur `/profile` pour les utilisateurs non-admin
+
+**Contexte :** Les endpoints `/api/v1/profile`, `/client/profile`, `/driver/profile`, `/merchant/profile` et `/business/profile` acceptaient auparavant `city_id`, permettant à un client, livreur ou commerce de basculer librement vers une autre ville sans validation opérationnelle.
+**Options considérées :** Ignorer silencieusement `city_id` / Rejeter explicitement `city_id` en validation HTTP `422` et réserver le changement de ville aux administrateurs habilités.
+**Décision retenue :** Règle `'city_id' => ['prohibited']` avec message français dans `BaseProfileRequest` et suppression de toute écriture sur `city_id` dans `ProfileController` (utilisateurs communs, livreurs, commerces). Tout changement de ville d'un compte passe désormais par le back-office administrateur Filament.
+**Raison :** Empêche le contournement d'isolation par ville côté API tout en restant transparent pour les 3 apps mobiles Flutter qui n'envoient pas ce champ dans `/profile`.
+**Impact :** `BaseProfileRequest`, `ProfileController`, suite `P2bProfileCityImmutableSecurityTest` et `Point3DecisionsLockTest`.
+**Réversible ?** Oui.
+
+### [2026-11-11] — D-ROLE-1 : Exclusion de `city_agent` sur `/admin/orders` et `/admin/dashboard`
+
+**Contexte :** `AdminController::orders()` et `dashboard()` acceptaient auparavant tout rôle de `RoleMiddleware::ADMIN_ROLES` (dont `city_agent`), alors que les chapitres `9.1`, `9.3` et `10.2` (ainsi que `6.4`) du CDC v5.0 (`CDC/GoLivreur_CahierDesCharges_v5.md`) définissent `city_agent` (« Agent de Terrain ») uniquement pour le terrain (recrutement commerces, formation livreurs) sans lui accorder de lecture sur les commandes ou indicateurs d'exploitation.
+**Options considérées :** Maintenir une lecture scopée par ville / Exclure strictement `city_agent` en HTTP `403`.
+**Décision retenue :** Exclusion stricte (`403`, message français) de `city_agent` dans `AdminController::verifierAccesOperations()` pour `/admin/orders` et `/admin/dashboard` (seuls les rôles support/finance/manager locaux et nationaux autorisés y conservent l'accès scopé par ville).
+**Raison :** Application stricte du principe du moindre privilège conformément à la matrice des rôles du CDC v5.0 tant qu'aucune fiche fonctionnelle ne lui attribue la supervision des commandes.
+**Impact :** `AdminController`, suite `P2cCityAgentAccessSecurityTest` et `Point3DecisionsLockTest`.
+**Réversible ?** Oui (ajout du rôle à `ROLES_LECTURE_OPERATIONS` si le CDC évolue).
+
+### [2026-11-11] — D-MERCHANT-1 : Blocage des routes `merchant/*` lorsque `is_active = false`
+
+**Contexte :** Un commerce suspendu par l'administration (`merchants.is_active = false`) mais détenteur d'un JWT encore valide pouvait encore consulter ou accepter des commandes, modifier ses produits ou basculer son statut d'ouverture (`is_open`).
+**Options considérées :** Filtrer uniquement `acceptOrder` / Appliquer un middleware dédié sur toutes les routes commerce hors consultation du profil et du statut.
+**Décision retenue :** Création de `ActiveMerchantMiddleware` (alias `active_merchant`) et garde dans `ProfileController::updateBusiness` renvoyant HTTP `403` avec message français pour tout commerce avec `is_active = false` sur toutes les routes `merchant/*` et l'écriture de `business/profile`, en maintenant uniquement `GET /merchant/profile`, `GET /business/profile` et `GET /merchant/status` accessibles en lecture seule (permettant à l'app Business d'afficher l'état de suspension).
+**Raison :** Garantit l'effet immédiat d'une suspension administrative sur l'activité commerciale sans casser l'écran de profil/statut côté application Business.
+**Impact :** `ActiveMerchantMiddleware`, `bootstrap/app.php`, `routes/api.php`, `ProfileController`, suite `P2dSuspendedMerchantRoutesSecurityTest` et `Point3DecisionsLockTest`.
+**Réversible ?** Oui (réactivation via `is_active = true` en base).
+
