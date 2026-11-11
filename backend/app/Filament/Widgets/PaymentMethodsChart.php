@@ -22,7 +22,7 @@ class PaymentMethodsChart extends ChartWidget
             'cash' => ['label' => 'Espèces à la livraison', 'color' => '#10b981'],
             'wallet' => ['label' => 'Portefeuille GoLivreur', 'color' => '#6366f1'],
             'wave' => ['label' => 'Wave Mobile Money', 'color' => '#06b6d4'],
-            'orange' => ['label' => 'Orange Money', 'color' => '#f97316'],
+            'orange_money' => ['label' => 'Orange Money', 'color' => '#f97316'],
             'mtn' => ['label' => 'MTN MoMo', 'color' => '#eab308'],
             'moov' => ['label' => 'Moov Money', 'color' => '#3b82f6'],
         ];
