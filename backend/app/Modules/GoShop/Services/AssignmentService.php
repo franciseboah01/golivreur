@@ -119,26 +119,22 @@ class AssignmentService
         int $cityId,
         array $excludeIds = [],
     ): ?Courier {
-        if (! $lat || ! $lng) {
-            return Courier::where('city_id', $cityId)
-                ->where('is_online', true)
-                ->where('is_active', true)
-                ->whereNull('penalty_until')
-                ->orWhere('penalty_until', '<', now())
-                ->whereNotIn('id', $excludeIds)
-                ->first();
-        }
-
-        $haversine = '(6371 * acos(least(1.0, greatest(-1.0, cos(radians(?)) * cos(radians(current_lat)) * cos(radians(current_lng) - radians(?)) + sin(radians(?)) * sin(radians(current_lat))))))';
-
-        return Courier::where('city_id', $cityId)
+        $baseQuery = Courier::where('city_id', $cityId)
             ->where('is_online', true)
             ->where('is_active', true)
             ->where(function ($q) {
                 $q->whereNull('penalty_until')
                     ->orWhere('penalty_until', '<', now());
             })
-            ->whereNotIn('id', $excludeIds)
+            ->whereNotIn('id', $excludeIds);
+
+        if (! $lat || ! $lng) {
+            return $baseQuery->first();
+        }
+
+        $haversine = '(6371 * acos(least(1.0, greatest(-1.0, cos(radians(?)) * cos(radians(current_lat)) * cos(radians(current_lng) - radians(?)) + sin(radians(?)) * sin(radians(current_lat))))))';
+
+        return $baseQuery
             ->whereNotNull('current_lat')
             ->whereNotNull('current_lng')
             ->selectRaw("*, {$haversine} AS distance", [$lat, $lng, $lat])
