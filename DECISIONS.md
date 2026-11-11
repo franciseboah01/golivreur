@@ -189,3 +189,37 @@ Ces décisions ont été validées par Francis pendant la phase de cadrage. Elle
 **Impact :** `ActiveMerchantMiddleware`, `bootstrap/app.php`, `routes/api.php`, `ProfileController`, suite `P2dSuspendedMerchantRoutesSecurityTest` et `Point3DecisionsLockTest`.
 **Réversible ?** Oui (réactivation via `is_active = true` en base).
 
+---
+
+## Décisions du fondateur — 2026-11-11
+
+### [2026-11-11] — D-TARIF-1 : Non-cumul pluie et heure de pointe (priorité au tarif Pluie)
+
+- **Identifiant :** `D-TARIF-1`
+- **Contexte :** Le CDC (`Chapitre 8.3 — Barème des frais de livraison GoShop`) définit trois colonnes tarifaires (`Tarif normal`, `Heure de pointe*`, `Mode Pluie`), mais reste silencieux sur la règle applicable lorsque le mode pluie est actif pendant une heure de pointe (`11:30–14:00` ou `18:00–21:00`) : tarif Pluie exclusif ou cumul des deux majorations.
+- **Décision :** Lorsque la pluie et l'heure de pointe sont simultanées, le tarif **PLUIE s'applique seul, sans cumul** (`CommissionService::calculerFraisLivraison()` teste `rain_mode_active` en priorité avant `estHeureDePointe()`).
+- **Justification :** Le tableau du Chapitre `8.3` définit 3 niveaux exclusifs (`Normal` / `Pointe` / `Pluie`) ; la colonne `Mode Pluie` correspond déjà au plafond le plus élevé de chaque tranche kilométrique.
+- **Exemple chiffré :** Course GoShop de `3 km` (tranche `2 - 4 km` : Normal `800 F CFA`, Pointe `1 000 F CFA`, Pluie `1 300 F CFA`) à `12:30` avec `rain_mode_active = true` = **`1 300 F CFA`** (et non `1 500 F CFA`).
+- **Test qui la verrouille :** `backend/tests/Feature/Api/V1/GoShop/CommissionServiceTest.php` — test `'it calcule le barème GoShop CDC 8.3 en tarif normal, pointe seule, pluie seule et pluie+pointe'` (lignes `30` et `36–40`).
+- **Comment la modifier plus tard :** Les montants de chaque colonne sont modifiables sans changement de code via la table `settings` (clé `tarifs_goshop.bareme` via Filament `SettingsPage` ou `SettingsService::set()`). Modifier la règle de priorité/non-cumul elle-même nécessiterait de modifier `CommissionService::calculerFraisLivraison()`.
+
+### [2026-11-11] — D-TARIF-2 : Neutralité de GoColis vis-à-vis de la pluie et des heures de pointe
+
+- **Identifiant :** `D-TARIF-2`
+- **Contexte :** Les chapitres `8.2` (*Structure financière GoColis*) et `8.4` (*Barème des frais d'expédition GoColis*) ne comportent aucune colonne Pluie ni heure de pointe et ne précisent pas explicitement si les majorations GoShop (`8.3`) s'étendent ou non à GoColis.
+- **Décision :** **GoColis n'est affecté ni par la pluie ni par l'heure de pointe** ; `CommissionService::calculerFraisExpedition()` applique dans tous les cas uniquement la formule `base + max(0, distance - 2) * par_km`.
+- **Justification :** Les chapitres `8.2` et `8.4` du CDC ne prévoient ni colonne pluie ni colonne pointe et l'exemple officiel du Chapitre `8.2` (`Colis Moyen, 4 km : 1 800 F CFA`) est fixe.
+- **Exemple chiffré :** Colis `moyen` sur `4 km` (`1 200 + (4 - 2) × 300`) = **`1 800 F CFA`** en toute circonstance (y compris à `12:30` avec `rain_mode_active = true`, réparti `1 350 F CFA` livreur / `450 F CFA` plateforme).
+- **Test qui la verrouille :** `backend/tests/Feature/Api/V1/GoShop/CommissionServiceTest.php` — test `'it calcule le barème GoColis CDC 8.2/8.4 (cas 4 km moyen = 1 800 F CFA et partage 75%/25%)'` (lignes `80–89`).
+- **Comment la modifier plus tard :** Modifiable plus tard via `settings` (clé `tarifs_gocolis` : `bareme`, `seuil_assurance`, `taux_assurance`) dans Filament `SettingsPage` ou `SettingsService::set()` sans changement de code. Ajouter une majoration pluie/pointe sur GoColis nécessiterait de modifier `CommissionService::calculerFraisExpedition()`.
+
+### [2026-11-11] — D-TARIF-3 : Bornes horaires de pointe inclusives (`11:30–14:00` et `18:00–21:00`)
+
+- **Identifiant :** `D-TARIF-3`
+- **Contexte :** Le Chapitre `8.3` mentionne en note de tableau `*Heures de pointe : 11h30-14h00 et 18h00-21h00*` sans préciser si les minutes limites exactes (`11:30`, `14:00`, `18:00`, `21:00`) sont incluses ou exclues de la majoration.
+- **Décision :** Les bornes horaires des heures de pointe sont **inclusives à la minute** (`$heureCourante >= $plage['debut'] && $heureCourante <= $plage['fin']`), soit `11:30–14:00` compris et `18:00–21:00` compris.
+- **Justification :** Conforme à l'interprétation courante des créneaux `11h30-14h00` / `18h00-21h00` du CDC `8.3` et au comportement vérifié de `CommissionService::estHeureDePointe()`.
+- **Exemple chiffré :** Livraison GoShop de `3 km` (sans pluie) : à **`14:00` = `1 000 F CFA`** (heure de pointe), à **`14:01` = `800 F CFA`** (tarif normal) ; bornes vérifiées de `11:29` (`false`) à `11:30` (`true`), `14:00` (`true`), `14:01` (`false`), `17:59` (`false`), `18:00` (`true`), `21:00` (`true`), `21:01` (`false`).
+- **Test qui la verrouille :** `backend/tests/Feature/Api/V1/GoShop/CommissionServiceTest.php` — test `'it vérifie les bornes horaires des heures de pointe GoShop (11:29, 11:30, 14:00, 14:01 et soirée)'` (lignes `43–76`).
+- **Comment la modifier plus tard :** Les plages `debut` et `fin` sont configurables dans `settings` via la clé `tarifs_goshop.heures_pointe` (Filament `SettingsPage` ou `SettingsService::set()`). Passer à une borne de fin exclusive (`<`) imposerait une modification de `CommissionService::estHeureDePointe()`.
+
