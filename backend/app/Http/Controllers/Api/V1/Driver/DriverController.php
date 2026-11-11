@@ -203,20 +203,52 @@ class DriverController extends Controller
     {
         $courier = $this->getCourier();
 
-        if ($order->courier_id !== $courier->id) {
-            return response()->json(['succes' => false, 'message' => 'Accès refusé.'], 403);
-        }
+        return DB::transaction(function () use ($order, $courier) {
+            /** @var Order $lockedOrder */
+            $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
 
-        $order->update([
-            'status' => 'picked_up',
-            'picked_up_at' => now(),
-        ]);
+            if (! $courier->city_id || (int) $lockedOrder->city_id !== (int) $courier->city_id) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Course introuvable.',
+                ], 404);
+            }
 
-        return response()->json([
-            'succes' => true,
-            'donnees' => $order,
-            'message' => 'Commande récupérée chez le commerce.',
-        ]);
+            if ($lockedOrder->courier_id === null || (int) $lockedOrder->courier_id !== (int) $courier->id) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Accès refusé.',
+                ], 403);
+            }
+
+            if (! $lockedOrder->peutTransitionnerVers(Order::STATUS_PICKED_UP)) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Cette commande ne peut pas être récupérée dans son statut actuel.',
+                ], 422);
+            }
+
+            $affected = Order::whereKey($lockedOrder->id)
+                ->where('courier_id', $courier->id)
+                ->whereIn('status', [Order::STATUS_ACCEPTED, Order::STATUS_READY])
+                ->update([
+                    'status' => Order::STATUS_PICKED_UP,
+                    'picked_up_at' => now(),
+                ]);
+
+            if ($affected === 0) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Cette commande ne peut pas être récupérée dans son statut actuel.',
+                ], 422);
+            }
+
+            return response()->json([
+                'succes' => true,
+                'donnees' => $lockedOrder->fresh(),
+                'message' => 'Commande récupérée chez le commerce.',
+            ]);
+        });
     }
 
     public function confirmDelivery(Request $request, Order $order, OrderService $orderService): JsonResponse

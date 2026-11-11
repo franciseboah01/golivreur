@@ -125,25 +125,34 @@ class OrderService
      */
     public function accepterCommande(Order $order, Merchant $merchant): Order
     {
-        if ($order->status !== Order::STATUS_PENDING) {
-            throw ValidationException::withMessages([
-                'status' => ['Cette commande ne peut plus être acceptée.'],
-            ]);
-        }
+        return DB::transaction(function () use ($order, $merchant) {
+            /** @var Order $lockedOrder */
+            $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
 
-        return DB::transaction(function () use ($order) {
-            $order->update([
+            if ((int) $lockedOrder->merchant_id !== (int) $merchant->id) {
+                throw ValidationException::withMessages([
+                    'merchant_id' => ['Cette commande ne concerne pas votre commerce.'],
+                ]);
+            }
+
+            if (! $lockedOrder->peutTransitionnerVers(Order::STATUS_ACCEPTED)) {
+                throw ValidationException::withMessages([
+                    'status' => ['Cette commande ne peut plus être acceptée.'],
+                ]);
+            }
+
+            $lockedOrder->update([
                 'status' => Order::STATUS_ACCEPTED,
                 'accepted_at' => now(),
             ]);
 
             // Notifier le client
-            $this->notificationService->notifierCommandeAcceptee($order);
+            $this->notificationService->notifierCommandeAcceptee($lockedOrder);
 
             // Chercher le livreur le plus proche
-            $this->assignmentService->attribuerLivreurGoShop($order);
+            $this->assignmentService->attribuerLivreurGoShop($lockedOrder);
 
-            return $order->fresh();
+            return $lockedOrder->fresh();
         });
     }
 
@@ -152,22 +161,27 @@ class OrderService
      */
     public function refuserCommande(Order $order, string $raison = ''): Order
     {
-        if ($order->status !== Order::STATUS_PENDING) {
-            throw ValidationException::withMessages([
-                'status' => ['Cette commande ne peut plus être refusée.'],
+        return DB::transaction(function () use ($order, $raison) {
+            /** @var Order $lockedOrder */
+            $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
+
+            if (! $lockedOrder->peutTransitionnerVers(Order::STATUS_REFUSED)) {
+                throw ValidationException::withMessages([
+                    'status' => ['Cette commande ne peut plus être refusée.'],
+                ]);
+            }
+
+            $lockedOrder->update([
+                'status' => Order::STATUS_REFUSED,
+                'cancelled_at' => now(),
+                'cancel_reason' => $raison ?: 'Refusé par le commerce.',
             ]);
-        }
 
-        $order->update([
-            'status' => Order::STATUS_REFUSED,
-            'cancelled_at' => now(),
-            'cancel_reason' => $raison ?: 'Refusé par le commerce.',
-        ]);
+            // Notifier le client immédiatement
+            $this->notificationService->notifierCommandeRefusee($lockedOrder);
 
-        // Notifier le client immédiatement
-        $this->notificationService->notifierCommandeRefusee($order);
-
-        return $order->fresh();
+            return $lockedOrder->fresh();
+        });
     }
 
     /**
@@ -249,23 +263,28 @@ class OrderService
      */
     public function signalerCommandePrete(Order $order): Order
     {
-        if ($order->status !== Order::STATUS_ACCEPTED) {
-            throw ValidationException::withMessages([
-                'status' => ['La commande doit être acceptée avant d\'être marquée prête.'],
+        return DB::transaction(function () use ($order) {
+            /** @var Order $lockedOrder */
+            $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
+
+            if (! $lockedOrder->peutTransitionnerVers(Order::STATUS_READY)) {
+                throw ValidationException::withMessages([
+                    'status' => ['La commande doit être acceptée avant d\'être marquée prête.'],
+                ]);
+            }
+
+            $lockedOrder->update([
+                'status' => Order::STATUS_READY,
+                'ready_at' => now(),
             ]);
-        }
 
-        $order->update([
-            'status' => Order::STATUS_READY,
-            'ready_at' => now(),
-        ]);
+            // Notifier le livreur assigné
+            if ($lockedOrder->courier) {
+                $this->notificationService->notifierCommandePrete($lockedOrder);
+            }
 
-        // Notifier le livreur assigné
-        if ($order->courier) {
-            $this->notificationService->notifierCommandePrete($order);
-        }
-
-        return $order->fresh();
+            return $lockedOrder->fresh();
+        });
     }
 
     // ─── Méthodes privées ─────────────────────────────────────────────────────

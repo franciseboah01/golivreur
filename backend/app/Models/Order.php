@@ -60,6 +60,27 @@ class Order extends Model
 
     const STATUS_CANCELLED = 'cancelled';
 
+    /**
+     * Graphe strict des transitions d'états GoShop selon le CDC v5.0 (Annexe A).
+     *
+     * @var array<string, list<string>>
+     */
+    public const TRANSITIONS_AUTORISEES = [
+        self::STATUS_PENDING => [self::STATUS_ACCEPTED, self::STATUS_REFUSED, self::STATUS_CANCELLED],
+        self::STATUS_ACCEPTED => [self::STATUS_READY, self::STATUS_PICKED_UP, self::STATUS_CANCELLED],
+        self::STATUS_READY => [self::STATUS_PICKED_UP, self::STATUS_CANCELLED],
+        self::STATUS_PICKED_UP => [self::STATUS_IN_TRANSIT, self::STATUS_DELIVERED],
+        self::STATUS_IN_TRANSIT => [self::STATUS_DELIVERED],
+        self::STATUS_REFUSED => [],
+        self::STATUS_DELIVERED => [],
+        self::STATUS_CANCELLED => [],
+    ];
+
+    public function peutTransitionnerVers(string $statutCible): bool
+    {
+        return in_array($statutCible, self::TRANSITIONS_AUTORISEES[$this->status] ?? [], true);
+    }
+
     // ─── Relations ────────────────────────────────────────────────────────────
 
     /**
