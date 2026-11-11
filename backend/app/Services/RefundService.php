@@ -167,9 +167,19 @@ class RefundService
             return 'Seul un colis livré, annulé après paiement, en litige ou déclaré perdu peut être remboursé.';
         }
 
-        $plafondColis = (bool) $parcel->has_insurance
-            ? max((int) $parcel->declared_value, (int) $parcel->shipping_fee + (int) $parcel->insurance_amount)
-            : ($estEnLitigeOuPerdu ? 2 * (int) $parcel->shipping_fee : (int) $parcel->shipping_fee);
+        $montantPaye = (int) $parcel->shipping_fee
+            + ((bool) $parcel->has_insurance ? (int) $parcel->insurance_amount : 0);
+
+        if (! $estEnLitigeOuPerdu) {
+            // Colis simplement livré ou annulé (assuré ou non) : plafond limité au montant payé
+            $plafondColis = $montantPaye;
+        } elseif ((bool) $parcel->has_insurance) {
+            // Colis assuré déclaré perdu ou en litige : valeur déclarée (CDC chap. 5.2 / D-REMB-1)
+            $plafondColis = (int) $parcel->declared_value;
+        } else {
+            // Colis sans assurance déclaré perdu ou en litige : 2 × frais d'expédition (CDC chap. 6 / D-REMB-1)
+            $plafondColis = 2 * (int) $parcel->shipping_fee;
+        }
 
         if ($montant <= 0 || $montant > $plafondColis) {
             return "Le montant demandé ({$montant} F CFA) dépasse le plafond autorisé ({$plafondColis} F CFA).";

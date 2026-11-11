@@ -290,11 +290,17 @@ class SettingsPage extends Page implements HasForms
                                     ->description('Limite maximale qu\'un administrateur peut valider en direct sans escalade')
                                     ->schema([
                                         Forms\Components\TextInput::make('remboursements.plafonds.city_support')
-                                            ->label('City Support')->numeric()->prefix('F')->required(),
+                                            ->label('City Support (< 2 000 F)')
+                                            ->numeric()->prefix('F')->required()
+                                            ->helperText('Montant strictement < 2 000 F CFA (1 999 F max par défaut, D-REMB-1).'),
                                         Forms\Components\TextInput::make('remboursements.plafonds.city_finance')
-                                            ->label('City Finance')->numeric()->prefix('F')->required(),
+                                            ->label('City Finance (2 000 – 10 000 F)')
+                                            ->numeric()->prefix('F')->required()
+                                            ->helperText('Plafond inclusif de 2 000 à 10 000 F CFA.'),
                                         Forms\Components\TextInput::make('remboursements.plafonds.city_manager')
-                                            ->label('City Manager')->numeric()->prefix('F')->required(),
+                                            ->label('City Manager (10 001 – 50 000 F)')
+                                            ->numeric()->prefix('F')->required()
+                                            ->helperText('Plafond inclusif jusqu\'à 50 000 F CFA.'),
                                         Forms\Components\TextInput::make('remboursements.plafonds.national_support')
                                             ->label('Support National')->numeric()->prefix('F')->required(),
                                         Forms\Components\TextInput::make('remboursements.plafonds.national_finance')

@@ -63,13 +63,13 @@ class SettingsService
         'remboursements' => [
             'plafonds' => [
                 'city_agent' => 0,
-                'city_support' => 2000,
-                'city_finance' => 10000,
-                'city_manager' => 50000,
-                'national_support' => 2000,
+                'city_support' => 1999, // Strictement < 2 000 F CFA (D-REMB-1)
+                'city_finance' => 10000, // 2 000 <= montant <= 10 000 F CFA (D-REMB-1)
+                'city_manager' => 50000, // 10 000 < montant <= 50 000 F CFA (D-REMB-1)
+                'national_support' => 1999, // Strictement < 2 000 F CFA (D-REMB-1)
                 'national_finance' => 50000,
-                'super_admin' => null,
-                'dg_national' => null,
+                'super_admin' => null, // > 50 000 F CFA / illimité (D-REMB-1)
+                'dg_national' => null, // > 50 000 F CFA / illimité (D-REMB-1)
             ],
         ],
 

@@ -16,17 +16,21 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-it('2.1 plafonds depuis SettingsService et frontières exactes 1999/2000/2001/10000/10001/50000/50001 par rôle', function (string $role, int $montant, int $expectedStatus, ?string $expectedRequiredRole) {
+it('2.1 plafonds depuis SettingsService et frontières exactes 1999/2000/2001/10000/10001/50000/50001 par rôle (D-REMB-1)', function (string $role, int $montant, int $expectedStatus, ?string $expectedRequiredRole) {
     $city = City::factory()->create();
-    $admin = User::factory()->create(['role' => $role, 'city_id' => $role === 'super_admin' ? null : $city->id]);
+    $admin = User::factory()->create([
+        'role' => $role,
+        'city_id' => in_array($role, ['super_admin', 'dg_national'], true) ? null : $city->id,
+    ]);
     $client = User::factory()->create(['role' => 'client', 'city_id' => $city->id, 'phone' => '0707070707']);
     $merchant = Merchant::factory()->create(['city_id' => $city->id]);
 
     $defaults = SettingsService::DEFAULTS['remboursements']['plafonds'];
-    expect($defaults['city_support'])->toBe(2000)
+    expect($defaults['city_support'])->toBe(1999)
         ->and($defaults['city_finance'])->toBe(10000)
         ->and($defaults['city_manager'])->toBe(50000)
-        ->and($defaults['super_admin'])->toBeNull();
+        ->and($defaults['super_admin'])->toBeNull()
+        ->and($defaults['dg_national'])->toBeNull();
 
     $order = Order::factory()->create([
         'city_id' => $city->id,
@@ -50,20 +54,49 @@ it('2.1 plafonds depuis SettingsService et frontières exactes 1999/2000/2001/10
         expect($res->json('message'))->toContain($expectedRequiredRole);
     }
 })->with([
+    // city_support : strictement < 2 000 F CFA (1 999 OK, 2 000+ refusé 403 -> city_finance)
     'city_support 1999 OK' => ['city_support', 1999, 200, null],
-    'city_support 2000 OK' => ['city_support', 2000, 200, null],
+    'city_support 2000 403' => ['city_support', 2000, 403, 'city_finance'],
     'city_support 2001 403' => ['city_support', 2001, 403, 'city_finance'],
+    'city_support 10000 403' => ['city_support', 10000, 403, 'city_finance'],
+    'city_support 10001 403' => ['city_support', 10001, 403, 'city_manager'],
+    'city_support 50000 403' => ['city_support', 50000, 403, 'city_manager'],
+    'city_support 50001 403' => ['city_support', 50001, 403, 'super_admin'],
+    // city_finance : 2 000 <= montant <= 10 000 F CFA (<= 10 000 OK, >= 10 001 -> city_manager)
+    'city_finance 1999 OK' => ['city_finance', 1999, 200, null],
     'city_finance 2000 OK' => ['city_finance', 2000, 200, null],
     'city_finance 2001 OK' => ['city_finance', 2001, 200, null],
     'city_finance 10000 OK' => ['city_finance', 10000, 200, null],
     'city_finance 10001 403' => ['city_finance', 10001, 403, 'city_manager'],
+    'city_finance 50000 403' => ['city_finance', 50000, 403, 'city_manager'],
+    'city_finance 50001 403' => ['city_finance', 50001, 403, 'super_admin'],
+    // city_manager : 10 000 < montant <= 50 000 F CFA (<= 50 000 OK, >= 50 001 -> super_admin)
+    'city_manager 1999 OK' => ['city_manager', 1999, 200, null],
+    'city_manager 2000 OK' => ['city_manager', 2000, 200, null],
+    'city_manager 2001 OK' => ['city_manager', 2001, 200, null],
     'city_manager 10000 OK' => ['city_manager', 10000, 200, null],
     'city_manager 10001 OK' => ['city_manager', 10001, 200, null],
     'city_manager 50000 OK' => ['city_manager', 50000, 200, null],
     'city_manager 50001 403' => ['city_manager', 50001, 403, 'super_admin'],
+    // super_admin : > 50 000 F CFA (illimité)
+    'super_admin 1999 OK' => ['super_admin', 1999, 200, null],
+    'super_admin 2000 OK' => ['super_admin', 2000, 200, null],
+    'super_admin 2001 OK' => ['super_admin', 2001, 200, null],
+    'super_admin 10000 OK' => ['super_admin', 10000, 200, null],
+    'super_admin 10001 OK' => ['super_admin', 10001, 200, null],
     'super_admin 50000 OK' => ['super_admin', 50000, 200, null],
     'super_admin 50001 OK' => ['super_admin', 50001, 200, null],
+    // dg_national : > 50 000 F CFA (illimité)
+    'dg_national 1999 OK' => ['dg_national', 1999, 200, null],
+    'dg_national 2000 OK' => ['dg_national', 2000, 200, null],
+    'dg_national 2001 OK' => ['dg_national', 2001, 200, null],
+    'dg_national 10000 OK' => ['dg_national', 10000, 200, null],
+    'dg_national 10001 OK' => ['dg_national', 10001, 200, null],
+    'dg_national 50000 OK' => ['dg_national', 50000, 200, null],
+    'dg_national 50001 OK' => ['dg_national', 50001, 200, null],
+    // city_agent : aucun remboursement autorisé (403 sur toutes frontières)
     'city_agent 1999 403' => ['city_agent', 1999, 403, null],
+    'city_agent 2000 403' => ['city_agent', 2000, 403, null],
 ]);
 
 it('2.1 source unique settings: modifier le plafond dans settings s\'applique immédiatement à RefundService et API', function () {
@@ -341,4 +374,100 @@ it('2.5 & 2.6 workflow complet requested -> approved -> paid et traçabilité ac
     $logs = ActivityLog::where('entity_type', 'refund')->where('entity_id', $refundId)->get();
     expect($logs->pluck('action')->all())->toContain('refund_requested', 'refund_approved', 'refund_paid')
         ->and(json_encode($logs->toArray()))->not->toContain('0799887766');
+});
+
+it('D-REMB-1 plafonds par type de colis/commande : sans assurance perdu = 2x frais, assuré perdu = valeur déclarée, livré ou annulé = montant payé', function () {
+    $city = City::factory()->create();
+    $manager = User::factory()->create(['role' => 'city_manager', 'city_id' => $city->id]);
+
+    // 1. Colis sans assurance déclaré perdu : plafond = 2 * shipping_fee (2 * 1200 = 2400)
+    $uninsuredLost = Parcel::factory()->create([
+        'city_id' => $city->id,
+        'status' => Parcel::STATUS_LOST,
+        'payment_status' => 'paid',
+        'has_insurance' => false,
+        'declared_value' => 15000,
+        'shipping_fee' => 1200,
+        'insurance_amount' => 0,
+    ]);
+
+    $this->actingAs($manager, 'api')
+        ->postJson("/api/v1/admin/parcels/{$uninsuredLost->id}/refund", ['montant' => 2401, 'raison' => 'Dépasse 2x frais'])
+        ->assertStatus(422);
+
+    $this->actingAs($manager, 'api')
+        ->postJson("/api/v1/admin/parcels/{$uninsuredLost->id}/refund", ['montant' => 2400, 'raison' => 'Plafond exact 2x frais'])
+        ->assertOk();
+
+    // 2. Colis sans assurance en litige : plafond = 2 * shipping_fee (2 * 1500 = 3000)
+    $uninsuredDisputed = Parcel::factory()->create([
+        'city_id' => $city->id,
+        'status' => Parcel::STATUS_DISPUTED,
+        'payment_status' => 'paid',
+        'has_insurance' => false,
+        'shipping_fee' => 1500,
+    ]);
+
+    $this->actingAs($manager, 'api')
+        ->postJson("/api/v1/admin/parcels/{$uninsuredDisputed->id}/refund", ['montant' => 3001, 'raison' => 'Dépasse 2x frais litige'])
+        ->assertStatus(422);
+
+    $this->actingAs($manager, 'api')
+        ->postJson("/api/v1/admin/parcels/{$uninsuredDisputed->id}/refund", ['montant' => 3000, 'raison' => 'Plafond exact 2x frais litige'])
+        ->assertOk();
+
+    // 3. Colis assuré déclaré perdu : plafond = declared_value (30000)
+    $insuredLost = Parcel::factory()->create([
+        'city_id' => $city->id,
+        'status' => Parcel::STATUS_LOST,
+        'payment_status' => 'paid',
+        'has_insurance' => true,
+        'declared_value' => 30000,
+        'shipping_fee' => 1200,
+        'insurance_amount' => 900,
+    ]);
+
+    $this->actingAs($manager, 'api')
+        ->postJson("/api/v1/admin/parcels/{$insuredLost->id}/refund", ['montant' => 30001, 'raison' => 'Dépasse valeur déclarée'])
+        ->assertStatus(422);
+
+    $this->actingAs($manager, 'api')
+        ->postJson("/api/v1/admin/parcels/{$insuredLost->id}/refund", ['montant' => 30000, 'raison' => 'Valeur déclarée exacte'])
+        ->assertOk();
+
+    // 4. Colis (même assuré) simplement annulé : plafond = montant payé (1200 + 900 = 2100), PAS declared_value
+    $insuredCancelled = Parcel::factory()->create([
+        'city_id' => $city->id,
+        'status' => Parcel::STATUS_CANCELLED,
+        'payment_status' => 'paid',
+        'has_insurance' => true,
+        'declared_value' => 30000,
+        'shipping_fee' => 1200,
+        'insurance_amount' => 900,
+    ]);
+
+    $this->actingAs($manager, 'api')
+        ->postJson("/api/v1/admin/parcels/{$insuredCancelled->id}/refund", ['montant' => 2101, 'raison' => 'Dépasse montant payé'])
+        ->assertStatus(422);
+
+    $this->actingAs($manager, 'api')
+        ->postJson("/api/v1/admin/parcels/{$insuredCancelled->id}/refund", ['montant' => 2100, 'raison' => 'Remboursement montant payé exact'])
+        ->assertOk();
+
+    // 5. Colis sans assurance livré : plafond = montant payé (1200), PAS 2x
+    $deliveredParcel = Parcel::factory()->create([
+        'city_id' => $city->id,
+        'status' => Parcel::STATUS_DELIVERED,
+        'payment_status' => 'paid',
+        'has_insurance' => false,
+        'shipping_fee' => 1200,
+    ]);
+
+    $this->actingAs($manager, 'api')
+        ->postJson("/api/v1/admin/parcels/{$deliveredParcel->id}/refund", ['montant' => 1201, 'raison' => 'Dépasse montant payé livré'])
+        ->assertStatus(422);
+
+    $this->actingAs($manager, 'api')
+        ->postJson("/api/v1/admin/parcels/{$deliveredParcel->id}/refund", ['montant' => 1200, 'raison' => 'Montant payé livré'])
+        ->assertOk();
 });

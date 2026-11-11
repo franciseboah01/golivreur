@@ -223,3 +223,22 @@ Ces décisions ont été validées par Francis pendant la phase de cadrage. Elle
 - **Test qui la verrouille :** `backend/tests/Feature/Api/V1/GoShop/CommissionServiceTest.php` — test `'it vérifie les bornes horaires des heures de pointe GoShop (11:29, 11:30, 14:00, 14:01 et soirée)'` (lignes `43–76`).
 - **Comment la modifier plus tard :** Les plages `debut` et `fin` sont configurables dans `settings` via la clé `tarifs_goshop.heures_pointe` (Filament `SettingsPage` ou `SettingsService::set()`). Passer à une borne de fin exclusive (`<`) imposerait une modification de `CommissionService::estHeureDePointe()`.
 
+### [2026-11-11] — D-REMB-1 : Bornes exactes de délégation remboursements (CDC 8.5 & Chap. 6)
+
+- **Identifiant :** `D-REMB-1`
+- **Contexte :** Le CDC (`Chapitre 8.5 — Remboursements — Délégation par plafond`) mentionne `< 2 000 F CFA` (`City Support`), `2 000 – 10 000 F CFA` (`City Finance`), `10 000 – 50 000 F CFA` (`City Manager`) et `> 50 000 F CFA` (`Super Admin`), créant une ambiguïté aux bornes exactes `2 000`, `10 000` et `50 000 F CFA` ainsi que sur le plafond applicable entre colis perdus/litigieux et colis annulés ou livrés (`Chapitre 5.2 / 6`).
+- **Décision :**
+  1. **Plafonds de validation par rôle (source unique `settings.remboursements.plafonds` consommée par `RefundService`) :**
+     - `city_support` (et `national_support`) : montant **strictement `< 2 000 F CFA`** → plafond maximal configuré à **`1 999 F CFA`**.
+     - `city_finance` : **`2 000 ≤ montant ≤ 10 000 F CFA`** → plafond maximal **`10 000 F CFA`** (prend le relais dès `2 000 F`).
+     - `city_manager` : **`10 000 < montant ≤ 50 000 F CFA`** → plafond maximal **`50 000 F CFA`** (prend le relais dès `10 001 F`).
+     - `super_admin` et `dg_national` : **`> 50 000 F CFA`** → illimité (`null` en base, résolu à `PHP_INT_MAX`).
+  2. **Plafonds par type d'expédition/commande (`RefundService::verifierEligibiliteOrder` / `verifierEligibiliteParcel`) :**
+     - Colis **sans assurance** déclaré `lost` ou en litige (`disputed` / code bloqué) : plafond **`2 × shipping_fee`** (CDC chap. 6).
+     - Colis **assuré** déclaré `lost` ou en litige : plafond **`declared_value`**.
+     - Commande GoShop ou colis GoColis **livré ou annulé** (assuré ou non) : plafond **montant payé** (`products_total + delivery_fee` pour GoShop ; `shipping_fee + insurance_amount` pour GoColis).
+- **Justification :** Respect littéral de l'inégalité stricte `< 2 000` pour `city_support` sans doublon ni écart entre `settings`, l'interface Filament `SettingsPage`, `ListRefunds` et `RefundService`, tout en distinguant l'indemnisation de perte de la simple restitution d'un paiement sur annulation.
+- **Exemple chiffré :** À `1 999 F` → `city_support` validé (`200`) ; à `2 000 F` → `city_support` refusé (`403`, requis `city_finance`) et `city_finance` validé (`200`) ; à `10 000 F` → `city_finance` validé (`200`), à `10 001 F` → requis `city_manager` ; à `50 000 F` → `city_manager` validé (`200`), à `50 001 F` → requis `super_admin` / `dg_national`. Pour un colis à `1 200 F` + assurance `900 F` (`declared_value = 30 000 F`) : perdu → plafond `30 000 F`, annulé → plafond `2 100 F` ; sans assurance et perdu → plafond `2 400 F`.
+- **Test qui la verrouille :** `backend/tests/Feature/Finance/RefundSecurityTest.php` — tests `'2.1 plafonds depuis SettingsService et frontières exactes 1999/2000/2001/10000/10001/50000/50001 par rôle (D-REMB-1)'` et `'D-REMB-1 plafonds par type de colis/commande : sans assurance perdu = 2x frais, assuré perdu = valeur déclarée, livré ou annulé = montant payé'`.
+- **Comment la modifier plus tard :** Les plafonds numériques par rôle sont modifiables à chaud dans `settings` (clé `remboursements.plafonds` via Filament `SettingsPage` ou `SettingsService::set()`). Modifier la règle de calcul `2 × shipping_fee` ou `declared_value` passe par `RefundService::verifierEligibiliteParcel()`.
+
