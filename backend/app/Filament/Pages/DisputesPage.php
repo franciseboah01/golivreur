@@ -69,7 +69,7 @@ class DisputesPage extends Page implements HasTable
 
                 Tables\Columns\TextColumn::make('client.name')
                     ->label('Client')
-                    ->description(fn (Order $record): string => $record->client?->phone ?? '-'),
+                    ->description(fn (Order $record): string => $record->client->phone ?? '-'),
 
                 Tables\Columns\TextColumn::make('courier.user.name')
                     ->label('Livreur assigné')

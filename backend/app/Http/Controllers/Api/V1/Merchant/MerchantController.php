@@ -35,7 +35,7 @@ class MerchantController extends Controller
                 'prep_time_minutes' => $merchant->prep_time_minutes,
                 'name' => $merchant->name,
                 'category' => $merchant->category,
-                'category_name' => $merchant->categoryModel?->name ?? ucfirst((string) $merchant->category),
+                'category_name' => $merchant->categoryModel->name ?? ucfirst((string) $merchant->category),
                 'emoji' => $merchant->resolved_emoji,
                 'logo_url' => $merchant->logo_url ?? $merchant->categoryModel?->logo_url,
                 'photo_url' => $merchant->photo_url,

@@ -2,11 +2,15 @@
 
 namespace App\Http\Resources;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * API Resource représentant le profil complet d'un Client GoLivreur.
+ *
+ * @mixin User
+ * @mixin User
  */
 class ClientProfileResource extends JsonResource
 {

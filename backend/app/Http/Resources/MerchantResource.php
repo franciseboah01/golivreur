@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Merchant;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,6 +17,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * - emoji          (string)      : Emoji du commerce (ou celui de sa catégorie en fallback, sinon "🏪")
  * - logo_url       (string|null) : URL publique du logo boutique (`storage/commerces/logos/...`)
  * - photo_url      (string|null) : URL publique de la photo vitrine (`storage/commerces/...`)
+ *
+ * @mixin Merchant
  */
 class MerchantResource extends JsonResource
 {
@@ -26,7 +29,7 @@ class MerchantResource extends JsonResource
             'city_id' => $this->city_id,
             'name' => $this->name,
             'category' => $this->category,
-            'category_name' => $this->categoryModel?->name ?? ucfirst((string) $this->category),
+            'category_name' => $this->categoryModel->name ?? ucfirst((string) $this->category),
             'category_emoji' => $this->categoryModel?->emoji,
             'emoji' => $this->resolved_emoji,
             'logo_url' => $this->logo_url ?? $this->categoryModel?->logo_url,

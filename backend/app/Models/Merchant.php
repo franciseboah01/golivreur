@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property-read string|null $logo_url
+ * @property-read string $resolved_emoji
+ */
 class Merchant extends Model
 {
     use HasFactory, SoftDeletes;
@@ -87,16 +91,25 @@ class Merchant extends Model
         return $this->categoryModel?->emoji ?: '🏪';
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @return BelongsTo<City, $this>
+     */
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
     }
 
+    /**
+     * @return BelongsTo<MerchantCategory, $this>
+     */
     public function categoryModel(): BelongsTo
     {
         return $this->belongsTo(MerchantCategory::class, 'category', 'slug');

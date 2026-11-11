@@ -14,8 +14,8 @@ class CreateCourier extends CreateRecord
     {
         if (empty($data['current_lat']) || empty($data['current_lng'])) {
             $city = City::find($data['city_id'] ?? null);
-            $data['current_lat'] = $city?->center_lat ?? 6.8770;
-            $data['current_lng'] = $city?->center_lng ?? -6.4502;
+            $data['current_lat'] = $city->center_lat ?? 6.8770;
+            $data['current_lng'] = $city->center_lng ?? -6.4502;
         }
 
         return $data;

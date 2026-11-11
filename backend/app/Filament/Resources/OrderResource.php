@@ -74,7 +74,7 @@ class OrderResource extends Resource
                         SearchableSelect::make('courier_id')
                             ->label('Livreur')
                             ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => $query->with('user')->orderBy('id'))
-                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}").($record->user?->phone ? " ({$record->user->phone})" : '')),
+                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user->name ?? "Livreur #{$record->id}").($record->user?->phone ? " ({$record->user->phone})" : '')),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Détails Financiers (F CFA)')
@@ -360,7 +360,7 @@ class OrderResource extends Resource
                         Forms\Components\Select::make('courier_id')
                             ->label('Nouveau livreur assigné')
                             ->options(fn () => Courier::where('is_active', true)->with('user')->get()->mapWithKeys(
-                                fn ($courier) => [$courier->id => ($courier->user?->name ?? "Livreur #{$courier->id}").($courier->vehicle_plate ? " ({$courier->vehicle_plate})" : '')]
+                                fn ($courier) => [$courier->id => ($courier->user->name ?? "Livreur #{$courier->id}").($courier->vehicle_plate ? " ({$courier->vehicle_plate})" : '')]
                             ))
                             ->searchable()
                             ->required(),

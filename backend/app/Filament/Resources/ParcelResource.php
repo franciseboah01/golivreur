@@ -63,7 +63,7 @@ class ParcelResource extends Resource
                         SearchableSelect::make('courier_id')
                             ->label('Livreur assigné')
                             ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => $query->with('user')->orderBy('id'))
-                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user?->name ?? "Livreur #{$record->id}").($record->user?->phone ? " ({$record->user->phone})" : '')),
+                            ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user->name ?? "Livreur #{$record->id}").($record->user?->phone ? " ({$record->user->phone})" : '')),
                         Forms\Components\TextInput::make('recipient_name')
                             ->label('Nom du Destinataire')
                             ->required(),

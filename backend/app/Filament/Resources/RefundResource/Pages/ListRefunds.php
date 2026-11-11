@@ -40,7 +40,7 @@ class ListRefunds extends ListRecords
                         ->label('Commande GoShop concernée')
                         ->options(fn () => SearchableSelect::sortedOptions(
                             Order::latest()->limit(50)->get()->mapWithKeys(
-                                fn ($o) => [$o->id => "#{$o->order_number} - {$o->total} F CFA ({$o->client?->name})"]
+                                fn (Order $o) => [$o->id => "#{$o->id} - {$o->total_client} F CFA ({$o->client?->name})"]
                             )->toArray()
                         ))
                         ->visible(fn (Forms\Get $get) => $get('contexte') === 'order')
@@ -50,7 +50,7 @@ class ListRefunds extends ListRecords
                         ->label('Colis GoColis concerné')
                         ->options(fn () => SearchableSelect::sortedOptions(
                             Parcel::latest()->limit(50)->get()->mapWithKeys(
-                                fn ($p) => [$p->id => "#{$p->tracking_number} - Déclaré {$p->declared_value} F CFA"]
+                                fn (Parcel $p) => [$p->id => "#{$p->id} - Déclaré {$p->declared_value} F CFA"]
                             )->toArray()
                         ))
                         ->visible(fn (Forms\Get $get) => $get('contexte') === 'parcel')
@@ -106,15 +106,17 @@ class ListRefunds extends ListRecords
 
                     // Traitement selon contexte
                     if ($data['contexte'] === 'order') {
+                        /** @var Order $order */
                         $order = Order::findOrFail($data['order_id']);
                         $ownerType = 'courier';
                         $ownerId = $order->courier_id ?? $order->client_id;
-                        $desc = "Remboursement commande #{$order->order_number} : ".$data['motif'];
+                        $desc = "Remboursement commande #{$order->id} : ".$data['motif'];
                     } else {
+                        /** @var Parcel $parcel */
                         $parcel = Parcel::findOrFail($data['parcel_id']);
                         $ownerType = 'courier';
                         $ownerId = $parcel->courier_id ?? $parcel->sender_id;
-                        $desc = "Indemnisation colis #{$parcel->tracking_number} : ".$data['motif'];
+                        $desc = "Indemnisation colis #{$parcel->id} : ".$data['motif'];
                         $parcel->update(['status' => 'refunded']);
                     }
 

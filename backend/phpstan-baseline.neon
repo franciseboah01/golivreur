@@ -1,0 +1,19 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Access to an undefined property App\\Filament\\Pages\\SettingsPage\:\:\$form\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Pages/SettingsPage.php
+
+		-
+			message: '#^Property ''photo_url'' is not a computed property, remove from \$appends\.$#'
+			identifier: rules.modelAppends
+			count: 1
+			path: app/Models/Courier.php
+
+		-
+			message: '#^Property ''photo_url'' is not a computed property, remove from \$appends\.$#'
+			identifier: rules.modelAppends
+			count: 1
+			path: app/Models/Merchant.php

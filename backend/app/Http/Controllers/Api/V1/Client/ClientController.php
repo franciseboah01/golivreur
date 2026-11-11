@@ -42,7 +42,7 @@ class ClientController extends Controller
      */
     public function merchants(Request $request): JsonResponse
     {
-        $cityId = $request->input('city_id', auth()->user()?->city_id ?? 1);
+        $cityId = $request->input('city_id', auth()->user()->city_id ?? 1);
 
         $merchants = Merchant::query()
             ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
@@ -192,7 +192,7 @@ class ClientController extends Controller
             ['max_km' => 99, 'normal' => 1500, 'pointe' => 1800, 'pluie' => 2000],
         ];
 
-        $isRainMode = (bool) ($city?->rain_mode_active ?? false);
+        $isRainMode = (bool) ($city->rain_mode_active ?? false);
         $branding = $settingsService->getBranding();
 
         $neighborhoods = $city
@@ -218,7 +218,7 @@ class ClientController extends Controller
                 'city_name' => $city?->name,
                 'rain_mode_active' => $isRainMode,
                 'rain_delay_minutes' => $isRainMode ? 15 : 0,
-                'emergency_mode_active' => (bool) ($city?->emergency_mode_active ?? false),
+                'emergency_mode_active' => (bool) ($city->emergency_mode_active ?? false),
                 'emergency_mode_message' => $city?->emergency_mode_message,
                 'center_lat' => $city?->center_lat !== null ? (float) $city->center_lat : null,
                 'center_lng' => $city?->center_lng !== null ? (float) $city->center_lng : null,
@@ -265,7 +265,8 @@ class ClientController extends Controller
             'is_default' => ['sometimes', 'boolean'],
         ]);
 
-        $address = DB::transaction(function () use ($user, $validated) {
+        /** @var ClientAddress $address */
+        $address = DB::transaction(function () use ($user, $validated): ClientAddress {
             $hasExisting = $user->addresses()->exists();
             $makeDefault = (bool) ($validated['is_default'] ?? ! $hasExisting);
 
@@ -278,6 +279,7 @@ class ClientController extends Controller
                 $cityId = City::where('is_active', true)->value('id');
             }
 
+            /** @var ClientAddress $addr */
             $addr = $user->addresses()->create([
                 'city_id' => $cityId,
                 'label' => trim($validated['label']),
@@ -447,7 +449,7 @@ class ClientController extends Controller
         return [
             'id' => $address->id,
             'city_id' => $address->city_id,
-            'city_name' => $address->city?->name ?? 'Daloa',
+            'city_name' => $address->city->name ?? 'Daloa',
             'label' => $address->label,
             'neighborhood' => $address->neighborhood,
             'address_line' => $address->address_line,

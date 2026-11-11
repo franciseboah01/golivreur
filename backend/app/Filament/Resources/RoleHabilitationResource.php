@@ -70,7 +70,11 @@ class RoleHabilitationResource extends Resource
                             ->gridDirection('row')
                             ->bulkToggleable()
                             ->required()
-                            ->minItems(1, 'Veuillez cocher au moins un onglet autorisé.'),
+                            ->minItems(1)
+                            ->validationMessages([
+                                'min' => 'Veuillez cocher au moins un onglet autorisé.',
+                                'required' => 'Veuillez cocher au moins un onglet autorisé.',
+                            ]),
                     ]),
             ]);
     }

@@ -15,8 +15,8 @@ class CreateMerchant extends CreateRecord
     {
         if (empty($data['lat']) || empty($data['lng'])) {
             $city = City::find($data['city_id'] ?? null);
-            $data['lat'] = $city?->center_lat ?? 6.8770;
-            $data['lng'] = $city?->center_lng ?? -6.4502;
+            $data['lat'] = $city->center_lat ?? 6.8770;
+            $data['lng'] = $city->center_lng ?? -6.4502;
         }
 
         if (empty($data['emoji']) && ! empty($data['category'])) {

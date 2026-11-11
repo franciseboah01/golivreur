@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
+/**
+ * @property-read string|null $photo_url
+ */
 class User extends Authenticatable implements FilamentUser, JWTSubject
 {
     use HasFactory, SoftDeletes;
@@ -133,36 +136,57 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
 
     // ─── Relations ────────────────────────────────────────────────────────────
 
+    /**
+     * @return BelongsTo<City, $this>
+     */
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
     }
 
+    /**
+     * @return HasOne<Merchant, $this>
+     */
     public function merchant(): HasOne
     {
         return $this->hasOne(Merchant::class);
     }
 
+    /**
+     * @return HasOne<Courier, $this>
+     */
     public function courier(): HasOne
     {
         return $this->hasOne(Courier::class);
     }
 
+    /**
+     * @return HasMany<Order, $this>
+     */
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class, 'client_id');
     }
 
+    /**
+     * @return HasMany<Parcel, $this>
+     */
     public function parcels(): HasMany
     {
         return $this->hasMany(Parcel::class, 'sender_id');
     }
 
+    /**
+     * @return HasMany<Notification, $this>
+     */
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);
     }
 
+    /**
+     * @return HasMany<ClientAddress, $this>
+     */
     public function addresses(): HasMany
     {
         return $this->hasMany(ClientAddress::class);

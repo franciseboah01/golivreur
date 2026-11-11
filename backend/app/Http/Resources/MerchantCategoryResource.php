@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\MerchantCategory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,6 +18,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * - emoji       (string)      : Emoji configuré dans l'admin (fallback "🏪")
  * - logo_url    (string|null) : URL publique du logo uploadé, ou null si absent
  * - is_active   (bool)        : Statut d'activation
+ *
+ * @mixin MerchantCategory
+ * @mixin MerchantCategory
  */
 class MerchantCategoryResource extends JsonResource
 {

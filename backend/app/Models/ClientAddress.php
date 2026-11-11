@@ -39,7 +39,7 @@ class ClientAddress extends Model
      */
     public function formattedFullAddress(): string
     {
-        $cityName = $this->city?->name ?? 'Daloa';
+        $cityName = $this->city->name ?? 'Daloa';
         $details = trim((string) $this->address_line);
 
         if ($details === '') {
