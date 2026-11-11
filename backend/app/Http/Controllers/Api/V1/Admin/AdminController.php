@@ -8,6 +8,7 @@ use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Parcel;
+use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,13 @@ use Illuminate\Http\Request;
 
 class AdminController extends Controller
 {
+    private const LOCAL_ROLES = [
+        'city_agent',
+        'city_support',
+        'city_finance',
+        'city_manager',
+    ];
+
     private const PLAFONDS_REMBOURSEMENT = [
         'city_agent' => 0,
         'city_support' => 2000,
@@ -53,6 +61,14 @@ class AdminController extends Controller
         ]);
 
         $user = auth()->user();
+
+        if ($this->estHorsVilleLocale($user, (int) $order->city_id)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Commande introuvable.',
+            ], 404);
+        }
+
         $montant = (float) $request->input('montant');
         $plafond = self::PLAFONDS_REMBOURSEMENT[$user->role] ?? 0;
 
@@ -84,6 +100,14 @@ class AdminController extends Controller
     public function parcelRefund(Request $request, Parcel $parcel, WalletService $walletService): JsonResponse
     {
         $user = auth()->user();
+
+        if ($this->estHorsVilleLocale($user, (int) $parcel->city_id)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Expédition introuvable.',
+            ], 404);
+        }
+
         $montant = (float) $request->input('montant', $parcel->declared_value);
         $plafond = self::PLAFONDS_REMBOURSEMENT[$user->role] ?? 0;
 
@@ -222,5 +246,14 @@ class AdminController extends Controller
                 'couriers_online' => $couriersOnline,
             ],
         ]);
+    }
+
+    private function estHorsVilleLocale(?User $user, int $resourceCityId): bool
+    {
+        if (! $user || ! in_array($user->role, self::LOCAL_ROLES, true)) {
+            return false;
+        }
+
+        return ! $user->city_id || $resourceCityId !== (int) $user->city_id;
     }
 }
