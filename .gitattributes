@@ -1,0 +1,6 @@
+*.php text eol=lf
+*.dart text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.neon text eol=lf
