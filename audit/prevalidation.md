@@ -1,73 +1,132 @@
-# Prévalidation Globale — GoLivreur (Bloc D)
+# Prévalidation Globale — GoLivreur (Contrôle Qualité)
 
-> **Rôle :** Contrôleur qualité — aucune modification de code métier effectuée.  
-> **Base vérifiée avant exécution :** `backend/.env` → `APP_ENV=local`, `DB_CONNECTION=pgsql`, `DB_HOST=127.0.0.1`, `DB_DATABASE=golivreur_dev`.
-
----
-
-## Tableau de synthèse des vérifications (dans l'ordre d'exécution)
-
-| # | Dossier | Commande | Résultat | Ligne de résumé / Extrait d'erreur | Fichiers concernés | Dû aux Blocs A/B ? |
-|---|---------|----------|----------|-----------------------------------|--------------------|-------------------|
-| 1 | `backend/` | `php artisan migrate:fresh --seed` | **OK** | `26` migrations `DONE` + `DaloaSeeder`, `DemoOrdersAndParcelsSeeder`, `RoleHabilitationSeeder` `DONE` (exit `0`). | `backend/database/migrations/*`, `backend/database/seeders/*` | Non |
-| 2 | `backend/` | `php artisan test` | **OK** | `Tests:    102 passed (526 assertions)` — `Duration: 144.74s` (exit `0`). | `backend/tests/Feature/**/*` | Inclut tests A & B (`ParcelCodeSecurityTest`, `CommissionServiceTest` : tous passés) |
-| 3 | `backend/` | `php vendor/bin/phpstan analyse` (`phpstan.neon`, niveau `5`) | **ÉCHEC** (exit `1`) | `[ERROR] Found 99 errors` (sur `149` fichiers analysés sous `app/`). | **18 fichiers préexistants** (liste détaillée ci-dessous ; `0` erreur dans `ParcelController.php`, `ParcelService.php`, `CommissionService.php`). | **Non** |
-| 4 | `backend/` | `php vendor/bin/pint --test` | **ÉCHEC** (exit `1`) | `{"tool":"pint","result":"fail","files":[...]}` : **187 fichiers** en échec de formatage. | Ensemble du dépôt `backend/` (`ParcelController.php`, `ParcelCodeSecurityTest.php` et `CommissionServiceTest.php` passent Pint ; `ParcelService.php` échoue sur des règles de style déjà présentes avant Bloc A + FQCN `\App\Models\Courier`). | **Non** (préexistant hors tests créés) |
-| 5a | `mobile/packages/core` | `flutter analyze` | **OK** | `No issues found! (ran in 70.6s)` (exit `0`). | `mobile/packages/core/lib/**/*` | Non |
-| 5b | `mobile/packages/core` | `flutter test` | **ÉCHEC** (exit `1`) | `Test directory "test" not found.` | `mobile/packages/core/` (dossier `test/` absent) | **Non** |
-| 5c | `mobile/apps/golivreur_client` | `flutter analyze` | **ÉCHEC** (exit `1`) | `5 issues found. (ran in 22.4s)` (`info - prefer_const_constructors`). | `mobile/apps/golivreur_client/lib/mocks/mock_gocolis_api.dart:168,178,183,208,218` | **Non** |
-| 5d | `mobile/apps/golivreur_client` | `flutter test` | **ÉCHEC** (exit `1`) | `00:04 +0 -3: Some tests failed.` — `A Timer is still pending even after the widget tree was disposed.` (`Failed assertion: line 2543 pos 12: '!timersPending'`). | `mobile/apps/golivreur_client/test/widget_test.dart` (3 tests : splash, login, `MainNavigationScreen` via timers HTTP `DioMixin` dans `AppBrandingNotifier.chargerBranding`, `WeatherNotifier.chargerStatutVille`, `AuthNotifier.chargerProfil`) | **Non** |
-| 5e | `mobile/apps/golivreur_business` | `flutter analyze` | **ÉCHEC** (exit `1`) | `2 issues found. (ran in 6.1s)` (`info - prefer_const_constructors`). | `mobile/apps/golivreur_business/lib/features/auth/screens/business_login_screen.dart:141,142` | **Non** |
-| 5f | `mobile/apps/golivreur_business` | `flutter test` | **ÉCHEC** (exit `1`) | `00:03 +2 -1: Some tests failed.` (`BusinessMainNavigationScreen - affiche les 4 onglets avec Profil` : `A Timer is still pending even after the widget tree was disposed.`). | `mobile/apps/golivreur_business/test/widget_test.dart` (`BusinessProfileNotifier.chargerProfil` → `DioMixin`) | **Non** |
-| 5g | `mobile/apps/golivreur_driver` | `flutter analyze` | **ÉCHEC** (exit `1`) | `2 issues found. (ran in 25.8s)` (`info - prefer_const_constructors`). | `mobile/apps/golivreur_driver/lib/features/auth/screens/driver_login_screen.dart:141,142` | **Non** |
-| 5h | `mobile/apps/golivreur_driver` | `flutter test` | **ÉCHEC** (exit `1`) | `00:03 +2 -1: Some tests failed.` (`DriverMainNavigationScreen - affiche les 4 onglets avec Profil` : `A Timer is still pending even after the widget tree was disposed.`). | `mobile/apps/golivreur_driver/test/widget_test.dart` (`DriverProfileNotifier.chargerProfil` → `DioMixin`) | **Non** |
-| 6 | `backend/` | `php artisan route:list --path=api` | **OK** | `Showing [94] routes` (`88` contrôleurs/méthodes vérifiés existants par réflexion PHP, `6` routes `Closure` valides, `0` contrôleur ou méthode manquant). | `backend/routes/api.php`, routes Horizon & Scramble | Non |
+> **Rôle :** Contrôleur qualité — **aucune modification de code métier, de tests ou de configuration** ; seul `audit/prevalidation.md` est rédigé.  
+> **Branche / Commit vérifié :** `develop` (`943a32b` aligné avec `origin/develop`).  
+> **Bases vérifiées sans `migrate:fresh` sur dev :** `golivreur_dev` (`backend/.env` : `DB_CONNECTION=pgsql`, `DB_HOST=127.0.0.1`, `DB_PORT=5432`, `DB_DATABASE=golivreur_dev`) et `golivreur_testing`.
 
 ---
 
-## Détail des échecs listés (sans modification)
+## Tableau de synthèse des vérifications
 
-### 1. PHPStan niveau 5 (`99 errors` dans `18` fichiers)
-- `Http\Resources\BusinessProfileResource.php` (`22`) — accès propriétés non typées `$this->merchant`, `$this->id`, etc. et nullsafe `?->` superflu.
-- `Http\Resources\DriverProfileResource.php` (`18`) — accès propriétés non typées et nullsafe `?->` superflu.
-- `Http\Resources\MerchantResource.php` (`17`) — accès propriétés non typées sur `JsonResource`.
-- `Http\Resources\ClientProfileResource.php` (`11`) — accès propriétés non typées sur `JsonResource`.
-- `Http\Resources\MerchantCategoryResource.php` (`8`) — accès propriétés non typées sur `JsonResource`.
-- `Http\Controllers\Api\V1\Client\ClientController.php` (`6`) — type `Closure(ClientAddress)` sur `Collection<Model>` (L238, L292) et `?->` inutiles (L38, L188, L214, L443).
-- `Filament\Pages\SettingsPage.php` (`2`) — propriété `$form` non résolue (L65, L389).
-- `Filament\Resources\RefundResource\Pages\ListRefunds.php` (`2`) — propriétés inexistantes `$order->order_number` (L108) et `$parcel->tracking_number` (L113).
-- `Filament\Resources\CourierResource\Pages\CreateCourier.php` (`2`) — `?->center_lat/lng` inutiles (L18, L19).
-- `Filament\Resources\MerchantResource\Pages\CreateMerchant.php` (`2`) — `?->center_lat/lng` inutiles (L19, L20).
-- `Filament\Resources\OrderResource.php` (`2`) — `?->name` inutile (L74, L360).
-- `Filament\Pages\DisputesPage.php` (`1`) — `?->phone` inutile (L69).
-- `Filament\Resources\ParcelResource.php` (`1`) — `?->name` inutile (L64).
-- `Filament\Resources\RoleHabilitationResource.php` (`1`) — `CheckboxList::minItems()` appelé avec 2 arguments (L72).
-- `Http\Controllers\Api\V1\Merchant\MerchantController.php` (`1`) — `?->name` inutile (L35).
-- `Models\ClientAddress.php` (`1`) — `?->name` inutile (L42).
-- `Models\Courier.php` (`1`) — `'photo_url'` déclaré dans `$appends` sans accesseur calculé (L52).
-- `Models\Merchant.php` (`1`) — `'photo_url'` déclaré dans `$appends` sans accesseur calculé (L46).
-
-### 2. Laravel Pint (`187` fichiers en échec)
-- Principalement des écarts de style préexistants (`line_ending`, `single_blank_line_at_eof`, `binary_operator_spaces`, `single_import_per_statement`, `concat_space`, `no_unused_imports`, `fully_qualified_strict_types`).
-- Concernant les fichiers modifiés ou ajoutés dans les Blocs A et B :
-  - `ParcelController.php`, `ParcelCodeSecurityTest.php` et `CommissionServiceTest.php` passent `pint --test`.
-  - `ParcelService.php` (comme `CommissionService.php`, non modifié) échoue sur des règles déjà présentes avant le Bloc A (`single_import_per_statement`, `type_declaration_spaces`, `unary_operator_spaces`, `braces_position`, `not_operator_with_successor_space`, `single_line_empty_body`, `binary_operator_spaces`, `fully_qualified_strict_types`).
-
-### 3. Tests et analyse Flutter
-- `packages/core` : aucun dossier `test/` (`flutter test` retourne code `1`).
-- `golivreur_client` : 5 avertissements `prefer_const_constructors` dans `lib/mocks/mock_gocolis_api.dart`, et `3/3` tests de `test/widget_test.dart` échouent (`!timersPending` à cause d'appels `Dio` déclenchés au montage sans mock/override dans les tests).
-- `golivreur_business` : 2 avertissements `prefer_const_constructors` dans `lib/features/auth/screens/business_login_screen.dart:141-142`, et `1/3` test échoue dans `test/widget_test.dart` (`BusinessMainNavigationScreen`, `!timersPending`).
-- `golivreur_driver` : 2 avertissements `prefer_const_constructors` dans `lib/features/auth/screens/driver_login_screen.dart:141-142`, et `1/3` test échoue dans `test/widget_test.dart` (`DriverMainNavigationScreen`, `!timersPending`).
-
-### 4. Vérification des routes API (`php artisan route:list --path=api`)
-- `94` routes listées (`api/v1/*`, `docs/api*`, `horizon/api/*`).
-- `88` actions contrôleurs vérifiées (`class_exists` et `method_exists` tous vrais) + `6` closures légitimes (`api/v1/health`, `api/v1/branding`, `api/v1/vehicle-types`, `api/v1/cities`, `docs/api`, `docs/api.json`). Aucune route cassée.
+| # | Périmètre | Commande | Résultat exact | Statut |
+|---|-----------|----------|----------------|--------|
+| 1a | Racine Git | `git status -s -b` | `## develop...origin/develop` ; `10` fichiers signalés `M` avant rédaction de ce fichier : `audit/decisions-argent-statut.md` (`+1` ligne vide en fin de fichier) et `9` fichiers `backend/tests/Feature/Security/*.php` (`0` diff sémantique sous `git diff --ignore-cr-at-eol --stat`, avertissement `LF will be replaced by CRLF`) | **ÉCHEC** (working tree non propre ; aucune régression de contenu) |
+| 1b | Racine Git | `git log --oneline -n 15` | `15` commits listés de `943a32b` à `e5f5dae` (cf. section 1) | **OK** |
+| 1c | Config PHPStan | `git diff --stat a2600a8 HEAD -- backend/phpstan.neon backend/phpstan-baseline.neon` | Sortie vide (`0` modification depuis `a2600a8`) ; baseline limité à `4` faux positifs connus (`3` règles) | **OK** |
+| 2a | Backend Tests | `php artisan test` | `Tests:    317 passed (1834 assertions)` — `Duration: 105.99s` (base `golivreur_testing` via `phpunit.xml`) | **OK** |
+| 2b | Backend Analyse | `php vendor/bin/phpstan analyse --no-progress --memory-limit=1G` | `Note: Using configuration file C:\Projets\golivreur\backend\phpstan.neon.` — `[OK] No errors` (niveau `5`) | **OK** |
+| 2c | Backend Style | `php vendor/bin/pint --test` | `{"tool":"pint","result":"passed"}` | **OK** |
+| 2d | Migrations Dev | `php artisan migrate:status` (`DB_DATABASE=golivreur_dev`) | `28/28` migrations `[Ran]` (Batch `1`, `2` pour `2026_11_11_120000_add_cash_remittance_constraints_and_indexes`, `3` pour `2026_11_11_130000_create_refunds_table`) | **OK** |
+| 2e | Migrations Test | `php artisan migrate:status` (`DB_DATABASE=golivreur_testing`) | `28/28` migrations `[Ran]` (Batch `1`, y compris les `2` migrations du `2026-11-11`) | **OK** |
+| 3 | Routes API | `php artisan route:list --path=api --json` + vérification PHP `class_exists`/`method_exists` | `TOTAL_API_ROUTES=101`, `CONTROLLER_ROUTES_OK=95`, `CLOSURES=6`, `MISSING_COUNT=0` (`7` nouvelles routes API depuis `7012825`) | **OK** |
+| 4a | Flutter `packages/core` | `flutter analyze --no-pub` / `flutter test --no-pub` | `No issues found! (ran in 2.8s)` / `00:02 +7: All tests passed!` | **OK** |
+| 4b | Flutter `golivreur_client` | `flutter analyze --no-pub` / `flutter test --no-pub` | `No issues found! (ran in 3.7s)` / `00:03 +3: All tests passed!` | **OK** |
+| 4c | Flutter `golivreur_business` | `flutter analyze --no-pub` / `flutter test --no-pub` | `No issues found! (ran in 3.9s)` / `00:04 +3: All tests passed!` | **OK** |
+| 4d | Flutter `golivreur_driver` | `flutter analyze --no-pub` / `flutter test --no-pub` | `No issues found! (ran in 3.7s)` / `00:02 +3: All tests passed!` | **OK** |
+| 5 | Mobile Driver GoColis | Recherche `/driver/parcels/{id}/accept|refuse` et écran offre colis dans `mobile/apps/golivreur_driver` | Appels API `/driver/parcels/{id}/accept|refuse` : **NON** (`driver_provider.dart:331,338` appellent `/driver/orders/$orderId/...`). Écran offre générique GoColis existant mais non branché | **ÉCHEC** (écart fonctionnel post-audit) |
+| 6 | Reliquats | Recherche `TODO`, `FIXME`, `UnimplementedError`, `stub`, `Push notification envoyée` (`backend/` + `mobile/`) | `0` `TODO`/`FIXME`/`stub` ; `SendPushNotification.php:25` (`Push notification envoyée` simulé) ; `offline_sync_service.dart:199,208` (`UnimplementedError` Riverpod) ; `gocolis_course_provider.dart:11-87` (simulation locale) | **OK** (inventaire documenté ci-dessous) |
+| 7 | Hygiène Secrets | `git check-ignore -v` + inspection `git show` historique récent & fichiers sensibles | `backend/.env`, `.env`, `backend/.env.production`, `backend/storage/*.key` bien ignorés ; aucun secret de prod commité dans les 30 derniers commits (`phpunit.xml` et CI utilisent des identifiants de test locaux) | **OK** (remarque mineure : `.env.testing` non listé dans `.gitignore`) |
 
 ---
 
-**Prêt pour l'audit final : NON**
+## Détails par bloc de contrôle
 
-**Raison :**
-1. **Échecs techniques préexistants à corriger :** `phpstan analyse` (niveau 5) rapporte `99` erreurs (dont deux bogues réels dans `ListRefunds.php:108,113` sur `$order->order_number` et `$parcel->tracking_number`), `pint --test` échoue sur `187` fichiers, les 3 applications Flutter échouent à `flutter analyze` (`prefer_const_constructors`) et à `flutter test` (`!timersPending` dans les widget tests), et `packages/core` ne contient aucun dossier `test/`.
-2. **Décisions financières bloquantes non tranchées (`audit/decisions-argent.md`) :** les flux espèces (double crédit / absence de réconciliation) et remboursements (wallet livreur crédité au lieu du client, absence d'idempotence et plafonds contradictoires) nécessitent arbitrage et implémentation avant mise en production ou validation d'audit final.
+### 1. Git, historique et baseline PHPStan
+- **`git status -s -b`** (relevé avant écriture de `audit/prevalidation.md`) :
+  - `M audit/decisions-argent-statut.md` (`+1` ligne vide en fin de fichier par rapport à `bff6e79`).
+  - `M` sur 9 fichiers de tests (`backend/tests/Feature/Security/D3ConfirmPickupSecurityTest.php`, `D5ShowDriverParcelSecurityTest.php`, `P1ParcelCodeCitySecurityTest.php`, `S3WebhookReplaySecurityTest.php`, `S4RatingSecurityTest.php`, `S5ClientCatalogAndOrderSecurityTest.php`, `S6DriverAvailabilitySecurityTest.php`, `S8AssignmentCityIsolationSecurityTest.php`, `SweepIdorSecurityTest.php`) uniquement liés aux fins de ligne `LF`/`CRLF` (`0` ligne modifiée sous `git diff --ignore-cr-at-eol --stat`).
+- **`git log --oneline -n 15`** :
+  ```text
+  943a32b feat(gocolis,driver): flux livreur acceptation/refus et notification reelle
+  be62a60 fix(filament,chart): filtrer orange_money dans PaymentMethodsChart et tester les compteurs
+  f8ea284 fix(refunds): bornes strictes CDC 8.5 (D-REMB-1) et plafonds colis chap. 6
+  bff6e79 docs(audit): bilan decisions-argent-statut.md et verification callers WalletService
+  af7043e fix(finance,refunds): table refunds, source unique settings et eligibilite stricte CDC 8.5
+  dee87ba fix(finance,cash): regles especes CDC 7.4.1, index unique et reversement sans double credit
+  3dee402 test,fix(settings): verrouiller baremes CDC 8.1-8.4 et preserver cles absentes dans SettingsPage
+  a2600a8 docs: décisions tarifaires du fondateur
+  7012825 docs(security): journaliser D-LIVREUR-1 D-VILLE-1 D-ROLE-1 D-MERCHANT-1 et clore balayage-autorisations
+  13d4014 fix(security): appliquer decisions fondateur courses uniques ville profil city_agent merchant suspendu
+  52b1454 fix(security,tests): corriger tests errones et durcir statut livrable et ville GoColis
+  5369cf3 test(security): ajouter balayage IDOR complet et matrice audit/balayage-autorisations.md
+  d28bc78 fix(security): grouper condition penalty_until dans AssignmentService sans fuite inter-villes
+  4920676 fix(security): bloquer contournement penalite et suspension sur availability
+  9dfb48d fix(security): bloquer commerces inactifs et verifier produits du commerce a la commande
+  ```
+- **Contrôle `phpstan.neon` et `phpstan-baseline.neon` depuis `a2600a8`** :
+  - `git diff --stat a2600a8 HEAD -- backend/phpstan.neon backend/phpstan-baseline.neon` → aucune différence.
+  - `backend/phpstan.neon` : `level: 5`, `paths: [app]`, `treatPhpDocTypesAsCertain: false`, `reportUnmatchedIgnoredErrors: true`, aucune section `ignoreErrors` ajoutée.
+  - `backend/phpstan-baseline.neon` : contient strictement les `3` entrées / `4` faux positifs connus :
+    1. `app/Filament/Pages/SettingsPage.php` (`count: 2`) — `Access to an undefined property App\Filament\Pages\SettingsPage::$form.` (`property.notFound`).
+    2. `app/Models/Courier.php` (`count: 1`) — `Property 'photo_url' is not a computed property, remove from $appends.` (`rules.modelAppends`).
+    3. `app/Models/Merchant.php` (`count: 1`) — `Property 'photo_url' is not a computed property, remove from $appends.` (`rules.modelAppends`).
 
+### 2. Backend (Tests, Larastan, Pint, Migrations)
+- **`php artisan test`** : `Tests:    317 passed (1834 assertions)` en `105.99s` (zéro test ignoré ou en échec).
+- **`php vendor/bin/phpstan analyse --no-progress --memory-limit=1G`** : `[OK] No errors` (niveau 5).
+- **`php vendor/bin/pint --test`** : `{"tool":"pint","result":"passed"}`.
+- **`php artisan migrate:status`** :
+  - Sur `golivreur_dev` : toutes les `28` migrations sont `Ran` (`2026_11_11_120000_add_cash_remittance_constraints_and_indexes` en Batch `[2]` et `2026_11_11_130000_create_refunds_table` en Batch `[3]`).
+  - Sur `golivreur_testing` : toutes les `28` migrations sont `Ran` (Batch `[1]`), y compris les deux migrations du `2026-11-11`.
+
+### 3. Routes API (`php artisan route:list --path=api --json`)
+- **Total vérifié :** `101` routes (`95` actions de contrôleurs vérifiées via `class_exists` et `method_exists` → `0` manquante ; `6` routes `Closure`).
+- **Nouvelles routes ajoutées depuis le contrôle précédent (`7012825` / `a2600a8`) :**
+  1. `POST api/v1/driver/parcels/{parcel}/accept` → `App\Http\Controllers\Api\V1\Driver\DriverController@acceptParcel`
+  2. `POST api/v1/driver/parcels/{parcel}/refuse` → `App\Http\Controllers\Api\V1\Driver\DriverController@refuseParcel`
+  3. `POST api/v1/admin/parcels/{parcel}/declare-lost` → `App\Http\Controllers\Api\V1\Admin\AdminController@declareParcelLost`
+  4. `POST api/v1/admin/refunds` → `App\Http\Controllers\Api\V1\Admin\AdminController@requestRefund`
+  5. `POST api/v1/admin/refunds/{refund}/approve` → `App\Http\Controllers\Api\V1\Admin\AdminController@approveRefund`
+  6. `POST api/v1/admin/refunds/{refund}/mark-paid` → `App\Http\Controllers\Api\V1\Admin\AdminController@markRefundPaid`
+  7. `POST api/v1/admin/refunds/{refund}/reject` → `App\Http\Controllers\Api\V1\Admin\AdminController@rejectRefund`
+
+### 4. Flutter (4 paquets, mode `--no-pub`)
+- `mobile/packages/core` : `flutter analyze --no-pub` → `No issues found! (ran in 2.8s)` ; `flutter test --no-pub` → `00:02 +7: All tests passed!`.
+- `mobile/apps/golivreur_client` : `flutter analyze --no-pub` → `No issues found! (ran in 3.7s)` ; `flutter test --no-pub` → `00:03 +3: All tests passed!`.
+- `mobile/apps/golivreur_business` : `flutter analyze --no-pub` → `No issues found! (ran in 3.9s)` ; `flutter test --no-pub` → `00:04 +3: All tests passed!`.
+- `mobile/apps/golivreur_driver` : `flutter analyze --no-pub` → `No issues found! (ran in 3.7s)` ; `flutter test --no-pub` → `00:02 +3: All tests passed!`.
+
+### 5. Recherche dans `mobile/apps/golivreur_driver` (Flux GoColis)
+- **Appel à `/driver/parcels/{id}/accept` ou `/driver/parcels/{id}/refuse` :** **NON** — aucune occurrence trouvée dans `mobile/apps/golivreur_driver/lib` ni `test`.
+  - Les seuls appels d'acceptation/refus présents sont câblés sur les commandes GoShop dans `mobile/apps/golivreur_driver/lib/features/driver/providers/driver_provider.dart:331` (`_api?.post('/driver/orders/$orderId/accept')`) et `mobile/apps/golivreur_driver/lib/features/driver/providers/driver_provider.dart:338` (`_api?.post('/driver/orders/$orderId/refuse')`).
+- **Écran d'offre de colis :** **UI générique présente mais non branchée à l'API GoColis** :
+  - `mobile/apps/golivreur_driver/lib/features/jobs/screens/driver_jobs_screen.dart:315-381` affiche la carte d'offre (y compris `job.parcelSize` aux lignes `315-326`) avec les boutons `Refuser` (`:357`) et `Accepter la course` (`:374`) qui invoquent `refuseJob()`/`acceptJob()` (`driver_provider.dart:327-341`, pointant vers `/driver/orders/...`).
+  - `mobile/apps/golivreur_driver/lib/features/driver/providers/driver_provider.dart:393-402` ne crée une offre `DriverJobType.gocolis` que dans la méthode locale `simulateIncomingJob`.
+  - `mobile/apps/golivreur_driver/lib/features/gocolis/providers/gocolis_course_provider.dart:11-87` et `mobile/apps/golivreur_driver/lib/features/gocolis/screens/codes_gocolis_screen.dart:87,117,165` utilisent des réponses locales simulées (`Future.delayed`, codes `'1234'`, `ParcelModel` statique) sans appel API GoColis.
+
+### 6. Recherche de reliquats (`TODO`, `FIXME`, `UnimplementedError`, `stub`, `Push notification envoyée`)
+- **Backend (`backend/app`, `backend/routes`, `backend/database`, `backend/config`, `backend/resources`) :**
+  - `0` occurrence de `TODO`, `FIXME`, `stub`.
+  - `backend/app/Jobs/SendPushNotification.php:25` : `Log::info('Push notification envoyée', [` (envoi push simulé par journalisation sans requête HTTP FCM réelle).
+- **Mobile (`mobile/packages/core`, `golivreur_client`, `golivreur_business`, `golivreur_driver`) :**
+  - `0` occurrence de `TODO`, `FIXME`, `stub`.
+  - `mobile/apps/golivreur_driver/lib/offline/offline_sync_service.dart:199` : `throw UnimplementedError('À initialiser dans main.dart');` (provider `offlineSyncProvider` destiné à être overridé dans `main.dart`).
+  - `mobile/apps/golivreur_driver/lib/offline/offline_sync_service.dart:208` : `Provider<LocationService>((ref) => throw UnimplementedError());` (placeholder `locationServiceProvider`).
+
+### 7. Vérification des secrets et `.gitignore`
+- **`git check-ignore -v`** :
+  - `.env` ignoré (`.gitignore:2`), `backend/.env` ignoré (`backend/.gitignore:3`), `backend/.env.production` ignoré (`backend/.gitignore:5`), `backend/storage/oauth-private.key` et `backend/storage/oauth-public.key` ignorés (`backend/.gitignore:21`).
+  - Seul `backend/.env.example` (contenant des `CHANGE_ME`) est suivi pour les variables d'environnement ; `backend/.env.testing` n'est pas listé dans `.gitignore` / `backend/.gitignore` (mais aucun fichier `.env.testing` n'existe ni n'est suivi dans le dépôt).
+- **Historique récent (`30` derniers commits + contrôle des commits `def6992` / `0a91a58`) :**
+  - Aucun vrai secret de production (clé privée PEM/JKS/Firebase, token Twilio/Hub2, vrai `JWT_SECRET` de production) n'a été commité.
+  - Les workflows GitHub Actions utilisent `${{ secrets.* }}` et des valeurs de test (`JWT_SECRET=ci-test-secret`, `JWT_SECRET=ci-test-secret-key-not-used-in-prod`, `POSTGRES_PASSWORD: secret_test`).
+  - `backend/phpunit.xml:30,34` contient les paramètres de la base locale de test (`DB_PASSWORD=d4e0ab51fb82421d8180fd3d987e8101`, `JWT_SECRET=testing-secret-not-for-production`).
+
+---
+
+## Verdict
+
+**Prêt pour l'audit final : OUI** *(avec action Git requise avant le gel du tag d'audit)*
+
+**Justification :**  
+Tous les verrous techniques et qualité demandés sont au vert : `317/317` tests backend (`1834` assertions), Larastan niveau `5` à `0` erreur (baseline figé sur les `4` faux positifs connus depuis `a2600a8`), `pint --test` réussi, `28/28` migrations `Ran` sur `golivreur_dev` et `golivreur_testing`, `101/101` routes API valides (`0` contrôleur/méthode manquant), et `4/4` paquets Flutter sans erreur à `flutter analyze` ni à `flutter test`. Aucun vrai secret de production n'est exposé dans l'historique Git.  
+Seul le working tree Git nécessite une remise au propre avant de figer le commit d'audit (`audit/prevalidation.md` généré par ce contrôle, suppression de la ligne vide superflue dans `audit/decisions-argent-statut.md`, et normalisation des fins de ligne `LF` sur les `9` fichiers `backend/tests/Feature/Security/*.php`).
+
+---
+
+## Écarts connus à traiter après l'audit
+
+1. **Notifications push FCM simulées :** [`SendPushNotification.php:25`](file:///c:/Projets/golivreur/backend/app/Jobs/SendPushNotification.php#L25) journalise encore `Log::info('Push notification envoyée', ...)` sans appel réel à l'API Firebase Cloud Messaging.
+2. **Branchement mobile GoColis Driver :** dans `mobile/apps/golivreur_driver`, brancher l'écran d'offre et de course GoColis (`driver_jobs_screen.dart:315-381`, `driver_provider.dart:327-341`, `gocolis_course_provider.dart:11-87`) sur les endpoints backend réels `POST /api/v1/driver/parcels/{parcel}/accept`, `refuse`, photos et validation des codes expéditeur/destinataire (en supprimant les simulations `'1234'` et `Future.delayed`).
+3. **Providers offline/localisation Flutter Driver :** initialiser/implémenter `offlineSyncProvider` (`offline_sync_service.dart:199`) dans `main.dart` et remplacer le placeholder `locationServiceProvider` (`offline_sync_service.dart:208`).
+4. **Hygiène Git & configuration :** ajouter `.env.testing` à `backend/.gitignore` (ou `.gitignore` racine), nettoyer les fins de ligne CRLF/LF et veiller à ce que la vue d'aide [`login-credentials.blade.php`](file:///c:/Projets/golivreur/backend/resources/views/filament/admin/login-credentials.blade.php) reste strictement désactivée hors environnement local.
