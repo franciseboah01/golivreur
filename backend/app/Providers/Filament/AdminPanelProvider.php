@@ -19,6 +19,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\View\View;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -47,7 +48,9 @@ class AdminPanelProvider extends PanelProvider
             })
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
-                fn () => view('filament.admin.login-credentials'),
+                fn (): View|string => app()->isLocal()
+                    ? view('filament.admin.login-credentials')
+                    : '',
             )
             ->colors([
                 'primary' => Color::Amber,

@@ -1,3 +1,4 @@
+@if (app()->isLocal())
 <div class="mt-6 rounded-xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-800 dark:bg-gray-900/60 text-left">
     <div class="flex items-center gap-2 mb-3 text-amber-600 dark:text-amber-400 font-semibold text-xs uppercase tracking-wider">
         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,3 +84,4 @@
         }
     };
 </script>
+@endif
