@@ -18,8 +18,15 @@ class PendingMerchantsWidget extends BaseWidget
 
     public function table(Table $table): Table
     {
+        $user = auth()->user();
+        $query = Merchant::query()->where('is_active', false)->latest('created_at');
+
+        if ($user && $user->is_local_admin && $user->city_id) {
+            $query->where('city_id', $user->city_id);
+        }
+
         return $table
-            ->query(Merchant::query()->where('is_active', false)->latest('created_at'))
+            ->query($query)
             ->heading('🏪 Commerces Partenaires en Attente de Validation')
             ->description('Vérifiez les pièces justificatives, les coordonnées et activez les nouveaux commerces.')
             ->columns([

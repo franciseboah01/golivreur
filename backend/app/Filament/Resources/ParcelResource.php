@@ -39,6 +39,18 @@ class ParcelResource extends Resource
         return $user !== null && $user->hasHabilitationTab('parcels');
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = auth()->user();
+
+        if ($user && $user->is_local_admin && $user->city_id) {
+            $query->where('city_id', $user->city_id);
+        }
+
+        return $query;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

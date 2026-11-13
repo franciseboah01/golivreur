@@ -44,9 +44,16 @@ class ClientResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->where('role', 'client')
             ->latest();
+
+        $user = auth()->user();
+        if ($user && $user->is_local_admin && $user->city_id) {
+            $query->where('city_id', $user->city_id);
+        }
+
+        return $query;
     }
 
     public static function form(Form $form): Form

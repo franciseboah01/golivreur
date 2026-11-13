@@ -19,8 +19,15 @@ class PendingCouriersWidget extends BaseWidget
 
     public function table(Table $table): Table
     {
+        $user = auth()->user();
+        $query = Courier::query()->where('is_active', false)->latest('created_at');
+
+        if ($user && $user->is_local_admin && $user->city_id) {
+            $query->where('city_id', $user->city_id);
+        }
+
         return $table
-            ->query(Courier::query()->where('is_active', false)->latest('created_at'))
+            ->query($query)
             ->heading('🚴 Livreurs Partenaires en Attente de Validation')
             ->description('Vérifiez l\'identité, le véhicule et activez les comptes des nouveaux livreurs.')
             ->columns([
