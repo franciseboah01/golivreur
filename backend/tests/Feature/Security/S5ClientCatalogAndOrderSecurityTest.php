@@ -59,6 +59,8 @@ it('S5 commande GoShop: refuse 422 un produit indisponible ou d\'un autre commer
             'merchant_id' => $merchantA->id,
             'items' => [['product_id' => $unavailableProduct->id, 'quantity' => 1]],
             'delivery_address' => 'Quartier Commerce',
+            'delivery_lat' => 6.8800,
+            'delivery_lng' => -6.4510,
             'payment_method' => 'cash',
             'distance_km' => 2.0,
         ])
@@ -70,6 +72,8 @@ it('S5 commande GoShop: refuse 422 un produit indisponible ou d\'un autre commer
             'merchant_id' => $merchantA->id,
             'items' => [['product_id' => $otherProduct->id, 'quantity' => 1]],
             'delivery_address' => 'Quartier Commerce',
+            'delivery_lat' => 6.8800,
+            'delivery_lng' => -6.4510,
             'payment_method' => 'cash',
             'distance_km' => 2.0,
         ])
@@ -81,6 +85,8 @@ it('S5 commande GoShop: refuse 422 un produit indisponible ou d\'un autre commer
             'merchant_id' => $merchantA->id,
             'items' => [['product_id' => $validProduct->id, 'quantity' => 1]],
             'delivery_address' => 'Quartier Commerce',
+            'delivery_lat' => 6.8800,
+            'delivery_lng' => -6.4510,
             'payment_method' => 'cash',
             'distance_km' => 2.0,
         ])

@@ -10,6 +10,36 @@ class City extends Model
 {
     use HasFactory;
 
+    public const RAYON_MAX_VILLE_KM = 25.0;
+
+    public static function distanceHaversine(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $terreKm = 6371.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+
+        $a = sin($dLat / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return 2 * $terreKm * asin(min(1.0, sqrt($a)));
+    }
+
+    public function estDansLaVille(float $lat, float $lng): bool
+    {
+        if ($this->center_lat === null || $this->center_lng === null) {
+            return true;
+        }
+
+        $distance = self::distanceHaversine(
+            (float) $this->center_lat,
+            (float) $this->center_lng,
+            $lat,
+            $lng
+        );
+
+        return $distance <= self::RAYON_MAX_VILLE_KM;
+    }
+
     protected $fillable = [
         'name',
         'is_active',

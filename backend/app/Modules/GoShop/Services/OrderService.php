@@ -57,9 +57,28 @@ class OrderService
                     'city_id' => [$msg],
                 ]);
             }
+
+            // Vérification coordonnées de livraison dans la ville
+            $deliveryLat = (float) $donnees['delivery_lat'];
+            $deliveryLng = (float) $donnees['delivery_lng'];
+            if (! $city->estDansLaVille($deliveryLat, $deliveryLng)) {
+                throw ValidationException::withMessages([
+                    'delivery_lat' => ['Les coordonnées de livraison sont situées en dehors du périmètre de la ville.'],
+                ]);
+            }
+
+            // Calcul distance serveur Haversine entre merchant (pickup) et delivery (coef routier approché CDC = 1.0)
+            $haversineDistance = City::distanceHaversine(
+                (float) $merchant->lat,
+                (float) $merchant->lng,
+                $deliveryLat,
+                $deliveryLng
+            );
+            $distanceKm = max(0.1, round($haversineDistance * 1.0, 2));
+
             [$produitsTotal, $produitsResolus] = $this->resoudreProduitsEtTotal($merchant, $donnees['items']);
             $fraisLivraison = $this->commissionService->calculerFraisLivraison(
-                distance: $donnees['distance_km'],
+                distance: $distanceKm,
                 city: $city,
             );
             $commissions = $this->commissionService->calculerCommissions(
@@ -80,16 +99,17 @@ class OrderService
                 'merchant_amount' => $commissions['merchant'],
                 'courier_amount' => $commissions['livreur'],
                 'rain_mode_applied' => $city->rain_mode_active,
-                'peak_hours_applied' => $this->commissionService->estHeureDePointe(),
+                'peak_hours_applied' => $this->commissionService->estHeureDePointe($city->id),
                 'payment_method' => $donnees['payment_method'],
                 'payment_status' => $donnees['payment_method'] === 'cash'
                                             ? 'pending_cash' : 'pending',
                 'confirmation_code' => Hash::make((string) random_int(1000, 9999)),
                 'delivery_address' => $donnees['delivery_address'],
-                'delivery_lat' => $donnees['delivery_lat'] ?? null,
-                'delivery_lng' => $donnees['delivery_lng'] ?? null,
+                'delivery_lat' => $deliveryLat,
+                'delivery_lng' => $deliveryLng,
                 'pickup_lat' => $merchant->lat,
                 'pickup_lng' => $merchant->lng,
+                'distance_km' => $distanceKm,
                 'special_instructions' => $donnees['special_instructions'] ?? null,
             ]);
 

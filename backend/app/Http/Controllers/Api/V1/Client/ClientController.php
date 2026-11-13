@@ -97,10 +97,10 @@ class ClientController extends Controller
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'delivery_address' => 'required|string',
-            'delivery_lat' => 'nullable|numeric',
-            'delivery_lng' => 'nullable|numeric',
+            'delivery_lat' => 'required|numeric|between:-90,90',
+            'delivery_lng' => 'required|numeric|between:-180,180',
             'payment_method' => 'required|in:cash,orange_money,wave,mtn,moov',
-            'distance_km' => 'required|numeric|min:0.1',
+            'distance_km' => 'nullable|numeric',
             'special_instructions' => 'nullable|string',
         ]);
 

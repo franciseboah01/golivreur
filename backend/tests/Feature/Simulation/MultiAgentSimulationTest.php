@@ -166,6 +166,8 @@ class MultiAgentSimulationTest extends TestCase
                     ['product_id' => $productAlloco->id, 'quantity' => 1],  // 500 F CFA
                 ],
                 'delivery_address' => 'Quartier Lobia, en face de la pharmacie principale, Daloa',
+                'delivery_lat' => 6.8800,
+                'delivery_lng' => -6.4510,
                 'payment_method' => 'wave',
                 'distance_km' => 3.2,
             ]);
@@ -355,6 +357,7 @@ class MultiAgentSimulationTest extends TestCase
                 'pickup_lat' => 6.8821,
                 'pickup_lng' => -6.4478,
                 'size' => 'moyen',
+                'weight_kg' => 2.5,
                 'declared_value' => 30000, // Assurance 3% obligatoire
                 'description' => 'Documents et colis textile scellé',
                 'payment_method' => 'orange_money',

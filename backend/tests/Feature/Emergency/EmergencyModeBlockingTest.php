@@ -46,6 +46,8 @@ it('bloque la création de commande GoShop et expédition GoColis si la ville es
                 ['product_id' => $product->id, 'quantity' => 1],
             ],
             'delivery_address' => 'Quartier Commerce',
+            'delivery_lat' => 6.8800,
+            'delivery_lng' => -6.4510,
             'payment_method' => 'cash',
             'distance_km' => 2.5,
         ]);
@@ -60,7 +62,12 @@ it('bloque la création de commande GoShop et expédition GoColis si la ville es
             'recipient_phone' => '0701020304',
             'pickup_address' => 'Gare de Daloa',
             'delivery_address' => 'Marché de Daloa',
+            'delivery_lat' => 6.8800,
+            'delivery_lng' => -6.4510,
+            'pickup_lat' => 6.8770,
+            'pickup_lng' => -6.4502,
             'size' => 'petit',
+            'weight_kg' => 0.5,
             'payment_method' => 'cash',
             'distance_km' => 3.0,
         ]);
@@ -81,6 +88,8 @@ it('bloque la création de commande GoShop et expédition GoColis si la ville es
                 ['product_id' => $product->id, 'quantity' => 1],
             ],
             'delivery_address' => 'Quartier Commerce',
+            'delivery_lat' => 6.8800,
+            'delivery_lng' => -6.4510,
             'payment_method' => 'cash',
             'distance_km' => 2.5,
         ]);
@@ -93,7 +102,12 @@ it('bloque la création de commande GoShop et expédition GoColis si la ville es
             'recipient_phone' => '0701020304',
             'pickup_address' => 'Gare de Daloa',
             'delivery_address' => 'Marché de Daloa',
+            'delivery_lat' => 6.8800,
+            'delivery_lng' => -6.4510,
+            'pickup_lat' => 6.8770,
+            'pickup_lng' => -6.4502,
             'size' => 'petit',
+            'weight_kg' => 0.5,
             'payment_method' => 'cash',
             'distance_km' => 3.0,
         ]);

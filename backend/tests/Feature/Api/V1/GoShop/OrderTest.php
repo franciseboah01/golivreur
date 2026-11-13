@@ -34,6 +34,8 @@ it('un client peut créer une commande GoShop pour un commerce ouvert', function
                 ['product_id' => $product->id, 'quantity' => 2],
             ],
             'delivery_address' => 'Quartier Commerce, Daloa',
+            'delivery_lat' => 6.8800,
+            'delivery_lng' => -6.4510,
             'payment_method' => 'cash',
             'distance_km' => 2.5,
         ]);
