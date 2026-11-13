@@ -61,19 +61,47 @@ class ParcelService
                 ]);
             }
 
-            // Calculer les frais d'expédition
+            // Vérification coordonnées de ramassage et livraison dans la ville
+            $pickupLat = (float) $donnees['pickup_lat'];
+            $pickupLng = (float) $donnees['pickup_lng'];
+            $deliveryLat = (float) $donnees['delivery_lat'];
+            $deliveryLng = (float) $donnees['delivery_lng'];
+
+            if (! $city->estDansLaVille($pickupLat, $pickupLng)) {
+                throw ValidationException::withMessages([
+                    'pickup_lat' => ['Les coordonnées de ramassage sont situées en dehors du périmètre de la ville.'],
+                ]);
+            }
+
+            if (! $city->estDansLaVille($deliveryLat, $deliveryLng)) {
+                throw ValidationException::withMessages([
+                    'delivery_lat' => ['Les coordonnées de livraison sont situées en dehors du périmètre de la ville.'],
+                ]);
+            }
+
+            // Calcul distance serveur Haversine entre pickup et delivery (coef routier approché CDC = 1.0)
+            $haversineDistance = City::distanceHaversine(
+                $pickupLat,
+                $pickupLng,
+                $deliveryLat,
+                $deliveryLng
+            );
+            $distanceKm = max(0.1, round($haversineDistance * 1.0, 2));
+
+            // Calculer les frais d'expédition avec la distance réelle et $city (Point 4)
             $fraisExpedition = $this->commissionService->calculerFraisExpedition(
                 taille: $donnees['size'],
-                distance: $donnees['distance_km'],
+                distance: $distanceKm,
+                city: $city,
             );
 
-            // Calculer l'assurance si applicable
+            // Calculer l'assurance si applicable avec $city (Point 4)
             $valeurDeclaree = $donnees['declared_value'] ?? 0;
-            $montantAssurance = $this->commissionService->calculerAssurance($valeurDeclaree);
+            $montantAssurance = $this->commissionService->calculerAssurance($valeurDeclaree, $city);
             $aAssurance = $montantAssurance > 0;
 
-            // Commissions
-            $commissions = $this->commissionService->calculerCommissionsGoColis($fraisExpedition);
+            // Commissions avec $city (Point 4)
+            $commissions = $this->commissionService->calculerCommissionsGoColis($fraisExpedition, $city);
 
             // Générer les codes (jamais stockés en clair)
             $codeExpediteur = (string) random_int(1000, 9999);
@@ -93,11 +121,12 @@ class ParcelService
                 'recipient_name' => $donnees['recipient_name'],
                 'recipient_phone' => $donnees['recipient_phone'],
                 'delivery_address' => $donnees['delivery_address'],
-                'delivery_lat' => $donnees['delivery_lat'] ?? null,
-                'delivery_lng' => $donnees['delivery_lng'] ?? null,
+                'delivery_lat' => $deliveryLat,
+                'delivery_lng' => $deliveryLng,
                 'pickup_address' => $donnees['pickup_address'] ?? null,
-                'pickup_lat' => $donnees['pickup_lat'] ?? null,
-                'pickup_lng' => $donnees['pickup_lng'] ?? null,
+                'pickup_lat' => $pickupLat,
+                'pickup_lng' => $pickupLng,
+                'distance_km' => $distanceKm,
                 'description' => $donnees['description'] ?? null,
                 'shipping_fee' => $fraisExpedition,
                 'platform_commission' => $commissions['plateforme'],
