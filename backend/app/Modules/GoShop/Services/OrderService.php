@@ -50,6 +50,13 @@ class OrderService
             // Calculer les montants selon la ville du commerce
             $cityId = $merchant->city_id ?? $client->city_id ?? 1;
             $city = City::findOrFail($cityId);
+
+            if ($city->emergency_mode_active) {
+                $msg = $city->emergency_mode_message ?: 'Le service de livraison est temporairement interrompu dans cette zone (Mode Urgence).';
+                throw ValidationException::withMessages([
+                    'city_id' => [$msg],
+                ]);
+            }
             [$produitsTotal, $produitsResolus] = $this->resoudreProduitsEtTotal($merchant, $donnees['items']);
             $fraisLivraison = $this->commissionService->calculerFraisLivraison(
                 distance: $donnees['distance_km'],

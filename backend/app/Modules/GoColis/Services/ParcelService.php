@@ -54,6 +54,13 @@ class ParcelService
         return DB::transaction(function () use ($expediteur, $donnees) {
             $city = City::findOrFail($expediteur->city_id);
 
+            if ($city->emergency_mode_active) {
+                $msg = $city->emergency_mode_message ?: 'Le service d\'expédition est temporairement interrompu dans cette zone (Mode Urgence).';
+                throw ValidationException::withMessages([
+                    'city_id' => [$msg],
+                ]);
+            }
+
             // Calculer les frais d'expédition
             $fraisExpedition = $this->commissionService->calculerFraisExpedition(
                 taille: $donnees['size'],
