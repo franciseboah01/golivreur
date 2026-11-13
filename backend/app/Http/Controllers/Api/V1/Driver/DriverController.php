@@ -502,7 +502,14 @@ class DriverController extends Controller
 
         $request->validate(['code' => 'required|string|size:4']);
 
-        $updated = $orderService->validerCodeConfirmation($order, $request->input('code'));
+        try {
+            $updated = $orderService->validerCodeConfirmation($order, $request->input('code'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'succes' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
 
         return response()->json([
             'succes' => true,
