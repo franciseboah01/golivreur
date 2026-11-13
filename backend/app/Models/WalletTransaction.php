@@ -32,6 +32,17 @@ class WalletTransaction extends Model
         'metadata' => 'array',
     ];
 
+    protected static function booted(): void
+    {
+        static::updating(function (WalletTransaction $transaction) {
+            throw new \RuntimeException('Les transactions de portefeuille sont strictement immuables et ne peuvent pas être modifiées.');
+        });
+
+        static::deleting(function (WalletTransaction $transaction) {
+            throw new \RuntimeException('Les transactions de portefeuille sont strictement immuables et ne peuvent pas être supprimées.');
+        });
+    }
+
     public function wallet(): BelongsTo
     {
         return $this->belongsTo(Wallet::class);
