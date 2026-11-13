@@ -26,6 +26,7 @@ it('un client peut créer une expédition GoColis', function () {
             'pickup_lat' => 6.8821,
             'pickup_lng' => -6.4478,
             'size' => 'moyen',
+            'weight_kg' => 2.0,
             'declared_value' => 25000,
             'description' => 'Vêtements et chaussures',
             'payment_method' => 'orange_money',
@@ -62,7 +63,12 @@ it('calcule correctement l\'assurance pour une valeur déclarée > 20000 F CFA',
             'recipient_name' => 'Test Destinataire',
             'recipient_phone' => '0709000002',
             'delivery_address' => 'Adresse test',
+            'delivery_lat' => 6.8800,
+            'delivery_lng' => -6.4510,
+            'pickup_lat' => 6.8770,
+            'pickup_lng' => -6.4502,
             'size' => 'grand',
+            'weight_kg' => 5.0,
             'declared_value' => 30000,  // > 20000 → assurance obligatoire
             'payment_method' => 'cash',
             'distance_km' => 2.0,
@@ -85,12 +91,18 @@ it('ne calcule pas d\'assurance pour une valeur déclarée <= 20000 F CFA', func
             'recipient_name' => 'Test',
             'recipient_phone' => '0709000003',
             'delivery_address' => 'Adresse test',
+            'delivery_lat' => 6.8800,
+            'delivery_lng' => -6.4510,
+            'pickup_lat' => 6.8770,
+            'pickup_lng' => -6.4502,
             'size' => 'petit',
+            'weight_kg' => 0.5,
             'declared_value' => 15000, // ≤ 20000 → pas d'assurance
             'payment_method' => 'cash',
             'distance_km' => 1.5,
         ]);
 
+    $response->assertCreated();
     $parcel = Parcel::find($response->json('donnees.id'));
     expect($parcel->has_insurance)->toBeFalse()
         ->and($parcel->insurance_amount)->toBe(0);

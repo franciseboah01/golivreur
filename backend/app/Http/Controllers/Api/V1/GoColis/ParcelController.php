@@ -3,33 +3,58 @@
 namespace App\Http\Controllers\Api\V1\GoColis;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Concerns\NormalizesIvorianPhone;
 use App\Models\City;
 use App\Models\Neighborhood;
 use App\Models\Parcel;
 use App\Modules\GoColis\Services\ParcelService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ParcelController extends Controller
 {
+    use NormalizesIvorianPhone;
+
     public function store(Request $request, ParcelService $service): JsonResponse
     {
         $validated = $request->validate([
             'recipient_name' => 'required|string|max:150',
-            'recipient_phone' => 'required|string|max:20',
+            'recipient_phone' => 'required|string',
             'delivery_address' => 'required|string',
-            'delivery_lat' => 'nullable|numeric',
-            'delivery_lng' => 'nullable|numeric',
+            'delivery_lat' => 'required|numeric|between:-90,90',
+            'delivery_lng' => 'required|numeric|between:-180,180',
             'pickup_address' => 'nullable|string',
-            'pickup_lat' => 'nullable|numeric',
-            'pickup_lng' => 'nullable|numeric',
+            'pickup_lat' => 'required|numeric|between:-90,90',
+            'pickup_lng' => 'required|numeric|between:-180,180',
             'size' => 'required|in:petit,moyen,grand',
-            'weight_kg' => 'nullable|numeric',
+            'weight_kg' => 'required|numeric|min:0.1',
             'declared_value' => 'nullable|numeric|min:0',
             'description' => 'nullable|string',
             'payment_method' => 'required|string|in:cash,orange_money,wave,mtn,moov',
-            'distance_km' => 'required|numeric|min:0.1',
+            'distance_km' => 'nullable|numeric',
         ]);
+
+        $phone = $this->normalizePhoneValue((string) $validated['recipient_phone']);
+        if (! preg_match('/^(01|05|07|21|25|27)[0-9]{8}$/', $phone)) {
+            throw ValidationException::withMessages([
+                'recipient_phone' => ['Format de numéro ivoirien invalide : 10 chiffres attendus (ex: 0701020304).'],
+            ]);
+        }
+        $validated['recipient_phone'] = $phone;
+
+        $weight = (float) $validated['weight_kg'];
+        $maxWeights = [
+            'petit' => 1.0,
+            'moyen' => 5.0,
+            'grand' => 15.0,
+        ];
+        $maxWeight = $maxWeights[$validated['size']] ?? 15.0;
+        if ($weight > $maxWeight) {
+            throw ValidationException::withMessages([
+                'weight_kg' => ["Pour le format {$validated['size']}, le poids maximum autorisé est de {$maxWeight} kg."],
+            ]);
+        }
 
         $parcel = $service->creerExpedition(auth()->user(), $validated);
 
