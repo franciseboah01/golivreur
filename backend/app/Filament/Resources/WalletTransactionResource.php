@@ -10,6 +10,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class WalletTransactionResource extends Resource
 {
@@ -32,6 +33,21 @@ class WalletTransactionResource extends Resource
         $user = auth()->user();
 
         return $user !== null && $user->hasHabilitationTab('finances');
+    }
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return false;
     }
 
     public static function form(Form $form): Form
@@ -170,14 +186,8 @@ class WalletTransactionResource extends Resource
                         'failed' => 'Échoué',
                     ]),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make()->label('Modifier'),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer la sélection'),
-                ]),
-            ]);
+            ->actions([])
+            ->bulkActions([]);
     }
 
     public static function getRelations(): array
@@ -189,8 +199,6 @@ class WalletTransactionResource extends Resource
     {
         return [
             'index' => Pages\ListWalletTransactions::route('/'),
-            'create' => Pages\CreateWalletTransaction::route('/create'),
-            'edit' => Pages\EditWalletTransaction::route('/{record}/edit'),
         ];
     }
 }

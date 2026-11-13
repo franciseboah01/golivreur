@@ -17,7 +17,7 @@ use App\Filament\Resources\RefundResource\Pages\ListRefunds;
 use App\Filament\Resources\UserResource\Pages\CreateUser;
 use App\Filament\Resources\VehicleTypeResource;
 use App\Filament\Resources\VehicleTypeResource\Pages\ListVehicleTypes;
-use App\Filament\Resources\WalletTransactionResource\Pages\CreateWalletTransaction;
+use App\Filament\Resources\WalletTransactionResource\Pages\ListWalletTransactions;
 use App\Models\City;
 use App\Models\Courier;
 use App\Models\Merchant;
@@ -177,7 +177,7 @@ it('charge tous les formulaires harmonisés avec listes déroulantes sans erreur
         CreateOrder::class,
         CreateParcel::class,
         CreateUser::class,
-        CreateWalletTransaction::class,
+        ListWalletTransactions::class,
         SettingsPage::class,
         ListRefunds::class,
         PendingValidationsPage::class,
