@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Client;
 
+use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\MerchantCategoryResource;
 use App\Http\Resources\MerchantResource;
@@ -18,6 +19,7 @@ use App\Services\SettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ClientController extends Controller
 {
@@ -91,6 +93,13 @@ class ClientController extends Controller
 
     public function createOrder(Request $request, OrderService $orderService): JsonResponse
     {
+        $merchantId = $request->input('merchant_id');
+        $merchantCityId = is_numeric($merchantId)
+            ? Merchant::whereKey((int) $merchantId)->value('city_id')
+            : null;
+        $cityId = $merchantCityId ?? auth()->user()?->city_id;
+        $activeModes = PaymentMethod::activeValues($cityId !== null ? (int) $cityId : null);
+
         $validated = $request->validate([
             'merchant_id' => 'required|exists:merchants,id',
             'items' => 'required|array|min:1',
@@ -99,7 +108,7 @@ class ClientController extends Controller
             'delivery_address' => 'required|string',
             'delivery_lat' => 'required|numeric|between:-90,90',
             'delivery_lng' => 'required|numeric|between:-180,180',
-            'payment_method' => 'required|in:cash,orange_money,wave,mtn,moov',
+            'payment_method' => ['required', 'string', Rule::in($activeModes)],
             'distance_km' => 'nullable|numeric',
             'special_instructions' => 'nullable|string',
         ]);

@@ -6,6 +6,7 @@ use App\Models\Parcel;
 use App\Models\ParcelPhoto;
 use App\Models\User;
 use App\Modules\GoShop\Services\CommissionService;
+use App\Services\SettingsService;
 use Illuminate\Support\Facades\Hash;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -13,6 +14,7 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 
 it('un client peut créer une expédition GoColis', function () {
     $city = City::factory()->create(['name' => 'Daloa']);
+    app(SettingsService::class)->set('paiements', ['modes_actifs' => ['cash', 'orange_money']], $city->id);
     $client = User::factory()->create(['role' => 'client', 'city_id' => $city->id]);
     $token = JWTAuth::fromUser($client);
 

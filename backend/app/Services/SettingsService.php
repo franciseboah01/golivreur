@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentMethod;
 use App\Models\ActivityLog;
+use App\Models\City;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -80,7 +82,7 @@ class SettingsService
         ],
 
         'paiements' => [
-            'modes_actifs' => ['orange_money', 'cash', 'wave', 'mtn_momo'],
+            'modes_actifs' => [PaymentMethod::CASH->value],
         ],
 
         'sms' => [
@@ -263,6 +265,13 @@ class SettingsService
         if ($cityId !== null) {
             // Invalider également la clé globale pour forcer la synchronisation
             Cache::forget($this->buildCacheKey($key, null));
+
+            return;
+        }
+
+        // Quand un paramètre global change, invalider le cache de toutes les villes qui en héritent
+        foreach (City::query()->pluck('id') as $id) {
+            Cache::forget($this->buildCacheKey($key, (int) $id));
         }
     }
 

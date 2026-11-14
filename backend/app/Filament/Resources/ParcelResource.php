@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PaymentMethod;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ParcelResource\Pages;
 use App\Models\Courier;
@@ -310,12 +311,7 @@ class ParcelResource extends Resource
 
                 Tables\Filters\SelectFilter::make('payment_method')
                     ->label('Mode de Règlement')
-                    ->options([
-                        'cash' => 'Espèces',
-                        'wave' => 'Wave',
-                        'orange' => 'Orange Money',
-                        'mtn' => 'MTN MoMo',
-                    ]),
+                    ->options(PaymentMethod::resourceOptions()),
 
                 Tables\Filters\TernaryFilter::make('sender_code_locked')
                     ->label('Code Enlèvement Bloqué')

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\PaymentMethod;
 use App\Filament\Components\ImageUploadField;
 use App\Filament\Components\SearchableSelect;
 use App\Models\City;
@@ -336,12 +337,7 @@ class SettingsPage extends Page implements HasForms
                             ->schema([
                                 Forms\Components\CheckboxList::make('paiements.modes_actifs')
                                     ->label('Moyens de paiement activés pour les clients')
-                                    ->options([
-                                        'orange_money' => 'Orange Money Côte d\'Ivoire',
-                                        'cash' => 'Espèces à la livraison (Cash)',
-                                        'wave' => 'Wave Côte d\'Ivoire',
-                                        'mtn_momo' => 'MTN Mobile Money',
-                                    ])
+                                    ->options(PaymentMethod::settingsOptions())
                                     ->columns(2),
                             ]),
 

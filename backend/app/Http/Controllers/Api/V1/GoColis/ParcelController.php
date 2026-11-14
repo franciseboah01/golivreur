@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\GoColis;
 
+use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Concerns\NormalizesIvorianPhone;
 use App\Models\City;
@@ -10,6 +11,7 @@ use App\Models\Parcel;
 use App\Modules\GoColis\Services\ParcelService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ParcelController extends Controller
@@ -18,6 +20,9 @@ class ParcelController extends Controller
 
     public function store(Request $request, ParcelService $service): JsonResponse
     {
+        $cityId = auth()->user()?->city_id;
+        $activeModes = PaymentMethod::activeValues($cityId !== null ? (int) $cityId : null);
+
         $validated = $request->validate([
             'recipient_name' => 'required|string|max:150',
             'recipient_phone' => 'required|string',
@@ -31,7 +36,7 @@ class ParcelController extends Controller
             'weight_kg' => 'required|numeric|min:0.1',
             'declared_value' => 'nullable|numeric|min:0',
             'description' => 'nullable|string',
-            'payment_method' => 'required|string|in:cash,orange_money,wave,mtn,moov',
+            'payment_method' => ['required', 'string', Rule::in($activeModes)],
             'distance_km' => 'nullable|numeric',
         ]);
 

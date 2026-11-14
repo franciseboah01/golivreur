@@ -11,6 +11,7 @@ use App\Models\ParcelPhoto;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Services\SettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -40,6 +41,9 @@ class MultiAgentSimulationTest extends TestCase
             'center_lat' => 6.8770,
             'center_lng' => -6.4502,
         ]);
+
+        // Scénario simulation Mobile Money : réactivation explicite de orange_money et wave pour ce test (D-PAIEMENT-1)
+        app(SettingsService::class)->set('paiements', ['modes_actifs' => ['cash', 'orange_money', 'wave']], $daloa->id);
 
         $adminUser = User::create([
             'name' => 'Francis EBOAH (Admin)',
@@ -304,6 +308,9 @@ class MultiAgentSimulationTest extends TestCase
             'center_lat' => 6.8770,
             'center_lng' => -6.4502,
         ]);
+
+        // Scénario simulation Mobile Money : réactivation explicite de orange_money et wave pour ce test (D-PAIEMENT-1)
+        app(SettingsService::class)->set('paiements', ['modes_actifs' => ['cash', 'orange_money', 'wave']], $daloa->id);
 
         $clientUser = User::create([
             'name' => 'Ama Kouassi (Expéditrice Daloa)',

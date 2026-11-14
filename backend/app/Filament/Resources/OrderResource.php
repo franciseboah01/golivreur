@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PaymentMethod;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\ActivityLog;
@@ -94,14 +95,7 @@ class OrderResource extends Resource
                         // Listes déroulantes remontées en haut de la section
                         SearchableSelect::make('payment_method')
                             ->label('Mode de règlement')
-                            ->options(SearchableSelect::sortedOptions([
-                                'cash' => 'Espèces à la livraison',
-                                'moov' => 'Moov Money',
-                                'mtn' => 'MTN Mobile Money',
-                                'orange' => 'Orange Money',
-                                'wallet' => 'Portefeuille GoLivreur',
-                                'wave' => 'Wave Mobile Money',
-                            ]))
+                            ->options(SearchableSelect::sortedOptions(PaymentMethod::resourceOptions()))
                             ->required(),
                         SearchableSelect::make('payment_status')
                             ->label('Statut du paiement')
@@ -236,15 +230,7 @@ class OrderResource extends Resource
                 Tables\Columns\TextColumn::make('payment_method')
                     ->label('Paiement')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'cash' => 'Espèces',
-                        'wallet' => 'Portefeuille',
-                        'wave' => 'Wave',
-                        'orange' => 'Orange',
-                        'mtn' => 'MTN',
-                        'moov' => 'Moov',
-                        default => $state,
-                    }),
+                    ->formatStateUsing(fn (?string $state): string => PaymentMethod::tryFromInput($state)?->shortLabel() ?? (string) $state),
 
                 Tables\Columns\TextColumn::make('payment_status')
                     ->label('État Paiement')
@@ -290,14 +276,7 @@ class OrderResource extends Resource
                     ]),
                 Tables\Filters\SelectFilter::make('payment_method')
                     ->label('Mode de Règlement')
-                    ->options([
-                        'cash' => 'Espèces à la livraison',
-                        'wave' => 'Wave Mobile Money',
-                        'orange' => 'Orange Money',
-                        'mtn' => 'MTN Mobile Money',
-                        'moov' => 'Moov Money',
-                        'wallet' => 'Portefeuille GoLivreur',
-                    ]),
+                    ->options(PaymentMethod::resourceOptions()),
                 Tables\Filters\SelectFilter::make('payment_status')
                     ->label('État du Paiement')
                     ->options([
