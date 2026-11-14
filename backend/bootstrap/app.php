@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureAccountIsActive;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\SecurityHeadersMiddleware;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,6 +15,8 @@ use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -56,6 +59,52 @@ return Application::configure(basePath: dirname(__DIR__))
                     'succes' => false,
                     'message' => 'Non authentifié.',
                 ], 401);
+            }
+        });
+
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Ressource introuvable.',
+                ], 404);
+            }
+        });
+
+        $exceptions->render(function (ModelNotFoundException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Ressource introuvable.',
+                ], 404);
+            }
+        });
+
+        $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => $e->getMessage() ?: 'Erreur HTTP.',
+                ], $e->getStatusCode());
+            }
+        });
+
+        $exceptions->render(function (Throwable $e, Request $request) {
+            if ($request->is('api/*')) {
+                if (config('app.debug')) {
+                    return response()->json([
+                        'succes' => false,
+                        'message' => $e->getMessage(),
+                        'exception' => get_class($e),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ], 500);
+                }
+
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Une erreur interne est survenue.',
+                ], 500);
             }
         });
     })->create();
