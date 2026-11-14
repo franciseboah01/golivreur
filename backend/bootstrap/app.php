@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\ActiveMerchantMiddleware;
 use App\Http\Middleware\CityContextMiddleware;
+use App\Http\Middleware\EnsureAccountIsActive;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\SecurityHeadersMiddleware;
 use Illuminate\Auth\AuthenticationException;
@@ -27,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'city_context' => CityContextMiddleware::class,
             'active_merchant' => ActiveMerchantMiddleware::class,
+            'active_account' => EnsureAccountIsActive::class,
         ]);
 
         $middleware->append(SecurityHeadersMiddleware::class);

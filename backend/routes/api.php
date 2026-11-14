@@ -68,7 +68,7 @@ Route::prefix('auth')->middleware('throttle:60,1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
     Route::post('login-password', [AuthController::class, 'loginPassword']);
     Route::post('verify-login', [AuthController::class, 'verifierOtpConnexion']);
-    Route::post('refresh', [AuthController::class, 'refresh'])->middleware('auth:api');
+    Route::post('refresh', [AuthController::class, 'refresh'])->middleware(['auth:api', 'active_account']);
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:api');
 });
 
@@ -79,7 +79,7 @@ Route::prefix('webhooks')->group(function () {
 });
 
 // ─── Routes protégées par JWT ─────────────────────────────────────────────────
-Route::middleware('auth:api')->group(function () {
+Route::middleware(['auth:api', 'active_account'])->group(function () {
 
     // ─── Profil unifié & mot de passe ─────────────────────────────────────────
     Route::get('profile', [ProfileController::class, 'show']);
