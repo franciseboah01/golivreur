@@ -12,6 +12,7 @@ use App\Modules\GoShop\Services\AssignmentService;
 use App\Modules\GoShop\Services\OrderService;
 use App\Services\CourierCapacityService;
 use App\Services\CourierRefusalService;
+use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
@@ -139,11 +140,15 @@ class DriverController extends Controller
         ]);
     }
 
-    public function acceptOrder(Order $order, SettingsService $settingsService, WalletService $walletService): JsonResponse
-    {
+    public function acceptOrder(
+        Order $order,
+        SettingsService $settingsService,
+        WalletService $walletService,
+        NotificationService $notificationService,
+    ): JsonResponse {
         $courier = $this->getCourier();
 
-        return DB::transaction(function () use ($order, $courier, $settingsService, $walletService) {
+        return DB::transaction(function () use ($order, $courier, $settingsService, $walletService, $notificationService) {
             /** @var Order $lockedOrder */
             $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
             /** @var Courier $lockedCourier */
@@ -214,19 +219,26 @@ class DriverController extends Controller
                 $lockedCourier->update(['consecutive_refusals' => 0]);
             }
 
+            $freshOrder = $lockedOrder->fresh() ?? $lockedOrder;
+            $notificationService->notifierCommandeAccepteeLivreur($freshOrder);
+
             return response()->json([
                 'succes' => true,
-                'donnees' => $lockedOrder->fresh(),
+                'donnees' => $freshOrder,
                 'message' => 'Course acceptée.',
             ]);
         });
     }
 
-    public function acceptParcel(Parcel $parcel, SettingsService $settingsService, WalletService $walletService): JsonResponse
-    {
+    public function acceptParcel(
+        Parcel $parcel,
+        SettingsService $settingsService,
+        WalletService $walletService,
+        NotificationService $notificationService,
+    ): JsonResponse {
         $courier = $this->getCourier();
 
-        return DB::transaction(function () use ($parcel, $courier, $settingsService, $walletService): JsonResponse {
+        return DB::transaction(function () use ($parcel, $courier, $settingsService, $walletService, $notificationService): JsonResponse {
             /** @var Parcel $lockedParcel */
             $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
             /** @var Courier $lockedCourier */
@@ -292,9 +304,12 @@ class DriverController extends Controller
                 $lockedCourier->update(['consecutive_refusals' => 0]);
             }
 
+            $freshParcel = $lockedParcel->fresh() ?? $lockedParcel;
+            $notificationService->notifierColisAccepteLivreur($freshParcel);
+
             return response()->json([
                 'succes' => true,
-                'donnees' => $lockedParcel->fresh(),
+                'donnees' => $freshParcel,
                 'message' => 'Expédition acceptée.',
             ]);
         });
@@ -460,11 +475,11 @@ class DriverController extends Controller
         return $outcome['response'];
     }
 
-    public function confirmPickup(Order $order): JsonResponse
+    public function confirmPickup(Order $order, NotificationService $notificationService): JsonResponse
     {
         $courier = $this->getCourier();
 
-        return DB::transaction(function () use ($order, $courier) {
+        return DB::transaction(function () use ($order, $courier, $notificationService) {
             /** @var Order $lockedOrder */
             $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
 
@@ -504,9 +519,12 @@ class DriverController extends Controller
                 ], 422);
             }
 
+            $freshOrder = $lockedOrder->fresh() ?? $lockedOrder;
+            $notificationService->notifierCommandeRamassage($freshOrder);
+
             return response()->json([
                 'succes' => true,
-                'donnees' => $lockedOrder->fresh(),
+                'donnees' => $freshOrder,
                 'message' => 'Commande récupérée chez le commerce.',
             ]);
         });

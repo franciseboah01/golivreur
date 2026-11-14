@@ -59,6 +59,27 @@ class NotificationService
         }
     }
 
+    public function notifierCommandeAccepteeLivreur(Order $order): void
+    {
+        $this->notifierLivreurEnRoute(
+            userId: (int) $order->client_id,
+            type: 'order_driver_accepted',
+            body: "Un livreur a accepté votre commande #{$order->id}.",
+            data: ['order_id' => $order->id],
+        );
+    }
+
+    public function notifierCommandeRamassage(Order $order): void
+    {
+        $this->createNotification(
+            userId: (int) $order->client_id,
+            type: 'order_picked_up',
+            title: 'Commande récupérée',
+            body: "Le livreur a récupéré votre commande #{$order->id} et est en route.",
+            data: ['order_id' => $order->id],
+        );
+    }
+
     public function notifierCommandeLivree(Order $order): void
     {
         $this->createNotification(
@@ -67,6 +88,30 @@ class NotificationService
             title: 'Commande livrée',
             body: 'Votre commande a été livrée avec succès. Bon appétit !',
             data: ['order_id' => $order->id],
+        );
+    }
+
+    public function notifierColisAccepteLivreur(Parcel $parcel): void
+    {
+        $this->notifierLivreurEnRoute(
+            userId: (int) $parcel->sender_id,
+            type: 'parcel_driver_accepted',
+            body: "Un livreur a accepté votre expédition #{$parcel->id}.",
+            data: ['parcel_id' => $parcel->id],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function notifierLivreurEnRoute(int $userId, string $type, string $body, array $data): void
+    {
+        $this->createNotification(
+            userId: $userId,
+            type: $type,
+            title: 'Livreur en route',
+            body: $body,
+            data: $data,
         );
     }
 
