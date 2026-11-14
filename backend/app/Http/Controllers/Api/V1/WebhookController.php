@@ -103,10 +103,10 @@ class WebhookController extends Controller
     {
         $user = auth()->user();
 
-        if (! $user || ! in_array($user->role, ['super_admin', 'dg_national', 'national_tech'], true)) {
+        if (! $user || ! in_array($user->role, ['super_admin', 'national_tech'], true)) {
             return response()->json([
                 'succes' => false,
-                'message' => 'Action réservée au Super Admin, DG National ou Tech National.',
+                'message' => 'Action réservée au Super Admin ou Tech National.',
             ], 403);
         }
 

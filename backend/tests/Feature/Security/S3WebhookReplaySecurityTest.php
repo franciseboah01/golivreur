@@ -27,9 +27,9 @@ it('S3 rôles interdits: refuse 403 aux rôles locaux et non habilités sur webh
 
     expect($webhookLog->fresh()->status)->toBe('failed')
         ->and($webhookLog->fresh()->retry_count)->toBe(0);
-})->with(['city_agent', 'city_support', 'city_finance', 'city_manager', 'national_support', 'client', 'merchant', 'driver']);
+})->with(['city_agent', 'city_support', 'city_finance', 'city_manager', 'national_support', 'dg_national', 'client', 'merchant', 'driver']);
 
-it('S3 rôles autorisés: autorise national_tech, dg_national et super_admin sur webhooks/{id}/replay', function (string $role) {
+it('S3 rôles autorisés: autorise national_tech et super_admin sur webhooks/{id}/replay', function (string $role) {
     Mail::fake();
     $city = City::factory()->create();
     Order::factory()->create([
@@ -52,4 +52,31 @@ it('S3 rôles autorisés: autorise national_tech, dg_national et super_admin sur
         ->postJson("/api/v1/admin/webhooks/{$webhookLog->id}/replay")
         ->assertOk()
         ->assertJsonPath('succes', true);
-})->with(['national_tech', 'dg_national', 'super_admin']);
+})->with(['national_tech', 'super_admin']);
+
+it('S3 filament replay action: visible uniquement pour super_admin et national_tech', function () {
+    $webhookLog = WebhookLog::create([
+        'source' => 'hub2',
+        'event_type' => 'payment',
+        'payload' => ['transaction_id' => 'TXN-FILAMENT', 'status' => 'SUCCESS'],
+        'signature_received' => 'valid-sig',
+        'signature_valid' => true,
+        'status' => 'failed',
+    ]);
+
+    $dg = User::factory()->create(['role' => 'dg_national']);
+    $tech = User::factory()->create(['role' => 'national_tech']);
+    $sa = User::factory()->create(['role' => 'super_admin']);
+
+    $this->actingAs($dg);
+    \Livewire\Livewire::test(\App\Filament\Resources\WebhookLogResource\Pages\ListWebhookLogs::class)
+        ->assertTableActionHidden('replay', $webhookLog);
+
+    $this->actingAs($tech);
+    \Livewire\Livewire::test(\App\Filament\Resources\WebhookLogResource\Pages\ListWebhookLogs::class)
+        ->assertTableActionVisible('replay', $webhookLog);
+
+    $this->actingAs($sa);
+    \Livewire\Livewire::test(\App\Filament\Resources\WebhookLogResource\Pages\ListWebhookLogs::class)
+        ->assertTableActionVisible('replay', $webhookLog);
+});

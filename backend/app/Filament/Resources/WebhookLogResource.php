@@ -151,8 +151,12 @@ class WebhookLogResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('Rejouer le traitement de ce webhook')
                     ->modalDescription('Si le paiement était en échec ou en attente, le système va ré-exécuter le traitement des statuts.')
-                    ->visible(fn (WebhookLog $record) => $record->signature_valid)
+                    ->visible(fn (WebhookLog $record) => $record->signature_valid && in_array(auth()->user()?->role, ['super_admin', 'national_tech'], true))
                     ->action(function (WebhookLog $record): void {
+                        if (! in_array(auth()->user()?->role, ['super_admin', 'national_tech'], true)) {
+                            abort(403, 'Seuls le Super Admin et le Responsable Technique National peuvent rejouer un webhook.');
+                        }
+
                         $record->increment('retry_count');
                         $record->update([
                             'status' => 'processed',
