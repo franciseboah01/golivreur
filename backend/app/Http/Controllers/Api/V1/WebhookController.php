@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProcessPaymentWebhook;
 use App\Models\WebhookLog;
 use App\Services\ActivityLogService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -29,13 +31,16 @@ class WebhookController extends Controller
     public function paiement(Request $request): JsonResponse
     {
         $payload = $request->getContent();
+        $payloadData = $request->all();
         [$source, $signatureRecue, $secret] = $this->resolveWebhookProvider($request);
+        $transactionId = $this->extractTransactionId($payloadData);
 
         // 1. Logger le webhook IMMÉDIATEMENT (avant toute validation)
         $webhookLog = WebhookLog::create([
             'source' => $source,
             'event_type' => $request->input('event') ?? 'payment',
-            'payload' => $request->all(),
+            'transaction_id' => $transactionId,
+            'payload' => $payloadData,
             'signature_received' => $signatureRecue,
             'signature_valid' => false, // Sera mis à jour si valide
             'status' => 'pending',
@@ -81,13 +86,53 @@ class WebhookController extends Controller
             ], 401);
         }
 
-        // 3. Signature valide → marquer et dispatcher le job haute priorité
-        $webhookLog->update(['signature_valid' => true]);
+        // 3. Fenêtre anti-rejeu temporelle (horodatage <= 5 minutes)
+        $rawTimestamp = $this->extractWebhookTimestamp($request, $payloadData);
+        if ($rawTimestamp !== null && $rawTimestamp !== '') {
+            $parsedTimestamp = $this->parseWebhookTimestamp($rawTimestamp);
+            if (! $parsedTimestamp || abs(now()->getTimestamp() - $parsedTimestamp->getTimestamp()) > 300) {
+                $webhookLog->update([
+                    'signature_valid' => true,
+                    'status' => 'rejected',
+                    'error_message' => 'Horodatage invalide ou expiré (fenêtre anti-rejeu de 5 minutes dépassée).',
+                ]);
 
-        ProcessPaymentWebhook::dispatch($webhookLog->id, $request->all())
+                $this->activityLogService->log(
+                    userId: null,
+                    action: 'webhook_timestamp_rejected',
+                    entityType: 'webhook_log',
+                    entityId: $webhookLog->id,
+                    properties: [
+                        'source' => $source,
+                        'transaction_id' => $transactionId,
+                        'raw_timestamp' => $rawTimestamp,
+                        'ip' => $request->ip(),
+                    ],
+                    severity: 'warning',
+                );
+
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Horodatage du webhook expiré (fenêtre anti-rejeu de 5 minutes dépassée).',
+                ], 422);
+            }
+        }
+
+        // 4. Fenêtre anti-rejeu unicité transaction_id (pré-vérification + contrainte unique PG)
+        if ($transactionId !== null && $this->transactionDejaTraitee($transactionId, $webhookLog->id)) {
+            return $this->rejeterRejeuTransaction($webhookLog, $source, $transactionId, $request);
+        }
+
+        try {
+            $webhookLog->update(['signature_valid' => true]);
+        } catch (UniqueConstraintViolationException) {
+            return $this->rejeterRejeuTransaction($webhookLog, $source, (string) $transactionId, $request);
+        }
+
+        ProcessPaymentWebhook::dispatch($webhookLog->id, $payloadData)
             ->onQueue('high');
 
-        // 4. Répondre immédiatement à Hub2 (ne pas les faire attendre)
+        // 5. Répondre immédiatement à Hub2/CinetPay (ne pas les faire attendre)
         return response()->json([
             'succes' => true,
             'message' => 'Webhook reçu.',
@@ -200,5 +245,97 @@ class WebhookController extends Controller
         $fallbackSource = $request->has('cpm_site_id') ? 'cinetpay' : 'hub2';
 
         return [$fallbackSource, '', ''];
+    }
+
+    private function extractTransactionId(array $payloadData): ?string
+    {
+        $raw = $payloadData['transaction_id']
+            ?? ($payloadData['data']['transaction_id'] ?? null)
+            ?? ($payloadData['cpm_trans_id'] ?? null);
+
+        if (! is_scalar($raw)) {
+            return null;
+        }
+
+        $normalized = trim((string) $raw);
+
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    private function extractWebhookTimestamp(Request $request, array $payloadData): mixed
+    {
+        return $request->header('X-Hub2-Timestamp')
+            ?? $request->header('X-Webhook-Timestamp')
+            ?? $request->header('X-Timestamp')
+            ?? $request->header('X-CinetPay-Timestamp')
+            ?? ($payloadData['timestamp'] ?? null)
+            ?? ($payloadData['created_at'] ?? null)
+            ?? ($payloadData['createdAt'] ?? null)
+            ?? ($payloadData['sent_at'] ?? null)
+            ?? ($payloadData['cpm_trans_date'] ?? null)
+            ?? ($payloadData['data']['timestamp'] ?? null)
+            ?? ($payloadData['data']['created_at'] ?? null);
+    }
+
+    private function parseWebhookTimestamp(mixed $raw): ?Carbon
+    {
+        if (is_int($raw) || (is_string($raw) && ctype_digit(trim($raw)))) {
+            $num = (int) trim((string) $raw);
+
+            return $num > 9999999999
+                ? Carbon::createFromTimestampMs($num)
+                : Carbon::createFromTimestamp($num);
+        }
+
+        if (! is_string($raw) || trim($raw) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse(trim($raw));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function transactionDejaTraitee(string $transactionId, int $excludeWebhookLogId): bool
+    {
+        return WebhookLog::query()
+            ->where('id', '!=', $excludeWebhookLogId)
+            ->where('transaction_id', $transactionId)
+            ->where('signature_valid', true)
+            ->whereIn('status', ['pending', 'processed'])
+            ->exists();
+    }
+
+    private function rejeterRejeuTransaction(
+        WebhookLog $webhookLog,
+        string $source,
+        string $transactionId,
+        Request $request,
+    ): JsonResponse {
+        $webhookLog->update([
+            'signature_valid' => true,
+            'status' => 'rejected',
+            'error_message' => "Rejeu bloqué : transaction {$transactionId} déjà traitée.",
+        ]);
+
+        $this->activityLogService->log(
+            userId: null,
+            action: 'webhook_replay_blocked',
+            entityType: 'webhook_log',
+            entityId: $webhookLog->id,
+            properties: [
+                'source' => $source,
+                'transaction_id' => $transactionId,
+                'ip' => $request->ip(),
+            ],
+            severity: 'warning',
+        );
+
+        return response()->json([
+            'succes' => false,
+            'message' => 'Transaction déjà traitée (rejeu bloqué).',
+        ], 409);
     }
 }

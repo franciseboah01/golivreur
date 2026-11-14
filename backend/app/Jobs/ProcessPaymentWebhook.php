@@ -53,12 +53,33 @@ class ProcessPaymentWebhook implements ShouldQueue
             return; // Déjà traité (idempotence)
         }
 
+        $txId = $webhookLog->transaction_id
+            ?? ($this->payload['transaction_id'] ?? $this->payload['data']['transaction_id'] ?? $this->payload['cpm_trans_id'] ?? null);
+
+        if ($txId !== null && WebhookLog::query()
+            ->where('id', '!=', $webhookLog->id)
+            ->where('transaction_id', (string) $txId)
+            ->where('signature_valid', true)
+            ->where('status', 'processed')
+            ->exists()) {
+            $webhookLog->update([
+                'status' => 'rejected',
+                'error_message' => "Rejeu bloqué : transaction {$txId} déjà traitée.",
+                'processed_at' => now(),
+            ]);
+
+            return;
+        }
+
         try {
             DB::transaction(function () use ($webhookLog, $notificationService, $activityLogService) {
                 $payload = $this->payload;
 
                 // Extraire la référence de transaction et le statut
-                $reference = $payload['transaction_id'] ?? $payload['data']['transaction_id'] ?? null;
+                $reference = $payload['transaction_id']
+                    ?? $payload['data']['transaction_id']
+                    ?? $payload['cpm_trans_id']
+                    ?? null;
                 $statut = $payload['status'] ?? $payload['data']['status'] ?? null;
 
                 if (! $reference) {
@@ -162,6 +183,7 @@ class ProcessPaymentWebhook implements ShouldQueue
                 }
 
                 $webhookLog->update([
+                    'transaction_id' => $webhookLog->transaction_id ?? (string) $reference,
                     'status' => 'processed',
                     'processed_at' => now(),
                     'horizon_job_id' => $this->job?->getJobId(),

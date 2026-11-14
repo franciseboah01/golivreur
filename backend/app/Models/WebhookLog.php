@@ -12,6 +12,7 @@ class WebhookLog extends Model
     protected $fillable = [
         'source',
         'event_type',
+        'transaction_id',
         'payload',
         'signature_received',
         'signature_valid',

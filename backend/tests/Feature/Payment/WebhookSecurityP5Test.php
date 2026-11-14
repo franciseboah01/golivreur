@@ -4,6 +4,8 @@ use App\Models\City;
 use App\Models\Order;
 use App\Models\Parcel;
 use App\Models\User;
+use App\Models\WebhookLog;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Mail;
 
 beforeEach(function () {
@@ -216,4 +218,133 @@ it('P5 Point 4: valide la signature HMAC CinetPay avec services.cinetpay.secret_
         ['CONTENT_TYPE' => 'application/json', 'HTTP_X_CINETPAY_SIGNATURE' => $emptySecretSig],
         $raw
     )->assertStatus(401);
+});
+
+it('P5 Point 5: refuse un webhook dont l\'horodatage a plus de 5 minutes (payload ou header)', function () {
+    $city = City::factory()->create(['name' => 'Daloa']);
+    $client = User::factory()->create(['role' => 'client', 'city_id' => $city->id]);
+    $order = Order::factory()->create([
+        'client_id' => $client->id,
+        'city_id' => $city->id,
+        'products_total' => 5000,
+        'delivery_fee' => 800,
+        'payment_method' => 'orange_money',
+        'payment_status' => 'pending',
+        'payment_reference' => 'TXN-EXPIRED-5MIN',
+    ]);
+
+    // 1. Horodatage expiré dans le payload (> 5 minutes) -> refus 422
+    $expiredPayload = [
+        'event' => 'payment.success',
+        'transaction_id' => 'TXN-EXPIRED-5MIN',
+        'status' => 'SUCCESS',
+        'amount' => 5800,
+        'timestamp' => now()->subMinutes(6)->timestamp,
+    ];
+    $rawExpired = json_encode($expiredPayload);
+    $sigExpired = hash_hmac('sha256', $rawExpired, config('services.hub2.webhook_secret'));
+
+    $this->call(
+        'POST',
+        '/api/v1/webhooks/payment',
+        [],
+        [],
+        [],
+        ['CONTENT_TYPE' => 'application/json', 'HTTP_X_HUB2_SIGNATURE' => $sigExpired],
+        $rawExpired
+    )->assertStatus(422)
+        ->assertJsonPath('succes', false);
+
+    expect($order->fresh()->payment_status)->toBe('pending');
+    $this->assertDatabaseHas('webhook_logs', [
+        'source' => 'hub2',
+        'status' => 'rejected',
+    ]);
+
+    // 2. Horodatage expiré dans l'en-tête HTTP X-Hub2-Timestamp (301s) -> refus 422
+    $payloadHeaderExpired = [
+        'event' => 'payment.success',
+        'transaction_id' => 'TXN-EXPIRED-5MIN',
+        'status' => 'SUCCESS',
+        'amount' => 5800,
+    ];
+    $rawHeader = json_encode($payloadHeaderExpired);
+    $sigHeader = hash_hmac('sha256', $rawHeader, config('services.hub2.webhook_secret'));
+
+    $this->call(
+        'POST',
+        '/api/v1/webhooks/payment',
+        [],
+        [],
+        [],
+        [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_HUB2_SIGNATURE' => $sigHeader,
+            'HTTP_X_HUB2_TIMESTAMP' => (string) now()->subSeconds(301)->timestamp,
+        ],
+        $rawHeader
+    )->assertStatus(422)
+        ->assertJsonPath('succes', false);
+
+    expect($order->fresh()->payment_status)->toBe('pending');
+});
+
+it('P5 Point 5: refuse un webhook avec transaction_id déjà traité (409) et garantit une clé unique en base', function () {
+    $city = City::factory()->create(['name' => 'Daloa']);
+    $client = User::factory()->create(['role' => 'client', 'city_id' => $city->id]);
+    $order = Order::factory()->create([
+        'client_id' => $client->id,
+        'city_id' => $city->id,
+        'products_total' => 5000,
+        'delivery_fee' => 800,
+        'payment_method' => 'orange_money',
+        'payment_status' => 'pending',
+        'payment_reference' => 'TXN-ANTI-REPLAY-UNIQUE-01',
+    ]);
+
+    $payload = [
+        'event' => 'payment.success',
+        'transaction_id' => 'TXN-ANTI-REPLAY-UNIQUE-01',
+        'status' => 'SUCCESS',
+        'amount' => 5800,
+        'timestamp' => now()->subMinute()->timestamp,
+    ];
+    $raw = json_encode($payload);
+    $sig = hash_hmac('sha256', $raw, config('services.hub2.webhook_secret'));
+
+    // Premier envoi valide -> 200 + paid
+    $this->call(
+        'POST',
+        '/api/v1/webhooks/payment',
+        [],
+        [],
+        [],
+        ['CONTENT_TYPE' => 'application/json', 'HTTP_X_HUB2_SIGNATURE' => $sig],
+        $raw
+    )->assertStatus(200);
+
+    expect($order->fresh()->payment_status)->toBe('paid');
+
+    // Deuxième envoi avec même transaction_id -> refus 409
+    $this->call(
+        'POST',
+        '/api/v1/webhooks/payment',
+        [],
+        [],
+        [],
+        ['CONTENT_TYPE' => 'application/json', 'HTTP_X_HUB2_SIGNATURE' => $sig],
+        $raw
+    )->assertStatus(409)
+        ->assertJsonPath('succes', false);
+
+    // Preuve clé unique en base : insertion SQL/Eloquent directe d'un second processed avec même transaction_id échoue
+    expect(fn () => WebhookLog::create([
+        'source' => 'hub2',
+        'event_type' => 'payment.success',
+        'transaction_id' => 'TXN-ANTI-REPLAY-UNIQUE-01',
+        'payload' => $payload,
+        'signature_received' => 'sig',
+        'signature_valid' => true,
+        'status' => 'processed',
+    ]))->toThrow(QueryException::class);
 });

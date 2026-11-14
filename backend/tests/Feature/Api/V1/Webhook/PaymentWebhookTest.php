@@ -168,7 +168,7 @@ test('le traitement des webhooks est idempotent face aux doublons', function () 
 
     expect($order->fresh()->payment_status)->toBe('paid');
 
-    // Deuxième envoi identique
+    // Deuxième envoi identique : refusé par la fenêtre anti-rejeu (clé unique transaction_id)
     $this->call(
         'POST',
         '/api/v1/webhooks/payment',
@@ -177,7 +177,8 @@ test('le traitement des webhooks est idempotent face aux doublons', function () 
         [],
         ['CONTENT_TYPE' => 'application/json', 'HTTP_X_HUB2_SIGNATURE' => $signature],
         $rawContent
-    )->assertStatus(200);
+    )->assertStatus(409)
+        ->assertJsonPath('succes', false);
 
     expect($order->fresh()->payment_status)->toBe('paid');
 });
