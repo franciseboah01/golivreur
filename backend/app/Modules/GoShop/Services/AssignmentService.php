@@ -253,17 +253,20 @@ class AssignmentService
 
         if (! $livreur) {
             $wasAlreadyWaiting = $course->status === $waitingStatus;
-            $course->update([
-                'status' => $waitingStatus,
-                'assignment_attempts' => max((int) $course->assignment_attempts, $tentative - 1),
-            ]);
+
+            if ($type === 'gocolis' || $tentative > 1) {
+                $course->update([
+                    'status' => $waitingStatus,
+                    'assignment_attempts' => max((int) $course->assignment_attempts, $tentative - 1),
+                ]);
+            }
 
             if (class_exists(AlerterAdminPasDelivreur::class)) {
                 AlerterAdminPasDelivreur::dispatch($course, $type)
                     ->onQueue('high');
             }
 
-            if ($type === 'goshop') {
+            if ($type === 'goshop' && $tentative > 1) {
                 $onWaiting($wasAlreadyWaiting);
             }
 

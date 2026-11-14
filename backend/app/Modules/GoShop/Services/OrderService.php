@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Service central GoShop — gère tout le cycle de vie d'une commande :
@@ -41,21 +42,26 @@ class OrderService
         return DB::transaction(function () use ($client, $donnees) {
             $merchant = Merchant::findOrFail($donnees['merchant_id']);
 
-            // Vérifier que le commerce est ouvert
-            if (! $merchant->is_open || ! $merchant->is_active) {
-                throw ValidationException::withMessages([
-                    'merchant_id' => ['Ce commerce est actuellement fermé.'],
-                ]);
-            }
-
             // Calculer les montants selon la ville du commerce
             $cityId = $merchant->city_id ?? $client->city_id ?? 1;
             $city = City::findOrFail($cityId);
 
             if ($city->emergency_mode_active) {
                 $msg = $city->emergency_mode_message ?: 'Le service de livraison est temporairement interrompu dans cette zone (Mode Urgence).';
+
+                throw new HttpException(503, $msg);
+            }
+
+            // Vérifier que le commerce est ouvert (statut manuel + plage horaires)
+            if (! $merchant->is_open || ! $merchant->is_active) {
                 throw ValidationException::withMessages([
-                    'city_id' => [$msg],
+                    'merchant_id' => ['Ce commerce est actuellement fermé.'],
+                ]);
+            }
+
+            if (! $merchant->estDansHorairesOuverture()) {
+                throw ValidationException::withMessages([
+                    'merchant_id' => ['Ce commerce est actuellement en dehors de ses horaires d\'ouverture.'],
                 ]);
             }
 

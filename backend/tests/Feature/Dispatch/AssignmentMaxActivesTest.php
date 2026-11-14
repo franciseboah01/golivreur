@@ -143,7 +143,9 @@ it('P6 Point 3 settings: AssignmentService autorise jusqu a courses.max_actives 
 
     $assignment->attribuerLivreurGoShop($o2);
 
-    expect($o2->fresh()->status)->toBe(Order::STATUS_WAITING);
+    Queue::assertNotPushed(NotifierLivreurGoShop::class, fn (NotifierLivreurGoShop $job): bool => $job->orderId === $o2->id);
     Queue::assertPushed(AlerterAdminPasDelivreur::class, fn (AlerterAdminPasDelivreur $job): bool => $job->type === 'goshop');
-});
 
+    $assignment->attribuerLivreurGoShop($o2, tentative: 2);
+    expect($o2->fresh()->status)->toBe(Order::STATUS_WAITING);
+});

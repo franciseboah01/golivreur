@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Service central GoColis — gère tout le cycle de vie d'une expédition :
@@ -56,9 +57,8 @@ class ParcelService
 
             if ($city->emergency_mode_active) {
                 $msg = $city->emergency_mode_message ?: 'Le service d\'expédition est temporairement interrompu dans cette zone (Mode Urgence).';
-                throw ValidationException::withMessages([
-                    'city_id' => [$msg],
-                ]);
+
+                throw new HttpException(503, $msg);
             }
 
             // Vérification coordonnées de ramassage et livraison dans la ville
