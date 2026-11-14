@@ -11,11 +11,12 @@ use App\Models\Parcel;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Attribue les courses aux livreurs disponibles par proximité géographique.
- * Gère jusqu'à 3 tentatives avant de passer en statut 'waiting' (GoColis)
- * ou d'alerter l'admin (GoShop).
+ * Gère jusqu'à 3 tentatives avant de passer en statut 'waiting' et d'alerter l'admin.
  */
 class AssignmentService
 {
@@ -45,56 +46,72 @@ class AssignmentService
 
     /**
      * Trouve le livreur le plus proche et lui propose la course GoShop.
+     *
+     * @param  array<int, int>  $exclusions
      */
-    public function attribuerLivreurGoShop(Order $order): void
+    public function attribuerLivreurGoShop(Order $order, int $tentative = 1, array $exclusions = []): void
     {
+        $statutsEligibles = $tentative === 1
+            ? [Order::STATUS_PENDING, Order::STATUS_ACCEPTED, Order::STATUS_READY, Order::STATUS_WAITING]
+            : [Order::STATUS_ACCEPTED, Order::STATUS_READY, Order::STATUS_WAITING];
+
+        if (
+            $order->courier_id !== null
+            || ! in_array($order->status, $statutsEligibles, true)
+        ) {
+            return;
+        }
+
         $montantRequisCash = $order->payment_method === 'cash'
             ? $this->walletService->calculerMontantAReverserOrder($order)
             : null;
 
-        $livreur = $this->trouverLivreurProche(
-            lat: $order->pickup_lat,
-            lng: $order->pickup_lng,
-            cityId: $order->city_id,
-            excludeIds: [],
+        $this->attribuerCourse(
+            course: $order,
+            type: 'goshop',
+            waitingStatus: Order::STATUS_WAITING,
+            pickupLat: $order->pickup_lat !== null ? (float) $order->pickup_lat : null,
+            pickupLng: $order->pickup_lng !== null ? (float) $order->pickup_lng : null,
+            cityId: (int) $order->city_id,
+            tentative: $tentative,
+            exclusions: $exclusions,
             montantRequisCash: $montantRequisCash,
+            defaultDelaySeconds: self::DELAI_ACCEPTATION_GOSHOP,
+            onOffer: function (Courier $livreur, int $currentAttempt, array $updatedExclusions, int $delaySeconds) use ($order): void {
+                $this->notificationService->proposerCourseGoShop($livreur, $order);
+
+                if (class_exists(NotifierLivreurGoShop::class)) {
+                    NotifierLivreurGoShop::dispatch(
+                        $order->id,
+                        $livreur->id,
+                        $currentAttempt,
+                        $updatedExclusions,
+                        now()->toIso8601String(),
+                    )
+                        ->delay(now()->addSeconds($delaySeconds))
+                        ->onQueue('default');
+                }
+            },
+            onWaiting: function (bool $wasAlreadyWaiting) use ($order): void {
+                if (! $wasAlreadyWaiting) {
+                    $this->notificationService->notifierClientAttenteGoShop($order);
+                }
+            },
         );
-
-        if (! $livreur) {
-            if (class_exists(AlerterAdminPasDelivreur::class)) {
-                AlerterAdminPasDelivreur::dispatch($order, 'goshop')
-                    ->onQueue('high');
-            }
-
-            return;
-        }
-
-        // Proposer la course au livreur (30 secondes pour accepter)
-        $this->notificationService->proposerCourseGoShop($livreur, $order);
-
-        // Si pas de réponse dans les 30s, passer au suivant
-        if (class_exists(NotifierLivreurGoShop::class)) {
-            NotifierLivreurGoShop::dispatch($order->id, $livreur->id, 1)
-                ->delay(now()->addSeconds(self::DELAI_ACCEPTATION_GOSHOP))
-                ->onQueue('default');
-        }
     }
 
     /**
      * Trouve le livreur le plus proche et lui propose la course GoColis.
      * La taille du colis est visible avant acceptation (v5).
+     *
+     * @param  array<int, int>  $exclusions
      */
     public function attribuerLivreurGoColis(Parcel $parcel, int $tentative = 1, array $exclusions = []): void
     {
-        if ($tentative > self::MAX_TENTATIVES) {
-            // 3 tentatives échouées → statut waiting + alerte Admin
-            $parcel->update(['status' => Parcel::STATUS_WAITING]);
-            if (class_exists(AlerterAdminPasDelivreur::class)) {
-                AlerterAdminPasDelivreur::dispatch($parcel, 'gocolis')
-                    ->onQueue('high');
-            }
-            $this->notificationService->notifierClientAttenteGoColis($parcel);
-
+        if (
+            $parcel->courier_id !== null
+            || ! in_array($parcel->status, [Parcel::STATUS_PENDING, Parcel::STATUS_WAITING], true)
+        ) {
             return;
         }
 
@@ -102,41 +119,159 @@ class AssignmentService
             ? $this->walletService->calculerMontantAReverserParcel($parcel)
             : null;
 
-        $livreur = $this->trouverLivreurProche(
-            lat: $parcel->pickup_lat,
-            lng: $parcel->pickup_lng,
-            cityId: $parcel->city_id,
-            excludeIds: $exclusions,
+        $this->attribuerCourse(
+            course: $parcel,
+            type: 'gocolis',
+            waitingStatus: Parcel::STATUS_WAITING,
+            pickupLat: $parcel->pickup_lat !== null ? (float) $parcel->pickup_lat : null,
+            pickupLng: $parcel->pickup_lng !== null ? (float) $parcel->pickup_lng : null,
+            cityId: (int) $parcel->city_id,
+            tentative: $tentative,
+            exclusions: $exclusions,
             montantRequisCash: $montantRequisCash,
-        );
+            defaultDelaySeconds: self::DELAI_ACCEPTATION_GOCOLIS,
+            onOffer: function (Courier $livreur, int $currentAttempt, array $updatedExclusions, int $delaySeconds) use ($parcel): void {
+                $this->notificationService->proposerCourseGoColis($livreur, $parcel);
 
-        if (! $livreur) {
-            $parcel->update(['status' => Parcel::STATUS_WAITING]);
-            if (class_exists(AlerterAdminPasDelivreur::class)) {
-                AlerterAdminPasDelivreur::dispatch($parcel, 'gocolis')
-                    ->onQueue('high');
+                if (class_exists(NotifierLivreurGoColis::class)) {
+                    NotifierLivreurGoColis::dispatch(
+                        $parcel->id,
+                        $livreur->id,
+                        $currentAttempt,
+                        $updatedExclusions,
+                        now()->toIso8601String(),
+                    )
+                        ->delay(now()->addSeconds($delaySeconds))
+                        ->onQueue('default');
+                }
+            },
+            onWaiting: function (bool $notifyClient) use ($parcel): void {
+                if ($notifyClient) {
+                    $this->notificationService->notifierClientAttenteGoColis($parcel);
+                }
+            },
+        );
+    }
+
+    /**
+     * Logique factorisée d'attribution et d'escalade GoShop / GoColis après timeout.
+     */
+    public function traiterVerificationTimeout(
+        Order|Parcel $course,
+        int $courierId,
+        int $tentative,
+        array $exclusions,
+        ?string $proposeeLe,
+        string $type,
+    ): void {
+        if ($proposeeLe === null) {
+            $courier = Courier::with('user')->find($courierId);
+            if ($courier && $courier->is_active && $courier->is_online && (int) $courier->city_id === (int) $course->city_id) {
+                if ($course instanceof Order) {
+                    $this->notificationService->proposerCourseGoShop($courier, $course);
+                } else {
+                    $this->notificationService->proposerCourseGoColis($courier, $course);
+                }
+
+                $label = $type === 'goshop' ? 'GoShop' : 'GoColis';
+                Log::info("Notification course {$label} #{$course->id} envoyée au livreur #{$courierId} (tentative {$tentative}).");
             }
 
             return;
         }
 
-        // Notifier le livreur avec la taille du colis visible
-        $this->notificationService->proposerCourseGoColis($livreur, $parcel);
+        $defaultDelay = $type === 'goshop' ? self::DELAI_ACCEPTATION_GOSHOP : self::DELAI_ACCEPTATION_GOCOLIS;
+        $delais = $this->settingsService->get('delais_regles', (int) $course->city_id);
+        $delaiSecondes = max(1, (int) (is_array($delais) ? ($delais['acceptation_livreur_secondes'] ?? $defaultDelay) : $defaultDelay));
 
-        $delais = $this->settingsService->get('delais_regles', $parcel->city_id);
-        $delaiSecondes = max(1, (int) (is_array($delais) ? ($delais['acceptation_livreur_secondes'] ?? self::DELAI_ACCEPTATION_GOCOLIS) : self::DELAI_ACCEPTATION_GOCOLIS));
+        $secondesEcoulees = Carbon::parse($proposeeLe)->diffInSeconds(now(), false);
+        $label = $type === 'goshop' ? 'GoShop' : 'GoColis';
 
-        if (class_exists(NotifierLivreurGoColis::class)) {
-            NotifierLivreurGoColis::dispatch(
-                $parcel->id,
-                $livreur->id,
-                $tentative,
-                [...$exclusions, $livreur->id],
-                now()->toIso8601String(),
-            )
-                ->delay(now()->addSeconds($delaiSecondes))
-                ->onQueue('default');
+        if ($secondesEcoulees < $delaiSecondes) {
+            Log::info("Vérification acceptation course {$label} #{$course->id} tentative {$tentative}");
+
+            return;
         }
+
+        Log::info("Délai expiré ({$secondesEcoulees}s) pour course {$label} #{$course->id} tentative {$tentative}, relance.");
+
+        if ($course instanceof Order) {
+            $this->attribuerLivreurGoShop($course, $tentative + 1, $exclusions);
+        } else {
+            $this->attribuerLivreurGoColis($course, $tentative + 1, $exclusions);
+        }
+    }
+
+    /**
+     * @param  array<int, int>  $exclusions
+     * @param  callable(Courier, int, array<int, int>, int): void  $onOffer
+     * @param  callable(bool): void  $onWaiting
+     */
+    private function attribuerCourse(
+        Order|Parcel $course,
+        string $type,
+        string $waitingStatus,
+        ?float $pickupLat,
+        ?float $pickupLng,
+        int $cityId,
+        int $tentative,
+        array $exclusions,
+        ?int $montantRequisCash,
+        int $defaultDelaySeconds,
+        callable $onOffer,
+        callable $onWaiting,
+    ): void {
+        if ($tentative > self::MAX_TENTATIVES) {
+            $wasAlreadyWaiting = $course->status === $waitingStatus;
+            $course->update([
+                'status' => $waitingStatus,
+                'assignment_attempts' => max((int) $course->assignment_attempts, self::MAX_TENTATIVES),
+            ]);
+
+            if (class_exists(AlerterAdminPasDelivreur::class)) {
+                AlerterAdminPasDelivreur::dispatch($course, $type)
+                    ->onQueue('high');
+            }
+
+            $onWaiting($type === 'gocolis' ? true : $wasAlreadyWaiting);
+
+            return;
+        }
+
+        $livreur = $this->trouverLivreurProche(
+            lat: $pickupLat,
+            lng: $pickupLng,
+            cityId: $cityId,
+            excludeIds: $exclusions,
+            montantRequisCash: $montantRequisCash,
+        );
+
+        if (! $livreur) {
+            $wasAlreadyWaiting = $course->status === $waitingStatus;
+            $course->update([
+                'status' => $waitingStatus,
+                'assignment_attempts' => max((int) $course->assignment_attempts, $tentative - 1),
+            ]);
+
+            if (class_exists(AlerterAdminPasDelivreur::class)) {
+                AlerterAdminPasDelivreur::dispatch($course, $type)
+                    ->onQueue('high');
+            }
+
+            if ($type === 'goshop') {
+                $onWaiting($wasAlreadyWaiting);
+            }
+
+            return;
+        }
+
+        $course->update(['assignment_attempts' => $tentative]);
+
+        $delais = $this->settingsService->get('delais_regles', $cityId);
+        $delaiSecondes = max(1, (int) (is_array($delais) ? ($delais['acceptation_livreur_secondes'] ?? $defaultDelaySeconds) : $defaultDelaySeconds));
+
+        $updatedExclusions = array_values(array_unique([...$exclusions, $livreur->id]));
+        $onOffer($livreur, $tentative, $updatedExclusions, $delaiSecondes);
     }
 
     /**

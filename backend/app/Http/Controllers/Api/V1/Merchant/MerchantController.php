@@ -65,6 +65,7 @@ class MerchantController extends Controller
             ->whereIn('status', [
                 Order::STATUS_PENDING,
                 Order::STATUS_ACCEPTED,
+                Order::STATUS_WAITING,
                 'ready',
                 'picked_up',
                 'in_transit',

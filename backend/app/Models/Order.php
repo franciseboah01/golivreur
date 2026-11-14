@@ -16,7 +16,7 @@ class Order extends Model
 
     protected $fillable = [
         'client_id', 'merchant_id', 'courier_id', 'city_id',
-        'status', 'products_total', 'delivery_fee',
+        'status', 'assignment_attempts', 'products_total', 'delivery_fee',
         'platform_commission', 'merchant_amount', 'courier_amount',
         'rain_mode_applied', 'peak_hours_applied',
         'payment_method', 'payment_status', 'payment_reference',
@@ -33,6 +33,7 @@ class Order extends Model
     ];
 
     protected $casts = [
+        'assignment_attempts' => 'integer',
         'rain_mode_applied' => 'boolean',
         'peak_hours_applied' => 'boolean',
         'confirmation_locked' => 'boolean',
@@ -48,6 +49,8 @@ class Order extends Model
     const STATUS_PENDING = 'pending';
 
     const STATUS_ACCEPTED = 'accepted';
+
+    const STATUS_WAITING = 'waiting';
 
     const STATUS_REFUSED = 'refused';
 
@@ -70,8 +73,9 @@ class Order extends Model
      */
     public const TRANSITIONS_AUTORISEES = [
         self::STATUS_PENDING => [self::STATUS_ACCEPTED, self::STATUS_REFUSED, self::STATUS_CANCELLED],
-        self::STATUS_ACCEPTED => [self::STATUS_READY, self::STATUS_PICKED_UP, self::STATUS_CANCELLED],
-        self::STATUS_READY => [self::STATUS_PICKED_UP, self::STATUS_CANCELLED],
+        self::STATUS_ACCEPTED => [self::STATUS_READY, self::STATUS_PICKED_UP, self::STATUS_WAITING, self::STATUS_CANCELLED],
+        self::STATUS_WAITING => [self::STATUS_ACCEPTED, self::STATUS_READY, self::STATUS_PICKED_UP, self::STATUS_CANCELLED],
+        self::STATUS_READY => [self::STATUS_PICKED_UP, self::STATUS_WAITING, self::STATUS_CANCELLED],
         self::STATUS_PICKED_UP => [self::STATUS_IN_TRANSIT, self::STATUS_DELIVERED],
         self::STATUS_IN_TRANSIT => [self::STATUS_DELIVERED],
         self::STATUS_REFUSED => [],
@@ -148,7 +152,7 @@ class Order extends Model
     public function scopeActive($query)
     {
         return $query->whereIn('status', [
-            self::STATUS_PENDING, self::STATUS_ACCEPTED,
+            self::STATUS_PENDING, self::STATUS_ACCEPTED, self::STATUS_WAITING,
             self::STATUS_READY, self::STATUS_PICKED_UP, self::STATUS_IN_TRANSIT,
         ]);
     }

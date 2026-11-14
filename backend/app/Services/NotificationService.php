@@ -92,14 +92,35 @@ class NotificationService
         );
     }
 
+    public function notifierClientAttenteGoShop(Order $order): void
+    {
+        $this->notifierClientAttente(
+            userId: (int) $order->client_id,
+            type: 'order_waiting',
+            data: ['order_id' => $order->id],
+        );
+    }
+
     public function notifierClientAttenteGoColis(Parcel $parcel): void
     {
-        $this->createNotification(
-            userId: $parcel->sender_id,
+        $this->notifierClientAttente(
+            userId: (int) $parcel->sender_id,
             type: 'parcel_waiting',
+            data: ['parcel_id' => $parcel->id],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function notifierClientAttente(int $userId, string $type, array $data): void
+    {
+        $this->createNotification(
+            userId: $userId,
+            type: $type,
             title: 'Recherche de livreur en cours',
             body: 'Tous nos livreurs sont occupés. Nous continuons la recherche.',
-            data: ['parcel_id' => $parcel->id],
+            data: $data,
         );
     }
 

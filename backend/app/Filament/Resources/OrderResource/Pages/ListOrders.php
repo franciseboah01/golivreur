@@ -29,6 +29,7 @@ class ListOrders extends ListRecords
                 ->modifyQueryUsing(fn (Builder $query) => $query->whereIn('status', [
                     Order::STATUS_PENDING,
                     Order::STATUS_ACCEPTED,
+                    Order::STATUS_WAITING,
                     'preparing',
                     Order::STATUS_READY,
                     Order::STATUS_PICKED_UP,
@@ -38,6 +39,7 @@ class ListOrders extends ListRecords
                 ->badge(Order::whereIn('status', [
                     Order::STATUS_PENDING,
                     Order::STATUS_ACCEPTED,
+                    Order::STATUS_WAITING,
                     'preparing',
                     Order::STATUS_READY,
                     Order::STATUS_PICKED_UP,

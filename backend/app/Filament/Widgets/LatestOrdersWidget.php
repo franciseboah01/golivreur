@@ -47,7 +47,7 @@ class LatestOrdersWidget extends BaseWidget
                     ->color(fn (string $state): string => match ($state) {
                         'pending' => 'gray',
                         'accepted' => 'info',
-                        'preparing' => 'warning',
+                        'waiting', 'preparing' => 'warning',
                         'ready' => 'primary',
                         'delivering' => 'info',
                         'delivered' => 'success',
@@ -57,6 +57,7 @@ class LatestOrdersWidget extends BaseWidget
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'pending' => 'En attente',
                         'accepted' => 'Acceptée',
+                        'waiting' => 'En attente de livreur',
                         'preparing' => 'En préparation',
                         'ready' => 'Prête',
                         'delivering' => 'En cours de livraison',

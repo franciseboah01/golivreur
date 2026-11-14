@@ -69,6 +69,7 @@ class OrderResource extends Resource
                                 'accepted' => 'Acceptée',
                                 'cancelled' => 'Annulée',
                                 'pending' => 'En attente',
+                                'waiting' => 'En attente de livreur',
                                 'delivering' => 'En cours de livraison',
                                 'preparing' => 'En préparation',
                                 'delivered' => 'Livrée',
@@ -194,7 +195,7 @@ class OrderResource extends Resource
                     ->color(fn (string $state): string => match ($state) {
                         'pending' => 'gray',
                         'accepted' => 'info',
-                        'preparing' => 'warning',
+                        'waiting', 'preparing' => 'warning',
                         'ready' => 'primary',
                         'delivering' => 'info',
                         'delivered' => 'success',
@@ -204,6 +205,7 @@ class OrderResource extends Resource
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'pending' => 'En attente',
                         'accepted' => 'Acceptée',
+                        'waiting' => 'En attente de livreur',
                         'preparing' => 'En préparation',
                         'ready' => 'Prête',
                         'delivering' => 'En livraison',
@@ -269,6 +271,7 @@ class OrderResource extends Resource
                     ->options([
                         'pending' => 'En attente',
                         'accepted' => 'Acceptée',
+                        'waiting' => 'En attente de livreur',
                         'preparing' => 'En préparation',
                         'ready' => 'Prête',
                         'delivering' => 'En cours de livraison',

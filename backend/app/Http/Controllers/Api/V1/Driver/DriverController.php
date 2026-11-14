@@ -204,7 +204,7 @@ class DriverController extends Controller
                 ], 409);
             }
 
-            if (! in_array($lockedOrder->status, [Order::STATUS_ACCEPTED, Order::STATUS_READY], true)) {
+            if (! in_array($lockedOrder->status, [Order::STATUS_ACCEPTED, Order::STATUS_READY, Order::STATUS_WAITING], true)) {
                 return response()->json([
                     'succes' => false,
                     'message' => 'Cette course ne peut plus être acceptée.',
@@ -225,11 +225,16 @@ class DriverController extends Controller
                 return $denied;
             }
 
+            $targetStatus = $lockedOrder->status === Order::STATUS_WAITING
+                ? ($lockedOrder->ready_at !== null ? Order::STATUS_READY : Order::STATUS_ACCEPTED)
+                : $lockedOrder->status;
+
             $affected = Order::whereKey($lockedOrder->id)
                 ->whereNull('courier_id')
-                ->whereIn('status', [Order::STATUS_ACCEPTED, Order::STATUS_READY])
+                ->whereIn('status', [Order::STATUS_ACCEPTED, Order::STATUS_READY, Order::STATUS_WAITING])
                 ->update([
                     'courier_id' => $lockedCourier->id,
+                    'status' => $targetStatus,
                     'accepted_at' => $lockedOrder->accepted_at ?? now(),
                 ]);
 
