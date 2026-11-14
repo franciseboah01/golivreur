@@ -153,6 +153,36 @@ class ParcelController extends Controller
         ], 201);
     }
 
+    public function atSender(Parcel $parcel, ParcelService $service): JsonResponse
+    {
+        if ($denied = $this->authorizeAssignedCourier($parcel, allowNationalAdmins: false)) {
+            return $denied;
+        }
+
+        $updated = $service->signalerArriveeExpediteur($parcel);
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $updated,
+            'message' => 'Arrivée chez l\'expéditeur enregistrée.',
+        ]);
+    }
+
+    public function atRecipient(Parcel $parcel, ParcelService $service): JsonResponse
+    {
+        if ($denied = $this->authorizeAssignedCourier($parcel, allowNationalAdmins: false)) {
+            return $denied;
+        }
+
+        $updated = $service->signalerArriveeDestinataire($parcel);
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $updated,
+            'message' => 'Arrivée chez le destinataire enregistrée.',
+        ]);
+    }
+
     private function authorizeAssignedCourier(Parcel $parcel, bool $allowNationalAdmins = true): ?JsonResponse
     {
         $user = auth()->user();

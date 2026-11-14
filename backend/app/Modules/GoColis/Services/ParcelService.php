@@ -210,6 +210,53 @@ class ParcelService
     }
 
     /**
+     * Le livreur signale son arrivée chez l'expéditeur (jalon STATUS_AT_SENDER).
+     */
+    public function signalerArriveeExpediteur(Parcel $parcel): Parcel
+    {
+        return $this->transitionnerJalon(
+            parcel: $parcel,
+            statutsAutorises: [Parcel::STATUS_ACCEPTED],
+            statutCible: Parcel::STATUS_AT_SENDER,
+            messageErreur: 'Vous ne pouvez signaler votre arrivée chez l\'expéditeur que pour un colis accepté.',
+        );
+    }
+
+    /**
+     * Le livreur signale son arrivée chez le destinataire (jalon STATUS_AT_RECIPIENT).
+     */
+    public function signalerArriveeDestinataire(Parcel $parcel): Parcel
+    {
+        return $this->transitionnerJalon(
+            parcel: $parcel,
+            statutsAutorises: [Parcel::STATUS_PICKED_UP, Parcel::STATUS_IN_TRANSIT],
+            statutCible: Parcel::STATUS_AT_RECIPIENT,
+            messageErreur: 'Le colis doit être ramassé ou en transit avant de signaler l\'arrivée chez le destinataire.',
+        );
+    }
+
+    /**
+     * @param  list<string>  $statutsAutorises
+     */
+    private function transitionnerJalon(Parcel $parcel, array $statutsAutorises, string $statutCible, string $messageErreur): Parcel
+    {
+        return DB::transaction(function () use ($parcel, $statutsAutorises, $statutCible, $messageErreur): Parcel {
+            /** @var Parcel $lockedParcel */
+            $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
+
+            if (! in_array($lockedParcel->status, $statutsAutorises, true)) {
+                throw ValidationException::withMessages([
+                    'status' => [$messageErreur],
+                ]);
+            }
+
+            $lockedParcel->update(['status' => $statutCible]);
+
+            return $lockedParcel->fresh(['sender', 'courier', 'photos']);
+        });
+    }
+
+    /**
      * Le livreur valide le code expéditeur au ramassage.
      * La photo de ramassage doit exister avant d'appeler cette méthode.
      */
@@ -238,7 +285,7 @@ class ParcelService
         );
 
         // Code correct — ramassage validé
-        return DB::transaction(function () use ($parcel) {
+        $ramasse = DB::transaction(function () use ($parcel) {
             $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
 
             $this->verifierStatutRamassage($lockedParcel);
@@ -252,6 +299,10 @@ class ParcelService
 
             return $lockedParcel->fresh(['sender', 'courier']);
         });
+
+        $this->smsService->envoyerNotificationColisRamasse((string) $ramasse->recipient_phone, $ramasse);
+
+        return $ramasse;
     }
 
     /**
@@ -283,7 +334,7 @@ class ParcelService
         );
 
         // Code correct — livraison confirmée
-        return DB::transaction(function () use ($parcel) {
+        $livre = DB::transaction(function () use ($parcel) {
             $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
 
             $this->verifierStatutLivraison($lockedParcel);
@@ -344,6 +395,10 @@ class ParcelService
 
             return $lockedParcel->fresh(['sender', 'courier', 'photos']);
         });
+
+        $this->smsService->envoyerNotificationColisLivre((string) $livre->recipient_phone, $livre);
+
+        return $livre;
     }
 
     private function verifierStatutRamassage(Parcel $parcel): void

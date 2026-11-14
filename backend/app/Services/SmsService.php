@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Mail\SmsBudgetAlertMail;
+use App\Models\Parcel;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -50,6 +51,26 @@ class SmsService
                  .'Donnez ce code uniquement au livreur.';
 
         return $this->envoyer($phone, $message, type: 'gocolis_recipient');
+    }
+
+    /**
+     * Notifie le destinataire par SMS que le colis a été ramassé et est en route.
+     */
+    public function envoyerNotificationColisRamasse(string $phone, Parcel $parcel): bool
+    {
+        $message = "GoLivreur GoColis : Votre colis #{$parcel->id} a ete pris en charge par le livreur et est en route vers vous.";
+
+        return $this->envoyer($phone, $message, type: 'gocolis_pickup_notify');
+    }
+
+    /**
+     * Notifie le destinataire par SMS que le colis a bien été livré.
+     */
+    public function envoyerNotificationColisLivre(string $phone, Parcel $parcel): bool
+    {
+        $message = "GoLivreur GoColis : Votre colis #{$parcel->id} a bien ete livre. Merci d'avoir utilise GoLivreur.";
+
+        return $this->envoyer($phone, $message, type: 'gocolis_delivered_notify');
     }
 
     /**

@@ -151,6 +151,8 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::get('parcels/{parcel}', [ParcelController::class, 'showDriver']);
         Route::post('parcels/{parcel}/accept', [DriverController::class, 'acceptParcel']);
         Route::post('parcels/{parcel}/refuse', [DriverController::class, 'refuseParcel']);
+        Route::post('parcels/{parcel}/at-sender', [ParcelController::class, 'atSender']);
+        Route::post('parcels/{parcel}/at-recipient', [ParcelController::class, 'atRecipient']);
         Route::post('parcels/{parcel}/photos', [ParcelController::class, 'uploadPhoto']);
         Route::get('wallet', [DriverController::class, 'wallet']);
     });
