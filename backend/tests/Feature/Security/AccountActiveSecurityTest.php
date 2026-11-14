@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Courier;
-use App\Models\Merchant;
 use App\Models\User;
 use Tymon\JWTAuth\Facades\JWTAuth;
 

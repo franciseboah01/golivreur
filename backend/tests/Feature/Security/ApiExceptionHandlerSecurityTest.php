@@ -34,7 +34,7 @@ it('renvoie un JSON standard 500 sans fuite de trace ni chemin en production', f
     config(['app.debug' => false]);
 
     Route::get('/api/v1/test-error-throwable', function () {
-        throw new \RuntimeException('Erreur interne de base de donnees fatale /var/www/secret/db.php');
+        throw new RuntimeException('Erreur interne de base de donnees fatale /var/www/secret/db.php');
     });
 
     $res = $this->getJson('/api/v1/test-error-throwable');

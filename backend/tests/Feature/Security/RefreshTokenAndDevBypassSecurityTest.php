@@ -1,10 +1,8 @@
 <?php
 
-use App\Models\City;
 use App\Models\OtpCode;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-use Tymon\JWTAuth\Facades\JWTAuth;
 
 afterEach(function () {
     app()->detectEnvironment(fn () => 'testing');

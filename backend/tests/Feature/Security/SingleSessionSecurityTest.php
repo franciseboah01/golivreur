@@ -5,7 +5,6 @@ use App\Models\Merchant;
 use App\Models\OtpCode;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-use Tymon\JWTAuth\Facades\JWTAuth;
 
 it('invalide l\'ancien JWT lors d\'une nouvelle connexion d\'un livreur et refuse l\'ancien avec 401', function () {
     $user = User::factory()->create([
