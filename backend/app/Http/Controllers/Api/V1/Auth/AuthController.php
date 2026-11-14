@@ -432,7 +432,7 @@ class AuthController extends Controller
             $newToken = JWTAuth::setToken($rawToken)->refresh();
             $user = JWTAuth::setToken($newToken)->toUser();
 
-            if (! $user || ! $user->is_active) {
+            if (! $user instanceof User || ! $user->is_active) {
                 return response()->json([
                     'succes' => false,
                     'message' => 'Votre compte est désactivé ou suspendu.',
