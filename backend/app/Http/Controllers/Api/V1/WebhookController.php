@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProcessPaymentWebhook;
 use App\Models\WebhookLog;
 use App\Services\ActivityLogService;
+use App\Services\WebhookReplayService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * Reçoit et valide les webhooks Hub2/CinetPay (confirmation paiement Mobile Money).
@@ -22,6 +24,7 @@ class WebhookController extends Controller
 {
     public function __construct(
         private readonly ActivityLogService $activityLogService,
+        private readonly WebhookReplayService $webhookReplayService,
     ) {}
 
     /**
@@ -145,9 +148,10 @@ class WebhookController extends Controller
      */
     public function rejouer(int $webhookLogId): JsonResponse
     {
+        /** @var \App\Models\User|null $user */
         $user = auth()->user();
 
-        if (! $user || ! in_array($user->role, ['super_admin', 'national_tech'], true)) {
+        if (! WebhookReplayService::canReplay($user)) {
             return response()->json([
                 'succes' => false,
                 'message' => 'Action réservée au Super Admin ou Tech National.',
@@ -156,32 +160,14 @@ class WebhookController extends Controller
 
         $webhookLog = WebhookLog::findOrFail($webhookLogId);
 
-        if (! $webhookLog->signature_valid) {
+        try {
+            $this->webhookReplayService->replay($user, $webhookLog);
+        } catch (HttpExceptionInterface $e) {
             return response()->json([
                 'succes' => false,
-                'message' => 'Ce webhook a une signature invalide — rejoue impossible.',
-            ], 422);
+                'message' => $e->getMessage(),
+            ], $e->getStatusCode());
         }
-
-        if ($webhookLog->status === 'processed') {
-            return response()->json([
-                'succes' => false,
-                'message' => 'Ce webhook a déjà été traité avec succès.',
-            ], 409);
-        }
-
-        $webhookLog->increment('retry_count');
-        $webhookLog->update(['status' => 'pending']);
-
-        ProcessPaymentWebhook::dispatch($webhookLog->id, $webhookLog->payload)
-            ->onQueue('high');
-
-        $this->activityLogService->log(
-            userId: auth()->id(),
-            action: 'webhook_replayed',
-            entityType: 'webhook_log',
-            entityId: $webhookLog->id,
-        );
 
         return response()->json([
             'succes' => true,

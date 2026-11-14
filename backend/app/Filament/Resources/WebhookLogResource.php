@@ -4,12 +4,14 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\WebhookLogResource\Pages;
 use App\Models\WebhookLog;
+use App\Services\WebhookReplayService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * Ressource Filament de surveillance et de rejeu des Webhooks (Hub2, CinetPay).
@@ -151,23 +153,32 @@ class WebhookLogResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('Rejouer le traitement de ce webhook')
                     ->modalDescription('Si le paiement était en échec ou en attente, le système va ré-exécuter le traitement des statuts.')
-                    ->visible(fn (WebhookLog $record) => $record->signature_valid && in_array(auth()->user()?->role, ['super_admin', 'national_tech'], true))
+                    ->visible(fn (WebhookLog $record): bool => $record->signature_valid
+                        && $record->status !== 'processed'
+                        && WebhookReplayService::canReplay(auth()->user()))
                     ->action(function (WebhookLog $record): void {
-                        if (! in_array(auth()->user()?->role, ['super_admin', 'national_tech'], true)) {
+                        $user = auth()->user();
+                        if (! WebhookReplayService::canReplay($user)) {
                             abort(403, 'Seuls le Super Admin et le Responsable Technique National peuvent rejouer un webhook.');
                         }
 
-                        $record->increment('retry_count');
-                        $record->update([
-                            'status' => 'processed',
-                            'error_message' => null,
-                            'processed_at' => now(),
-                        ]);
+                        try {
+                            app(WebhookReplayService::class)->replay($user, $record);
 
-                        Notification::make()
-                            ->title("Webhook #{$record->id} rejoué avec succès")
-                            ->success()
-                            ->send();
+                            Notification::make()
+                                ->title("Webhook #{$record->id} mis en queue pour rejeu.")
+                                ->success()
+                                ->send();
+                        } catch (HttpExceptionInterface $e) {
+                            if ($e->getStatusCode() === 403) {
+                                abort(403, $e->getMessage());
+                            }
+
+                            Notification::make()
+                                ->title($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
                     }),
             ]);
     }
