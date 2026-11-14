@@ -5,7 +5,10 @@ namespace App\Providers;
 use App\Models\User;
 use App\Policies\ProfilePolicy;
 use App\Services\SmsService;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Twilio\Rest\Client;
 
@@ -43,5 +46,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(User::class, ProfilePolicy::class);
+
+        RateLimiter::for('driver-location', function (Request $request) {
+            return Limit::perMinute(12)->by($request->user()?->id ?: $request->ip());
+        });
     }
 }

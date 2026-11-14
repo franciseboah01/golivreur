@@ -15,6 +15,7 @@ use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 
 class DriverController extends Controller
 {
@@ -100,8 +101,8 @@ class DriverController extends Controller
     public function updateLocation(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'lat' => 'required|numeric',
-            'lng' => 'required|numeric',
+            'lat' => 'required|numeric|between:-90,90',
+            'lng' => 'required|numeric|between:-180,180',
         ]);
 
         $courier = $this->getCourier()->load('user');
@@ -112,6 +113,16 @@ class DriverController extends Controller
                 'message' => 'Votre compte livreur est suspendu ou inactif.',
             ], 403);
         }
+
+        // Throttle : 1 requête par 5 secondes par livreur (CDC 11.4)
+        $rateKey = "driver_location:{$courier->id}";
+        if (RateLimiter::tooManyAttempts($rateKey, 1)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Position mise à jour trop fréquemment (maximum 1 requête toutes les 5 secondes).',
+            ], 429);
+        }
+        RateLimiter::hit($rateKey, 5);
 
         $courier->update([
             'current_lat' => $validated['lat'],

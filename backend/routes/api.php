@@ -22,20 +22,47 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// ─── Health check (public) ────────────────────────────────────────────────────
-Route::get('/health', fn () => response()->json([
-    'status' => 'ok',
-    'version' => '5.0',
-    'timestamp' => now()->toIso8601String(),
-    'service' => 'GoLivreur API',
-]));
-Route::get('/branding', fn (SettingsService $settingsService) => response()->json([
-    'succes' => true,
-    'donnees' => $settingsService->getBranding(),
-]));
+// ─── Routes publiques throttlées (20 req/min - CDC 11.4) ───────────────────────
+Route::middleware('throttle:20,1')->group(function () {
+    Route::get('/health', fn () => response()->json([
+        'status' => 'ok',
+        'version' => '5.0',
+        'timestamp' => now()->toIso8601String(),
+        'service' => 'GoLivreur API',
+    ]));
+    Route::get('/branding', fn (SettingsService $settingsService) => response()->json([
+        'succes' => true,
+        'donnees' => $settingsService->getBranding(),
+    ]));
 
-// ─── Authentification (public) ───────────────────────────────────────────────
-Route::prefix('auth')->group(function () {
+    // Catalogue GoShop Public
+    Route::prefix('client')->group(function () {
+        Route::get('city-status', [ClientController::class, 'cityStatus']);
+        Route::get('categories', [ClientController::class, 'categories']);
+        Route::get('merchants', [ClientController::class, 'merchants']);
+        Route::get('merchants/{merchant}/catalog', [ClientController::class, 'merchantCatalog']);
+    });
+    Route::get('categories', [ClientController::class, 'categories']);
+    Route::get('vehicle-types', fn () => response()->json([
+        'succes' => true,
+        'donnees' => VehicleType::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'description']),
+    ]));
+    Route::get('cities', fn () => response()->json([
+        'succes' => true,
+        'donnees' => City::where('is_active', true)->orderBy('name')->get([
+            'id',
+            'name',
+            'center_lat',
+            'center_lng',
+            'rain_mode_active',
+            'emergency_mode_active',
+            'emergency_mode_message',
+        ]),
+    ]));
+});
+
+// ─── Authentification (60 req/min - CDC 11.4) ─────────────────────────────────
+Route::prefix('auth')->middleware('throttle:60,1')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('verify-register', [AuthController::class, 'verifierOtpInscription']);
     Route::post('login', [AuthController::class, 'login']);
@@ -44,31 +71,6 @@ Route::prefix('auth')->group(function () {
     Route::post('refresh', [AuthController::class, 'refresh'])->middleware('auth:api');
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:api');
 });
-
-// ─── Catalogue GoShop Public (Accessible avec ou sans connexion) ──────────────
-Route::prefix('client')->group(function () {
-    Route::get('city-status', [ClientController::class, 'cityStatus']);
-    Route::get('categories', [ClientController::class, 'categories']);
-    Route::get('merchants', [ClientController::class, 'merchants']);
-    Route::get('merchants/{merchant}/catalog', [ClientController::class, 'merchantCatalog']);
-});
-Route::get('categories', [ClientController::class, 'categories']);
-Route::get('vehicle-types', fn () => response()->json([
-    'succes' => true,
-    'donnees' => VehicleType::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'description']),
-]));
-Route::get('cities', fn () => response()->json([
-    'succes' => true,
-    'donnees' => City::where('is_active', true)->orderBy('name')->get([
-        'id',
-        'name',
-        'center_lat',
-        'center_lng',
-        'rain_mode_active',
-        'emergency_mode_active',
-        'emergency_mode_message',
-    ]),
-]));
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
 Route::prefix('webhooks')->group(function () {
@@ -136,7 +138,8 @@ Route::middleware('auth:api')->group(function () {
         Route::get('profile', [ProfileController::class, 'showDriver']);
         Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateDriver']);
         Route::post('availability', [DriverController::class, 'availability']);
-        Route::post('location', [DriverController::class, 'updateLocation']);
+        Route::post('location', [DriverController::class, 'updateLocation'])
+            ->middleware('throttle:driver-location');
         Route::get('courses', [DriverController::class, 'courses']);
         Route::post('orders/{order}/accept', [DriverController::class, 'acceptOrder']);
         Route::post('orders/{order}/confirm-pickup', [DriverController::class, 'confirmPickup']);
