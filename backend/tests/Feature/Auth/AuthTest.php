@@ -161,11 +161,10 @@ it('la connexion d\'un merchant révoque l\'ancienne session', function () {
         'otp' => $code,
     ])->assertOk();
 
-    // L'ancien session_token doit être révoqué
-    $this->assertDatabaseHas('users', [
-        'id' => $merchant->id,
-        'session_token' => null,
-    ]);
+    // L'ancien session_token doit être remplacé par le nouveau jti de session (Point 4 - Session unique)
+    $merchant->refresh();
+    expect($merchant->session_token)->not->toBe('ancien-token-xyz')
+        ->not->toBeNull();
 });
 
 // ─── Refresh Token ────────────────────────────────────────────────────────────

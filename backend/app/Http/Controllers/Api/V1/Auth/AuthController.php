@@ -260,11 +260,15 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if (in_array($user->role, ['merchant', 'driver'])) {
+        if (in_array($user->role, ['merchant', 'driver', 'courier'])) {
             $this->revoquerSessionPrecedente($user);
         }
 
         $token = JWTAuth::fromUser($user);
+        if (in_array($user->role, ['merchant', 'driver', 'courier'])) {
+            $jti = (string) JWTAuth::setToken($token)->getPayload()->get('jti');
+            $user->update(['session_token' => $jti]);
+        }
         $user->load('city');
 
         return response()->json([
@@ -334,8 +338,8 @@ class AuthController extends Controller
         }
         RateLimiter::clear("otp_login:{$phone}");
 
-        // Session unique pour merchants et drivers
-        if (in_array($user->role, ['merchant', 'driver'])) {
+        // Session unique pour merchants et drivers (CDC 9.2 & ADR-002)
+        if (in_array($user->role, ['merchant', 'driver', 'courier'])) {
             $this->revoquerSessionPrecedente($user);
         }
 
@@ -352,6 +356,10 @@ class AuthController extends Controller
         $user->load('city');
 
         $token = JWTAuth::fromUser($user);
+        if (in_array($user->role, ['merchant', 'driver', 'courier'])) {
+            $jti = (string) JWTAuth::setToken($token)->getPayload()->get('jti');
+            $user->update(['session_token' => $jti]);
+        }
 
         $this->activityLogService->log(
             userId: $user->id,
@@ -402,6 +410,9 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         try {
+            if ($user = auth('api')->user()) {
+                $user->update(['session_token' => null]);
+            }
             JWTAuth::parseToken()->invalidate();
             auth('api')->logout();
         } catch (\Exception $e) {
@@ -460,7 +471,6 @@ class AuthController extends Controller
                     ['type' => 'forced_logout'],
                 )->onQueue('default');
             }
-            $user->update(['session_token' => null]);
         }
     }
 }

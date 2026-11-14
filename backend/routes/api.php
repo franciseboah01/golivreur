@@ -79,7 +79,7 @@ Route::prefix('webhooks')->group(function () {
 });
 
 // ─── Routes protégées par JWT ─────────────────────────────────────────────────
-Route::middleware(['auth:api', 'active_account'])->group(function () {
+Route::middleware(['auth:api', 'active_account', 'single_session'])->group(function () {
 
     // ─── Profil unifié & mot de passe ─────────────────────────────────────────
     Route::get('profile', [ProfileController::class, 'show']);
