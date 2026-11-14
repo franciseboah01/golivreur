@@ -176,6 +176,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::post('cities/{city}/emergency-mode', [AdminController::class, 'emergencyMode']);
         Route::post('orders/{order}/regenerate-code', [AdminController::class, 'regenerateOrderCode']);
         Route::post('parcels/{parcel}/regenerate-sender-code', [AdminController::class, 'regenerateParcelSenderCode']);
+        Route::post('parcels/{parcel}/resend-recipient-code', [AdminController::class, 'resendParcelRecipientCode']);
         Route::get('parcels/{parcel}/photos', [AdminController::class, 'parcelPhotos']);
         Route::post('webhooks/{id}/replay', [WebhookController::class, 'rejouer']);
     });

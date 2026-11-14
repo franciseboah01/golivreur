@@ -250,6 +250,14 @@ class ParcelResource extends Resource
                     })
                     ->sortable(),
 
+                Tables\Columns\IconColumn::make('sms_failed')
+                    ->label('SMS Échec')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-exclamation-circle')
+                    ->falseIcon('heroicon-o-check-circle')
+                    ->trueColor('danger')
+                    ->falseColor('success'),
+
                 Tables\Columns\TextColumn::make('shipping_fee')
                     ->label('Frais de Course')
                     ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA')
@@ -432,6 +440,47 @@ class ParcelResource extends Resource
                             ->title("Nouveau code expéditeur généré pour le colis #{$record->id}")
                             ->success()
                             ->send();
+                    }),
+
+                Tables\Actions\Action::make('resendRecipientCode')
+                    ->label('Renvoyer Code Destinataire')
+                    ->icon('heroicon-m-chat-bubble-left-ellipsis')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Renvoyer le code destinataire par SMS')
+                    ->modalDescription('Un nouveau code destinataire sera généré et envoyé par SMS au destinataire sans être affiché ou journalisé.')
+                    ->visible(function (Parcel $record): bool {
+                        $user = auth()->user();
+
+                        return $user instanceof User
+                            && $user->canManageCodes()
+                            && $user->canAccessCity((int) $record->city_id)
+                            && ! in_array($record->status, [
+                                Parcel::STATUS_DELIVERED,
+                                Parcel::STATUS_CANCELLED,
+                                Parcel::STATUS_REFUSED,
+                                Parcel::STATUS_LOST,
+                            ], true);
+                    })
+                    ->action(function (Parcel $record): void {
+                        $user = auth()->user();
+                        if (! $user instanceof User || ! $user->canManageCodes() || ! $user->canAccessCity((int) $record->city_id)) {
+                            abort(403);
+                        }
+
+                        $sent = app(ParcelService::class)->renvoyerCodeDestinataire($record, $user);
+
+                        if ($sent) {
+                            Notification::make()
+                                ->title("Code destinataire renvoyé par SMS pour le colis #{$record->id}")
+                                ->success()
+                                ->send();
+                        } else {
+                            Notification::make()
+                                ->title("Échec du renvoi SMS pour le colis #{$record->id}")
+                                ->danger()
+                                ->send();
+                        }
                     }),
 
                 Tables\Actions\Action::make('declareLost')

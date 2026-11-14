@@ -20,6 +20,7 @@ class Parcel extends Model
         'has_insurance', 'insurance_amount',
         'sender_code', 'sender_code_enc', 'sender_code_attempts', 'sender_code_locked',
         'recipient_code', 'recipient_code_attempts', 'recipient_code_locked',
+        'sms_failed', 'sms_failed_at',
         'recipient_name', 'recipient_phone',
         'delivery_address', 'delivery_lat', 'delivery_lng', 'distance_km',
         'pickup_address', 'pickup_lat', 'pickup_lng',
@@ -44,6 +45,8 @@ class Parcel extends Model
         'distance_km' => 'float',
         'sender_code_locked' => 'boolean',
         'recipient_code_locked' => 'boolean',
+        'sms_failed' => 'boolean',
+        'sms_failed_at' => 'datetime',
         'picked_up_at' => 'datetime',
         'delivered_at' => 'datetime',
         'cancelled_at' => 'datetime',
@@ -83,6 +86,9 @@ class Parcel extends Model
 
     // ─── Relations ────────────────────────────────────────────────────────────
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function sender(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sender_id');

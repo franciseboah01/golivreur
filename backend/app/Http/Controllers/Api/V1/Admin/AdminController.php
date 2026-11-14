@@ -451,6 +451,43 @@ class AdminController extends Controller
         ]);
     }
 
+    public function resendParcelRecipientCode(Parcel $parcel, ParcelService $parcelService): JsonResponse
+    {
+        /** @var User|null $user */
+        $user = auth()->user();
+
+        if ($denied = $this->verifierHabilitationCode($user, (int) $parcel->city_id, 'Expédition introuvable.')) {
+            return $denied;
+        }
+
+        try {
+            $sent = $parcelService->renvoyerCodeDestinataire($parcel, $user);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'succes' => false,
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        if (! $sent) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'L\'envoi du SMS destinataire a échoué.',
+            ], 502);
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'parcel_id' => $parcel->id,
+                'sms_failed' => false,
+                'sent' => true,
+            ],
+            'message' => 'Code destinataire renvoyé par SMS.',
+        ]);
+    }
+
     private function verifierHabilitationCode(?User $user, int $entityCityId, string $notFoundMessage): ?JsonResponse
     {
         if (! $user || ! $user->canManageCodes()) {

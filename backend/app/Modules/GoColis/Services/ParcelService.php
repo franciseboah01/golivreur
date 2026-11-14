@@ -3,6 +3,7 @@
 namespace App\Modules\GoColis\Services;
 
 use App\Jobs\AlerterAdminCodeBloque;
+use App\Jobs\AlerterAdminSmsEchec;
 use App\Models\City;
 use App\Models\Courier;
 use App\Models\Parcel;
@@ -155,11 +156,20 @@ class ParcelService
             ]);
 
             // Envoyer le code destinataire par SMS (jamais loggé)
-            $this->smsService->envoyerCodeDestinataire(
+            $smsEnvoye = $this->smsService->envoyerCodeDestinataire(
                 phone: $donnees['recipient_phone'],
                 code: $codeDestinataire,
                 expediteurNom: $expediteur->name,
             );
+
+            if (! $smsEnvoye) {
+                $parcel->update([
+                    'sms_failed' => true,
+                    'sms_failed_at' => now(),
+                ]);
+
+                $this->signalerEchecSmsDestinataire($parcel, $expediteur->id);
+            }
 
             $this->activityLogService->log(
                 userId: $expediteur->id,
@@ -558,5 +568,102 @@ class ParcelService
 
             return $lockedParcel->fresh();
         });
+    }
+
+    /**
+     * Génère et renvoie le code destinataire par SMS sans jamais exposer le code en logs.
+     */
+    public function renvoyerCodeDestinataire(Parcel $parcel, User $admin): bool
+    {
+        return DB::transaction(function () use ($parcel, $admin): bool {
+            /** @var Parcel $lockedParcel */
+            $lockedParcel = Parcel::with('sender')->lockForUpdate()->findOrFail($parcel->id);
+
+            if (in_array($lockedParcel->status, [
+                Parcel::STATUS_DELIVERED,
+                Parcel::STATUS_CANCELLED,
+                Parcel::STATUS_REFUSED,
+                Parcel::STATUS_LOST,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    'status' => ['Impossible de renvoyer le code destinataire d\'un colis clôturé.'],
+                ]);
+            }
+
+            $nouveauCode = $this->confirmationCodeService->genererCode();
+
+            $lockedParcel->update([
+                'recipient_code' => Hash::make($nouveauCode),
+                'recipient_code_attempts' => 0,
+                'recipient_code_locked' => false,
+            ]);
+
+            /** @var User|null $sender */
+            $sender = $lockedParcel->sender;
+            $expediteurNom = $sender instanceof User ? $sender->name : 'GoLivreur';
+            $smsEnvoye = $this->smsService->envoyerCodeDestinataire(
+                phone: (string) $lockedParcel->recipient_phone,
+                code: $nouveauCode,
+                expediteurNom: $expediteurNom,
+            );
+
+            if (! $smsEnvoye) {
+                $lockedParcel->update([
+                    'sms_failed' => true,
+                    'sms_failed_at' => now(),
+                ]);
+
+                $this->signalerEchecSmsDestinataire($lockedParcel, $admin->id);
+
+                return false;
+            }
+
+            $lockedParcel->update([
+                'sms_failed' => false,
+                'sms_failed_at' => null,
+            ]);
+
+            $this->activityLogService->log(
+                userId: $admin->id,
+                action: 'parcel_recipient_sms_resent',
+                entityType: 'parcel',
+                entityId: $lockedParcel->id,
+                properties: [
+                    'parcel_id' => $lockedParcel->id,
+                    'city_id' => $lockedParcel->city_id,
+                    'resent_by' => $admin->id,
+                ],
+                severity: 'warning',
+            );
+
+            return true;
+        });
+    }
+
+    private function signalerEchecSmsDestinataire(Parcel $parcel, ?int $actorId = null): void
+    {
+        $phone = (string) $parcel->recipient_phone;
+        $phoneMasked = strlen($phone) >= 5
+            ? substr($phone, 0, 2).'****'.substr($phone, -3)
+            : '****';
+
+        $this->activityLogService->log(
+            userId: $actorId,
+            action: 'parcel_recipient_sms_failed',
+            entityType: 'parcel',
+            entityId: $parcel->id,
+            properties: [
+                'parcel_id' => $parcel->id,
+                'city_id' => $parcel->city_id,
+                'recipient_phone_masked' => $phoneMasked,
+            ],
+            severity: 'critical',
+        );
+
+        AsyncJobDispatcher::dispatchAfterCommit(
+            static fn () => AlerterAdminSmsEchec::dispatch($parcel)->onQueue('high'),
+            operation: 'alerter_admin_sms_echec',
+            contexte: ['parcel_id' => $parcel->id, 'city_id' => $parcel->city_id],
+        );
     }
 }
