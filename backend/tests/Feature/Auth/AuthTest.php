@@ -59,10 +59,9 @@ it('un client peut vérifier son OTP et créer son compte', function () {
         'role' => 'client',
     ]);
 
-    // L'OTP doit être marqué utilisé
-    $this->assertDatabaseHas('otp_codes', [
+    // L'OTP doit être supprimé après validation (CDC 11.4 / Lot P3)
+    $this->assertDatabaseMissing('otp_codes', [
         'phone' => $phone,
-        'is_used' => true,
     ]);
 });
 

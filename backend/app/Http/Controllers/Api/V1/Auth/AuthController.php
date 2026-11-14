@@ -108,6 +108,18 @@ class AuthController extends Controller
         $isMasterDevOtp = app()->environment('local', 'testing') && $otp === '1234';
 
         if (! $isMasterDevOtp && (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash))) {
+            if ($otpRecord) {
+                $otpRecord->increment('attempts');
+                if ($otpRecord->attempts >= 5) {
+                    $otpRecord->update(['is_used' => true]);
+
+                    return response()->json([
+                        'succes' => false,
+                        'message' => 'Trop de tentatives de validation. Votre code a été invalidé. Veuillez demander un nouveau code.',
+                    ], 429);
+                }
+            }
+
             return response()->json([
                 'succes' => false,
                 'message' => 'Code incorrect ou expiré.',
@@ -121,9 +133,9 @@ class AuthController extends Controller
             ], 409);
         }
 
-        // Marquer l'OTP utilisé et consommer les métadonnées d'inscription
+        // Supprimer l'OTP après validation réussie (CDC 11.4) et consommer les métadonnées
         if ($otpRecord) {
-            $otpRecord->update(['is_used' => true]);
+            $otpRecord->delete();
         }
         Cache::forget("register_meta:{$phone}");
         RateLimiter::clear("otp_register:{$phone}");
@@ -175,7 +187,7 @@ class AuthController extends Controller
                 'message' => 'Trop de tentatives. Réessayez dans '.ceil($secondes / 60).' minute(s).',
             ], 429);
         }
-        RateLimiter::hit($rateLimitKey, 600);
+        RateLimiter::hit($rateLimitKey, 3600);
 
         $user = User::where('phone', $phone)
             ->where('is_active', true)
@@ -287,6 +299,18 @@ class AuthController extends Controller
         $isMasterDevOtp = app()->environment('local', 'testing') && $otp === '1234';
 
         if (! $isMasterDevOtp && (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash))) {
+            if ($otpRecord) {
+                $otpRecord->increment('attempts');
+                if ($otpRecord->attempts >= 5) {
+                    $otpRecord->update(['is_used' => true]);
+
+                    return response()->json([
+                        'succes' => false,
+                        'message' => 'Trop de tentatives de validation. Votre code a été invalidé. Veuillez demander un nouveau code.',
+                    ], 429);
+                }
+            }
+
             return response()->json([
                 'succes' => false,
                 'message' => 'Code incorrect ou expiré.',
@@ -306,7 +330,7 @@ class AuthController extends Controller
         }
 
         if ($otpRecord) {
-            $otpRecord->update(['is_used' => true]);
+            $otpRecord->delete();
         }
         RateLimiter::clear("otp_login:{$phone}");
 
