@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\City;
 use App\Models\RoleHabilitation;
 use App\Models\User;
+use Database\Seeders\RoleHabilitationSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -19,7 +20,7 @@ class EmergencyModeSecurityTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RoleHabilitationSeeder::class);
+        $this->seed(RoleHabilitationSeeder::class);
     }
 
     public function test_api_activation_allowed_for_super_admin_and_dg_national(): void

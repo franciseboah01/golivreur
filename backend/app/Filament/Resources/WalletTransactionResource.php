@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\WalletTransactionResource\Pages;
+use App\Models\Courier;
+use App\Models\Merchant;
 use App\Models\WalletTransaction;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -64,10 +66,10 @@ class WalletTransactionResource extends Resource
                     ->orWhereHas('wallet', function ($w) use ($cityId) {
                         $w->where(function ($sub) use ($cityId) {
                             $sub->where('owner_type', 'merchant')
-                                ->whereIn('owner_id', \App\Models\Merchant::where('city_id', $cityId)->select('id'));
+                                ->whereIn('owner_id', Merchant::where('city_id', $cityId)->select('id'));
                         })->orWhere(function ($sub2) use ($cityId) {
                             $sub2->where('owner_type', 'courier')
-                                ->whereIn('owner_id', \App\Models\Courier::where('city_id', $cityId)->select('id'));
+                                ->whereIn('owner_id', Courier::where('city_id', $cityId)->select('id'));
                         });
                     });
             });

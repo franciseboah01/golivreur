@@ -8,10 +8,10 @@ use App\Filament\Resources\AdministratorResource\Pages\EditAdministrator;
 use App\Models\City;
 use App\Models\RoleHabilitation;
 use App\Models\User;
+use Database\Seeders\RoleHabilitationSeeder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class AdministratorHierarchySecurityTest extends TestCase
@@ -22,7 +22,7 @@ class AdministratorHierarchySecurityTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RoleHabilitationSeeder::class);
+        $this->seed(RoleHabilitationSeeder::class);
     }
 
     public function test_role_selector_options_depend_on_authenticated_user_role(): void
@@ -178,7 +178,7 @@ class AdministratorHierarchySecurityTest extends TestCase
         $this->assertFalse(AdministratorResource::canDelete($agentBouake));
 
         // Le City Manager ne peut pas charger la page d'édition d'un admin hors de sa ville (scoping getEloquentQuery)
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->expectException(ModelNotFoundException::class);
         Livewire::test(EditAdministrator::class, ['record' => $agentBouake->getRouteKey()]);
     }
 

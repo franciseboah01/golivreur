@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Hash;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 it('calcule la distance cote serveur par Haversine et ignore la distance envoyee par le client', function () {
+    // Fige l'heure à 10h00 pour être hors heure de pointe (11h30-14h00 et 18h30-21h00)
+    $this->travelTo(now()->setTime(10, 0));
+
     // Ville Daloa : centre (6.8770, -6.4502)
     $city = City::factory()->create([
         'name' => 'Daloa '.uniqid(),

@@ -24,7 +24,11 @@ class StatsOverview extends BaseWidget
         $user = auth()->user();
         $isLocal = $user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id;
         $cityId = $isLocal ? (int) $user->city_id : null;
-        $cityName = $isLocal ? ($user->city?->name ?? City::find($cityId)?->name ?? 'votre ville') : null;
+        $cityName = null;
+        if ($isLocal) {
+            $city = $user->city ?? ($cityId ? City::find($cityId) : null);
+            $cityName = $city ? $city->name : 'votre ville';
+        }
 
         // 1. Volumes du jour
         $ordersCount = Order::where('created_at', '>=', $today)

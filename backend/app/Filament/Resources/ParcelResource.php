@@ -7,6 +7,7 @@ use App\Filament\Resources\ParcelResource\Pages;
 use App\Models\Courier;
 use App\Models\Parcel;
 use App\Models\User;
+use App\Modules\GoColis\Services\ParcelService;
 use App\Services\RefundService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -360,7 +361,7 @@ class ParcelResource extends Resource
                     ->modalDescription('Appelez impérativement le client expéditeur avant de débloquer le code.')
                     ->modalSubmitActionLabel('Débloquer le code')
                     ->action(function (Parcel $record): void {
-                        app(\App\Modules\GoColis\Services\ParcelService::class)->debloquerCode(
+                        app(ParcelService::class)->debloquerCode(
                             $record,
                             'sender',
                             auth()->user()
@@ -387,7 +388,7 @@ class ParcelResource extends Resource
                     ->modalDescription('Appelez impérativement le client destinataire avant de débloquer le code.')
                     ->modalSubmitActionLabel('Débloquer le code')
                     ->action(function (Parcel $record): void {
-                        app(\App\Modules\GoColis\Services\ParcelService::class)->debloquerCode(
+                        app(ParcelService::class)->debloquerCode(
                             $record,
                             'recipient',
                             auth()->user()

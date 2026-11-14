@@ -6,6 +6,8 @@ use App\Filament\Widgets\EmergencyStatsWidget;
 use App\Models\City;
 use App\Models\Order;
 use App\Models\Parcel;
+use App\Models\User;
+use App\Services\ActivityLogService;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -139,13 +141,14 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                 ->modalHeading('Arrêt d\'urgence de sécurité - Toutes les villes')
                 ->modalSubmitActionLabel('Enclencher l\'Urgence')
                 ->action(function (array $data): void {
+                    /** @var User|null $user */
                     $user = auth()->user();
-                    if (! in_array($user?->role, ['super_admin', 'dg_national'], true)) {
+                    if (! $user instanceof User || ! in_array($user->role, ['super_admin', 'dg_national'], true)) {
                         abort(403, 'L\'activation du mode urgence général est réservée au Super Admin ou DG National.');
                     }
 
                     $cities = City::all();
-                    $activityLogService = app(\App\Services\ActivityLogService::class);
+                    $activityLogService = app(ActivityLogService::class);
 
                     foreach ($cities as $city) {
                         $oldState = (bool) $city->emergency_mode_active;
@@ -156,14 +159,14 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                         ]);
 
                         $activityLogService->log(
-                            userId: $user?->id,
+                            userId: $user->id,
                             action: 'emergency_mode_activated',
                             entityType: 'city',
                             entityId: $city->id,
                             properties: [
-                                'user_id' => $user?->id,
-                                'user_name' => $user?->name,
-                                'user_role' => $user?->role,
+                                'user_id' => $user->id,
+                                'user_name' => $user->name,
+                                'user_role' => $user->role,
                                 'city_id' => $city->id,
                                 'city_name' => $city->name,
                                 'ancien_etat' => $oldState,
@@ -190,13 +193,14 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                 ->modalDescription('Cette action désactive le mode urgence sur toutes les villes et autorise la reprise des commandes.')
                 ->modalSubmitActionLabel('Rétablir le service')
                 ->action(function (): void {
+                    /** @var User|null $user */
                     $user = auth()->user();
-                    if ($user?->role !== 'super_admin') {
+                    if (! $user instanceof User || $user->role !== 'super_admin') {
                         abort(403, 'La désactivation du mode urgence général est réservée au Super Admin seul.');
                     }
 
                     $cities = City::all();
-                    $activityLogService = app(\App\Services\ActivityLogService::class);
+                    $activityLogService = app(ActivityLogService::class);
 
                     foreach ($cities as $city) {
                         $oldState = (bool) $city->emergency_mode_active;
@@ -207,14 +211,14 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                         ]);
 
                         $activityLogService->log(
-                            userId: $user?->id,
+                            userId: $user->id,
                             action: 'emergency_mode_deactivated',
                             entityType: 'city',
                             entityId: $city->id,
                             properties: [
-                                'user_id' => $user?->id,
-                                'user_name' => $user?->name,
-                                'user_role' => $user?->role,
+                                'user_id' => $user->id,
+                                'user_name' => $user->name,
+                                'user_role' => $user->role,
                                 'city_id' => $city->id,
                                 'city_name' => $city->name,
                                 'ancien_etat' => $oldState,
@@ -310,15 +314,20 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                     ->modalHeading(fn (City $record): string => $record->emergency_mode_active ? "Lever l'urgence sur {$record->name}" : "Déclencher l'urgence sur {$record->name}")
                     ->modalSubmitActionLabel(fn (City $record): string => $record->emergency_mode_active ? 'Confirmer la réouverture' : 'Confirmer l\'arrêt d\'urgence')
                     ->action(function (City $record, array $data): void {
+                        /** @var User|null $user */
                         $user = auth()->user();
+                        if (! $user instanceof User) {
+                            abort(403);
+                        }
+
                         $newStatus = ! $record->emergency_mode_active;
 
                         if ($newStatus) {
-                            if (! in_array($user?->role, ['super_admin', 'dg_national'], true)) {
+                            if (! in_array($user->role, ['super_admin', 'dg_national'], true)) {
                                 abort(403, 'L\'activation du mode urgence est réservée au Super Admin ou DG National.');
                             }
                         } else {
-                            if ($user?->role !== 'super_admin') {
+                            if ($user->role !== 'super_admin') {
                                 abort(403, 'La désactivation du mode urgence est réservée au Super Admin seul.');
                             }
                         }
@@ -330,15 +339,15 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                             'emergency_mode_message' => $newStatus ? ($data['message'] ?? 'Service temporairement interrompu') : null,
                         ]);
 
-                        app(\App\Services\ActivityLogService::class)->log(
-                            userId: $user?->id,
+                        app(ActivityLogService::class)->log(
+                            userId: $user->id,
                             action: $newStatus ? 'emergency_mode_activated' : 'emergency_mode_deactivated',
                             entityType: 'city',
                             entityId: $record->id,
                             properties: [
-                                'user_id' => $user?->id,
-                                'user_name' => $user?->name,
-                                'user_role' => $user?->role,
+                                'user_id' => $user->id,
+                                'user_name' => $user->name,
+                                'user_role' => $user->role,
                                 'city_id' => $record->id,
                                 'city_name' => $record->name,
                                 'ancien_etat' => $oldState,

@@ -8,6 +8,7 @@ use App\Models\City;
 use App\Models\Parcel;
 use App\Models\RoleHabilitation;
 use App\Models\User;
+use Database\Seeders\RoleHabilitationSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -20,7 +21,7 @@ class ParcelCodeUnlockSecurityTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RoleHabilitationSeeder::class);
+        $this->seed(RoleHabilitationSeeder::class);
     }
 
     public function test_unlock_sender_code_requires_client_called_checkbox_and_calls_service(): void

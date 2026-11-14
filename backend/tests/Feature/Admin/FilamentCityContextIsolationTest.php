@@ -10,7 +10,6 @@ use App\Filament\Resources\MerchantResource\Pages\ListMerchants;
 use App\Filament\Resources\OrderResource\Pages\ListOrders;
 use App\Filament\Resources\ParcelResource\Pages\ListParcels;
 use App\Filament\Resources\WalletTransactionResource\Pages\ListWalletTransactions;
-use App\Filament\Widgets\BlockedCodesAlertWidget;
 use App\Filament\Widgets\LatestOrdersWidget;
 use App\Filament\Widgets\StatsOverview;
 use App\Models\City;
@@ -18,10 +17,10 @@ use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Parcel;
-use App\Models\RoleHabilitation;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use Database\Seeders\RoleHabilitationSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -34,7 +33,7 @@ class FilamentCityContextIsolationTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RoleHabilitationSeeder::class);
+        $this->seed(RoleHabilitationSeeder::class);
     }
 
     public function test_city_manager_daloa_sees_no_orders_parcels_merchants_couriers_from_bouake(): void

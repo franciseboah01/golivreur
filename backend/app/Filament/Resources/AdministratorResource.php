@@ -177,6 +177,7 @@ class AdministratorResource extends Resource
                             ->label('Niveau d\'Habilitation')
                             ->relationship('roleHabilitation', 'name', modifyQueryUsing: function (Builder $query) {
                                 $allowedRoles = array_keys(static::getAllowedRolesForUser(auth()->user()));
+
                                 return $query->whereIn('slug', $allowedRoles)->orderBy('name');
                             })
                             ->nullable()
@@ -193,10 +194,27 @@ class AdministratorResource extends Resource
                         SearchableSelect::make('city_id')
                             ->label('Ville d\'affectation')
                             ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->default(fn () => auth()->user()?->role === 'city_manager' ? auth()->user()?->city_id : null)
-                            ->disabled(fn () => auth()->user()?->role === 'city_manager')
+                            ->default(function () {
+                                /** @var User|null $user */
+                                $user = auth()->user();
+
+                                return ($user instanceof User && $user->role === 'city_manager') ? $user->city_id : null;
+                            })
+                            ->disabled(function () {
+                                /** @var User|null $user */
+                                $user = auth()->user();
+
+                                return $user instanceof User && $user->role === 'city_manager';
+                            })
                             ->dehydrated()
-                            ->helperText(fn () => auth()->user()?->role === 'city_manager' ? 'Imposé automatiquement à votre ville.' : 'Laisser vide pour les fonctions à compétence nationale'),
+                            ->helperText(function () {
+                                /** @var User|null $user */
+                                $user = auth()->user();
+
+                                return ($user instanceof User && $user->role === 'city_manager')
+                                    ? 'Imposé automatiquement à votre ville.'
+                                    : 'Laisser vide pour les fonctions à compétence nationale';
+                            }),
                         Forms\Components\TextInput::make('name')
                             ->label('Nom et Prénom')
                             ->required()

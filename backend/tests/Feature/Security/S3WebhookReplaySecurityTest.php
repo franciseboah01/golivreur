@@ -1,10 +1,12 @@
 <?php
 
+use App\Filament\Resources\WebhookLogResource\Pages\ListWebhookLogs;
 use App\Models\City;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\WebhookLog;
 use Illuminate\Support\Facades\Mail;
+use Livewire\Livewire;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 it('S3 rôles interdits: refuse 403 aux rôles locaux et non habilités sur webhooks/{id}/replay', function (string $role) {
@@ -69,14 +71,14 @@ it('S3 filament replay action: visible uniquement pour super_admin et national_t
     $sa = User::factory()->create(['role' => 'super_admin']);
 
     $this->actingAs($dg);
-    \Livewire\Livewire::test(\App\Filament\Resources\WebhookLogResource\Pages\ListWebhookLogs::class)
+    Livewire::test(ListWebhookLogs::class)
         ->assertTableActionHidden('replay', $webhookLog);
 
     $this->actingAs($tech);
-    \Livewire\Livewire::test(\App\Filament\Resources\WebhookLogResource\Pages\ListWebhookLogs::class)
+    Livewire::test(ListWebhookLogs::class)
         ->assertTableActionVisible('replay', $webhookLog);
 
     $this->actingAs($sa);
-    \Livewire\Livewire::test(\App\Filament\Resources\WebhookLogResource\Pages\ListWebhookLogs::class)
+    Livewire::test(ListWebhookLogs::class)
         ->assertTableActionVisible('replay', $webhookLog);
 });
