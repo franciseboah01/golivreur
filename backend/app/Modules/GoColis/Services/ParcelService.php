@@ -414,6 +414,13 @@ class ParcelService
             action: "parcel_{$typeCode}_code_unlocked",
             entityType: 'parcel',
             entityId: $parcel->id,
+            properties: [
+                'type_code' => $typeCode,
+                'parcel_id' => $parcel->id,
+                'unlocked_by' => $admin->id,
+                'called_client' => true,
+            ],
+            severity: 'warning',
         );
 
         return $parcel->fresh();

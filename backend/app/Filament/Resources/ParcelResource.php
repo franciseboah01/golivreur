@@ -44,7 +44,7 @@ class ParcelResource extends Resource
         $query = parent::getEloquentQuery();
         $user = auth()->user();
 
-        if ($user && $user->is_local_admin && $user->city_id) {
+        if ($user && str_starts_with((string) $user->role, 'city_')) {
             $query->where('city_id', $user->city_id);
         }
 
@@ -350,12 +350,21 @@ class ParcelResource extends Resource
                     ->icon('heroicon-m-lock-open')
                     ->color('success')
                     ->visible(fn (Parcel $record): bool => (bool) $record->sender_code_locked)
+                    ->form([
+                        Forms\Components\Checkbox::make('client_called')
+                            ->label('J\'ai appelé le client pour confirmer son identité')
+                            ->required()
+                            ->accepted(),
+                    ])
+                    ->modalHeading('Déblocage du code expéditeur')
+                    ->modalDescription('Appelez impérativement le client expéditeur avant de débloquer le code.')
+                    ->modalSubmitActionLabel('Débloquer le code')
                     ->action(function (Parcel $record): void {
-                        $record->update([
-                            'sender_code_locked' => false,
-                            'sender_code_attempts' => 0,
-                            'sender_code_unlocked_by' => auth()->id(),
-                        ]);
+                        app(\App\Modules\GoColis\Services\ParcelService::class)->debloquerCode(
+                            $record,
+                            'sender',
+                            auth()->user()
+                        );
 
                         Notification::make()
                             ->title("Code expéditeur débloqué pour le colis #{$record->id}")
@@ -368,12 +377,21 @@ class ParcelResource extends Resource
                     ->icon('heroicon-m-lock-open')
                     ->color('success')
                     ->visible(fn (Parcel $record): bool => (bool) $record->recipient_code_locked)
+                    ->form([
+                        Forms\Components\Checkbox::make('client_called')
+                            ->label('J\'ai appelé le client pour confirmer son identité')
+                            ->required()
+                            ->accepted(),
+                    ])
+                    ->modalHeading('Déblocage du code destinataire')
+                    ->modalDescription('Appelez impérativement le client destinataire avant de débloquer le code.')
+                    ->modalSubmitActionLabel('Débloquer le code')
                     ->action(function (Parcel $record): void {
-                        $record->update([
-                            'recipient_code_locked' => false,
-                            'recipient_code_attempts' => 0,
-                            'recipient_code_unlocked_by' => auth()->id(),
-                        ]);
+                        app(\App\Modules\GoColis\Services\ParcelService::class)->debloquerCode(
+                            $record,
+                            'recipient',
+                            auth()->user()
+                        );
 
                         Notification::make()
                             ->title("Code destinataire débloqué pour le colis #{$record->id}")
