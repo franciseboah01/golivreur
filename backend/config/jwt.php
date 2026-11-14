@@ -20,8 +20,8 @@ return [
     // Duree de vie de l'access token, en minutes.
     'ttl' => env('JWT_TTL', 60),
 
-    // Duree de vie du refresh token, en minutes (30 jours).
-    'refresh_ttl' => env('JWT_REFRESH_TTL', 43200),
+    // Duree de vie du refresh token, en minutes (7 jours = 10080 min selon CDC 11.4).
+    'refresh_ttl' => (int) env('JWT_REFRESH_TTL', 10080),
 
     'algo' => env('JWT_ALGO', 'HS256'),
 

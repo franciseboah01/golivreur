@@ -381,22 +381,81 @@ class AuthController extends Controller
     }
 
     /**
-     * Renouvellement du JWT avec le refresh token.
+     * Renouvellement du JWT avec le refresh token (CDC 11.4 & ADR-002).
      */
     public function refresh(Request $request): JsonResponse
     {
+        $rawToken = $request->bearerToken() ?: (string) $request->input('refresh_token');
+
+        if (! $rawToken) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Token de renouvellement manquant.',
+            ], 401);
+        }
+
+        // Cas 1 : Refresh token opaque stocké en cache (émis au login/register)
+        $userId = Cache::get("refresh_token:{$rawToken}");
+        if ($userId) {
+            $user = User::find($userId);
+            if (! $user || ! $user->is_active) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Votre compte est désactivé ou suspendu.',
+                ], 403);
+            }
+
+            // Rotation du refresh token : invalide l'ancien et en génère un nouveau
+            Cache::forget("refresh_token:{$rawToken}");
+            $newRefreshToken = $this->genererRefreshToken($user);
+            $newAccessToken = JWTAuth::fromUser($user);
+
+            // Pour merchant/driver, mettre à jour le session_token
+            if (in_array($user->role, ['merchant', 'driver', 'courier'])) {
+                $jti = (string) JWTAuth::setToken($newAccessToken)->getPayload()->get('jti');
+                $user->update(['session_token' => $jti]);
+            }
+
+            return response()->json([
+                'succes' => true,
+                'donnees' => [
+                    'access_token' => $newAccessToken,
+                    'refresh_token' => $newRefreshToken,
+                    'token_type' => 'bearer',
+                    'expires_in' => config('jwt.ttl') * 60,
+                ],
+            ]);
+        }
+
+        // Cas 2 : JWT passé directement pour renouvellement
         try {
-            $newToken = JWTAuth::parseToken()->refresh();
+            $newToken = JWTAuth::setToken($rawToken)->refresh();
+            $user = JWTAuth::setToken($newToken)->toUser();
+
+            if (! $user || ! $user->is_active) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Votre compte est désactivé ou suspendu.',
+                ], 403);
+            }
+
+            $newRefreshToken = $this->genererRefreshToken($user);
+
+            if (in_array($user->role, ['merchant', 'driver', 'courier'])) {
+                $jti = (string) JWTAuth::setToken($newToken)->getPayload()->get('jti');
+                $user->update(['session_token' => $jti]);
+            }
 
             return response()->json([
                 'succes' => true,
                 'donnees' => [
                     'access_token' => $newToken,
+                    'refresh_token' => $newRefreshToken,
                     'token_type' => 'bearer',
                     'expires_in' => config('jwt.ttl') * 60,
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'succes' => false,
                 'message' => 'Token invalide ou expiré. Veuillez vous reconnecter.',
@@ -452,9 +511,10 @@ class AuthController extends Controller
 
     private function genererRefreshToken(User $user): string
     {
-        // Refresh token stocké en cache Redis (7 jours)
+        // Refresh token opaque stocké en cache Redis (7 jours selon CDC 11.4)
         $token = Str::random(64);
-        Cache::put("refresh_token:{$user->id}", $token, now()->addDays(7));
+        Cache::put("refresh_token_user:{$user->id}", $token, now()->addDays(7));
+        Cache::put("refresh_token:{$token}", $user->id, now()->addDays(7));
 
         return $token;
     }

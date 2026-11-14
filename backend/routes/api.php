@@ -68,7 +68,7 @@ Route::prefix('auth')->middleware('throttle:60,1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
     Route::post('login-password', [AuthController::class, 'loginPassword']);
     Route::post('verify-login', [AuthController::class, 'verifierOtpConnexion']);
-    Route::post('refresh', [AuthController::class, 'refresh'])->middleware(['auth:api', 'active_account']);
+    Route::post('refresh', [AuthController::class, 'refresh']);
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:api');
 });
 
