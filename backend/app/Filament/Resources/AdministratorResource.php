@@ -12,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 
 class AdministratorResource extends Resource
@@ -37,6 +38,65 @@ class AdministratorResource extends Resource
         return $user !== null && $user->hasHabilitationTab('administrators');
     }
 
+    public static function canCreate(): bool
+    {
+        /** @var User|null $user */
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        return in_array($user->role, ['super_admin', 'dg_national', 'city_manager'], true);
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        /** @var User|null $user */
+        $user = auth()->user();
+        if (! $user || ! ($record instanceof User)) {
+            return false;
+        }
+
+        if ($user->role === 'super_admin') {
+            return true;
+        }
+
+        if ($user->role === 'dg_national') {
+            return $record->role !== 'super_admin';
+        }
+
+        if ($user->role === 'city_manager') {
+            return (int) $record->city_id === (int) $user->city_id
+                && in_array($record->role, ['city_support', 'city_agent', 'city_finance'], true);
+        }
+
+        return false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        /** @var User|null $user */
+        $user = auth()->user();
+        if (! $user || ! ($record instanceof User) || $user->id === $record->id) {
+            return false;
+        }
+
+        if ($user->role === 'super_admin') {
+            return true;
+        }
+
+        if ($user->role === 'dg_national') {
+            return ! in_array($record->role, ['super_admin', 'dg_national'], true);
+        }
+
+        if ($user->role === 'city_manager') {
+            return (int) $record->city_id === (int) $user->city_id
+                && in_array($record->role, ['city_support', 'city_agent', 'city_finance'], true);
+        }
+
+        return false;
+    }
+
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()
@@ -50,6 +110,49 @@ class AdministratorResource extends Resource
         return $query;
     }
 
+    public static function getAllowedRolesForUser(?User $user): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        if ($user->role === 'super_admin') {
+            return [
+                'super_admin' => 'Super Admin',
+                'dg_national' => 'Directeur Général',
+                'national_finance' => 'Finance Nationale',
+                'national_tech' => 'Tech & IT',
+                'national_support' => 'Support National',
+                'city_manager' => 'City Manager',
+                'city_finance' => 'Finance Ville',
+                'city_support' => 'Support Ville',
+                'city_agent' => 'Agent Ville',
+            ];
+        }
+
+        if ($user->role === 'dg_national') {
+            return [
+                'national_finance' => 'Finance Nationale',
+                'national_tech' => 'Tech & IT',
+                'national_support' => 'Support National',
+                'city_manager' => 'City Manager',
+                'city_finance' => 'Finance Ville',
+                'city_support' => 'Support Ville',
+                'city_agent' => 'Agent Ville',
+            ];
+        }
+
+        if ($user->role === 'city_manager') {
+            return [
+                'city_support' => 'Support Ville',
+                'city_agent' => 'Agent Ville',
+                'city_finance' => 'Finance Ville',
+            ];
+        }
+
+        return [];
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -57,11 +160,26 @@ class AdministratorResource extends Resource
                 Forms\Components\Section::make('Identité & Accès d\'Administration')
                     ->description('Gestion des comptes ayant accès au tableau de bord et à la gestion opérationnelle')
                     ->schema([
-                        // Listes déroulantes en haut avec recherche live et tri alphabétique
-                        SearchableSelect::make('role_habilitation_id')
-                            ->label('Niveau d\'Habilitation & Rôle')
-                            ->relationship('roleHabilitation', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                        SearchableSelect::make('role')
+                            ->label('Rôle Administratif')
+                            ->options(fn () => static::getAllowedRolesForUser(auth()->user()))
                             ->required()
+                            ->live()
+                            ->afterStateUpdated(function ($state, Forms\Set $set) {
+                                if ($state) {
+                                    $level = RoleHabilitation::where('slug', $state)->first();
+                                    if ($level) {
+                                        $set('role_habilitation_id', $level->id);
+                                    }
+                                }
+                            }),
+                        SearchableSelect::make('role_habilitation_id')
+                            ->label('Niveau d\'Habilitation')
+                            ->relationship('roleHabilitation', 'name', modifyQueryUsing: function (Builder $query) {
+                                $allowedRoles = array_keys(static::getAllowedRolesForUser(auth()->user()));
+                                return $query->whereIn('slug', $allowedRoles)->orderBy('name');
+                            })
+                            ->nullable()
                             ->live()
                             ->afterStateUpdated(function ($state, Forms\Set $set) {
                                 if ($state) {
@@ -72,23 +190,13 @@ class AdministratorResource extends Resource
                                 }
                             })
                             ->helperText('Tous les onglets et accès du panneau sont automatiquement hérités selon ce niveau.'),
-                        Forms\Components\Hidden::make('role')
-                            ->default('city_agent')
-                            ->dehydrateStateUsing(function ($state, Forms\Get $get) {
-                                $levelId = $get('role_habilitation_id');
-                                if ($levelId) {
-                                    $level = RoleHabilitation::find($levelId);
-                                    if ($level) {
-                                        return $level->slug;
-                                    }
-                                }
-
-                                return $state ?? 'admin';
-                            }),
                         SearchableSelect::make('city_id')
                             ->label('Ville d\'affectation')
                             ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
-                            ->helperText('Laisser vide pour les fonctions à compétence nationale'),
+                            ->default(fn () => auth()->user()?->role === 'city_manager' ? auth()->user()?->city_id : null)
+                            ->disabled(fn () => auth()->user()?->role === 'city_manager')
+                            ->dehydrated()
+                            ->helperText(fn () => auth()->user()?->role === 'city_manager' ? 'Imposé automatiquement à votre ville.' : 'Laisser vide pour les fonctions à compétence nationale'),
                         Forms\Components\TextInput::make('name')
                             ->label('Nom et Prénom')
                             ->required()
