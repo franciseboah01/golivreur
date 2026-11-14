@@ -9,7 +9,11 @@ backend/.env.production
 # MCP config & local keys
 mcp_config.json
 *.keystore
+**/*.keystore
 *.jks
+**/*.jks
+key.properties
+**/key.properties
 **/android/key.properties
 **/android/local.properties
 
