@@ -9,7 +9,7 @@ use App\Modules\GoShop\Services\OrderService;
 use Illuminate\Validation\ValidationException;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
-it('D3 nominal: le livreur assigné de la même ville confirme le ramassage depuis accepted ou ready -> picked_up', function (string $status) {
+it('D3 nominal: le livreur assigné de la même ville confirme le ramassage depuis ready -> picked_up (CDC Annexe A)', function () {
     $city = City::factory()->create();
     $driver = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
     $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
@@ -19,7 +19,7 @@ it('D3 nominal: le livreur assigné de la même ville confirme le ramassage depu
         'city_id' => $city->id,
         'merchant_id' => $merchant->id,
         'courier_id' => $courier->id,
-        'status' => $status,
+        'status' => Order::STATUS_READY,
         'picked_up_at' => null,
     ]);
 
@@ -32,7 +32,7 @@ it('D3 nominal: le livreur assigné de la même ville confirme le ramassage depu
     $order->refresh();
     expect($order->status)->toBe(Order::STATUS_PICKED_UP)
         ->and($order->picked_up_at)->not->toBeNull();
-})->with([Order::STATUS_ACCEPTED, Order::STATUS_READY]);
+});
 
 it('D3 autre ville: refuse 404 sans fuite si la commande est dans une autre ville même avec incohérence', function () {
     $cityDaloa = City::factory()->create(['name' => 'Daloa']);
@@ -86,7 +86,7 @@ it('D3 mauvais propriétaire: refuse 403 si la commande est non assignée ou ass
     'autre livreur' => [true],
 ]);
 
-it('D3 mauvais statut: refuse 422 pour tout statut hors accepted/ready', function (string $status) {
+it('D3 mauvais statut: refuse 422 pour tout statut hors ready (dont accepted et waiting)', function (string $status) {
     $city = City::factory()->create();
     $driver = User::factory()->create(['role' => 'driver', 'city_id' => $city->id]);
     $courier = Courier::factory()->create(['user_id' => $driver->id, 'city_id' => $city->id]);
@@ -105,6 +105,8 @@ it('D3 mauvais statut: refuse 422 pour tout statut hors accepted/ready', functio
     expect($order->fresh()->status)->toBe($status);
 })->with([
     Order::STATUS_PENDING,
+    Order::STATUS_ACCEPTED,
+    Order::STATUS_WAITING,
     Order::STATUS_REFUSED,
     Order::STATUS_PICKED_UP,
     Order::STATUS_IN_TRANSIT,
@@ -132,13 +134,16 @@ it('D3 graphe CDC: OrderService respecte strictement les transitions d\'états a
     expect(Order::TRANSITIONS_AUTORISEES)->toHaveKeys([
         Order::STATUS_PENDING,
         Order::STATUS_ACCEPTED,
+        Order::STATUS_WAITING,
         Order::STATUS_READY,
         Order::STATUS_PICKED_UP,
         Order::STATUS_IN_TRANSIT,
         Order::STATUS_REFUSED,
         Order::STATUS_DELIVERED,
         Order::STATUS_CANCELLED,
-    ]);
+    ])
+        ->and(Order::TRANSITIONS_AUTORISEES[Order::STATUS_ACCEPTED])->not->toContain(Order::STATUS_PICKED_UP)
+        ->and(Order::TRANSITIONS_AUTORISEES[Order::STATUS_WAITING])->not->toContain(Order::STATUS_PICKED_UP);
 
     // accepterCommande: refusé si pas pending (ex: ready, delivered, cancelled, refused)
     foreach ([Order::STATUS_ACCEPTED, Order::STATUS_READY, Order::STATUS_PICKED_UP, Order::STATUS_DELIVERED, Order::STATUS_CANCELLED, Order::STATUS_REFUSED] as $badStatus) {

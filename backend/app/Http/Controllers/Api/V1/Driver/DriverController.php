@@ -491,7 +491,7 @@ class DriverController extends Controller
 
             $affected = Order::whereKey($lockedOrder->id)
                 ->where('courier_id', $courier->id)
-                ->whereIn('status', [Order::STATUS_ACCEPTED, Order::STATUS_READY])
+                ->where('status', Order::STATUS_READY)
                 ->update([
                     'status' => Order::STATUS_PICKED_UP,
                     'picked_up_at' => now(),

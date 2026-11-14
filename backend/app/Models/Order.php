@@ -73,8 +73,8 @@ class Order extends Model
      */
     public const TRANSITIONS_AUTORISEES = [
         self::STATUS_PENDING => [self::STATUS_ACCEPTED, self::STATUS_REFUSED, self::STATUS_CANCELLED],
-        self::STATUS_ACCEPTED => [self::STATUS_READY, self::STATUS_PICKED_UP, self::STATUS_WAITING, self::STATUS_CANCELLED],
-        self::STATUS_WAITING => [self::STATUS_ACCEPTED, self::STATUS_READY, self::STATUS_PICKED_UP, self::STATUS_CANCELLED],
+        self::STATUS_ACCEPTED => [self::STATUS_READY, self::STATUS_WAITING, self::STATUS_CANCELLED],
+        self::STATUS_WAITING => [self::STATUS_ACCEPTED, self::STATUS_READY, self::STATUS_CANCELLED],
         self::STATUS_READY => [self::STATUS_PICKED_UP, self::STATUS_WAITING, self::STATUS_CANCELLED],
         self::STATUS_PICKED_UP => [self::STATUS_IN_TRANSIT, self::STATUS_DELIVERED],
         self::STATUS_IN_TRANSIT => [self::STATUS_DELIVERED],
