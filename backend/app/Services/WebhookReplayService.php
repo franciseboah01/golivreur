@@ -93,4 +93,3 @@ class WebhookReplayService
         return $normalized !== '' ? $normalized : null;
     }
 }
-

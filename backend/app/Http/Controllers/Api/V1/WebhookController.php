@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessPaymentWebhook;
+use App\Models\User;
 use App\Models\WebhookLog;
 use App\Services\ActivityLogService;
 use App\Services\WebhookReplayService;
@@ -148,7 +149,7 @@ class WebhookController extends Controller
      */
     public function rejouer(int $webhookLogId): JsonResponse
     {
-        /** @var \App\Models\User|null $user */
+        /** @var User|null $user */
         $user = auth()->user();
 
         if (! WebhookReplayService::canReplay($user)) {
