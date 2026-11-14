@@ -52,4 +52,3 @@ class CourierCapacityService
         return $this->compterCoursesActives($courierId) < $this->obtenirMaxCoursesActives($cityId);
     }
 }
-
