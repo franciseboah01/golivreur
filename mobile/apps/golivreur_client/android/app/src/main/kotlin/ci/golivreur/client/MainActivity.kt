@@ -1,4 +1,4 @@
-package com.example.golivreur_driver
+package ci.golivreur.client
 
 import io.flutter.embedding.android.FlutterActivity
 

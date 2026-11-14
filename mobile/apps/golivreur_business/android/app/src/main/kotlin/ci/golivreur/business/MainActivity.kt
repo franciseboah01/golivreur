@@ -1,4 +1,4 @@
-package com.example.golivreur_client
+package ci.golivreur.business
 
 import io.flutter.embedding.android.FlutterActivity
 
