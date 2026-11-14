@@ -137,7 +137,7 @@ class RefundService
         }
 
         $estEnLitige = $order->status === Order::STATUS_DISPUTED || (bool) $order->confirmation_locked;
-        $estEligible = in_array($order->status, [Order::STATUS_DELIVERED, Order::STATUS_CANCELLED], true) || $estEnLitige;
+        $estEligible = in_array($order->status, [Order::STATUS_DELIVERED, Order::STATUS_CANCELLED, Order::STATUS_REFUSED], true) || $estEnLitige;
 
         if (! $estEligible) {
             return 'Seule une commande livrée, en litige ou annulée après paiement peut être remboursée.';

@@ -9,6 +9,7 @@ use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Refund;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\NotificationService;
@@ -202,6 +203,37 @@ class OrderService
                 'cancelled_at' => now(),
                 'cancel_reason' => $raison ?: 'Refusé par le commerce.',
             ]);
+
+            if ($lockedOrder->payment_status === 'paid' && ! Refund::where('order_id', $lockedOrder->id)->exists()) {
+                $montantRemboursement = (int) round((float) $lockedOrder->products_total + (float) $lockedOrder->delivery_fee);
+                if ($montantRemboursement > 0) {
+                    $refund = Refund::create([
+                        'city_id' => $lockedOrder->city_id,
+                        'order_id' => $lockedOrder->id,
+                        'parcel_id' => null,
+                        'client_id' => $lockedOrder->client_id,
+                        'amount' => $montantRemboursement,
+                        'reason' => 'Refus commerce d\'une commande déjà payée : '.($raison ?: 'Refusé par le commerce.'),
+                        'status' => Refund::STATUS_REQUESTED,
+                        'cost_bearer' => Refund::COST_PLATFORM,
+                        'requested_by' => auth()->id() ?? $lockedOrder->merchant?->user_id,
+                    ]);
+
+                    $this->activityLogService->log(
+                        userId: auth()->id() ?? $lockedOrder->merchant?->user_id,
+                        action: 'refund_requested_auto_merchant_refusal',
+                        entityType: 'refund',
+                        entityId: $refund->id,
+                        properties: [
+                            'order_id' => $lockedOrder->id,
+                            'amount' => $montantRemboursement,
+                            'cost_bearer' => Refund::COST_PLATFORM,
+                            'status' => Refund::STATUS_REQUESTED,
+                        ],
+                        severity: 'warning',
+                    );
+                }
+            }
 
             // Notifier le client immédiatement
             $this->notificationService->notifierCommandeRefusee($lockedOrder);
