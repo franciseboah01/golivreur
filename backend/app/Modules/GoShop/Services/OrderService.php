@@ -13,6 +13,7 @@ use App\Models\Refund;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\AsyncJobDispatcher;
+use App\Services\ConfirmationCodeService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
@@ -30,6 +31,8 @@ class OrderService
 {
     private readonly SettingsService $settingsService;
 
+    private readonly ConfirmationCodeService $confirmationCodeService;
+
     public function __construct(
         private readonly AssignmentService $assignmentService,
         private readonly CommissionService $commissionService,
@@ -37,8 +40,10 @@ class OrderService
         private readonly NotificationService $notificationService,
         private readonly ActivityLogService $activityLogService,
         ?SettingsService $settingsService = null,
+        ?ConfirmationCodeService $confirmationCodeService = null,
     ) {
         $this->settingsService = $settingsService ?? app(SettingsService::class);
+        $this->confirmationCodeService = $confirmationCodeService ?? app(ConfirmationCodeService::class);
     }
 
     /**
@@ -101,6 +106,8 @@ class OrderService
                 merchant: $merchant,
             );
 
+            $codePaire = $this->confirmationCodeService->genererPaire();
+
             // Créer la commande
             $order = Order::create([
                 'client_id' => $client->id,
@@ -117,7 +124,8 @@ class OrderService
                 'payment_method' => $donnees['payment_method'],
                 'payment_status' => $donnees['payment_method'] === 'cash'
                                             ? 'pending_cash' : 'pending',
-                'confirmation_code' => Hash::make((string) random_int(1000, 9999)),
+                'confirmation_code' => $codePaire['hash'],
+                'confirmation_code_enc' => $codePaire['enc'],
                 'delivery_address' => $donnees['delivery_address'],
                 'delivery_lat' => $deliveryLat,
                 'delivery_lng' => $deliveryLng,
@@ -433,6 +441,53 @@ class OrderService
             if ($lockedOrder->courier) {
                 $this->notificationService->notifierCommandePrete($lockedOrder);
             }
+
+            return $lockedOrder->fresh();
+        });
+    }
+
+    /**
+     * Régénère le code de confirmation (ex: anciennes lignes sans chiffrement) avec trace admin.
+     */
+    public function regenererCodeConfirmation(Order $order, User $admin): Order
+    {
+        return DB::transaction(function () use ($order, $admin): Order {
+            /** @var Order $lockedOrder */
+            $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
+
+            if (in_array($lockedOrder->status, [
+                Order::STATUS_DELIVERED,
+                Order::STATUS_CANCELLED,
+                Order::STATUS_REFUSED,
+                Order::STATUS_DISPUTED,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    'status' => ['Impossible de régénérer le code d\'une commande clôturée.'],
+                ]);
+            }
+
+            $paire = $this->confirmationCodeService->genererPaire();
+
+            $lockedOrder->update([
+                'confirmation_code' => $paire['hash'],
+                'confirmation_code_enc' => $paire['enc'],
+                'confirmation_attempts' => 0,
+                'confirmation_locked' => false,
+                'confirmation_unlocked_by' => $admin->id,
+            ]);
+
+            $this->activityLogService->log(
+                userId: $admin->id,
+                action: 'order_confirmation_code_regenerated',
+                entityType: 'order',
+                entityId: $lockedOrder->id,
+                properties: [
+                    'order_id' => $lockedOrder->id,
+                    'city_id' => $lockedOrder->city_id,
+                    'regenerated_by' => $admin->id,
+                ],
+                severity: 'warning',
+            );
 
             return $lockedOrder->fresh();
         });

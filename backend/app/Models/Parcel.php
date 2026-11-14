@@ -18,7 +18,7 @@ class Parcel extends Model
         'sender_id', 'courier_id', 'city_id', 'status',
         'size', 'weight_kg', 'declared_value',
         'has_insurance', 'insurance_amount',
-        'sender_code', 'sender_code_attempts', 'sender_code_locked',
+        'sender_code', 'sender_code_enc', 'sender_code_attempts', 'sender_code_locked',
         'recipient_code', 'recipient_code_attempts', 'recipient_code_locked',
         'recipient_name', 'recipient_phone',
         'delivery_address', 'delivery_lat', 'delivery_lng', 'distance_km',
@@ -31,7 +31,7 @@ class Parcel extends Model
     ];
 
     protected $hidden = [
-        'sender_code', 'recipient_code',
+        'sender_code', 'sender_code_enc', 'recipient_code',
     ];
 
     protected $casts = [

@@ -8,6 +8,8 @@ use App\Filament\Resources\OrderResource\Pages;
 use App\Models\ActivityLog;
 use App\Models\Courier;
 use App\Models\Order;
+use App\Models\User;
+use App\Modules\GoShop\Services\OrderService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -140,8 +142,10 @@ class OrderResource extends Resource
                             ->required()
                             ->columnSpanFull(),
                         Forms\Components\TextInput::make('confirmation_code')
-                            ->label('Code OTP de confirmation (4 chiffres)')
-                            ->maxLength(10),
+                            ->label('Code OTP de confirmation (chiffré)')
+                            ->formatStateUsing(fn (): string => '••••')
+                            ->disabled()
+                            ->dehydrated(false),
                         Forms\Components\Toggle::make('confirmation_locked')
                             ->label('Code bloqué après 3 tentatives erronées'),
                         Forms\Components\Toggle::make('rain_mode_applied')
@@ -398,6 +402,40 @@ class OrderResource extends Resource
 
                         Notification::make()
                             ->title("Code débloqué pour commande #{$record->id}")
+                            ->success()
+                            ->send();
+                    }),
+
+                Tables\Actions\Action::make('regenerateCode')
+                    ->label('Régénérer code')
+                    ->icon('heroicon-m-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Régénérer le code de confirmation')
+                    ->modalDescription('Un nouveau code à 4 chiffres chiffré sera généré pour le client. L\'action est tracée dans les journaux d\'audit.')
+                    ->visible(function (Order $record): bool {
+                        $user = auth()->user();
+
+                        return $user instanceof User
+                            && $user->canManageCodes()
+                            && $user->canAccessCity((int) $record->city_id)
+                            && ! in_array($record->status, [
+                                Order::STATUS_DELIVERED,
+                                Order::STATUS_CANCELLED,
+                                Order::STATUS_REFUSED,
+                                Order::STATUS_DISPUTED,
+                            ], true);
+                    })
+                    ->action(function (Order $record): void {
+                        $user = auth()->user();
+                        if (! $user instanceof User || ! $user->canManageCodes() || ! $user->canAccessCity((int) $record->city_id)) {
+                            abort(403);
+                        }
+
+                        app(OrderService::class)->regenererCodeConfirmation($record, $user);
+
+                        Notification::make()
+                            ->title("Nouveau code généré pour commande #{$record->id}")
                             ->success()
                             ->send();
                     }),

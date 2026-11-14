@@ -397,6 +397,40 @@ class ParcelResource extends Resource
                             ->send();
                     }),
 
+                Tables\Actions\Action::make('regenerateSenderCode')
+                    ->label('Régénérer Code Enlèvement')
+                    ->icon('heroicon-m-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Régénérer le code expéditeur')
+                    ->modalDescription('Un nouveau code expéditeur chiffré à 4 chiffres sera généré. L\'action est tracée dans les journaux d\'audit.')
+                    ->visible(function (Parcel $record): bool {
+                        $user = auth()->user();
+
+                        return $user instanceof User
+                            && $user->canManageCodes()
+                            && $user->canAccessCity((int) $record->city_id)
+                            && in_array($record->status, [
+                                Parcel::STATUS_PENDING,
+                                Parcel::STATUS_WAITING,
+                                Parcel::STATUS_ACCEPTED,
+                                Parcel::STATUS_AT_SENDER,
+                            ], true);
+                    })
+                    ->action(function (Parcel $record): void {
+                        $user = auth()->user();
+                        if (! $user instanceof User || ! $user->canManageCodes() || ! $user->canAccessCity((int) $record->city_id)) {
+                            abort(403);
+                        }
+
+                        app(ParcelService::class)->regenererCodeExpediteur($record, $user);
+
+                        Notification::make()
+                            ->title("Nouveau code expéditeur généré pour le colis #{$record->id}")
+                            ->success()
+                            ->send();
+                    }),
+
                 Tables\Actions\Action::make('declareLost')
                     ->label('Déclarer perdu')
                     ->icon('heroicon-m-exclamation-triangle')

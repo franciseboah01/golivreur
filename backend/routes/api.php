@@ -102,8 +102,10 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::post('orders', [ClientController::class, 'createOrder']);
         Route::get('orders', [ClientController::class, 'orders']);
         Route::get('orders/{order}', [ClientController::class, 'showOrder']);
+        Route::get('orders/{order}/confirmation-code', [ClientController::class, 'orderConfirmationCode']);
         Route::post('parcels', [ParcelController::class, 'store']);
         Route::get('parcels/{parcel}', [ParcelController::class, 'showClient']);
+        Route::get('parcels/{parcel}/sender-code', [ParcelController::class, 'senderCode']);
         Route::get('notifications', [ClientController::class, 'notifications']);
         Route::put('notifications/{notification}/read', [ClientController::class, 'markNotificationRead']);
         Route::post('ratings', [RatingController::class, 'store']);
@@ -169,6 +171,8 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::post('refunds/{refund}/mark-paid', [AdminController::class, 'markRefundPaid']);
         Route::post('refunds/{refund}/reject', [AdminController::class, 'rejectRefund']);
         Route::post('cities/{city}/emergency-mode', [AdminController::class, 'emergencyMode']);
+        Route::post('orders/{order}/regenerate-code', [AdminController::class, 'regenerateOrderCode']);
+        Route::post('parcels/{parcel}/regenerate-sender-code', [AdminController::class, 'regenerateParcelSenderCode']);
         Route::post('webhooks/{id}/replay', [WebhookController::class, 'rejouer']);
     });
 });

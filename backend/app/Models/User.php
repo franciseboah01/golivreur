@@ -40,6 +40,19 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
         'courier',
     ];
 
+    public const CODE_MANAGEMENT_LOCAL_ROLES = [
+        'city_support',
+        'city_finance',
+        'city_manager',
+    ];
+
+    public const CODE_MANAGEMENT_NATIONAL_ROLES = [
+        'national_support',
+        'national_finance',
+        'dg_national',
+        'super_admin',
+    ];
+
     protected $fillable = [
         'name', 'phone', 'role', 'role_habilitation_id', 'city_id',
         'default_address', 'language', 'notifications_enabled',
@@ -290,6 +303,14 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     public function isVerified(): bool
     {
         return $this->phone_verified_at !== null;
+    }
+
+    public function canManageCodes(): bool
+    {
+        return in_array($this->role, [
+            ...self::CODE_MANAGEMENT_LOCAL_ROLES,
+            ...self::CODE_MANAGEMENT_NATIONAL_ROLES,
+        ], true);
     }
 
     public function canAccessCity(int $cityId): bool

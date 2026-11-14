@@ -12,6 +12,7 @@ use App\Modules\GoShop\Services\AssignmentService;
 use App\Modules\GoShop\Services\CommissionService;
 use App\Services\ActivityLogService;
 use App\Services\AsyncJobDispatcher;
+use App\Services\ConfirmationCodeService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\SmsService;
@@ -42,6 +43,8 @@ class ParcelService
 
     private readonly SettingsService $settingsService;
 
+    private readonly ConfirmationCodeService $confirmationCodeService;
+
     public function __construct(
         private readonly CommissionService $commissionService,
         private readonly AssignmentService $assignmentService,
@@ -50,8 +53,10 @@ class ParcelService
         private readonly SmsService $smsService,
         private readonly ActivityLogService $activityLogService,
         ?SettingsService $settingsService = null,
+        ?ConfirmationCodeService $confirmationCodeService = null,
     ) {
         $this->settingsService = $settingsService ?? app(SettingsService::class);
+        $this->confirmationCodeService = $confirmationCodeService ?? app(ConfirmationCodeService::class);
     }
 
     /**
@@ -110,9 +115,10 @@ class ParcelService
             // Commissions avec $city (Point 4)
             $commissions = $this->commissionService->calculerCommissionsGoColis($fraisExpedition, $city);
 
-            // Générer les codes (jamais stockés en clair)
-            $codeExpediteur = (string) random_int(1000, 9999);
-            $codeDestinataire = (string) random_int(1000, 9999);
+            // Générer les codes (hashé + chiffré pour expéditeur, SMS uniquement pour destinataire)
+            $senderPair = $this->confirmationCodeService->genererPaire();
+            $codeExpediteur = $senderPair['code'];
+            $codeDestinataire = $this->confirmationCodeService->genererCode();
 
             $parcel = Parcel::create([
                 'sender_id' => $expediteur->id,
@@ -123,7 +129,8 @@ class ParcelService
                 'declared_value' => $valeurDeclaree,
                 'has_insurance' => $aAssurance,
                 'insurance_amount' => $montantAssurance,
-                'sender_code' => Hash::make($codeExpediteur),
+                'sender_code' => $senderPair['hash'],
+                'sender_code_enc' => $senderPair['enc'],
                 'recipient_code' => Hash::make($codeDestinataire),
                 'recipient_name' => $donnees['recipient_name'],
                 'recipient_phone' => $donnees['recipient_phone'],
@@ -436,5 +443,52 @@ class ParcelService
         );
 
         return $parcel->fresh();
+    }
+
+    /**
+     * Régénère le code expéditeur GoColis (ex: anciennes lignes sans chiffrement) avec trace admin.
+     */
+    public function regenererCodeExpediteur(Parcel $parcel, User $admin): Parcel
+    {
+        return DB::transaction(function () use ($parcel, $admin): Parcel {
+            /** @var Parcel $lockedParcel */
+            $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
+
+            if (! in_array($lockedParcel->status, [
+                Parcel::STATUS_PENDING,
+                Parcel::STATUS_WAITING,
+                Parcel::STATUS_ACCEPTED,
+                Parcel::STATUS_AT_SENDER,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    'status' => ['Impossible de régénérer le code expéditeur après prise en charge ou clôture du colis.'],
+                ]);
+            }
+
+            $paire = $this->confirmationCodeService->genererPaire();
+
+            $lockedParcel->update([
+                'sender_code' => $paire['hash'],
+                'sender_code_enc' => $paire['enc'],
+                'sender_code_attempts' => 0,
+                'sender_code_locked' => false,
+                'sender_code_unlocked_by' => $admin->id,
+            ]);
+
+            $this->activityLogService->log(
+                userId: $admin->id,
+                action: 'parcel_sender_code_regenerated',
+                entityType: 'parcel',
+                entityId: $lockedParcel->id,
+                properties: [
+                    'parcel_id' => $lockedParcel->id,
+                    'city_id' => $lockedParcel->city_id,
+                    'regenerated_by' => $admin->id,
+                ],
+                severity: 'warning',
+            );
+
+            return $lockedParcel->fresh();
+        });
     }
 }

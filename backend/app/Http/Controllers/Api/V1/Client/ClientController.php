@@ -15,6 +15,7 @@ use App\Models\Notification;
 use App\Models\Order;
 use App\Models\User;
 use App\Modules\GoShop\Services\OrderService;
+use App\Services\ConfirmationCodeService;
 use App\Services\SettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -152,6 +153,46 @@ class ClientController extends Controller
         return response()->json([
             'succes' => true,
             'donnees' => $order,
+        ]);
+    }
+
+    /**
+     * Lecture dédiée du code de confirmation GoShop par son client propriétaire (D-CODE-1).
+     */
+    public function orderConfirmationCode(Order $order, ConfirmationCodeService $codeService): JsonResponse
+    {
+        if ((int) $order->client_id !== (int) auth()->id()) {
+            return response()->json(['succes' => false, 'message' => 'Accès refusé.'], 403);
+        }
+
+        if (! in_array($order->status, [
+            Order::STATUS_ACCEPTED,
+            Order::STATUS_WAITING,
+            Order::STATUS_READY,
+            Order::STATUS_PICKED_UP,
+            Order::STATUS_IN_TRANSIT,
+        ], true)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Le code de confirmation n\'est accessible qu\'une fois la commande acceptée et avant sa livraison.',
+            ], 422);
+        }
+
+        $code = $codeService->dechiffrer($order->confirmation_code_enc);
+        if ($code === null) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'code indisponible, régénérer',
+            ], 409);
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'order_id' => $order->id,
+                'confirmation_code' => $code,
+            ],
+            'message' => 'Code de confirmation récupéré.',
         ]);
     }
 

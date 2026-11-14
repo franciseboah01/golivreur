@@ -9,6 +9,7 @@ use App\Models\City;
 use App\Models\Neighborhood;
 use App\Models\Parcel;
 use App\Modules\GoColis\Services\ParcelService;
+use App\Services\ConfirmationCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -304,6 +305,45 @@ class ParcelController extends Controller
         return response()->json([
             'succes' => true,
             'donnees' => $parcel,
+        ]);
+    }
+
+    /**
+     * Lecture dédiée du code expéditeur GoColis avant ramassage (D-CODE-1).
+     */
+    public function senderCode(Parcel $parcel, ConfirmationCodeService $codeService): JsonResponse
+    {
+        if ((int) $parcel->sender_id !== (int) auth()->id()) {
+            return response()->json(['succes' => false, 'message' => 'Accès refusé à cette expédition.'], 403);
+        }
+
+        if (! in_array($parcel->status, [
+            Parcel::STATUS_PENDING,
+            Parcel::STATUS_WAITING,
+            Parcel::STATUS_ACCEPTED,
+            Parcel::STATUS_AT_SENDER,
+        ], true)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Le code expéditeur n\'est disponible qu\'avant le ramassage du colis.',
+            ], 422);
+        }
+
+        $code = $codeService->dechiffrer($parcel->sender_code_enc);
+        if ($code === null) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'code indisponible, régénérer',
+            ], 409);
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'parcel_id' => $parcel->id,
+                'sender_code' => $code,
+            ],
+            'message' => 'Code expéditeur récupéré.',
         ]);
     }
 }

@@ -10,10 +10,13 @@ use App\Models\Order;
 use App\Models\Parcel;
 use App\Models\Refund;
 use App\Models\User;
+use App\Modules\GoColis\Services\ParcelService;
+use App\Modules\GoShop\Services\OrderService;
 use App\Services\ActivityLogService;
 use App\Services\RefundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class AdminController extends Controller
 {
@@ -323,32 +326,9 @@ class AdminController extends Controller
     public function unlockOrderCode(Request $request, Order $order, ActivityLogService $activityLogService): JsonResponse
     {
         $user = auth()->user();
-        $localRoles = [
-            'city_support',
-            'city_finance',
-            'city_manager',
-        ];
-        $nationalRoles = [
-            'national_support',
-            'national_finance',
-            'dg_national',
-            'super_admin',
-        ];
-        $rolesAutorises = [...$localRoles, ...$nationalRoles];
 
-        if (! in_array($user->role, $rolesAutorises, true)) {
-            return response()->json([
-                'succes' => false,
-                'message' => 'Action réservée au Support Ville ou niveau supérieur.',
-            ], 403);
-        }
-
-        if (in_array($user->role, $localRoles, true)
-            && (! $user->city_id || (int) $order->city_id !== (int) $user->city_id)) {
-            return response()->json([
-                'succes' => false,
-                'message' => 'Commande introuvable.',
-            ], 404);
+        if ($denied = $this->verifierHabilitationCode($user, (int) $order->city_id, 'Commande introuvable.')) {
+            return $denied;
         }
 
         if (in_array($order->status, [Order::STATUS_DELIVERED, Order::STATUS_CANCELLED, Order::STATUS_REFUSED], true)) {
@@ -384,6 +364,84 @@ class AdminController extends Controller
             'donnees' => $order->fresh(),
             'message' => 'Code de confirmation débloqué.',
         ]);
+    }
+
+    public function regenerateOrderCode(Order $order, OrderService $orderService): JsonResponse
+    {
+        /** @var User|null $user */
+        $user = auth()->user();
+
+        if ($denied = $this->verifierHabilitationCode($user, (int) $order->city_id, 'Commande introuvable.')) {
+            return $denied;
+        }
+
+        try {
+            $updated = $orderService->regenererCodeConfirmation($order, $user);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'succes' => false,
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'order_id' => $updated->id,
+                'regenerated' => true,
+            ],
+            'message' => 'Code de confirmation régénéré.',
+        ]);
+    }
+
+    public function regenerateParcelSenderCode(Parcel $parcel, ParcelService $parcelService): JsonResponse
+    {
+        /** @var User|null $user */
+        $user = auth()->user();
+
+        if ($denied = $this->verifierHabilitationCode($user, (int) $parcel->city_id, 'Expédition introuvable.')) {
+            return $denied;
+        }
+
+        try {
+            $updated = $parcelService->regenererCodeExpediteur($parcel, $user);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'succes' => false,
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'parcel_id' => $updated->id,
+                'regenerated' => true,
+            ],
+            'message' => 'Code expéditeur régénéré.',
+        ]);
+    }
+
+    private function verifierHabilitationCode(?User $user, int $entityCityId, string $notFoundMessage): ?JsonResponse
+    {
+        if (! $user || ! $user->canManageCodes()) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Action réservée au Support Ville ou niveau supérieur.',
+            ], 403);
+        }
+
+        if (in_array($user->role, User::CODE_MANAGEMENT_LOCAL_ROLES, true)
+            && (! $user->city_id || $entityCityId !== (int) $user->city_id)) {
+            return response()->json([
+                'succes' => false,
+                'message' => $notFoundMessage,
+            ], 404);
+        }
+
+        return null;
     }
 
     public function dashboard(Request $request): JsonResponse

@@ -20,7 +20,7 @@ class Order extends Model
         'platform_commission', 'merchant_amount', 'courier_amount',
         'rain_mode_applied', 'peak_hours_applied',
         'payment_method', 'payment_status', 'payment_reference',
-        'confirmation_code', 'confirmation_attempts', 'confirmation_locked',
+        'confirmation_code', 'confirmation_code_enc', 'confirmation_attempts', 'confirmation_locked',
         'confirmation_unlocked_by',
         'delivery_address', 'delivery_lat', 'delivery_lng', 'distance_km',
         'pickup_lat', 'pickup_lng', 'special_instructions',
@@ -30,6 +30,7 @@ class Order extends Model
 
     protected $hidden = [
         'confirmation_code',
+        'confirmation_code_enc',
     ];
 
     protected $casts = [
