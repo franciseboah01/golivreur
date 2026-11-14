@@ -114,8 +114,10 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
         // Rôles opérationnels hérités par défaut si pas encore assigné
         return match ($this->role) {
             'dg_national' => true,
-            'national_finance' => in_array($tabKey, ['dashboard', 'finances', 'refunds', 'activity_logs'], true),
-            'city_manager' => in_array($tabKey, ['dashboard', 'orders', 'parcels', 'merchants', 'couriers', 'clients', 'pending_validations', 'disputes', 'emergency_center', 'administrators', 'cities'], true),
+            'national_finance' => in_array($tabKey, ['dashboard', 'finances', 'refunds', 'activity_logs', 'webhook_logs'], true),
+            'national_tech' => in_array($tabKey, ['dashboard', 'webhook_logs', 'activity_logs', 'settings'], true),
+            'city_manager' => in_array($tabKey, ['dashboard', 'orders', 'parcels', 'merchants', 'couriers', 'clients', 'pending_validations', 'disputes', 'administrators', 'cities', 'refunds'], true),
+            'city_finance' => in_array($tabKey, ['dashboard', 'finances', 'refunds'], true),
             'city_support', 'national_support' => in_array($tabKey, ['dashboard', 'orders', 'parcels', 'merchants', 'couriers', 'clients', 'pending_validations', 'disputes', 'refunds'], true),
             'city_agent' => in_array($tabKey, ['dashboard', 'merchants', 'couriers', 'pending_validations'], true),
             default => false,

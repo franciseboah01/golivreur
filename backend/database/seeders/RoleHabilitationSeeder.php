@@ -53,7 +53,7 @@ class RoleHabilitationSeeder extends Seeder
                 'description' => 'Gestion des opérations GoShop, GoColis, partenaires, validations, litiges et gestionnaires locaux.',
                 'onglets' => [
                     'dashboard', 'orders', 'parcels', 'merchants', 'couriers',
-                    'clients', 'pending_validations', 'disputes', 'emergency_center',
+                    'clients', 'pending_validations', 'disputes', 'refunds',
                     'administrators', 'cities',
                 ],
                 'is_system' => true,
@@ -85,6 +85,28 @@ class RoleHabilitationSeeder extends Seeder
             ]
         );
 
+        // 7. Finance Ville
+        $cityFinanceRole = RoleHabilitation::updateOrCreate(
+            ['slug' => 'city_finance'],
+            [
+                'name' => 'Responsable Finance Ville',
+                'description' => 'Gestion de la trésorerie locale, transactions portefeuilles et remboursements de sa ville.',
+                'onglets' => ['dashboard', 'finances', 'refunds'],
+                'is_system' => true,
+            ]
+        );
+
+        // 8. Responsable Technique National
+        $nationalTechRole = RoleHabilitation::updateOrCreate(
+            ['slug' => 'national_tech'],
+            [
+                'name' => 'Responsable Technique & IT National',
+                'description' => 'Supervision technique, logs de webhooks, journal d\'activité et maintenance système.',
+                'onglets' => ['dashboard', 'webhook_logs', 'activity_logs', 'settings'],
+                'is_system' => true,
+            ]
+        );
+
         // ─── Synchronisation des utilisateurs existants ───────────────────────────
 
         // Super Admin users
@@ -104,6 +126,14 @@ class RoleHabilitationSeeder extends Seeder
         // Agents
         User::where('role', 'city_agent')
             ->update(['role_habilitation_id' => $agentRole->id]);
+
+        // Finance Ville
+        User::where('role', 'city_finance')
+            ->update(['role_habilitation_id' => $cityFinanceRole->id]);
+
+        // Tech National
+        User::where('role', 'national_tech')
+            ->update(['role_habilitation_id' => $nationalTechRole->id]);
 
         // Any other admin users without role_habilitation_id
         User::whereIn('role', User::ADMIN_ROLES)
