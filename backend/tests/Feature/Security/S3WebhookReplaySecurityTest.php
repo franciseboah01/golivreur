@@ -44,7 +44,7 @@ it('S3 rôles autorisés: autorise national_tech et super_admin sur webhooks/{id
     $webhookLog = WebhookLog::create([
         'source' => 'hub2',
         'event_type' => 'payment',
-        'payload' => ['transaction_id' => 'TXN-ALLOW-'.$role, 'status' => 'SUCCESS'],
+        'payload' => ['transaction_id' => 'TXN-ALLOW-'.$role, 'status' => 'SUCCESS', 'amount' => 5800],
         'signature_received' => 'valid-sig',
         'signature_valid' => true,
         'status' => 'failed',

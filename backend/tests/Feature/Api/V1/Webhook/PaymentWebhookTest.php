@@ -64,6 +64,7 @@ test('un webhook Hub2 valide passe le statut du paiement en paid', function () {
         'event' => 'payment.success',
         'transaction_id' => 'TXN-HUB2-SUCCESS-999',
         'status' => 'SUCCESS',
+        'amount' => 5800,
     ];
 
     $rawContent = json_encode($payload);
@@ -148,6 +149,7 @@ test('le traitement des webhooks est idempotent face aux doublons', function () 
         'event' => 'payment.success',
         'transaction_id' => 'TXN-IDEMPOTENT-456',
         'status' => 'SUCCESS',
+        'amount' => 5800,
     ];
 
     $rawContent = json_encode($payload);
@@ -200,6 +202,7 @@ test('un admin peut rejouer un webhook valide échoué', function () {
         'payload' => [
             'transaction_id' => 'TXN-REPLAY-777',
             'status' => 'SUCCESS',
+            'amount' => 5800,
         ],
         'signature_received' => 'valid-sig',
         'signature_valid' => true,

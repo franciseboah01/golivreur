@@ -100,6 +100,7 @@ class OrderResource extends Resource
                         SearchableSelect::make('payment_status')
                             ->label('Statut du paiement')
                             ->options(SearchableSelect::sortedOptions([
+                                'amount_mismatch' => 'Écart de montant',
                                 'failed' => 'Échoué',
                                 'paid' => 'Payé',
                                 'paid_cash' => 'Payé en espèces',

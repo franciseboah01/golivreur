@@ -78,8 +78,25 @@ class ProcessPaymentWebhook implements ShouldQueue
                 }
 
                 if ($statut === 'SUCCESS' || $statut === 'ACCEPTED') {
-                    // Paiement confirmé
+                    $receivedAmount = $this->extractAmount($payload);
+
+                    // Paiement confirmé (uniquement si le montant concorde strictement avec le total dû)
                     if ($order) {
+                        $expectedAmount = (int) round((float) $order->products_total + (float) $order->delivery_fee);
+                        if ($receivedAmount === null || $receivedAmount !== $expectedAmount) {
+                            $this->handleAmountMismatch(
+                                entity: $order,
+                                entityType: 'order',
+                                reference: (string) $reference,
+                                expectedAmount: $expectedAmount,
+                                receivedAmount: $receivedAmount,
+                                webhookLog: $webhookLog,
+                                activityLogService: $activityLogService,
+                            );
+
+                            return;
+                        }
+
                         if ($order->payment_status !== 'paid') {
                             $order->update(['payment_status' => 'paid']);
                             if ($order->client instanceof User) {
@@ -90,15 +107,37 @@ class ProcessPaymentWebhook implements ShouldQueue
                                 action: 'payment_confirmed',
                                 entityType: 'order',
                                 entityId: $order->id,
-                                properties: ['reference' => $reference, 'amount' => $order->products_total + $order->delivery_fee],
+                                properties: ['reference' => $reference, 'amount' => $expectedAmount],
                             );
                         }
                     } elseif ($parcel) {
+                        $expectedAmount = (int) round((float) $parcel->shipping_fee + ((bool) $parcel->has_insurance ? (float) $parcel->insurance_amount : 0.0));
+                        if ($receivedAmount === null || $receivedAmount !== $expectedAmount) {
+                            $this->handleAmountMismatch(
+                                entity: $parcel,
+                                entityType: 'parcel',
+                                reference: (string) $reference,
+                                expectedAmount: $expectedAmount,
+                                receivedAmount: $receivedAmount,
+                                webhookLog: $webhookLog,
+                                activityLogService: $activityLogService,
+                            );
+
+                            return;
+                        }
+
                         if ($parcel->payment_status !== 'paid') {
                             $parcel->update(['payment_status' => 'paid']);
                             if ($parcel->sender instanceof User) {
                                 $notificationService->notifierPaiementConfirme($parcel->sender, null, $parcel);
                             }
+                            $activityLogService->log(
+                                userId: null,
+                                action: 'payment_confirmed',
+                                entityType: 'parcel',
+                                entityId: $parcel->id,
+                                properties: ['reference' => $reference, 'amount' => $expectedAmount],
+                            );
                         }
                     }
                 } elseif ($statut === 'FAILED' || $statut === 'CANCELLED') {
@@ -167,6 +206,63 @@ class ProcessPaymentWebhook implements ShouldQueue
         Log::critical('Webhook paiement échoué définitivement', [
             'webhook_log_id' => $this->webhookLogId,
             'error' => $exception->getMessage(),
+        ]);
+    }
+
+    private function extractAmount(array $payload): ?int
+    {
+        $raw = $payload['amount'] ?? $payload['data']['amount'] ?? $payload['cpm_amount'] ?? null;
+
+        if ($raw === null || ! is_numeric($raw)) {
+            return null;
+        }
+
+        return (int) round((float) $raw);
+    }
+
+    private function handleAmountMismatch(
+        Order|Parcel $entity,
+        string $entityType,
+        string $reference,
+        int $expectedAmount,
+        ?int $receivedAmount,
+        WebhookLog $webhookLog,
+        ActivityLogService $activityLogService,
+    ): void {
+        $entity->update(['payment_status' => 'amount_mismatch']);
+
+        $receivedLabel = $receivedAmount !== null ? (string) $receivedAmount : 'absent';
+        $message = "Écart de montant webhook : reçu {$receivedLabel} F CFA, attendu {$expectedAmount} F CFA.";
+
+        Log::critical('Alerte critique : écart de montant sur webhook paiement', [
+            'entity_type' => $entityType,
+            'entity_id' => $entity->id,
+            'reference' => $reference,
+            'expected_amount' => $expectedAmount,
+            'received_amount' => $receivedAmount,
+            'webhook_log_id' => $webhookLog->id,
+        ]);
+
+        $activityLogService->log(
+            userId: null,
+            action: 'webhook_amount_mismatch',
+            entityType: $entityType,
+            entityId: $entity->id,
+            properties: [
+                'reference' => $reference,
+                'source' => $webhookLog->source,
+                'webhook_log_id' => $webhookLog->id,
+                'expected_amount' => $expectedAmount,
+                'received_amount' => $receivedAmount,
+            ],
+            severity: 'critical',
+        );
+
+        $webhookLog->update([
+            'status' => 'rejected',
+            'error_message' => $message,
+            'processed_at' => now(),
+            'horizon_job_id' => $this->job?->getJobId(),
         ]);
     }
 }
