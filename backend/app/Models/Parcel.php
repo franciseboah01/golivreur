@@ -94,6 +94,9 @@ class Parcel extends Model
         return $this->belongsTo(User::class, 'sender_id');
     }
 
+    /**
+     * @return BelongsTo<Courier, $this>
+     */
     public function courier(): BelongsTo
     {
         return $this->belongsTo(Courier::class);

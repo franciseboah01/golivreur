@@ -103,9 +103,13 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::get('orders', [ClientController::class, 'orders']);
         Route::get('orders/{order}', [ClientController::class, 'showOrder']);
         Route::get('orders/{order}/confirmation-code', [ClientController::class, 'orderConfirmationCode']);
+        Route::get('orders/{order}/courier-location', [ClientController::class, 'orderCourierLocation'])
+            ->middleware('throttle:client-courier-location');
         Route::post('parcels', [ParcelController::class, 'store']);
         Route::get('parcels/{parcel}', [ParcelController::class, 'showClient']);
         Route::get('parcels/{parcel}/sender-code', [ParcelController::class, 'senderCode']);
+        Route::get('parcels/{parcel}/courier-location', [ParcelController::class, 'courierLocation'])
+            ->middleware('throttle:client-courier-location');
         Route::get('notifications', [ClientController::class, 'notifications']);
         Route::put('notifications/{notification}/read', [ClientController::class, 'markNotificationRead']);
         Route::post('ratings', [RatingController::class, 'store']);

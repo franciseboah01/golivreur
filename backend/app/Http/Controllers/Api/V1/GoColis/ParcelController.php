@@ -10,6 +10,7 @@ use App\Models\Neighborhood;
 use App\Models\Parcel;
 use App\Modules\GoColis\Services\ParcelService;
 use App\Services\ConfirmationCodeService;
+use App\Services\CourierLocationPollingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -409,5 +410,32 @@ class ParcelController extends Controller
             ],
             'message' => 'Code expéditeur récupéré.',
         ]);
+    }
+
+    /**
+     * Suivi bêta de position livreur pour une expédition GoColis (D-BETA-1, 1 req / 5s).
+     */
+    public function courierLocation(Parcel $parcel, CourierLocationPollingService $pollingService): JsonResponse
+    {
+        $estEnCours = in_array($parcel->status, [
+            Parcel::STATUS_ACCEPTED,
+            Parcel::STATUS_AT_SENDER,
+            Parcel::STATUS_PICKED_UP,
+            Parcel::STATUS_IN_TRANSIT,
+            Parcel::STATUS_AT_RECIPIENT,
+        ], true);
+
+        $parcel->loadMissing('courier');
+        $uid = auth()->id();
+
+        return $pollingService->repondrePosition(
+            ownerId: (int) $parcel->sender_id,
+            authenticatedUserId: $uid !== null ? (int) $uid : null,
+            scopeKey: "parcel:{$parcel->id}",
+            estEnCours: $estEnCours,
+            courier: $parcel->courier,
+            forbiddenMessage: 'Accès refusé à cette expédition.',
+            inactiveMessage: 'Le suivi livreur n\'est disponible que pour une expédition en cours avec livreur assigné.',
+        );
     }
 }

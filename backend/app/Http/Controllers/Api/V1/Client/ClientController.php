@@ -16,6 +16,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Modules\GoShop\Services\OrderService;
 use App\Services\ConfirmationCodeService;
+use App\Services\CourierLocationPollingService;
 use App\Services\SettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -194,6 +195,33 @@ class ClientController extends Controller
             ],
             'message' => 'Code de confirmation récupéré.',
         ]);
+    }
+
+    /**
+     * Suivi bêta de position livreur par polling REST (D-BETA-1, 1 req / 5s).
+     */
+    public function orderCourierLocation(Order $order, CourierLocationPollingService $pollingService): JsonResponse
+    {
+        $estEnCours = in_array($order->status, [
+            Order::STATUS_ACCEPTED,
+            Order::STATUS_WAITING,
+            Order::STATUS_READY,
+            Order::STATUS_PICKED_UP,
+            Order::STATUS_IN_TRANSIT,
+        ], true);
+
+        $order->loadMissing('courier');
+        $uid = auth()->id();
+
+        return $pollingService->repondrePosition(
+            ownerId: (int) $order->client_id,
+            authenticatedUserId: $uid !== null ? (int) $uid : null,
+            scopeKey: "order:{$order->id}",
+            estEnCours: $estEnCours,
+            courier: $order->courier,
+            forbiddenMessage: 'Accès refusé.',
+            inactiveMessage: 'Le suivi livreur n\'est disponible que pour une commande en cours avec livreur assigné.',
+        );
     }
 
     public function notifications(): JsonResponse

@@ -50,5 +50,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('driver-location', function (Request $request) {
             return Limit::perMinute(12)->by($request->user()?->id ?: $request->ip());
         });
+
+        RateLimiter::for('client-courier-location', function (Request $request) {
+            return Limit::perMinute(12)->by('client_courier_loc:'.($request->user()?->id ?: $request->ip()));
+        });
     }
 }
