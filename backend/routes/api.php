@@ -113,6 +113,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::get('notifications', [ClientController::class, 'notifications']);
         Route::put('notifications/{notification}/read', [ClientController::class, 'markNotificationRead']);
         Route::post('ratings', [RatingController::class, 'store']);
+        Route::post('ratings/merchant', [RatingController::class, 'storeMerchant']);
     });
 
     // ─── Merchant / Business (GoShop Business) ───────────────────────────────

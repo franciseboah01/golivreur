@@ -358,6 +358,7 @@ class OrderService
             $lockedOrder->update([
                 'status' => Order::STATUS_DELIVERED,
                 'payment_status' => $estCash ? 'paid_cash' : $lockedOrder->payment_status,
+                'confirmation_attempts' => 0,
                 'delivered_at' => now(),
             ]);
 

@@ -35,6 +35,8 @@ class Merchant extends Model
         'is_active',
         'is_open',
         'commission_rate',
+        'average_rating',
+        'total_ratings',
         'photo_url',
     ];
 
@@ -44,6 +46,8 @@ class Merchant extends Model
         'open_hours' => 'array',
         'prep_time_minutes' => 'integer',
         'commission_rate' => 'float',
+        'average_rating' => 'float',
+        'total_ratings' => 'integer',
         'lat' => 'float',
         'lng' => 'float',
     ];

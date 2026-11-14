@@ -302,6 +302,7 @@ class ParcelService
 
             $lockedParcel->update([
                 'status' => Parcel::STATUS_PICKED_UP,
+                'sender_code_attempts' => 0,
                 'picked_up_at' => now(),
             ]);
 
@@ -354,6 +355,7 @@ class ParcelService
             $lockedParcel->update([
                 'status' => Parcel::STATUS_DELIVERED,
                 'payment_status' => $estCash ? 'paid_cash' : $lockedParcel->payment_status,
+                'recipient_code_attempts' => 0,
                 'delivered_at' => now(),
             ]);
 
