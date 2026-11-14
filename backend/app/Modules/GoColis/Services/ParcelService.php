@@ -14,13 +14,13 @@ use App\Services\ActivityLogService;
 use App\Services\AsyncJobDispatcher;
 use App\Services\ConfirmationCodeService;
 use App\Services\NotificationService;
+use App\Services\ParcelPhotoStorageService;
 use App\Services\SettingsService;
 use App\Services\SmsService;
 use App\Services\WalletService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -45,6 +45,8 @@ class ParcelService
 
     private readonly ConfirmationCodeService $confirmationCodeService;
 
+    private readonly ParcelPhotoStorageService $photoStorageService;
+
     public function __construct(
         private readonly CommissionService $commissionService,
         private readonly AssignmentService $assignmentService,
@@ -54,9 +56,11 @@ class ParcelService
         private readonly ActivityLogService $activityLogService,
         ?SettingsService $settingsService = null,
         ?ConfirmationCodeService $confirmationCodeService = null,
+        ?ParcelPhotoStorageService $photoStorageService = null,
     ) {
         $this->settingsService = $settingsService ?? app(SettingsService::class);
         $this->confirmationCodeService = $confirmationCodeService ?? app(ConfirmationCodeService::class);
+        $this->photoStorageService = $photoStorageService ?? app(ParcelPhotoStorageService::class);
     }
 
     /**
@@ -176,21 +180,30 @@ class ParcelService
     }
 
     /**
-     * Sauvegarde une photo de preuve (ramassage ou livraison).
-     * La photo est obligatoire AVANT de pouvoir valider le code.
+     * Sauvegarde une photo de preuve (ramassage ou livraison) après validation et ré-encodage GD.
+     * L'ordre strict at_sender -> photo (pickup) et at_recipient -> photo (delivery) est imposé.
      */
     public function sauvegarderPhoto(Parcel $parcel, UploadedFile $photo, string $type, ?float $lat = null, ?float $lng = null): ParcelPhoto
     {
-        // Upload vers DigitalOcean Spaces
-        $chemin = $photo->store(
-            "photos/colis/{$parcel->id}/{$type}",
-            's3'
-        );
+        if ($type === 'pickup' && $parcel->status !== Parcel::STATUS_AT_SENDER) {
+            throw ValidationException::withMessages([
+                'status' => ['Vous devez d\'abord signaler votre arrivée chez l\'expéditeur avant de prendre la photo de ramassage.'],
+            ]);
+        }
+
+        if ($type === 'delivery' && $parcel->status !== Parcel::STATUS_AT_RECIPIENT) {
+            throw ValidationException::withMessages([
+                'status' => ['Vous devez d\'abord signaler votre arrivée chez le destinataire avant de prendre la photo de livraison.'],
+            ]);
+        }
+
+        $storagePath = $this->photoStorageService->reencoderEtStocker($parcel, $photo, $type);
 
         return ParcelPhoto::create([
             'parcel_id' => $parcel->id,
             'type' => $type,
-            'photo_url' => Storage::disk('s3')->url($chemin),
+            'photo_url' => '',
+            'storage_path' => $storagePath,
             'lat' => $lat,
             'lng' => $lng,
         ]);

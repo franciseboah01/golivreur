@@ -424,6 +424,33 @@ class AdminController extends Controller
         ]);
     }
 
+    public function parcelPhotos(Parcel $parcel): JsonResponse
+    {
+        /** @var User|null $user */
+        $user = auth()->user();
+
+        if ($denied = $this->verifierAccesOperations($user)) {
+            return $denied;
+        }
+
+        if (! $user?->canAccessCity((int) $parcel->city_id)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Expédition introuvable.',
+            ], 404);
+        }
+
+        $parcel->load(['photos']);
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'parcel_id' => $parcel->id,
+                'photos' => $parcel->photos,
+            ],
+        ]);
+    }
+
     private function verifierHabilitationCode(?User $user, int $entityCityId, string $notFoundMessage): ?JsonResponse
     {
         if (! $user || ! $user->canManageCodes()) {

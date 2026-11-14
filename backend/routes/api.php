@@ -151,6 +151,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::get('parcels/{parcel}', [ParcelController::class, 'showDriver']);
         Route::post('parcels/{parcel}/accept', [DriverController::class, 'acceptParcel']);
         Route::post('parcels/{parcel}/refuse', [DriverController::class, 'refuseParcel']);
+        Route::post('parcels/{parcel}/photos', [ParcelController::class, 'uploadPhoto']);
         Route::get('wallet', [DriverController::class, 'wallet']);
     });
 
@@ -173,6 +174,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::post('cities/{city}/emergency-mode', [AdminController::class, 'emergencyMode']);
         Route::post('orders/{order}/regenerate-code', [AdminController::class, 'regenerateOrderCode']);
         Route::post('parcels/{parcel}/regenerate-sender-code', [AdminController::class, 'regenerateParcelSenderCode']);
+        Route::get('parcels/{parcel}/photos', [AdminController::class, 'parcelPhotos']);
         Route::post('webhooks/{id}/replay', [WebhookController::class, 'rejouer']);
     });
 });

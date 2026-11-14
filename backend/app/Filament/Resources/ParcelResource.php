@@ -7,6 +7,7 @@ use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ParcelResource\Pages;
 use App\Models\Courier;
 use App\Models\Parcel;
+use App\Models\ParcelPhoto;
 use App\Models\User;
 use App\Modules\GoColis\Services\ParcelService;
 use App\Services\RefundService;
@@ -168,8 +169,10 @@ class ParcelResource extends Resource
                                 Forms\Components\TextInput::make('type')
                                     ->label('Étape (ramassage / livraison)')
                                     ->disabled(),
-                                Forms\Components\TextInput::make('photo_url')
-                                    ->label('Chemin de l\'image')
+                                Forms\Components\TextInput::make('signed_url')
+                                    ->label('URL signée temporaire')
+                                    ->formatStateUsing(fn (?ParcelPhoto $record): ?string => $record?->signed_url)
+                                    ->dehydrated(false)
                                     ->disabled(),
                                 Forms\Components\TextInput::make('created_at')
                                     ->label('Horodatage')

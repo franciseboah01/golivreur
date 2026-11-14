@@ -12,6 +12,7 @@ use App\Modules\GoColis\Services\ParcelService;
 use App\Services\ConfirmationCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -78,7 +79,7 @@ class ParcelController extends Controller
 
     public function verifySenderCode(Request $request, Parcel $parcel, ParcelService $service): JsonResponse
     {
-        if ($denied = $this->authorizeCodeVerification($parcel)) {
+        if ($denied = $this->authorizeAssignedCourier($parcel, allowNationalAdmins: true)) {
             return $denied;
         }
 
@@ -97,7 +98,7 @@ class ParcelController extends Controller
 
     public function verifyRecipientCode(Request $request, Parcel $parcel, ParcelService $service): JsonResponse
     {
-        if ($denied = $this->authorizeCodeVerification($parcel)) {
+        if ($denied = $this->authorizeAssignedCourier($parcel, allowNationalAdmins: true)) {
             return $denied;
         }
 
@@ -121,11 +122,42 @@ class ParcelController extends Controller
         ]);
     }
 
-    private function authorizeCodeVerification(Parcel $parcel): ?JsonResponse
+    public function uploadPhoto(Request $request, Parcel $parcel, ParcelService $service): JsonResponse
+    {
+        if ($denied = $this->authorizeAssignedCourier($parcel, allowNationalAdmins: false)) {
+            return $denied;
+        }
+
+        $validated = $request->validate([
+            'type' => ['required', 'string', 'in:pickup,delivery'],
+            'photo' => ['required', 'file', 'max:5120', 'mimetypes:image/jpeg,image/png,image/webp', 'mimes:jpg,jpeg,png,webp'],
+            'lat' => ['nullable', 'numeric', 'between:-90,90'],
+            'lng' => ['nullable', 'numeric', 'between:-180,180'],
+        ]);
+
+        /** @var UploadedFile $photoFile */
+        $photoFile = $request->file('photo');
+
+        $photo = $service->sauvegarderPhoto(
+            parcel: $parcel,
+            photo: $photoFile,
+            type: (string) $validated['type'],
+            lat: isset($validated['lat']) ? (float) $validated['lat'] : null,
+            lng: isset($validated['lng']) ? (float) $validated['lng'] : null,
+        );
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $photo,
+            'message' => 'Photo de preuve enregistrée.',
+        ], 201);
+    }
+
+    private function authorizeAssignedCourier(Parcel $parcel, bool $allowNationalAdmins = true): ?JsonResponse
     {
         $user = auth()->user();
 
-        if ($user && in_array($user->role, ['super_admin', 'dg_national'], true)) {
+        if ($allowNationalAdmins && $user && in_array($user->role, ['super_admin', 'dg_national'], true)) {
             return null;
         }
 
@@ -294,13 +326,15 @@ class ParcelController extends Controller
     {
         $user = auth()->user();
 
-        if ($parcel->sender_id !== $user->id && ! in_array($user->role, ['super_admin', 'dg_national', 'city_manager'])) {
+        if ((int) $parcel->sender_id !== (int) $user->id && ! in_array($user->role, ['super_admin', 'dg_national', 'city_manager'])) {
             return response()->json(['succes' => false, 'message' => 'Accès refusé à cette expédition.'], 403);
         }
 
-        if ($user->role === 'city_manager' && $parcel->city_id !== $user->city_id) {
+        if ($user->role === 'city_manager' && (int) $parcel->city_id !== (int) $user->city_id) {
             return response()->json(['succes' => false, 'message' => 'Accès refusé pour cette zone.'], 403);
         }
+
+        $parcel->load(['photos']);
 
         return response()->json([
             'succes' => true,
