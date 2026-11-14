@@ -38,6 +38,7 @@ Route::middleware('throttle:20,1')->group(function () {
     // Catalogue GoShop Public
     Route::prefix('client')->group(function () {
         Route::get('city-status', [ClientController::class, 'cityStatus']);
+        Route::get('payment-methods', [ClientController::class, 'paymentMethods']);
         Route::get('categories', [ClientController::class, 'categories']);
         Route::get('merchants', [ClientController::class, 'merchants']);
         Route::get('merchants/{merchant}/catalog', [ClientController::class, 'merchantCatalog']);

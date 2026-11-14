@@ -246,6 +246,41 @@ class ClientController extends Controller
         ]);
     }
 
+    /**
+     * Liste des modes de paiement actifs pour le client (pilotés par SettingsService).
+     */
+    public function paymentMethods(Request $request, SettingsService $settingsService): JsonResponse
+    {
+        $requestedCityId = $request->input('city_id', auth('api')->user()?->city_id);
+
+        $city = $requestedCityId
+            ? City::find($requestedCityId)
+            : City::where('is_active', true)->orderBy('id')->first();
+
+        if (! $city) {
+            $city = City::orderBy('id')->first();
+        }
+
+        $cityId = $city?->id;
+        $cases = PaymentMethod::activeCases($cityId, $settingsService);
+        $default = PaymentMethod::defaultActive($cityId, $settingsService);
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'city_id' => $cityId,
+                'default' => $default,
+                'modes_actifs' => array_map(fn (PaymentMethod $m): string => $m->value, $cases),
+                'methodes' => array_map(fn (PaymentMethod $m): array => [
+                    'id' => $m->value,
+                    'label' => $m->label(),
+                    'short_label' => $m->shortLabel(),
+                    'is_default' => $m->value === $default,
+                ], $cases),
+            ],
+        ]);
+    }
+
     // ─── Adresses de livraison du Client ──────────────────────────────────────
 
     public function addresses(): JsonResponse
