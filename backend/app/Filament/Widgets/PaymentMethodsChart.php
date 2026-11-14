@@ -27,13 +27,23 @@ class PaymentMethodsChart extends ChartWidget
             'moov' => ['label' => 'Moov Money', 'color' => '#3b82f6'],
         ];
 
+        $user = auth()->user();
+        $isLocal = $user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id;
+        $cityId = $isLocal ? (int) $user->city_id : null;
+
         $labels = [];
         $data = [];
         $backgroundColors = [];
 
         foreach ($methods as $key => $meta) {
-            $countOrders = Order::where('payment_method', $key)->count();
-            $countParcels = Parcel::where('payment_method', $key)->count();
+            $ordersQ = Order::where('payment_method', $key);
+            $parcelsQ = Parcel::where('payment_method', $key);
+            if ($cityId) {
+                $ordersQ->where('city_id', $cityId);
+                $parcelsQ->where('city_id', $cityId);
+            }
+            $countOrders = $ordersQ->count();
+            $countParcels = $parcelsQ->count();
             $total = $countOrders + $countParcels;
 
             $labels[] = $meta['label'];

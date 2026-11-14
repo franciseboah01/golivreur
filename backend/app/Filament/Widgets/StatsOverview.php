@@ -21,18 +21,28 @@ class StatsOverview extends BaseWidget
     protected function getStats(): array
     {
         $today = now()->startOfDay();
+        $user = auth()->user();
+        $isLocal = $user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id;
+        $cityId = $isLocal ? (int) $user->city_id : null;
+        $cityName = $isLocal ? ($user->city?->name ?? City::find($cityId)?->name ?? 'votre ville') : null;
 
         // 1. Volumes du jour
-        $ordersCount = Order::where('created_at', '>=', $today)->count();
-        $parcelsCount = Parcel::where('created_at', '>=', $today)->count();
+        $ordersCount = Order::where('created_at', '>=', $today)
+            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
+            ->count();
+        $parcelsCount = Parcel::where('created_at', '>=', $today)
+            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
+            ->count();
         $totalCourses = $ordersCount + $parcelsCount;
 
         // 2. Chiffre d'Affaires (Commissions plateforme du jour)
         $caOrders = (float) Order::where('created_at', '>=', $today)
+            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
             ->where('status', Order::STATUS_DELIVERED)
             ->sum('platform_commission');
 
         $caParcels = (float) Parcel::where('created_at', '>=', $today)
+            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
             ->where('status', Parcel::STATUS_DELIVERED)
             ->sum('platform_commission');
 
@@ -40,41 +50,71 @@ class StatsOverview extends BaseWidget
 
         // 3. Volume d'Affaires Brut (GMV)
         $ordersGMV = (float) Order::where('created_at', '>=', $today)
+            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
             ->select(DB::raw('COALESCE(SUM(products_total + delivery_fee), 0) as total'))
             ->value('total');
 
         $parcelsGMV = (float) Parcel::where('created_at', '>=', $today)
+            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
             ->select(DB::raw('COALESCE(SUM(shipping_fee + COALESCE(insurance_amount, 0)), 0) as total'))
             ->value('total');
 
         $totalGMV = $ordersGMV + $parcelsGMV;
 
         // 4. Trésorerie Portefeuilles
-        $totalWalletBalance = (float) Wallet::sum('balance');
+        $walletQuery = Wallet::query();
+        if ($cityId) {
+            $walletQuery->where(function ($w) use ($cityId) {
+                $w->where(function ($sub) use ($cityId) {
+                    $sub->where('owner_type', 'merchant')
+                        ->whereIn('owner_id', Merchant::where('city_id', $cityId)->select('id'));
+                })->orWhere(function ($sub) use ($cityId) {
+                    $sub->where('owner_type', 'courier')
+                        ->whereIn('owner_id', Courier::where('city_id', $cityId)->select('id'));
+                });
+            });
+        }
+        $totalWalletBalance = (float) $walletQuery->sum('balance');
 
         // 5. Flotte & Partenaires
-        $totalCouriers = Courier::where('is_active', true)->count();
-        $onlineCouriers = Courier::where('is_online', true)->where('is_active', true)->count();
+        $courierQuery = Courier::where('is_active', true)->when($cityId, fn ($q) => $q->where('city_id', $cityId));
+        $totalCouriers = (clone $courierQuery)->count();
+        $onlineCouriers = (clone $courierQuery)->where('is_online', true)->count();
 
-        $totalMerchants = Merchant::where('is_active', true)->count();
-        $openMerchants = Merchant::where('is_open', true)->where('is_active', true)->count();
+        $merchantQuery = Merchant::where('is_active', true)->when($cityId, fn ($q) => $q->where('city_id', $cityId));
+        $totalMerchants = (clone $merchantQuery)->count();
+        $openMerchants = (clone $merchantQuery)->where('is_open', true)->count();
 
         // 6. Mode Pluie & Zones d'opération
-        $totalCities = City::count();
-        $rainActiveCities = City::where('rain_mode_active', true)->count();
+        $cityQuery = City::query()->when($cityId, fn ($q) => $q->where('id', $cityId));
+        $totalCities = (clone $cityQuery)->count();
+        $rainActiveCities = (clone $cityQuery)->where('rain_mode_active', true)->count();
 
         // 7. Taux de succès
-        $deliveredCount = Order::where('status', Order::STATUS_DELIVERED)->count()
-            + Parcel::where('status', Parcel::STATUS_DELIVERED)->count();
-        $cancelledCount = Order::where('status', Order::STATUS_CANCELLED)->count()
-            + Parcel::where('status', Parcel::STATUS_CANCELLED)->count();
+        $deliveredCount = Order::where('status', Order::STATUS_DELIVERED)
+            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
+            ->count()
+            + Parcel::where('status', Parcel::STATUS_DELIVERED)
+                ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
+                ->count();
+        $cancelledCount = Order::where('status', Order::STATUS_CANCELLED)
+            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
+            ->count()
+            + Parcel::where('status', Parcel::STATUS_CANCELLED)
+                ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
+                ->count();
         $totalEnded = $deliveredCount + $cancelledCount;
         $successRate = $totalEnded > 0 ? round(($deliveredCount / $totalEnded) * 100, 1) : 100.0;
 
         // 8. Alertes de sécurité (codes OTP bloqués)
-        $blockedOrders = Order::where('confirmation_locked', true)->count();
-        $blockedParcels = Parcel::where('sender_code_locked', true)
-            ->orWhere('recipient_code_locked', true)
+        $blockedOrders = Order::where('confirmation_locked', true)
+            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
+            ->count();
+        $blockedParcels = Parcel::where(function ($q) {
+            $q->where('sender_code_locked', true)
+                ->orWhere('recipient_code_locked', true);
+        })
+            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
             ->count();
         $totalBlocked = $blockedOrders + $blockedParcels;
 
@@ -100,7 +140,7 @@ class StatsOverview extends BaseWidget
                 ->color('warning'),
 
             Stat::make('Livreurs en Ligne', "{$onlineCouriers} / {$totalCouriers}")
-                ->description('Flotte active à Daloa')
+                ->description($cityName ? "Flotte active à {$cityName}" : 'Flotte active (Toutes les villes)')
                 ->descriptionIcon('heroicon-m-truck')
                 ->color('primary'),
 
@@ -110,7 +150,7 @@ class StatsOverview extends BaseWidget
                 ->color('info'),
 
             Stat::make('Mode Pluie', "{$rainActiveCities} / {$totalCities}")
-                ->description($rainActiveCities > 0 ? "{$rainActiveCities} zone(s) sous majoration (+20%)" : 'Météo normale sur toutes les zones')
+                ->description($rainActiveCities > 0 ? "{$rainActiveCities} zone(s) sous majoration (+20%)" : ($cityName ? "Météo normale à {$cityName}" : 'Météo normale sur toutes les zones'))
                 ->descriptionIcon('heroicon-m-cloud')
                 ->color($rainActiveCities > 0 ? 'warning' : 'gray'),
 

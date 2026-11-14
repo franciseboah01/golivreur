@@ -47,4 +47,14 @@ class WalletTransaction extends Model
     {
         return $this->belongsTo(Wallet::class);
     }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
+    }
+
+    public function parcel(): BelongsTo
+    {
+        return $this->belongsTo(Parcel::class);
+    }
 }

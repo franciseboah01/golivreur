@@ -10,6 +10,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class WalletTransactionResource extends Resource
@@ -48,6 +49,31 @@ class WalletTransactionResource extends Resource
     public static function canDelete(Model $record): bool
     {
         return false;
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = auth()->user();
+
+        if ($user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id) {
+            $cityId = (int) $user->city_id;
+            $query->where(function ($q) use ($cityId) {
+                $q->whereHas('order', fn ($o) => $o->where('city_id', $cityId))
+                    ->orWhereHas('parcel', fn ($p) => $p->where('city_id', $cityId))
+                    ->orWhereHas('wallet', function ($w) use ($cityId) {
+                        $w->where(function ($sub) use ($cityId) {
+                            $sub->where('owner_type', 'merchant')
+                                ->whereIn('owner_id', \App\Models\Merchant::where('city_id', $cityId)->select('id'));
+                        })->orWhere(function ($sub2) use ($cityId) {
+                            $sub2->where('owner_type', 'courier')
+                                ->whereIn('owner_id', \App\Models\Courier::where('city_id', $cityId)->select('id'));
+                        });
+                    });
+            });
+        }
+
+        return $query;
     }
 
     public static function form(Form $form): Form

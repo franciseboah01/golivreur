@@ -23,14 +23,24 @@ class WeeklyRevenueChart extends ChartWidget
 
         $labels = $days->map(fn (Carbon $date): string => $date->translatedFormat('D d/m'))->toArray();
 
-        $revenueData = $days->map(function (Carbon $date): float {
-            $orderCA = (float) Order::whereDate('created_at', $date)
-                ->where('status', Order::STATUS_DELIVERED)
-                ->sum('platform_commission');
+        $user = auth()->user();
+        $isLocal = $user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id;
+        $cityId = $isLocal ? (int) $user->city_id : null;
 
-            $parcelCA = (float) Parcel::whereDate('created_at', $date)
-                ->where('status', Parcel::STATUS_DELIVERED)
-                ->sum('platform_commission');
+        $revenueData = $days->map(function (Carbon $date) use ($cityId): float {
+            $orderQ = Order::whereDate('created_at', $date)
+                ->where('status', Order::STATUS_DELIVERED);
+            if ($cityId) {
+                $orderQ->where('city_id', $cityId);
+            }
+            $orderCA = (float) $orderQ->sum('platform_commission');
+
+            $parcelQ = Parcel::whereDate('created_at', $date)
+                ->where('status', Parcel::STATUS_DELIVERED);
+            if ($cityId) {
+                $parcelQ->where('city_id', $cityId);
+            }
+            $parcelCA = (float) $parcelQ->sum('platform_commission');
 
             return $orderCA + $parcelCA;
         })->toArray();

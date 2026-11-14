@@ -48,7 +48,7 @@ class MerchantResource extends Resource
         $query = parent::getEloquentQuery();
         $user = auth()->user();
 
-        if ($user && $user->is_local_admin && $user->city_id) {
+        if ($user && str_starts_with((string) $user->role, 'city_')) {
             $query->where('city_id', $user->city_id);
         }
 

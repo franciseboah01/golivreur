@@ -19,13 +19,25 @@ class BlockedCodesAlertWidget extends BaseWidget
 
     public static function canView(): bool
     {
-        return Order::where('confirmation_locked', true)->exists();
+        $query = Order::where('confirmation_locked', true);
+        $user = auth()->user();
+        if ($user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id) {
+            $query->where('city_id', $user->city_id);
+        }
+
+        return $query->exists();
     }
 
     public function table(Table $table): Table
     {
+        $query = Order::query()->where('confirmation_locked', true);
+        $user = auth()->user();
+        if ($user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id) {
+            $query->where('city_id', $user->city_id);
+        }
+
         return $table
-            ->query(Order::query()->where('confirmation_locked', true))
+            ->query($query)
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->label('N° Commande'),

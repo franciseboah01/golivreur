@@ -18,8 +18,14 @@ class LatestOrdersWidget extends BaseWidget
 
     public function table(Table $table): Table
     {
+        $query = Order::query()->latest();
+        $user = auth()->user();
+        if ($user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id) {
+            $query->where('city_id', $user->city_id);
+        }
+
         return $table
-            ->query(Order::query()->latest()->limit(5))
+            ->query($query->limit(5))
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->label('N° Commande')

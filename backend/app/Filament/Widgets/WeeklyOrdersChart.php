@@ -23,9 +23,27 @@ class WeeklyOrdersChart extends ChartWidget
 
         $labels = $days->map(fn (Carbon $date): string => $date->translatedFormat('D d/m'))->toArray();
 
-        $ordersData = $days->map(fn (Carbon $date): int => Order::whereDate('created_at', $date)->count())->toArray();
+        $user = auth()->user();
+        $isLocal = $user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id;
+        $cityId = $isLocal ? (int) $user->city_id : null;
 
-        $parcelsData = $days->map(fn (Carbon $date): int => Parcel::whereDate('created_at', $date)->count())->toArray();
+        $ordersData = $days->map(function (Carbon $date) use ($cityId): int {
+            $q = Order::whereDate('created_at', $date);
+            if ($cityId) {
+                $q->where('city_id', $cityId);
+            }
+
+            return $q->count();
+        })->toArray();
+
+        $parcelsData = $days->map(function (Carbon $date) use ($cityId): int {
+            $q = Parcel::whereDate('created_at', $date);
+            if ($cityId) {
+                $q->where('city_id', $cityId);
+            }
+
+            return $q->count();
+        })->toArray();
 
         return [
             'datasets' => [
