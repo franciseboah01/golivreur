@@ -10,6 +10,7 @@ use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Modules\GoShop\Services\AssignmentService;
 use App\Modules\GoShop\Services\OrderService;
+use App\Services\CourierRefusalService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
@@ -31,48 +32,11 @@ class DriverController extends Controller
 
     private function verifierEligibiliteLivreur(Courier $courier, ?SettingsService $settingsService = null): ?JsonResponse
     {
-        if (! $courier->is_active || ($courier->user && ! $courier->user->is_active)) {
-            return response()->json([
-                'succes' => false,
-                'message' => 'Votre compte livreur est suspendu ou inactif.',
-            ], 403);
-        }
+        $service = $settingsService !== null
+            ? new CourierRefusalService($settingsService)
+            : app(CourierRefusalService::class);
 
-        if ($courier->penalty_until !== null) {
-            if ($courier->penalty_until->isFuture()) {
-                if ($courier->is_online) {
-                    $courier->update(['is_online' => false]);
-                }
-
-                return response()->json([
-                    'succes' => false,
-                    'message' => 'Votre compte est temporairement suspendu suite à des refus répétés.',
-                ], 403);
-            }
-
-            $courier->update([
-                'penalty_until' => null,
-                'consecutive_refusals' => 0,
-            ]);
-
-            return null;
-        }
-
-        [$seuilRefus, $dureePenalite] = $this->obtenirReglesPenaliteRefus($settingsService, $courier->city_id);
-
-        if ($courier->consecutive_refusals >= $seuilRefus) {
-            $courier->update([
-                'penalty_until' => now()->addMinutes($dureePenalite),
-                'is_online' => false,
-            ]);
-
-            return response()->json([
-                'succes' => false,
-                'message' => "Suite à {$seuilRefus} refus consécutifs, vous êtes hors ligne pour {$dureePenalite} minutes.",
-            ], 403);
-        }
-
-        return null;
+        return $service->verifierEligibilite($courier);
     }
 
     public function availability(Request $request): JsonResponse
@@ -335,11 +299,12 @@ class DriverController extends Controller
         });
     }
 
-    public function refuseParcel(
+    public function refuseOrder(
         Request $request,
-        Parcel $parcel,
+        Order $order,
         SettingsService $settingsService,
         AssignmentService $assignmentService,
+        CourierRefusalService $refusalService,
     ): JsonResponse {
         $request->validate([
             'raison' => 'nullable|string|max:500',
@@ -348,7 +313,80 @@ class DriverController extends Controller
         $courier = $this->getCourier();
 
         /** @var array{response: JsonResponse, reassign_tentative?: int, exclude_courier_id?: int} $outcome */
-        $outcome = DB::transaction(function () use ($parcel, $courier, $settingsService): array {
+        $outcome = DB::transaction(function () use ($order, $courier, $settingsService, $refusalService): array {
+            /** @var Order $lockedOrder */
+            $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
+            /** @var Courier $lockedCourier */
+            $lockedCourier = Courier::with('user')->lockForUpdate()->findOrFail($courier->id);
+
+            if ($denied = $this->verifierLivreurEnLigneEtEligible(
+                lockedCourier: $lockedCourier,
+                resourceCityId: (int) $lockedOrder->city_id,
+                notFoundMessage: 'Course introuvable.',
+                offlineStatus: 403,
+                offlineMessage: 'Vous devez être en ligne pour refuser une course.',
+                settingsService: $settingsService,
+            )) {
+                return ['response' => $denied];
+            }
+
+            if ($lockedOrder->courier_id !== null && (int) $lockedOrder->courier_id !== (int) $lockedCourier->id) {
+                return [
+                    'response' => response()->json([
+                        'succes' => false,
+                        'message' => 'Course déjà assignée à un autre livreur.',
+                    ], 409),
+                ];
+            }
+
+            if (
+                $lockedOrder->courier_id === null
+                && in_array($lockedOrder->status, [Order::STATUS_ACCEPTED, Order::STATUS_READY, Order::STATUS_WAITING], true)
+            ) {
+                return $refusalService->enregistrerRefusProposition(
+                    lockedCourier: $lockedCourier,
+                    lockedCourse: $lockedOrder,
+                    courseLabel: 'Course',
+                );
+            }
+
+            return [
+                'response' => response()->json([
+                    'succes' => false,
+                    'message' => 'Cette course ne peut pas être refusée dans son statut actuel.',
+                ], 422),
+            ];
+        });
+
+        if (isset($outcome['reassign_tentative'], $outcome['exclude_courier_id'])) {
+            $freshOrder = $order->fresh();
+            if ($freshOrder && $freshOrder->courier_id === null) {
+                $assignmentService->attribuerLivreurGoShop(
+                    order: $freshOrder,
+                    tentative: $outcome['reassign_tentative'],
+                    exclusions: [$outcome['exclude_courier_id']],
+                );
+            }
+        }
+
+        return $outcome['response'];
+    }
+
+    public function refuseParcel(
+        Request $request,
+        Parcel $parcel,
+        SettingsService $settingsService,
+        AssignmentService $assignmentService,
+        CourierRefusalService $refusalService,
+    ): JsonResponse {
+        $request->validate([
+            'raison' => 'nullable|string|max:500',
+        ]);
+
+        $courier = $this->getCourier();
+
+        /** @var array{response: JsonResponse, reassign_tentative?: int, exclude_courier_id?: int} $outcome */
+        $outcome = DB::transaction(function () use ($parcel, $courier, $settingsService, $refusalService): array {
             /** @var Parcel $lockedParcel */
             $lockedParcel = Parcel::lockForUpdate()->findOrFail($parcel->id);
             /** @var Courier $lockedCourier */
@@ -392,35 +430,11 @@ class DriverController extends Controller
             }
 
             if ($lockedParcel->courier_id === null && in_array($lockedParcel->status, [Parcel::STATUS_PENDING, Parcel::STATUS_WAITING], true)) {
-                [$seuilRefus, $dureePenalite] = $this->obtenirReglesPenaliteRefus($settingsService, $lockedCourier->city_id);
-                $nouveauxRefus = (int) $lockedCourier->consecutive_refusals + 1;
-
-                if ($nouveauxRefus >= $seuilRefus) {
-                    $lockedCourier->update([
-                        'consecutive_refusals' => $nouveauxRefus,
-                        'penalty_until' => now()->addMinutes($dureePenalite),
-                        'is_online' => false,
-                    ]);
-                } else {
-                    $lockedCourier->update([
-                        'consecutive_refusals' => $nouveauxRefus,
-                    ]);
-                }
-
-                $tentativeSuivante = ((int) $lockedParcel->assignment_attempts) + 1;
-                $lockedParcel->update(['assignment_attempts' => $tentativeSuivante]);
-
-                return [
-                    'response' => response()->json([
-                        'succes' => true,
-                        'donnees' => $lockedParcel->fresh(),
-                        'message' => $nouveauxRefus >= $seuilRefus
-                            ? "Expédition refusée. Suite à {$seuilRefus} refus consécutifs, vous êtes hors ligne pour {$dureePenalite} minutes."
-                            : 'Expédition refusée et transmise au livreur suivant.',
-                    ]),
-                    'reassign_tentative' => $tentativeSuivante + 1,
-                    'exclude_courier_id' => $lockedCourier->id,
-                ];
+                return $refusalService->enregistrerRefusProposition(
+                    lockedCourier: $lockedCourier,
+                    lockedCourse: $lockedParcel,
+                    courseLabel: 'Expédition',
+                );
             }
 
             return [
@@ -588,20 +602,6 @@ class DriverController extends Controller
             ->count();
 
         return $commandesActives + $colisActifs;
-    }
-
-    /**
-     * @return array{0: int, 1: int}
-     */
-    private function obtenirReglesPenaliteRefus(?SettingsService $settingsService, ?int $cityId): array
-    {
-        $service = $settingsService ?? app(SettingsService::class);
-        $delais = $service->get('delais_regles', $cityId);
-
-        $seuil = is_array($delais) ? (int) ($delais['refus_avant_penalite'] ?? 3) : 3;
-        $duree = is_array($delais) ? (int) ($delais['duree_penalite_minutes'] ?? 15) : 15;
-
-        return [max(1, $seuil), max(1, $duree)];
     }
 
     private function verifierLivreurEnLigneEtEligible(

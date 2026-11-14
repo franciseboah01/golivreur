@@ -143,6 +143,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
             ->middleware('throttle:driver-location');
         Route::get('courses', [DriverController::class, 'courses']);
         Route::post('orders/{order}/accept', [DriverController::class, 'acceptOrder']);
+        Route::post('orders/{order}/refuse', [DriverController::class, 'refuseOrder']);
         Route::post('orders/{order}/confirm-pickup', [DriverController::class, 'confirmPickup']);
         Route::post('orders/{order}/confirm-delivery', [DriverController::class, 'confirmDelivery']);
         Route::get('parcels/{parcel}', [ParcelController::class, 'showDriver']);
