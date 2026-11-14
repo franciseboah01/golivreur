@@ -265,19 +265,53 @@ class AdminController extends Controller
     {
         $user = auth()->user();
 
-        if (! in_array($user->role, ['super_admin', 'dg_national'], true)) {
-            return response()->json([
-                'succes' => false,
-                'message' => 'Action réservée au Super Admin ou DG National.',
-            ], 403);
+        $validated = $request->validate([
+            'activer' => ['required', 'boolean'],
+            'message' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $activer = (bool) $validated['activer'];
+
+        if ($activer) {
+            if (! in_array($user->role, ['super_admin', 'dg_national'], true)) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'L\'activation du mode urgence est réservée au Super Admin ou DG National.',
+                ], 403);
+            }
+        } else {
+            if ($user->role !== 'super_admin') {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'La désactivation du mode urgence est réservée au Super Admin seul.',
+                ], 403);
+            }
         }
 
-        $activer = $request->boolean('activer');
+        $oldState = (bool) $city->emergency_mode_active;
         $city->update([
             'emergency_mode_active' => $activer,
-            'emergency_mode_message' => $request->input('message'),
+            'emergency_mode_message' => $activer ? ($validated['message'] ?? null) : null,
             'emergency_mode_activated_at' => $activer ? now() : null,
         ]);
+
+        app(ActivityLogService::class)->log(
+            userId: $user->id,
+            action: $activer ? 'emergency_mode_activated' : 'emergency_mode_deactivated',
+            entityType: 'city',
+            entityId: $city->id,
+            properties: [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_role' => $user->role,
+                'city_id' => $city->id,
+                'city_name' => $city->name,
+                'ancien_etat' => $oldState,
+                'nouvel_etat' => $activer,
+                'message' => $validated['message'] ?? null,
+            ],
+            severity: 'critical',
+        );
 
         return response()->json([
             'succes' => true,

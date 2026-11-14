@@ -127,20 +127,52 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                 ->label('Déclencher Mode Urgence Général')
                 ->icon('heroicon-m-exclamation-triangle')
                 ->color('danger')
+                ->visible(fn () => in_array(auth()->user()?->role, ['super_admin', 'dg_national'], true))
                 ->form([
                     Forms\Components\Textarea::make('message')
                         ->label('Message d\'alerte diffusé aux utilisateurs et livreurs')
                         ->required()
+                        ->string()
+                        ->maxLength(255)
                         ->default('En raison d\'un cas de force majeure, le service de livraison est momentanément interrompu.'),
                 ])
                 ->modalHeading('Arrêt d\'urgence de sécurité - Toutes les villes')
                 ->modalSubmitActionLabel('Enclencher l\'Urgence')
                 ->action(function (array $data): void {
-                    City::query()->update([
-                        'emergency_mode_active' => true,
-                        'emergency_mode_activated_at' => now(),
-                        'emergency_mode_message' => $data['message'],
-                    ]);
+                    $user = auth()->user();
+                    if (! in_array($user?->role, ['super_admin', 'dg_national'], true)) {
+                        abort(403, 'L\'activation du mode urgence général est réservée au Super Admin ou DG National.');
+                    }
+
+                    $cities = City::all();
+                    $activityLogService = app(\App\Services\ActivityLogService::class);
+
+                    foreach ($cities as $city) {
+                        $oldState = (bool) $city->emergency_mode_active;
+                        $city->update([
+                            'emergency_mode_active' => true,
+                            'emergency_mode_activated_at' => now(),
+                            'emergency_mode_message' => $data['message'],
+                        ]);
+
+                        $activityLogService->log(
+                            userId: $user?->id,
+                            action: 'emergency_mode_activated',
+                            entityType: 'city',
+                            entityId: $city->id,
+                            properties: [
+                                'user_id' => $user?->id,
+                                'user_name' => $user?->name,
+                                'user_role' => $user?->role,
+                                'city_id' => $city->id,
+                                'city_name' => $city->name,
+                                'ancien_etat' => $oldState,
+                                'nouvel_etat' => true,
+                                'message' => $data['message'],
+                            ],
+                            severity: 'critical',
+                        );
+                    }
 
                     Notification::make()
                         ->title('Mode Urgence activé sur l\'ensemble des zones')
@@ -152,16 +184,46 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                 ->label('Lever le Mode Urgence Général')
                 ->icon('heroicon-m-shield-check')
                 ->color('success')
+                ->visible(fn () => auth()->user()?->role === 'super_admin')
                 ->requiresConfirmation()
                 ->modalHeading('Reprise normale des activités')
                 ->modalDescription('Cette action désactive le mode urgence sur toutes les villes et autorise la reprise des commandes.')
                 ->modalSubmitActionLabel('Rétablir le service')
                 ->action(function (): void {
-                    City::query()->update([
-                        'emergency_mode_active' => false,
-                        'emergency_mode_activated_at' => null,
-                        'emergency_mode_message' => null,
-                    ]);
+                    $user = auth()->user();
+                    if ($user?->role !== 'super_admin') {
+                        abort(403, 'La désactivation du mode urgence général est réservée au Super Admin seul.');
+                    }
+
+                    $cities = City::all();
+                    $activityLogService = app(\App\Services\ActivityLogService::class);
+
+                    foreach ($cities as $city) {
+                        $oldState = (bool) $city->emergency_mode_active;
+                        $city->update([
+                            'emergency_mode_active' => false,
+                            'emergency_mode_activated_at' => null,
+                            'emergency_mode_message' => null,
+                        ]);
+
+                        $activityLogService->log(
+                            userId: $user?->id,
+                            action: 'emergency_mode_deactivated',
+                            entityType: 'city',
+                            entityId: $city->id,
+                            properties: [
+                                'user_id' => $user?->id,
+                                'user_name' => $user?->name,
+                                'user_role' => $user?->role,
+                                'city_id' => $city->id,
+                                'city_name' => $city->name,
+                                'ancien_etat' => $oldState,
+                                'nouvel_etat' => false,
+                                'message' => null,
+                            ],
+                            severity: 'critical',
+                        );
+                    }
 
                     Notification::make()
                         ->title('Toutes les zones sont revenues en fonctionnement normal')
@@ -234,21 +296,58 @@ class EmergencyCenter extends Page implements HasForms, HasTable
                     ->icon(fn (City $record): string => $record->emergency_mode_active ? 'heroicon-m-shield-check' : 'heroicon-m-exclamation-triangle')
                     ->color(fn (City $record): string => $record->emergency_mode_active ? 'success' : 'danger')
                     ->button()
+                    ->visible(fn (City $record): bool => $record->emergency_mode_active
+                        ? auth()->user()?->role === 'super_admin'
+                        : in_array(auth()->user()?->role, ['super_admin', 'dg_national'], true))
                     ->form(fn (City $record): array => $record->emergency_mode_active ? [] : [
                         Forms\Components\Textarea::make('message')
                             ->label('Message d\'alerte diffusé aux clients et livreurs de cette ville')
                             ->default('En raison d\'intempéries ou de circonstances exceptionnelles, les livraisons sont momentanément suspendues.')
+                            ->string()
+                            ->maxLength(255)
                             ->required(),
                     ])
                     ->modalHeading(fn (City $record): string => $record->emergency_mode_active ? "Lever l'urgence sur {$record->name}" : "Déclencher l'urgence sur {$record->name}")
                     ->modalSubmitActionLabel(fn (City $record): string => $record->emergency_mode_active ? 'Confirmer la réouverture' : 'Confirmer l\'arrêt d\'urgence')
                     ->action(function (City $record, array $data): void {
+                        $user = auth()->user();
                         $newStatus = ! $record->emergency_mode_active;
+
+                        if ($newStatus) {
+                            if (! in_array($user?->role, ['super_admin', 'dg_national'], true)) {
+                                abort(403, 'L\'activation du mode urgence est réservée au Super Admin ou DG National.');
+                            }
+                        } else {
+                            if ($user?->role !== 'super_admin') {
+                                abort(403, 'La désactivation du mode urgence est réservée au Super Admin seul.');
+                            }
+                        }
+
+                        $oldState = (bool) $record->emergency_mode_active;
                         $record->update([
                             'emergency_mode_active' => $newStatus,
                             'emergency_mode_activated_at' => $newStatus ? now() : null,
                             'emergency_mode_message' => $newStatus ? ($data['message'] ?? 'Service temporairement interrompu') : null,
                         ]);
+
+                        app(\App\Services\ActivityLogService::class)->log(
+                            userId: $user?->id,
+                            action: $newStatus ? 'emergency_mode_activated' : 'emergency_mode_deactivated',
+                            entityType: 'city',
+                            entityId: $record->id,
+                            properties: [
+                                'user_id' => $user?->id,
+                                'user_name' => $user?->name,
+                                'user_role' => $user?->role,
+                                'city_id' => $record->id,
+                                'city_name' => $record->name,
+                                'ancien_etat' => $oldState,
+                                'nouvel_etat' => $newStatus,
+                                'message' => $newStatus ? ($data['message'] ?? null) : null,
+                            ],
+                            severity: 'critical',
+                        );
+
                         Notification::make()
                             ->title("Mode Urgence {$record->name} : ".($newStatus ? 'Enclenché' : 'Levé'))
                             ->color($newStatus ? 'danger' : 'success')
