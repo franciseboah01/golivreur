@@ -27,11 +27,6 @@ class AssignmentService
 
     private const MAX_TENTATIVES = 3;
 
-    // Délai d'acceptation en secondes
-    private const DELAI_ACCEPTATION_GOSHOP = 30;
-
-    private const DELAI_ACCEPTATION_GOCOLIS = 30;
-
     private readonly WalletService $walletService;
 
     private readonly SettingsService $settingsService;
@@ -81,7 +76,6 @@ class AssignmentService
             tentative: $tentative,
             exclusions: $exclusions,
             montantRequisCash: $montantRequisCash,
-            defaultDelaySeconds: self::DELAI_ACCEPTATION_GOSHOP,
             onOffer: function (Courier $livreur, int $currentAttempt, array $updatedExclusions, int $delaySeconds) use ($order): void {
                 $this->notificationService->proposerCourseGoShop($livreur, $order);
 
@@ -134,7 +128,6 @@ class AssignmentService
             tentative: $tentative,
             exclusions: $exclusions,
             montantRequisCash: $montantRequisCash,
-            defaultDelaySeconds: self::DELAI_ACCEPTATION_GOCOLIS,
             onOffer: function (Courier $livreur, int $currentAttempt, array $updatedExclusions, int $delaySeconds) use ($parcel): void {
                 $this->notificationService->proposerCourseGoColis($livreur, $parcel);
 
@@ -185,9 +178,7 @@ class AssignmentService
             return;
         }
 
-        $defaultDelay = $type === 'goshop' ? self::DELAI_ACCEPTATION_GOSHOP : self::DELAI_ACCEPTATION_GOCOLIS;
-        $delais = $this->settingsService->get('delais_regles', (int) $course->city_id);
-        $delaiSecondes = max(1, (int) (is_array($delais) ? ($delais['acceptation_livreur_secondes'] ?? $defaultDelay) : $defaultDelay));
+        $delaiSecondes = $this->settingsService->getDelaiRegle('acceptation_livreur_secondes', (int) $course->city_id, 30);
 
         $secondesEcoulees = Carbon::parse($proposeeLe)->diffInSeconds(now(), false);
         $label = $type === 'goshop' ? 'GoShop' : 'GoColis';
@@ -222,7 +213,6 @@ class AssignmentService
         int $tentative,
         array $exclusions,
         ?int $montantRequisCash,
-        int $defaultDelaySeconds,
         callable $onOffer,
         callable $onWaiting,
     ): void {
@@ -275,8 +265,7 @@ class AssignmentService
 
         $course->update(['assignment_attempts' => $tentative]);
 
-        $delais = $this->settingsService->get('delais_regles', $cityId);
-        $delaiSecondes = max(1, (int) (is_array($delais) ? ($delais['acceptation_livreur_secondes'] ?? $defaultDelaySeconds) : $defaultDelaySeconds));
+        $delaiSecondes = $this->settingsService->getDelaiRegle('acceptation_livreur_secondes', $cityId, 30);
 
         $updatedExclusions = array_values(array_unique([...$exclusions, $livreur->id]));
         $onOffer($livreur, $tentative, $updatedExclusions, $delaiSecondes);

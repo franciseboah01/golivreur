@@ -12,6 +12,7 @@ use App\Modules\GoShop\Services\AssignmentService;
 use App\Modules\GoShop\Services\CommissionService;
 use App\Services\ActivityLogService;
 use App\Services\NotificationService;
+use App\Services\SettingsService;
 use App\Services\SmsService;
 use App\Services\WalletService;
 use Illuminate\Http\UploadedFile;
@@ -38,6 +39,8 @@ class ParcelService
         Parcel::STATUS_AT_RECIPIENT,
     ];
 
+    private readonly SettingsService $settingsService;
+
     public function __construct(
         private readonly CommissionService $commissionService,
         private readonly AssignmentService $assignmentService,
@@ -45,7 +48,10 @@ class ParcelService
         private readonly NotificationService $notificationService,
         private readonly SmsService $smsService,
         private readonly ActivityLogService $activityLogService,
-    ) {}
+        ?SettingsService $settingsService = null,
+    ) {
+        $this->settingsService = $settingsService ?? app(SettingsService::class);
+    }
 
     /**
      * Crée une expédition GoColis et envoie le code destinataire par SMS.
@@ -372,8 +378,9 @@ class ParcelService
             $parcel->refresh();
 
             $attempts = (int) $parcel->{$attemptsColumn};
+            $maxErreurs = $this->settingsService->getDelaiRegle('erreurs_code_avant_blocage', (int) $parcel->city_id, 3);
 
-            if ($attempts >= 3) {
+            if ($attempts >= $maxErreurs) {
                 $parcel->update([$lockedColumn => true]);
                 AlerterAdminCodeBloque::dispatch($parcel, $alertType)
                     ->onQueue('high');
@@ -383,7 +390,7 @@ class ParcelService
                 ]);
             }
 
-            $restants = 3 - $attempts;
+            $restants = max(0, $maxErreurs - $attempts);
             throw ValidationException::withMessages([
                 'code' => ["Code {$label} incorrect. {$restants} tentative(s) restante(s)."],
             ]);

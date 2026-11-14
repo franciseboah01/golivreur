@@ -20,12 +20,10 @@ class CourierRefusalService
      */
     public function obtenirReglesPenaliteRefus(?int $cityId): array
     {
-        $delais = $this->settingsService->get('delais_regles', $cityId);
-
-        $seuil = is_array($delais) ? (int) ($delais['refus_avant_penalite'] ?? 3) : 3;
-        $duree = is_array($delais) ? (int) ($delais['duree_penalite_minutes'] ?? 15) : 15;
-
-        return [max(1, $seuil), max(1, $duree)];
+        return [
+            $this->settingsService->getDelaiRegle('refus_avant_penalite', $cityId, 3),
+            $this->settingsService->getDelaiRegle('duree_penalite_minutes', $cityId, 15),
+        ];
     }
 
     public function verifierEligibilite(Courier $courier): ?JsonResponse
@@ -119,4 +117,3 @@ class CourierRefusalService
         ];
     }
 }
-

@@ -13,13 +13,26 @@ use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
+    private readonly SettingsService $settingsService;
+
+    public function __construct(?SettingsService $settingsService = null)
+    {
+        $this->settingsService = $settingsService ?? app(SettingsService::class);
+    }
+
     public function notifierNouvelleCommande(Merchant $merchant, Order $order): void
     {
+        $delaiSecondes = $this->settingsService->getDelaiRegle(
+            'acceptation_commerce_secondes',
+            $merchant->city_id ? (int) $merchant->city_id : null,
+            45,
+        );
+
         $this->createNotification(
             userId: $merchant->user_id,
             type: 'new_order',
             title: 'Nouvelle commande GoShop',
-            body: "Commande #{$order->id} reçue. Confirmez sous 45s.",
+            body: "Commande #{$order->id} reçue. Confirmez sous {$delaiSecondes}s.",
             data: ['order_id' => $order->id],
         );
     }

@@ -13,6 +13,7 @@ use App\Models\Refund;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\NotificationService;
+use App\Services\SettingsService;
 use App\Services\WalletService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -26,13 +27,18 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  */
 class OrderService
 {
+    private readonly SettingsService $settingsService;
+
     public function __construct(
         private readonly AssignmentService $assignmentService,
         private readonly CommissionService $commissionService,
         private readonly WalletService $walletService,
         private readonly NotificationService $notificationService,
         private readonly ActivityLogService $activityLogService,
-    ) {}
+        ?SettingsService $settingsService = null,
+    ) {
+        $this->settingsService = $settingsService ?? app(SettingsService::class);
+    }
 
     /**
      * Crée une commande GoShop et déclenche la notification au commerce.
@@ -144,9 +150,10 @@ class OrderService
                 properties: ['total' => $produitsTotal + $fraisLivraison],
             );
 
-            // Timeout 45 secondes : planifier l'annulation automatique
+            // Timeout acceptation commerce : planifier l'annulation automatique selon SettingsService
+            $delaiAcceptationCommerce = $this->settingsService->getDelaiRegle('acceptation_commerce_secondes', $city->id, 45);
             AnnulerCommandeTimeout::dispatch($order->id)
-                ->delay(now()->addSeconds(45))
+                ->delay(now()->addSeconds($delaiAcceptationCommerce))
                 ->onQueue('default');
 
             return $order->load('items.product', 'merchant');
@@ -313,7 +320,9 @@ class OrderService
                 $lockedOrder->increment('confirmation_attempts');
                 $lockedOrder->refresh();
 
-                if ($lockedOrder->confirmation_attempts >= 3) {
+                $maxErreurs = $this->settingsService->getDelaiRegle('erreurs_code_avant_blocage', (int) $lockedOrder->city_id, 3);
+
+                if ($lockedOrder->confirmation_attempts >= $maxErreurs) {
                     $lockedOrder->update(['confirmation_locked' => true]);
                     AlerterAdminCodeBloque::dispatch($lockedOrder, 'goshop')
                         ->onQueue('high');
@@ -321,7 +330,7 @@ class OrderService
                     return 'Code incorrect. Livraison bloquée — le support a été alerté.';
                 }
 
-                $restants = max(0, 3 - (int) $lockedOrder->confirmation_attempts);
+                $restants = max(0, $maxErreurs - (int) $lockedOrder->confirmation_attempts);
 
                 return "Code incorrect. {$restants} tentative(s) restante(s).";
             }

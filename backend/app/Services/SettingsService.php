@@ -139,6 +139,18 @@ class SettingsService
     }
 
     /**
+     * Retourne une règle numérique de `delais_regles` (avec repli sur le défaut CDC).
+     */
+    public function getDelaiRegle(string $cle, ?int $cityId = null, int $fallback = 1): int
+    {
+        $delais = $this->get('delais_regles', $cityId);
+        $defautCdc = self::DEFAULTS['delais_regles'][$cle] ?? $fallback;
+        $valeur = is_array($delais) ? ($delais[$cle] ?? $defautCdc) : $defautCdc;
+
+        return max(1, (int) $valeur);
+    }
+
+    /**
      * Enregistre ou met à jour un paramètre avec traçabilité dans activity_logs.
      */
     public function set(
