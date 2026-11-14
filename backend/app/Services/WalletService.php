@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\ActivityLog;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\Parcel;
+use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -68,6 +71,54 @@ class WalletService
             description: "GoColis — Expédition #{$parcel->id} — Livraison créditée",
             parcelId: $parcel->id,
         );
+    }
+
+    /**
+     * Effectue un ajustement comptable manuel sur un portefeuille.
+     * Rôles autorisés : super_admin, national_finance.
+     * Motif obligatoire, traçabilité dans activity_logs.
+     */
+    public function ajusterSolde(Wallet $wallet, int $montant, string $motif, User $admin): WalletTransaction
+    {
+        if (! in_array($admin->role, ['super_admin', 'national_finance'], true)) {
+            throw new AuthorizationException('Seul un Super Admin ou National Finance peut effectuer un ajustement comptable.');
+        }
+
+        $motifNettoye = trim($motif);
+        if ($motifNettoye === '') {
+            throw new \InvalidArgumentException('Le motif de l\'ajustement est obligatoire.');
+        }
+
+        if ($montant === 0) {
+            throw new \InvalidArgumentException('Le montant de l\'ajustement ne peut pas être nul.');
+        }
+
+        $transaction = $this->effectuerTransaction(
+            wallet: $wallet,
+            type: 'adjustment',
+            montant: $montant,
+            description: "Ajustement comptable : {$motifNettoye}",
+            processedBy: $admin->id,
+        );
+
+        ActivityLog::create([
+            'user_id' => $admin->id,
+            'action' => 'wallet_balance_adjusted',
+            'entity_type' => 'wallet',
+            'entity_id' => $wallet->id,
+            'properties' => [
+                'wallet_id' => $wallet->id,
+                'transaction_id' => $transaction->id,
+                'amount' => $montant,
+                'reason' => $motifNettoye,
+                'balance_before' => $transaction->balance_before,
+                'balance_after' => $transaction->balance_after,
+            ],
+            'ip_address' => request()?->ip(),
+            'severity' => 'warning',
+        ]);
+
+        return $transaction;
     }
 
     /**
@@ -297,8 +348,8 @@ class WalletService
                 $balanceAvant = (int) round((float) $lockedWallet->balance);
                 $balanceApres = $balanceAvant + $montantEntier;
 
-                if ($type === 'withdrawal' && $balanceApres < 0) {
-                    throw new \InvalidArgumentException('Solde insuffisant pour effectuer ce retrait.');
+                if (in_array($type, ['withdrawal', 'adjustment'], true) && $balanceApres < 0) {
+                    throw new \InvalidArgumentException('Solde insuffisant pour effectuer cette opération : le solde ne peut pas être négatif.');
                 }
 
                 if ($type === 'debit_cash_remittance' && $balanceApres < 0) {
