@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\Refund;
 use App\Models\User;
 use App\Services\ActivityLogService;
+use App\Services\AsyncJobDispatcher;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
@@ -152,9 +153,14 @@ class OrderService
 
             // Timeout acceptation commerce : planifier l'annulation automatique selon SettingsService
             $delaiAcceptationCommerce = $this->settingsService->getDelaiRegle('acceptation_commerce_secondes', $city->id, 45);
-            AnnulerCommandeTimeout::dispatch($order->id)
-                ->delay(now()->addSeconds($delaiAcceptationCommerce))
-                ->onQueue('default');
+            $orderId = $order->id;
+            AsyncJobDispatcher::dispatchAfterCommit(
+                static fn () => AnnulerCommandeTimeout::dispatch($orderId)
+                    ->delay(now()->addSeconds($delaiAcceptationCommerce))
+                    ->onQueue('default'),
+                operation: 'annuler_commande_timeout',
+                contexte: ['order_id' => $orderId],
+            );
 
             return $order->load('items.product', 'merchant');
         });
@@ -324,8 +330,12 @@ class OrderService
 
                 if ($lockedOrder->confirmation_attempts >= $maxErreurs) {
                     $lockedOrder->update(['confirmation_locked' => true]);
-                    AlerterAdminCodeBloque::dispatch($lockedOrder, 'goshop')
-                        ->onQueue('high');
+                    AsyncJobDispatcher::dispatchAfterCommit(
+                        static fn () => AlerterAdminCodeBloque::dispatch($lockedOrder, 'goshop')
+                            ->onQueue('high'),
+                        operation: 'alerter_admin_code_bloque_goshop',
+                        contexte: ['order_id' => $lockedOrder->id],
+                    );
 
                     return 'Code incorrect. Livraison bloquée — le support a été alerté.';
                 }

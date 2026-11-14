@@ -9,7 +9,6 @@ use App\Models\Notification;
 use App\Models\Order;
 use App\Models\Parcel;
 use App\Models\User;
-use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
@@ -245,13 +244,14 @@ class NotificationService
             'is_read' => false,
         ]);
 
-        try {
-            $user = User::find($userId);
-            if ($user && $user->device_token) {
-                SendPushNotification::dispatch($user->device_token, $title, $body, $data);
-            }
-        } catch (\Throwable $e) {
-            Log::warning("Notification push non envoyée : {$e->getMessage()}");
+        $user = User::find($userId);
+        if ($user && $user->device_token) {
+            $deviceToken = (string) $user->device_token;
+            AsyncJobDispatcher::dispatchAfterCommit(
+                static fn () => SendPushNotification::dispatch($deviceToken, $title, $body, $data),
+                operation: 'send_push_notification',
+                contexte: ['user_id' => $userId, 'type' => $type],
+            );
         }
 
         return $notification;

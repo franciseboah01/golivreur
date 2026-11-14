@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Modules\GoShop\Services\AssignmentService;
 use App\Modules\GoShop\Services\CommissionService;
 use App\Services\ActivityLogService;
+use App\Services\AsyncJobDispatcher;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\SmsService;
@@ -382,8 +383,12 @@ class ParcelService
 
             if ($attempts >= $maxErreurs) {
                 $parcel->update([$lockedColumn => true]);
-                AlerterAdminCodeBloque::dispatch($parcel, $alertType)
-                    ->onQueue('high');
+                AsyncJobDispatcher::dispatchAfterCommit(
+                    static fn () => AlerterAdminCodeBloque::dispatch($parcel, $alertType)
+                        ->onQueue('high'),
+                    operation: 'alerter_admin_code_bloque_gocolis',
+                    contexte: ['parcel_id' => $parcel->id, 'alert_type' => $alertType],
+                );
 
                 throw ValidationException::withMessages([
                     'code' => [$blockedOnFailureMessage],

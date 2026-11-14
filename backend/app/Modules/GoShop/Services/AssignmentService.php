@@ -8,6 +8,7 @@ use App\Jobs\NotifierLivreurGoShop;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\Parcel;
+use App\Services\AsyncJobDispatcher;
 use App\Services\CourierCapacityService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
@@ -80,15 +81,22 @@ class AssignmentService
                 $this->notificationService->proposerCourseGoShop($livreur, $order);
 
                 if (class_exists(NotifierLivreurGoShop::class)) {
-                    NotifierLivreurGoShop::dispatch(
-                        $order->id,
-                        $livreur->id,
-                        $currentAttempt,
-                        $updatedExclusions,
-                        now()->toIso8601String(),
-                    )
-                        ->delay(now()->addSeconds($delaySeconds))
-                        ->onQueue('default');
+                    $orderId = $order->id;
+                    $courierId = $livreur->id;
+                    $proposeeLe = now()->toIso8601String();
+                    AsyncJobDispatcher::dispatchAfterCommit(
+                        static fn () => NotifierLivreurGoShop::dispatch(
+                            $orderId,
+                            $courierId,
+                            $currentAttempt,
+                            $updatedExclusions,
+                            $proposeeLe,
+                        )
+                            ->delay(now()->addSeconds($delaySeconds))
+                            ->onQueue('default'),
+                        operation: 'notifier_livreur_goshop',
+                        contexte: ['order_id' => $orderId, 'courier_id' => $courierId, 'tentative' => $currentAttempt],
+                    );
                 }
             },
             onWaiting: function (bool $wasAlreadyWaiting) use ($order): void {
@@ -132,15 +140,22 @@ class AssignmentService
                 $this->notificationService->proposerCourseGoColis($livreur, $parcel);
 
                 if (class_exists(NotifierLivreurGoColis::class)) {
-                    NotifierLivreurGoColis::dispatch(
-                        $parcel->id,
-                        $livreur->id,
-                        $currentAttempt,
-                        $updatedExclusions,
-                        now()->toIso8601String(),
-                    )
-                        ->delay(now()->addSeconds($delaySeconds))
-                        ->onQueue('default');
+                    $parcelId = $parcel->id;
+                    $courierId = $livreur->id;
+                    $proposeeLe = now()->toIso8601String();
+                    AsyncJobDispatcher::dispatchAfterCommit(
+                        static fn () => NotifierLivreurGoColis::dispatch(
+                            $parcelId,
+                            $courierId,
+                            $currentAttempt,
+                            $updatedExclusions,
+                            $proposeeLe,
+                        )
+                            ->delay(now()->addSeconds($delaySeconds))
+                            ->onQueue('default'),
+                        operation: 'notifier_livreur_gocolis',
+                        contexte: ['parcel_id' => $parcelId, 'courier_id' => $courierId, 'tentative' => $currentAttempt],
+                    );
                 }
             },
             onWaiting: function (bool $notifyClient) use ($parcel): void {
@@ -224,8 +239,12 @@ class AssignmentService
             ]);
 
             if (class_exists(AlerterAdminPasDelivreur::class)) {
-                AlerterAdminPasDelivreur::dispatch($course, $type)
-                    ->onQueue('high');
+                AsyncJobDispatcher::dispatchAfterCommit(
+                    static fn () => AlerterAdminPasDelivreur::dispatch($course, $type)
+                        ->onQueue('high'),
+                    operation: 'alerter_admin_pas_de_livreur',
+                    contexte: ['course_id' => $course->id, 'type' => $type],
+                );
             }
 
             $onWaiting($type === 'gocolis' ? true : $wasAlreadyWaiting);
@@ -252,8 +271,12 @@ class AssignmentService
             }
 
             if (class_exists(AlerterAdminPasDelivreur::class)) {
-                AlerterAdminPasDelivreur::dispatch($course, $type)
-                    ->onQueue('high');
+                AsyncJobDispatcher::dispatchAfterCommit(
+                    static fn () => AlerterAdminPasDelivreur::dispatch($course, $type)
+                        ->onQueue('high'),
+                    operation: 'alerter_admin_pas_de_livreur',
+                    contexte: ['course_id' => $course->id, 'type' => $type],
+                );
             }
 
             if ($type === 'goshop' && $tentative > 1) {
