@@ -141,3 +141,79 @@ it('P5 Point 3: vérifie aussi le total dû sur GoColis (shipping_fee + insuranc
 
     expect($orderNoAmount->fresh()->payment_status)->toBe('amount_mismatch');
 });
+
+it('P5 Point 4: valide la signature HMAC CinetPay avec services.cinetpay.secret_key et refuse le secret Hub2 ou un secret vide', function () {
+    config([
+        'services.hub2.webhook_secret' => 'hub2-only-secret-xyz',
+        'services.cinetpay.secret_key' => 'cinetpay-only-secret-abc',
+    ]);
+
+    $city = City::factory()->create(['name' => 'Daloa']);
+    $client = User::factory()->create(['role' => 'client', 'city_id' => $city->id]);
+    $order = Order::factory()->create([
+        'client_id' => $client->id,
+        'city_id' => $city->id,
+        'products_total' => 5000,
+        'delivery_fee' => 800,
+        'payment_method' => 'orange_money',
+        'payment_status' => 'pending',
+        'payment_reference' => 'TXN-CINETPAY-SECRET-001',
+    ]);
+
+    $payload = [
+        'event' => 'payment.success',
+        'transaction_id' => 'TXN-CINETPAY-SECRET-001',
+        'status' => 'ACCEPTED',
+        'amount' => 5800,
+        'timestamp' => now()->timestamp,
+    ];
+    $raw = json_encode($payload);
+
+    // 1. Webhook CinetPay signé avec le mauvais secret (Hub2) -> 401
+    $wrongSignature = hash_hmac('sha256', $raw, 'hub2-only-secret-xyz');
+    $this->call(
+        'POST',
+        '/api/v1/webhooks/payment',
+        [],
+        [],
+        [],
+        ['CONTENT_TYPE' => 'application/json', 'HTTP_X_CINETPAY_SIGNATURE' => $wrongSignature],
+        $raw
+    )->assertStatus(401)
+        ->assertJson(['succes' => false, 'message' => 'Signature invalide.']);
+
+    expect($order->fresh()->payment_status)->toBe('pending');
+
+    // 2. Webhook CinetPay signé avec le vrai secret CinetPay -> 200 + paid
+    $cinetpaySignature = hash_hmac('sha256', $raw, 'cinetpay-only-secret-abc');
+    $this->call(
+        'POST',
+        '/api/v1/webhooks/payment',
+        [],
+        [],
+        [],
+        ['CONTENT_TYPE' => 'application/json', 'HTTP_X_CINETPAY_SIGNATURE' => $cinetpaySignature],
+        $raw
+    )->assertStatus(200)
+        ->assertJson(['succes' => true]);
+
+    expect($order->fresh()->payment_status)->toBe('paid');
+    $this->assertDatabaseHas('webhook_logs', [
+        'source' => 'cinetpay',
+        'signature_valid' => true,
+        'status' => 'processed',
+    ]);
+
+    // 3. Si secret CinetPay vide en config, rejet 401 même avec HMAC sur chaîne vide
+    config(['services.cinetpay.secret_key' => '']);
+    $emptySecretSig = hash_hmac('sha256', $raw, '');
+    $this->call(
+        'POST',
+        '/api/v1/webhooks/payment',
+        [],
+        [],
+        [],
+        ['CONTENT_TYPE' => 'application/json', 'HTTP_X_CINETPAY_SIGNATURE' => $emptySecretSig],
+        $raw
+    )->assertStatus(401);
+});

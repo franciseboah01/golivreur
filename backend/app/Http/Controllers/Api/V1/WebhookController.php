@@ -29,8 +29,7 @@ class WebhookController extends Controller
     public function paiement(Request $request): JsonResponse
     {
         $payload = $request->getContent();
-        $signatureRecue = $request->header('X-Hub2-Signature') ?? $request->header('X-CinetPay-Signature') ?? '';
-        $source = $request->header('X-Hub2-Signature') ? 'hub2' : 'cinetpay';
+        [$source, $signatureRecue, $secret] = $this->resolveWebhookProvider($request);
 
         // 1. Logger le webhook IMMÉDIATEMENT (avant toute validation)
         $webhookLog = WebhookLog::create([
@@ -42,14 +41,14 @@ class WebhookController extends Controller
             'status' => 'pending',
         ]);
 
-        // 2. Valider la signature HMAC
-        $signatureCalculee = hash_hmac(
-            'sha256',
-            $payload,
-            config('services.hub2.webhook_secret'),
-        );
+        // 2. Valider la signature HMAC avec le secret propre au fournisseur
+        $signatureCalculee = $secret !== ''
+            ? hash_hmac('sha256', $payload, $secret)
+            : '';
 
-        $signatureValide = hash_equals($signatureCalculee, $signatureRecue);
+        $signatureValide = $secret !== ''
+            && $signatureRecue !== ''
+            && hash_equals($signatureCalculee, $signatureRecue);
 
         if (! $signatureValide) {
             // Signature invalide → rejet total + alerte critique
@@ -171,5 +170,35 @@ class WebhookController extends Controller
                 'webhook_log' => $log->id,
             ]);
         }
+    }
+
+    /**
+     * Détermine le fournisseur, l'en-tête de signature et le secret associé.
+     *
+     * @return array{0: string, 1: string, 2: string}
+     */
+    private function resolveWebhookProvider(Request $request): array
+    {
+        $hub2Sig = $request->header('X-Hub2-Signature');
+        if ($hub2Sig !== null) {
+            return [
+                'hub2',
+                (string) $hub2Sig,
+                (string) config('services.hub2.webhook_secret', ''),
+            ];
+        }
+
+        $cinetpaySig = $request->header('X-CinetPay-Signature') ?? $request->header('x-token');
+        if ($cinetpaySig !== null) {
+            return [
+                'cinetpay',
+                (string) $cinetpaySig,
+                (string) config('services.cinetpay.secret_key', ''),
+            ];
+        }
+
+        $fallbackSource = $request->has('cpm_site_id') ? 'cinetpay' : 'hub2';
+
+        return [$fallbackSource, '', ''];
     }
 }
