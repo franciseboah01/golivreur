@@ -8,6 +8,7 @@ use App\Jobs\NotifierLivreurGoShop;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\Parcel;
+use App\Services\CourierCapacityService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
@@ -35,13 +36,17 @@ class AssignmentService
 
     private readonly SettingsService $settingsService;
 
+    private readonly CourierCapacityService $capacityService;
+
     public function __construct(
         private readonly NotificationService $notificationService,
         ?WalletService $walletService = null,
         ?SettingsService $settingsService = null,
+        ?CourierCapacityService $capacityService = null,
     ) {
         $this->walletService = $walletService ?? app(WalletService::class);
         $this->settingsService = $settingsService ?? app(SettingsService::class);
+        $this->capacityService = $capacityService ?? new CourierCapacityService($this->settingsService);
     }
 
     /**
@@ -305,19 +310,23 @@ class AssignmentService
                 ->orderBy('distance');
         }
 
-        if ($montantRequisCash === null) {
-            return $baseQuery->first();
-        }
-
         /** @var Courier|null $eligible */
-        $eligible = $baseQuery->get()->first(
-            fn (Courier $candidat): bool => $this->walletService->verifierSoldeCashSuffisant(
+        $eligible = $baseQuery->get()->first(function (Courier $candidat) use ($cityId, $montantRequisCash): bool {
+            if (! $this->capacityService->peutAccepterNouvelleCourse($candidat->id, $cityId)) {
+                return false;
+            }
+
+            if ($montantRequisCash === null) {
+                return true;
+            }
+
+            return $this->walletService->verifierSoldeCashSuffisant(
                 courier: $candidat,
                 montantAReverser: $montantRequisCash,
                 settingsService: $this->settingsService,
                 lockWallet: false,
-            )['ok']
-        );
+            )['ok'];
+        });
 
         return $eligible;
     }
