@@ -50,7 +50,7 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     ];
 
     protected $hidden = [
-        'password', 'session_token', 'remember_token',
+        'password', 'session_token', 'remember_token', 'device_token',
     ];
 
     protected $casts = [

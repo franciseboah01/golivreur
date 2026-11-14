@@ -23,4 +23,11 @@ class OtpCode extends Model
         'is_used' => 'boolean',
         'expires_at' => 'datetime',
     ];
+
+    /**
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'code_hash',
+    ];
 }
