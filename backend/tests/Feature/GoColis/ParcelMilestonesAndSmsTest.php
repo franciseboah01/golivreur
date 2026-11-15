@@ -29,7 +29,7 @@ function makeTestJpeg(): UploadedFile
 
 it('P7 Point 3: impose ordre at-sender -> photo -> code -> at-recipient -> photo -> code et notifie expediteur/destinataire', function () {
     Queue::fake();
-    Storage::fake('s3');
+    Storage::fake(ParcelPhoto::storageDisk());
 
     $logged = [];
     Log::listen(function ($entry) use (&$logged) {

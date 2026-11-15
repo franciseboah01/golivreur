@@ -30,8 +30,8 @@ function makeRawImageWithTrailingPayload(string $format, string $payload = 'EVIL
     return $bytes.$payload;
 }
 
-it('P7 Point 2: refuse .exe, fichiers > 5 Mo et tiers, re-encode JPEG/PNG/WebP en prive sur s3', function () {
-    Storage::fake('s3');
+it('P7 Point 2: refuse .exe, fichiers > 5 Mo et tiers, re-encode JPEG/PNG/WebP en prive sur le disque photo', function () {
+    Storage::fake(ParcelPhoto::storageDisk());
 
     $cityDaloa = City::factory()->create(['name' => 'Daloa']);
     $cityBouake = City::factory()->create(['name' => 'Bouaké']);
@@ -140,8 +140,8 @@ it('P7 Point 2: refuse .exe, fichiers > 5 Mo et tiers, re-encode JPEG/PNG/WebP e
             ->and($photo->storage_path)->not->toContain('origine-secret')
             ->and((string) $photo->photo_url)->not->toStartWith('http');
 
-        Storage::disk('s3')->assertExists($photo->storage_path);
-        $storedBytes = Storage::disk('s3')->get($photo->storage_path);
+        Storage::disk(ParcelPhoto::storageDisk())->assertExists($photo->storage_path);
+        $storedBytes = Storage::disk(ParcelPhoto::storageDisk())->get($photo->storage_path);
         expect($storedBytes)->not->toContain('EVIL_PAYLOAD_STRIPPED')
             ->and(@getimagesizefromstring($storedBytes))->not->toBeFalse();
 
@@ -162,13 +162,13 @@ it('P7 Point 2: refuse .exe, fichiers > 5 Mo et tiers, re-encode JPEG/PNG/WebP e
         ->assertCreated();
 
     $webpPhoto = ParcelPhoto::findOrFail($webpRes->json('donnees.id'));
-    $storedWebp = Storage::disk('s3')->get($webpPhoto->storage_path);
+    $storedWebp = Storage::disk(ParcelPhoto::storageDisk())->get($webpPhoto->storage_path);
     expect($storedWebp)->not->toContain('EVIL_WEBP_PAYLOAD')
         ->and(@getimagesizefromstring($storedWebp))->not->toBeFalse();
 });
 
 it('P7 Point 2: impose ordre statut photo et expose URL signees uniquement a expediteur et admin ville', function () {
-    Storage::fake('s3');
+    Storage::fake(ParcelPhoto::storageDisk());
     $this->seed(RoleHabilitationSeeder::class);
 
     $cityDaloa = City::factory()->create(['name' => 'Daloa']);

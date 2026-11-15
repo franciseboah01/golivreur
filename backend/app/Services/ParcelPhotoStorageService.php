@@ -3,20 +3,21 @@
 namespace App\Services;
 
 use App\Models\Parcel;
+use App\Models\ParcelPhoto;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Validation binaire, ré-encodage GD (suppression EXIF/payloads) et stockage privé S3 des photos de preuve.
+ * Validation binaire, ré-encodage GD (suppression EXIF/payloads) et stockage privé des photos de preuve.
  */
 class ParcelPhotoStorageService
 {
     private const MAX_DIMENSION_PX = 10000;
 
     /**
-     * Valide, ré-encode côté serveur en JPEG/PNG/WebP et enregistre en privé sur disk s3.
+     * Valide, ré-encode côté serveur en JPEG/PNG/WebP et enregistre en privé sur le disque configuré.
      */
     public function reencoderEtStocker(Parcel $parcel, UploadedFile $photo, string $type): string
     {
@@ -86,7 +87,7 @@ class ParcelPhotoStorageService
             $formatSpec['ext'],
         );
 
-        Storage::disk('s3')->put($storagePath, $reencoded, ['visibility' => 'private']);
+        Storage::disk(ParcelPhoto::storageDisk())->put($storagePath, $reencoded, ['visibility' => 'private']);
 
         return $storagePath;
     }

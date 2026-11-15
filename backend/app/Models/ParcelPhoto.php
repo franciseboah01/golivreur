@@ -33,12 +33,21 @@ class ParcelPhoto extends Model
         'lng' => 'float',
     ];
 
+    public static function storageDisk(): string
+    {
+        $configured = config('filesystems.parcel_photos_disk');
+
+        return is_string($configured) && trim($configured) !== ''
+            ? trim($configured)
+            : 'parcel_photos';
+    }
+
     public function getSignedUrlAttribute(): ?string
     {
         $storagePath = $this->attributes['storage_path'] ?? null;
 
         if (is_string($storagePath) && $storagePath !== '') {
-            return Storage::disk('s3')->temporaryUrl($storagePath, now()->addMinutes(15));
+            return Storage::disk(self::storageDisk())->temporaryUrl($storagePath, now()->addMinutes(15));
         }
 
         $legacyUrl = $this->attributes['photo_url'] ?? null;

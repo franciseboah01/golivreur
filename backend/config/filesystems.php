@@ -15,6 +15,8 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    'parcel_photos_disk' => env('PARCEL_PHOTOS_DISK', 'parcel_photos'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
@@ -35,6 +37,16 @@ return [
             'root' => storage_path('app/private'),
             'serve' => true,
             'throw' => false,
+            'report' => false,
+        ],
+
+        'parcel_photos' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/parcel_photos'),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/media/parcel-photos',
+            'serve' => true,
+            'visibility' => 'private',
+            'throw' => true,
             'report' => false,
         ],
 
