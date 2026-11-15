@@ -206,13 +206,20 @@ it('un utilisateur connecté peut se déconnecter', function () {
 
 it('conserve le nom du client lors de l\'inscription même si verify-register ne le renvoie pas', function () {
     $phone = '0705112233';
+    $code = '5821';
 
     $reg = $this->postJson('/api/v1/auth/register', [
         'phone' => "+225 {$phone}",
         'name' => 'Ahou Koffi',
     ]);
     $reg->assertOk();
-    $code = $reg->json('debug_otp') ?? '1234';
+    expect($reg->json())->not->toHaveKey('debug_otp');
+
+    OtpCode::where('phone', $phone)->delete();
+    OtpCode::factory()->withCode($code)->create([
+        'phone' => $phone,
+        'purpose' => 'register',
+    ]);
 
     $verify = $this->postJson('/api/v1/auth/verify-register', [
         'phone' => $phone,
@@ -239,8 +246,15 @@ it('réinitialise le rate limit de connexion après vérification OTP réussie',
     ]);
 
     for ($i = 0; $i < 4; $i++) {
+        $code = '7412';
         $loginRes = $this->postJson('/api/v1/auth/login', ['phone' => $user->phone])->assertOk();
-        $code = $loginRes->json('debug_otp') ?? '1234';
+        expect($loginRes->json())->not->toHaveKey('debug_otp');
+
+        OtpCode::where('phone', $user->phone)->delete();
+        OtpCode::factory()->withCode($code)->create([
+            'phone' => $user->phone,
+            'purpose' => 'login',
+        ]);
 
         $this->postJson('/api/v1/auth/verify-login', [
             'phone' => $user->phone,

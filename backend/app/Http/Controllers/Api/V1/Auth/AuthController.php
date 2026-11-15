@@ -75,16 +75,10 @@ class AuthController extends Controller
 
         $this->smsService->envoyerOtp($phone, $code, 'inscription');
 
-        $responseData = [
+        return response()->json([
             'succes' => true,
             'message' => "Code envoyé au {$this->masquerTelephone($phone)}.",
-        ];
-
-        if (app()->environment('local', 'testing')) {
-            $responseData['debug_otp'] = $code;
-        }
-
-        return response()->json($responseData, 200);
+        ], 200);
     }
 
     /**
@@ -105,9 +99,7 @@ class AuthController extends Controller
             ->latest()
             ->first();
 
-        $isMasterDevOtp = app()->environment('local', 'testing') && $otp === '1234';
-
-        if (! $isMasterDevOtp && (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash))) {
+        if (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash)) {
             if ($otpRecord) {
                 $otpRecord->increment('attempts');
                 if ($otpRecord->attempts >= 5) {
@@ -134,9 +126,7 @@ class AuthController extends Controller
         }
 
         // Supprimer l'OTP après validation réussie (CDC 11.4) et consommer les métadonnées
-        if ($otpRecord) {
-            $otpRecord->delete();
-        }
+        $otpRecord->delete();
         Cache::forget("register_meta:{$phone}");
         RateLimiter::clear("otp_register:{$phone}");
 
@@ -211,16 +201,10 @@ class AuthController extends Controller
 
         $this->smsService->envoyerOtp($phone, $code, 'connexion');
 
-        $responseData = [
+        return response()->json([
             'succes' => true,
             'message' => "Code envoyé au {$this->masquerTelephone($phone)}.",
-        ];
-
-        if (app()->environment('local', 'testing')) {
-            $responseData['debug_otp'] = $code;
-        }
-
-        return response()->json($responseData);
+        ]);
     }
 
     /**
@@ -248,10 +232,7 @@ class AuthController extends Controller
             ], 404);
         }
 
-        $isDev = app()->environment('local', 'testing');
-        $validDevPasswords = ['123456', '1234', 'password', '1234-JK-01'];
-        $passwordMatches = ($user->password && Hash::check($password, $user->password)) ||
-                           ($isDev && in_array($password, $validDevPasswords));
+        $passwordMatches = $user->password && Hash::check($password, $user->password);
 
         if (! $passwordMatches) {
             return response()->json([
@@ -300,9 +281,7 @@ class AuthController extends Controller
             ->latest()
             ->first();
 
-        $isMasterDevOtp = app()->environment('local', 'testing') && $otp === '1234';
-
-        if (! $isMasterDevOtp && (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash))) {
+        if (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash)) {
             if ($otpRecord) {
                 $otpRecord->increment('attempts');
                 if ($otpRecord->attempts >= 5) {
@@ -333,9 +312,7 @@ class AuthController extends Controller
             ], 404);
         }
 
-        if ($otpRecord) {
-            $otpRecord->delete();
-        }
+        $otpRecord->delete();
         RateLimiter::clear("otp_login:{$phone}");
 
         // Session unique pour merchants et drivers (CDC 9.2 & ADR-002)

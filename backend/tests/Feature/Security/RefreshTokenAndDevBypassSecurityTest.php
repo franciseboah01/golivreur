@@ -110,3 +110,47 @@ it('prouve qu en environnement de production AUCUN bypass dev ne fonctionne', fu
     $resLog->assertOk();
     expect($resLog->json())->not->toHaveKey('debug_otp');
 });
+
+it('prouve qu en environnement local et testing AUCUN bypass dev ne fonctionne', function (string $env) {
+    app()->detectEnvironment(fn () => $env);
+    config(['app.env' => $env]);
+
+    $user = User::factory()->create([
+        'phone' => '0709998866',
+        'password' => Hash::make('vrai-mot-de-passe-ultra-securise'),
+        'role' => 'driver',
+        'is_active' => true,
+    ]);
+
+    // 1. Aucun bypass OTP '1234' sur verify-login ni verify-register
+    $this->postJson('/api/v1/auth/verify-login', [
+        'phone' => '0709998866',
+        'otp' => '1234',
+    ])->assertStatus(422);
+
+    $this->postJson('/api/v1/auth/verify-register', [
+        'phone' => '0709998855',
+        'otp' => '1234',
+    ])->assertStatus(422);
+
+    // 2. Aucun mot de passe dev autorisé sur login-password
+    foreach (['123456', '1234', 'password', '1234-JK-01'] as $devPassword) {
+        $this->postJson('/api/v1/auth/login-password', [
+            'phone' => '0709998866',
+            'password' => $devPassword,
+        ])->assertStatus(422)
+            ->assertJsonPath('succes', false);
+    }
+
+    // 3. Aucun debug_otp exposé par register ni login
+    $resReg = $this->postJson('/api/v1/auth/register', [
+        'phone' => '0709998844',
+        'name' => 'Test Local',
+    ])->assertOk();
+    expect($resReg->json())->not->toHaveKey('debug_otp');
+
+    $resLog = $this->postJson('/api/v1/auth/login', [
+        'phone' => '0709998866',
+    ])->assertOk();
+    expect($resLog->json())->not->toHaveKey('debug_otp');
+})->with(['testing', 'local']);
