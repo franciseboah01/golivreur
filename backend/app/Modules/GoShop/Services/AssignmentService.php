@@ -305,9 +305,19 @@ class AssignmentService
         array $excludeIds = [],
         ?int $montantRequisCash = null,
     ): ?Courier {
+        $fraicheurMinutes = $this->settingsService->getDelaiRegle(
+            'gps_fraicheur_minutes',
+            $cityId,
+            2,
+        );
+
         $baseQuery = Courier::where('city_id', $cityId)
             ->where('is_online', true)
             ->where('is_active', true)
+            ->whereNotNull('current_lat')
+            ->whereNotNull('current_lng')
+            ->whereNotNull('location_updated_at')
+            ->where('location_updated_at', '>=', now()->subMinutes($fraicheurMinutes))
             ->where(function ($q) {
                 $q->whereNull('penalty_until')
                     ->orWhere('penalty_until', '<', now());
@@ -318,8 +328,6 @@ class AssignmentService
             $haversine = '(6371 * acos(least(1.0, greatest(-1.0, cos(radians(?)) * cos(radians(current_lat)) * cos(radians(current_lng) - radians(?)) + sin(radians(?)) * sin(radians(current_lat))))))';
 
             $baseQuery = $baseQuery
-                ->whereNotNull('current_lat')
-                ->whereNotNull('current_lng')
                 ->selectRaw("*, {$haversine} AS distance", [$lat, $lng, $lat])
                 ->whereRaw("{$haversine} < ?", [$lat, $lng, $lat, self::RAYON_ETENDU_KM])
                 ->orderBy('distance');

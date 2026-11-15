@@ -27,6 +27,7 @@ it('P6 Point 1: NotifierLivreurGoShop exclut le livreur sans reponse apres 30s, 
         'is_active' => true,
         'current_lat' => 6.8771,
         'current_lng' => -6.4502,
+        'location_updated_at' => now(),
     ]);
 
     $driver2 = User::factory()->create(['role' => 'driver', 'city_id' => $city->id, 'device_token' => 'tok-goshop-2']);
@@ -37,6 +38,7 @@ it('P6 Point 1: NotifierLivreurGoShop exclut le livreur sans reponse apres 30s, 
         'is_active' => true,
         'current_lat' => 6.8850,
         'current_lng' => -6.4520,
+        'location_updated_at' => now(),
     ]);
 
     $order = Order::factory()->create([

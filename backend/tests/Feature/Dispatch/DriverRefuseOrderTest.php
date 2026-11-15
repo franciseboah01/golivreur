@@ -24,6 +24,7 @@ it('P6 Point 2: POST /driver/orders/{order}/refuse incremente consecutive_refusa
         'consecutive_refusals' => 0,
         'current_lat' => 6.8770,
         'current_lng' => -6.4502,
+        'location_updated_at' => now(),
     ]);
 
     $driver2 = User::factory()->create(['role' => 'driver', 'city_id' => $city->id, 'device_token' => 'tok-d2']);
@@ -34,6 +35,7 @@ it('P6 Point 2: POST /driver/orders/{order}/refuse incremente consecutive_refusa
         'is_active' => true,
         'current_lat' => 6.8800,
         'current_lng' => -6.4510,
+        'location_updated_at' => now(),
     ]);
 
     $o1 = Order::factory()->create([

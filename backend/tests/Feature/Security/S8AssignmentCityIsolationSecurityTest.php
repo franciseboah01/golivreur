@@ -22,6 +22,9 @@ it('S8 isolation ville et statut: attribuerLivreurGoShop n\'assigne pas un livre
         'is_online' => false,
         'is_active' => false,
         'penalty_until' => now()->subHour(),
+        'current_lat' => 6.8770,
+        'current_lng' => -6.4502,
+        'location_updated_at' => now(),
     ]);
 
     $orderDaloa = Order::factory()->create([

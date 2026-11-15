@@ -270,6 +270,9 @@ class SettingsPage extends Page implements HasForms
                                         Forms\Components\TextInput::make('delais_regles.acceptation_livreur_secondes')
                                             ->label('Délai sonnerie livreur')
                                             ->numeric()->suffix('secondes')->required(),
+                                        Forms\Components\TextInput::make('delais_regles.gps_fraicheur_minutes')
+                                            ->label('Fraîcheur position GPS livreur')
+                                            ->numeric()->suffix('minutes')->required(),
                                         Forms\Components\TextInput::make('delais_regles.refus_avant_penalite')
                                             ->label('Refus consécutifs avant pénalité')
                                             ->numeric()->required(),

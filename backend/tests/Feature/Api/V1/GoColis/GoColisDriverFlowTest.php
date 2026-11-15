@@ -254,6 +254,9 @@ it('GoColis refuse: 3 refus consécutifs appliquent la pénalité 15 min hors li
         'is_online' => true,
         'is_active' => true,
         'consecutive_refusals' => 0,
+        'current_lat' => 6.8770,
+        'current_lng' => -6.4502,
+        'location_updated_at' => now(),
     ]);
 
     $driver2 = User::factory()->create(['role' => 'driver', 'city_id' => $city->id, 'device_token' => 'tok-drv-2']);
@@ -262,6 +265,9 @@ it('GoColis refuse: 3 refus consécutifs appliquent la pénalité 15 min hors li
         'city_id' => $city->id,
         'is_online' => true,
         'is_active' => true,
+        'current_lat' => 6.8800,
+        'current_lng' => -6.4510,
+        'location_updated_at' => now(),
     ]);
 
     $p1 = Parcel::factory()->create(['city_id' => $city->id, 'status' => Parcel::STATUS_PENDING, 'pickup_lat' => null, 'pickup_lng' => null]);
@@ -312,6 +318,7 @@ it('GoColis notifications réelles: NotifierLivreurGoColis envoie la même notif
         'is_active' => true,
         'current_lat' => 6.8820,
         'current_lng' => -6.4475,
+        'location_updated_at' => now(),
     ]);
 
     $driver2 = User::factory()->create(['role' => 'driver', 'city_id' => $city->id, 'device_token' => 'device-token-driver-2']);
@@ -322,6 +329,7 @@ it('GoColis notifications réelles: NotifierLivreurGoColis envoie la même notif
         'is_active' => true,
         'current_lat' => 6.8900,
         'current_lng' => -6.4500,
+        'location_updated_at' => now(),
     ]);
 
     $parcel = Parcel::factory()->create([

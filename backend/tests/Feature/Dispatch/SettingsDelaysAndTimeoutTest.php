@@ -112,6 +112,7 @@ it('P6 Point 7: erreurs_code_avant_blocage et acceptation_livreur_secondes lus d
         'is_active' => true,
         'current_lat' => 6.8771,
         'current_lng' => -6.4502,
+        'location_updated_at' => now(),
     ]);
 
     // 1. acceptation_livreur_secondes = 45 -> delay ~ 45s sur NotifierLivreurGoShop

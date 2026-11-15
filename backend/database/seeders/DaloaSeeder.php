@@ -263,11 +263,11 @@ class DaloaSeeder extends Seeder
 
         // ── 6. Livreurs actifs Daloa ───────────────────────────────────────────
         $livreursData = [
-            ['name' => 'Ouattara Seydou',   'phone' => '0703000001', 'lat' => 6.8815, 'lng' => -6.4488],
-            ['name' => 'Coulibaly Issouf',  'phone' => '0703000002', 'lat' => 6.8800, 'lng' => -6.4510],
-            ['name' => 'Bamba Moussa',       'phone' => '0703000003', 'lat' => 6.8790, 'lng' => -6.4525],
-            ['name' => 'Doumbia Lacina',     'phone' => '0703000004', 'lat' => 6.8840, 'lng' => -6.4460],
-            ['name' => 'Koné Drissa',        'phone' => '0703000005', 'lat' => 6.8760, 'lng' => -6.4545],
+            ['name' => 'Ouattara Seydou',   'phone' => '0703000001'],
+            ['name' => 'Coulibaly Issouf',  'phone' => '0703000002'],
+            ['name' => 'Bamba Moussa',       'phone' => '0703000003'],
+            ['name' => 'Doumbia Lacina',     'phone' => '0703000004'],
+            ['name' => 'Koné Drissa',        'phone' => '0703000005'],
         ];
 
         foreach ($livreursData as $livreurData) {
@@ -284,8 +284,9 @@ class DaloaSeeder extends Seeder
                 'user_id' => $userDriver->id,
                 'city_id' => $daloa->id,
                 'is_online' => true,
-                'current_lat' => $livreurData['lat'],
-                'current_lng' => $livreurData['lng'],
+                'current_lat' => null,
+                'current_lng' => null,
+                'location_updated_at' => null,
                 'vehicle_type' => 'moto',
                 'is_active' => true,
                 'activated_at' => now(),

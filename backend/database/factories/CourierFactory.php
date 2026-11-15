@@ -17,13 +17,23 @@ class CourierFactory extends Factory
             'user_id' => User::factory(['role' => 'driver']),
             'city_id' => City::factory(),
             'is_online' => true,
-            'current_lat' => 6.8770,
-            'current_lng' => -6.4502,
+            'current_lat' => null,
+            'current_lng' => null,
+            'location_updated_at' => null,
             'vehicle_type' => 'moto',
             'vehicle_plate' => 'AB-123-CD',
             'is_active' => true,
             'activated_at' => now(),
             'consecutive_refusals' => 0,
         ];
+    }
+
+    public function withGps(float $lat = 6.8770, float $lng = -6.4502): static
+    {
+        return $this->state(fn (): array => [
+            'current_lat' => $lat,
+            'current_lng' => $lng,
+            'location_updated_at' => now(),
+        ]);
     }
 }

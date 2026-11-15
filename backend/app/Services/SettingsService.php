@@ -57,6 +57,7 @@ class SettingsService
             'acceptation_commerce_secondes' => 45,
             'paiement_attente_minutes' => 10,
             'acceptation_livreur_secondes' => 30,
+            'gps_fraicheur_minutes' => 2,
             'refus_avant_penalite' => 3,
             'duree_penalite_minutes' => 15,
             'erreurs_code_avant_blocage' => 3,

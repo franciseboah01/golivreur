@@ -189,8 +189,9 @@ it('Arbitrage 2 AssignmentService ne propose pas une course ou un colis cash à 
         'city_id' => $city->id,
         'is_online' => true,
         'is_active' => true,
-        'current_lat' => null,
-        'current_lng' => null,
+        'current_lat' => 6.8770,
+        'current_lng' => -6.4502,
+        'location_updated_at' => now(),
     ]);
 
     $cashOrder = Order::factory()->cash()->create([

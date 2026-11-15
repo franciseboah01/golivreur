@@ -27,6 +27,7 @@ it('P6 Point 3: AssignmentService exclut un livreur ayant deja atteint courses.m
         'is_active' => true,
         'current_lat' => 6.8771,
         'current_lng' => -6.4502,
+        'location_updated_at' => now(),
     ]);
 
     $driver2 = User::factory()->create(['role' => 'driver', 'city_id' => $city->id, 'device_token' => 'tok-c2']);
@@ -37,6 +38,7 @@ it('P6 Point 3: AssignmentService exclut un livreur ayant deja atteint courses.m
         'is_active' => true,
         'current_lat' => 6.8900,
         'current_lng' => -6.4600,
+        'location_updated_at' => now(),
     ]);
 
     // courier1 a deja 1 commande GoShop active -> max_actives = 1 atteint
@@ -101,6 +103,7 @@ it('P6 Point 3 settings: AssignmentService autorise jusqu a courses.max_actives 
         'is_active' => true,
         'current_lat' => 6.8771,
         'current_lng' => -6.4502,
+        'location_updated_at' => now(),
     ]);
 
     // 1 course active (< 2) -> courier1 reste eligible
