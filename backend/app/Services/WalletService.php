@@ -226,17 +226,22 @@ class WalletService
         }
 
         $solde = $wallet ? (int) round((float) $wallet->balance) : 0;
-        if ($solde < $soldeMinimum) {
+        $engagements = $this->calculerEngagementsCashEnCours($courier->id);
+        $soldeRequis = $soldeMinimum + $engagements;
+        $disponible = $solde - $engagements;
+
+        if ($solde < $soldeRequis) {
+            $detailMinimum = $engagements > 0
+                ? "minimum {$soldeMinimum} F CFA + engagements en cours {$engagements} F CFA"
+                : "minimum requis de {$soldeMinimum} F CFA";
+
             return [
                 'ok' => false,
-                'message' => "Solde portefeuille insuffisant pour une course en espèces ({$solde} F CFA < minimum requis de {$soldeMinimum} F CFA).",
+                'message' => "Solde portefeuille insuffisant pour une course en espèces ({$solde} F CFA < {$detailMinimum}).",
                 'solde' => $solde,
-                'disponible' => $solde,
+                'disponible' => $disponible,
             ];
         }
-
-        $engagements = $this->calculerEngagementsCashEnCours($courier->id);
-        $disponible = $solde - $engagements;
 
         if ($disponible < $montantAReverser) {
             return [
