@@ -32,4 +32,3 @@ class OtpCodeFactory extends Factory
         ]);
     }
 }
-
