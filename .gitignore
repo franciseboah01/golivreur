@@ -1,5 +1,7 @@
 # Environment files
 .env
+.env*
+!.env.example
 .env.backup
 .env.production
 backend/.env
@@ -8,6 +10,7 @@ backend/.env.production
 
 # MCP config & local keys
 mcp_config.json
+**/google-services.json
 *.keystore
 **/*.keystore
 *.jks
