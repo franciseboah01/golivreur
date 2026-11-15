@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Support\FilamentCityScope;
 use App\Models\Order;
 use App\Models\Parcel;
 use Filament\Widgets\ChartWidget;
@@ -23,27 +24,35 @@ class WeeklyOrdersChart extends ChartWidget
 
         $labels = $days->map(fn (Carbon $date): string => $date->translatedFormat('D d/m'))->toArray();
 
-        $user = auth()->user();
-        $isLocal = $user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id;
-        $cityId = $isLocal ? (int) $user->city_id : null;
+        if (! FilamentCityScope::hasValidLocalCity()) {
+            $zeros = array_fill(0, count($labels), 0);
 
-        $ordersData = $days->map(function (Carbon $date) use ($cityId): int {
-            $q = Order::whereDate('created_at', $date);
-            if ($cityId) {
-                $q->where('city_id', $cityId);
-            }
+            return [
+                'datasets' => [
+                    [
+                        'label' => 'Commandes GoShop',
+                        'data' => $zeros,
+                        'backgroundColor' => '#f59e0b',
+                        'borderColor' => '#d97706',
+                    ],
+                    [
+                        'label' => 'Expéditions GoColis',
+                        'data' => $zeros,
+                        'backgroundColor' => '#3b82f6',
+                        'borderColor' => '#2563eb',
+                    ],
+                ],
+                'labels' => $labels,
+            ];
+        }
 
-            return $q->count();
-        })->toArray();
+        $ordersData = $days->map(
+            fn (Carbon $date): int => FilamentCityScope::scopeByCity(Order::whereDate('created_at', $date))->count()
+        )->toArray();
 
-        $parcelsData = $days->map(function (Carbon $date) use ($cityId): int {
-            $q = Parcel::whereDate('created_at', $date);
-            if ($cityId) {
-                $q->where('city_id', $cityId);
-            }
-
-            return $q->count();
-        })->toArray();
+        $parcelsData = $days->map(
+            fn (Carbon $date): int => FilamentCityScope::scopeByCity(Parcel::whereDate('created_at', $date))->count()
+        )->toArray();
 
         return [
             'datasets' => [

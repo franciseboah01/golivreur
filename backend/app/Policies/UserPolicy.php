@@ -18,6 +18,10 @@ class UserPolicy
         }
 
         if ($user->role === 'city_manager') {
+            if ($user->city_id === null || $model->city_id === null) {
+                return false;
+            }
+
             return (int) $model->city_id === (int) $user->city_id;
         }
 
@@ -48,6 +52,10 @@ class UserPolicy
         }
 
         if ($user->role === 'city_manager') {
+            if ($user->city_id === null || $model->city_id === null) {
+                return false;
+            }
+
             return (int) $model->city_id === (int) $user->city_id
                 && in_array($model->role, ['city_support', 'city_agent', 'city_finance'], true);
         }
@@ -70,10 +78,30 @@ class UserPolicy
         }
 
         if ($user->role === 'city_manager') {
+            if ($user->city_id === null || $model->city_id === null) {
+                return false;
+            }
+
             return (int) $model->city_id === (int) $user->city_id
                 && in_array($model->role, ['city_support', 'city_agent', 'city_finance'], true);
         }
 
         return false;
+    }
+
+    /**
+     * Action API stricte : un utilisateur ne consulte QUE son propre profil.
+     */
+    public function viewSelfProfile(User $authUser, User $targetUser): bool
+    {
+        return $authUser->id === $targetUser->id;
+    }
+
+    /**
+     * Action API stricte : modification autorisée uniquement sur son propre compte.
+     */
+    public function updateSelfProfile(User $authUser, User $targetUser): bool
+    {
+        return $authUser->id === $targetUser->id;
     }
 }

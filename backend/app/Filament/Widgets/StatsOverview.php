@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Support\FilamentCityScope;
 use App\Models\City;
 use App\Models\Courier;
 use App\Models\Merchant;
@@ -20,15 +21,59 @@ class StatsOverview extends BaseWidget
 
     protected function getStats(): array
     {
-        $today = now()->startOfDay();
-        $user = auth()->user();
-        $isLocal = $user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id;
-        $cityId = $isLocal ? (int) $user->city_id : null;
-        $cityName = null;
-        if ($isLocal) {
-            $city = $user->city ?? ($cityId ? City::find($cityId) : null);
-            $cityName = $city ? $city->name : 'votre ville';
+        if (! FilamentCityScope::hasValidLocalCity()) {
+            return [
+                Stat::make('Courses du jour', 0)
+                    ->description('0 GoShop · 0 GoColis')
+                    ->descriptionIcon('heroicon-m-shopping-bag')
+                    ->color('primary'),
+
+                Stat::make('Chiffre d\'Affaires Plateforme', '0 F CFA')
+                    ->description('Commissions nettes encaissées')
+                    ->descriptionIcon('heroicon-m-banknotes')
+                    ->color('success'),
+
+                Stat::make('Volume d\'Affaires Brut (GMV)', '0 F CFA')
+                    ->description('Paniers marchands + livraisons')
+                    ->descriptionIcon('heroicon-m-arrow-trending-up')
+                    ->color('info'),
+
+                Stat::make('Trésorerie Portefeuilles', '0 F CFA')
+                    ->description('Solde total marchands & livreurs')
+                    ->descriptionIcon('heroicon-m-wallet')
+                    ->color('warning'),
+
+                Stat::make('Livreurs en Ligne', '0 / 0')
+                    ->description('Aucune ville rattachée')
+                    ->descriptionIcon('heroicon-m-truck')
+                    ->color('primary'),
+
+                Stat::make('Commerces Ouverts', '0 / 0')
+                    ->description('Prêts à recevoir des commandes')
+                    ->descriptionIcon('heroicon-m-building-storefront')
+                    ->color('info'),
+
+                Stat::make('Mode Pluie', '0 / 0')
+                    ->description('Aucune ville rattachée')
+                    ->descriptionIcon('heroicon-m-cloud')
+                    ->color('gray'),
+
+                Stat::make('Taux de Livraison Réussie', '0 %')
+                    ->description('0 livrées · 0 annulations')
+                    ->descriptionIcon('heroicon-m-check-badge')
+                    ->color('success'),
+
+                Stat::make('Alertes Codes Bloqués', 0)
+                    ->description('Aucun code bloqué')
+                    ->descriptionIcon('heroicon-m-shield-exclamation')
+                    ->color('gray'),
+            ];
         }
+
+        $today = now()->startOfDay();
+        $isLocal = FilamentCityScope::isLocal();
+        $cityId = FilamentCityScope::localCityId();
+        $cityName = $isLocal ? (FilamentCityScope::scopedCityName() ?? 'votre ville') : null;
 
         // 1. Volumes du jour
         $ordersCount = Order::where('created_at', '>=', $today)

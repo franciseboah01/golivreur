@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Support\FilamentCityScope;
 use App\Models\Courier;
 use App\Models\Merchant;
 use Filament\Pages\Page;
@@ -28,8 +29,8 @@ class PendingValidationsPage extends Page
 
     public function mount(): void
     {
-        $pendingCouriers = Courier::where('is_active', false)->count();
-        $pendingMerchants = Merchant::where('is_active', false)->count();
+        $pendingCouriers = FilamentCityScope::scopeByCity(Courier::where('is_active', false))->count();
+        $pendingMerchants = FilamentCityScope::scopeByCity(Merchant::where('is_active', false))->count();
 
         if ($pendingCouriers > 0 && $pendingMerchants === 0) {
             $this->activeTab = 'couriers';
@@ -49,7 +50,9 @@ class PendingValidationsPage extends Page
 
     public static function getNavigationBadge(): ?string
     {
-        $count = Merchant::where('is_active', false)->count() + Courier::where('is_active', false)->count();
+        $couriers = FilamentCityScope::scopeByCity(Courier::where('is_active', false))->count();
+        $merchants = FilamentCityScope::scopeByCity(Merchant::where('is_active', false))->count();
+        $count = $couriers + $merchants;
 
         return $count > 0 ? (string) $count : null;
     }
@@ -61,12 +64,12 @@ class PendingValidationsPage extends Page
 
     public function getPendingCouriersCountProperty(): int
     {
-        return Courier::where('is_active', false)->count();
+        return FilamentCityScope::scopeByCity(Courier::where('is_active', false))->count();
     }
 
     public function getPendingMerchantsCountProperty(): int
     {
-        return Merchant::where('is_active', false)->count();
+        return FilamentCityScope::scopeByCity(Merchant::where('is_active', false))->count();
     }
 
     public function setTab(string $tab): void

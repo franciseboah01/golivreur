@@ -4,7 +4,7 @@ namespace App\Filament\Resources\CourierResource\Pages;
 
 use App\Filament\Resources\CourierResource;
 use App\Filament\Resources\VehicleTypeResource;
-use App\Models\Courier;
+use App\Filament\Support\FilamentCityScope;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
@@ -31,16 +31,16 @@ class ListCouriers extends ListRecords
     {
         return [
             'all' => Tab::make('Tous les Livreurs')
-                ->badge(Courier::count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(CourierResource::class)),
             'online' => Tab::make('En Ligne')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('is_online', true))
-                ->badge(Courier::where('is_online', true)->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(CourierResource::class, fn (Builder $q) => $q->where('is_online', true))),
             'active' => Tab::make('Validés & Actifs')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('is_active', true))
-                ->badge(Courier::where('is_active', true)->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(CourierResource::class, fn (Builder $q) => $q->where('is_active', true))),
             'pending' => Tab::make('En Attente de Validation')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('is_active', false))
-                ->badge(Courier::where('is_active', false)->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(CourierResource::class, fn (Builder $q) => $q->where('is_active', false))),
         ];
     }
 }

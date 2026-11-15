@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Support\FilamentCityScope;
 use App\Models\City;
 use App\Models\Order;
 use App\Models\Parcel;
@@ -14,14 +15,34 @@ class EmergencyStatsWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $totalCities = City::count();
-        $rainActive = City::where('rain_mode_active', true)->count();
-        $emergencyActive = City::where('emergency_mode_active', true)->count();
+        if (! FilamentCityScope::hasValidLocalCity()) {
+            return [
+                Stat::make('Mode Pluie Météo (+20%)', '0 / 0 villes')
+                    ->description('Aucune ville rattachée')
+                    ->descriptionIcon('heroicon-m-cloud')
+                    ->color('gray'),
 
-        $lockedOrders = Order::where('confirmation_locked', true)->count();
-        $lockedParcels = Parcel::where('sender_code_locked', true)
-            ->orWhere('recipient_code_locked', true)
-            ->count();
+                Stat::make('Mode Urgence & Crises', '0 zone(s) suspendue(s)')
+                    ->description('Aucune ville rattachée')
+                    ->descriptionIcon('heroicon-m-exclamation-triangle')
+                    ->color('gray'),
+
+                Stat::make('Codes OTP Bloqués', '0 course(s)')
+                    ->description('0 GoShop · 0 GoColis')
+                    ->descriptionIcon('heroicon-m-lock-closed')
+                    ->color('gray'),
+            ];
+        }
+
+        $cityQuery = FilamentCityScope::scopeByCity(City::query(), 'id');
+        $totalCities = (clone $cityQuery)->count();
+        $rainActive = (clone $cityQuery)->where('rain_mode_active', true)->count();
+        $emergencyActive = (clone $cityQuery)->where('emergency_mode_active', true)->count();
+
+        $lockedOrders = FilamentCityScope::scopeByCity(Order::where('confirmation_locked', true))->count();
+        $lockedParcels = FilamentCityScope::scopeByCity(
+            Parcel::where(fn ($q) => $q->where('sender_code_locked', true)->orWhere('recipient_code_locked', true))
+        )->count();
         $totalLocked = $lockedOrders + $lockedParcels;
 
         return [

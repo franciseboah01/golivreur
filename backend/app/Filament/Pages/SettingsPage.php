@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\PaymentMethod;
 use App\Filament\Components\ImageUploadField;
 use App\Filament\Components\SearchableSelect;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\City;
 use App\Services\SettingsService;
 use Filament\Forms;
@@ -45,16 +46,26 @@ class SettingsPage extends Page implements HasForms
     {
         $user = auth()->user();
 
-        return $user !== null && $user->hasHabilitationTab('settings');
+        return $user !== null
+            && ! FilamentCityScope::isLocal($user)
+            && $user->hasHabilitationTab('settings');
     }
 
     public function mount(): void
     {
+        if (FilamentCityScope::isLocal()) {
+            abort(403, 'La configuration des paramètres est réservée aux rôles nationaux.');
+        }
+
         $this->loadSettings();
     }
 
     public function updatedSelectedCityId(): void
     {
+        if (FilamentCityScope::isLocal()) {
+            abort(403, 'La configuration des paramètres est réservée aux rôles nationaux.');
+        }
+
         $this->loadSettings();
     }
 
@@ -398,6 +409,10 @@ class SettingsPage extends Page implements HasForms
 
     public function save(): void
     {
+        if (FilamentCityScope::isLocal()) {
+            abort(403, 'La configuration des paramètres est réservée aux rôles nationaux.');
+        }
+
         $settingsService = app(SettingsService::class);
         $oldBranding = $settingsService->getBranding();
         $state = $this->form->getState();

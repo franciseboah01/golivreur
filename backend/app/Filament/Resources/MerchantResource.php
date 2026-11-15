@@ -6,6 +6,7 @@ use App\Filament\Components\EmojiSelectField;
 use App\Filament\Components\ImageUploadField;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\MerchantResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\Merchant;
 use App\Models\MerchantCategory;
@@ -17,6 +18,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -43,16 +45,26 @@ class MerchantResource extends Resource
         return $user !== null && $user->hasHabilitationTab('merchants');
     }
 
+    public static function canCreate(): bool
+    {
+        return FilamentCityScope::hasValidLocalCity() && parent::canCreate();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canEdit($record);
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canDelete($record);
+    }
+
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
-        $user = auth()->user();
-
-        if ($user && str_starts_with((string) $user->role, 'city_')) {
-            $query->where('city_id', $user->city_id);
-        }
-
-        return $query;
+        return FilamentCityScope::scopeByCity(parent::getEloquentQuery());
     }
 
     public static function form(Form $form): Form
@@ -65,7 +77,9 @@ class MerchantResource extends Resource
                         // Listes déroulantes remontées en haut du formulaire avec recherche live et tri alphabétique
                         SearchableSelect::make('user_id')
                             ->label('Compte Gestionnaire')
-                            ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->where('role', 'merchant')->orWhereDoesntHave('merchant')->orderBy('name'))
+                            ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query)
+                                ->where(fn (Builder $q) => $q->where('role', 'merchant')->orWhereDoesntHave('merchant'))
+                                ->orderBy('name'))
                             ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} (".($record->phone ?? 'Sans téléphone').')')
                             ->required()
                             ->helperText('Sélectionnez un compte gestionnaire ou créez-en un nouveau via le bouton +.')
@@ -94,12 +108,17 @@ class MerchantResource extends Resource
                                     ->dehydrateStateUsing(fn ($state) => Hash::make($state)),
                             ])
                             ->createOptionUsing(function (array $data): int {
+                                if (! FilamentCityScope::hasValidLocalCity()) {
+                                    abort(403, 'Aucune ville rattachée à votre compte administrateur.');
+                                }
+
                                 $user = User::create([
                                     'name' => $data['name'],
                                     'phone' => $data['phone'],
                                     'email' => $data['email'],
                                     'password' => Hash::make($data['password']),
                                     'role' => 'merchant',
+                                    'city_id' => FilamentCityScope::localCityId(),
                                     'is_active' => true,
                                     'phone_verified_at' => now(),
                                 ]);
@@ -107,9 +126,9 @@ class MerchantResource extends Resource
                                 return $user->id;
                             }),
 
-                        SearchableSelect::make('city_id')
-                            ->label('Ville d\'implantation')
-                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                        FilamentCityScope::configureCitySelect(
+                            SearchableSelect::make('city_id')->label('Ville d\'implantation')
+                        )
                             ->required(),
 
                         SearchableSelect::make('category')
@@ -317,7 +336,8 @@ class MerchantResource extends Resource
                     ->options(fn () => MerchantCategory::pluck('name', 'slug')->toArray()),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
-                    ->relationship('city', 'name'),
+                    ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query, 'cities.id'))
+                    ->visible(fn (): bool => ! FilamentCityScope::isLocal()),
                 Tables\Filters\Filter::make('created_at')
                     ->form([
                         Forms\Components\DatePicker::make('created_from')->label('Inscrit à partir du'),
@@ -352,6 +372,8 @@ class MerchantResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading(fn (Merchant $record): string => $record->is_active ? "Désactiver {$record->name}" : "Activer {$record->name}")
                     ->action(function (Merchant $record, array $data): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         $newStatus = ! $record->is_active;
                         $updateData = ['is_active' => $newStatus];
 

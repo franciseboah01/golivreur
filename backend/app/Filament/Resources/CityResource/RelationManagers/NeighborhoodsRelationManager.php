@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources\CityResource\RelationManagers;
 
+use App\Filament\Support\FilamentCityScope;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class NeighborhoodsRelationManager extends RelationManager
 {
@@ -17,6 +19,26 @@ class NeighborhoodsRelationManager extends RelationManager
     protected static ?string $modelLabel = 'Quartier';
 
     protected static ?string $pluralModelLabel = 'Quartiers';
+
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return FilamentCityScope::canAccessCityId((int) $ownerRecord->getKey());
+    }
+
+    protected function canCreate(): bool
+    {
+        return FilamentCityScope::canAccessCityId((int) $this->getOwnerRecord()->getKey());
+    }
+
+    protected function canEdit(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId((int) $this->getOwnerRecord()->getKey());
+    }
+
+    protected function canDelete(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId((int) $this->getOwnerRecord()->getKey());
+    }
 
     public function form(Form $form): Form
     {

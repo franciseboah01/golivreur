@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\AdministratorResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\RoleHabilitation;
 use App\Models\User;
 use Filament\Forms;
@@ -46,7 +47,11 @@ class AdministratorResource extends Resource
             return false;
         }
 
-        return in_array($user->role, ['super_admin', 'dg_national', 'city_manager'], true);
+        if ($user->role === 'city_manager') {
+            return $user->city_id !== null;
+        }
+
+        return in_array($user->role, ['super_admin', 'dg_national'], true);
     }
 
     public static function canEdit(Model $record): bool
@@ -66,7 +71,9 @@ class AdministratorResource extends Resource
         }
 
         if ($user->role === 'city_manager') {
-            return (int) $record->city_id === (int) $user->city_id
+            return $user->city_id !== null
+                && $record->city_id !== null
+                && (int) $record->city_id === (int) $user->city_id
                 && in_array($record->role, ['city_support', 'city_agent', 'city_finance'], true);
         }
 
@@ -90,7 +97,9 @@ class AdministratorResource extends Resource
         }
 
         if ($user->role === 'city_manager') {
-            return (int) $record->city_id === (int) $user->city_id
+            return $user->city_id !== null
+                && $record->city_id !== null
+                && (int) $record->city_id === (int) $user->city_id
                 && in_array($record->role, ['city_support', 'city_agent', 'city_finance'], true);
         }
 
@@ -102,12 +111,7 @@ class AdministratorResource extends Resource
         $query = parent::getEloquentQuery()
             ->whereIn('role', User::ADMIN_ROLES);
 
-        $user = auth()->user();
-        if ($user && $user->role === 'city_manager' && $user->city_id) {
-            $query->where('city_id', $user->city_id);
-        }
-
-        return $query;
+        return FilamentCityScope::scopeByCity($query);
     }
 
     public static function getAllowedRolesForUser(?User $user): array
@@ -332,7 +336,8 @@ class AdministratorResource extends Resource
                     ->label('Statut du Compte'),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
-                    ->relationship('city', 'name'),
+                    ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query, 'cities.id'))
+                    ->visible(fn (): bool => ! FilamentCityScope::isLocal()),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make()->label('Voir'),

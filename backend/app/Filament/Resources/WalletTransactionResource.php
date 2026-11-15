@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\WalletTransactionResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\WalletTransaction;
@@ -56,24 +57,29 @@ class WalletTransactionResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
-        $user = auth()->user();
 
-        if ($user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id) {
-            $cityId = (int) $user->city_id;
-            $query->where(function ($q) use ($cityId) {
-                $q->whereHas('order', fn ($o) => $o->where('city_id', $cityId))
-                    ->orWhereHas('parcel', fn ($p) => $p->where('city_id', $cityId))
-                    ->orWhereHas('wallet', function ($w) use ($cityId) {
-                        $w->where(function ($sub) use ($cityId) {
-                            $sub->where('owner_type', 'merchant')
-                                ->whereIn('owner_id', Merchant::where('city_id', $cityId)->select('id'));
-                        })->orWhere(function ($sub2) use ($cityId) {
-                            $sub2->where('owner_type', 'courier')
-                                ->whereIn('owner_id', Courier::where('city_id', $cityId)->select('id'));
-                        });
-                    });
-            });
+        if (! FilamentCityScope::isLocal()) {
+            return $query;
         }
+
+        $cityId = FilamentCityScope::localCityId();
+        if ($cityId === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $query->where(function ($q) use ($cityId) {
+            $q->whereHas('order', fn ($o) => $o->where('city_id', $cityId))
+                ->orWhereHas('parcel', fn ($p) => $p->where('city_id', $cityId))
+                ->orWhereHas('wallet', function ($w) use ($cityId) {
+                    $w->where(function ($sub) use ($cityId) {
+                        $sub->where('owner_type', 'merchant')
+                            ->whereIn('owner_id', Merchant::where('city_id', $cityId)->select('id'));
+                    })->orWhere(function ($sub2) use ($cityId) {
+                        $sub2->where('owner_type', 'courier')
+                            ->whereIn('owner_id', Courier::where('city_id', $cityId)->select('id'));
+                    });
+                });
+        });
 
         return $query;
     }

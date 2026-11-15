@@ -3,12 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ActivityLogResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Ressource Filament du Journal d'Audit (Immuable).
@@ -35,6 +37,27 @@ class ActivityLogResource extends Resource
         $user = auth()->user();
 
         return $user !== null && $user->hasHabilitationTab('activity_logs');
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        if (! FilamentCityScope::isLocal()) {
+            return $query;
+        }
+
+        $cityId = FilamentCityScope::localCityId();
+
+        if ($cityId === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $q) use ($cityId): void {
+            $q->whereHas('user', fn (Builder $u) => $u->where('city_id', $cityId))
+                ->orWhere('properties->city_id', $cityId)
+                ->orWhere(fn (Builder $c) => $c->where('entity_type', 'city')->where('entity_id', $cityId));
+        });
     }
 
     public static function form(Form $form): Form

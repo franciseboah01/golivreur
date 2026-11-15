@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\PaymentMethod;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ParcelResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\Courier;
 use App\Models\Parcel;
 use App\Models\ParcelPhoto;
@@ -18,6 +19,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class ParcelResource extends Resource
 {
@@ -42,16 +44,26 @@ class ParcelResource extends Resource
         return $user !== null && $user->hasHabilitationTab('parcels');
     }
 
+    public static function canCreate(): bool
+    {
+        return FilamentCityScope::hasValidLocalCity() && parent::canCreate();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canEdit($record);
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canDelete($record);
+    }
+
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
-        $user = auth()->user();
-
-        if ($user && str_starts_with((string) $user->role, 'city_')) {
-            $query->where('city_id', $user->city_id);
-        }
-
-        return $query;
+        return FilamentCityScope::scopeByCity(parent::getEloquentQuery());
     }
 
     public static function form(Form $form): Form
@@ -61,9 +73,9 @@ class ParcelResource extends Resource
                 Forms\Components\Section::make('Expéditeur & Destinataire')
                     ->schema([
                         // Listes déroulantes remontées en haut avec recherche live et tri alphabétique
-                        SearchableSelect::make('city_id')
-                            ->label('Ville')
-                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                        FilamentCityScope::configureCitySelect(
+                            SearchableSelect::make('city_id')->label('Ville')
+                        )
                             ->required(),
                         SearchableSelect::make('size')
                             ->label('Format du colis')
@@ -75,11 +87,11 @@ class ParcelResource extends Resource
                             ->required(),
                         SearchableSelect::make('sender_id')
                             ->label('Client Expéditeur')
-                            ->relationship('sender', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                            ->relationship('sender', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query)->orderBy('name'))
                             ->required(),
                         SearchableSelect::make('courier_id')
                             ->label('Livreur assigné')
-                            ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => $query->with('user')->orderBy('id'))
+                            ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query)->with('user')->orderBy('id'))
                             ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user->name ?? "Livreur #{$record->id}").($record->user?->phone ? " ({$record->user->phone})" : '')),
                         Forms\Components\TextInput::make('recipient_name')
                             ->label('Nom du Destinataire')
@@ -111,10 +123,12 @@ class ParcelResource extends Resource
                             ->required(),
                         Forms\Components\TextInput::make('declared_value')
                             ->label('Valeur déclarée (F CFA)')
-                            ->numeric(),
+                            ->numeric()
+                            ->default(0),
                         Forms\Components\TextInput::make('insurance_amount')
                             ->label('Prime d\'assurance (F CFA)')
-                            ->numeric(),
+                            ->numeric()
+                            ->default(0),
                         Forms\Components\TextInput::make('platform_commission')
                             ->label('Commission plateforme (F CFA)')
                             ->numeric()
@@ -332,7 +346,8 @@ class ParcelResource extends Resource
 
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
-                    ->relationship('city', 'name'),
+                    ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query, 'cities.id'))
+                    ->visible(fn (): bool => ! FilamentCityScope::isLocal()),
 
                 Tables\Filters\Filter::make('created_at')
                     ->form([
@@ -369,6 +384,8 @@ class ParcelResource extends Resource
                     ->modalDescription('Appelez impérativement le client expéditeur avant de débloquer le code.')
                     ->modalSubmitActionLabel('Débloquer le code')
                     ->action(function (Parcel $record): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         app(ParcelService::class)->debloquerCode(
                             $record,
                             'sender',
@@ -396,6 +413,8 @@ class ParcelResource extends Resource
                     ->modalDescription('Appelez impérativement le client destinataire avant de débloquer le code.')
                     ->modalSubmitActionLabel('Débloquer le code')
                     ->action(function (Parcel $record): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         app(ParcelService::class)->debloquerCode(
                             $record,
                             'recipient',

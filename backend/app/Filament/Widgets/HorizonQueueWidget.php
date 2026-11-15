@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Support\FilamentCityScope;
 use App\Models\WebhookLog;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -17,6 +18,11 @@ class HorizonQueueWidget extends BaseWidget
     protected static ?int $sort = 2;
 
     protected static ?string $pollingInterval = '15s';
+
+    public static function canView(): bool
+    {
+        return FilamentCityScope::user() !== null && ! FilamentCityScope::isLocal();
+    }
 
     protected function getStats(): array
     {

@@ -4,7 +4,7 @@ namespace App\Filament\Resources\NeighborhoodResource\Pages;
 
 use App\Filament\Resources\CityResource;
 use App\Filament\Resources\NeighborhoodResource;
-use App\Models\Neighborhood;
+use App\Filament\Support\FilamentCityScope;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
@@ -39,13 +39,13 @@ class ListNeighborhoods extends ListRecords
     {
         return [
             'all' => Tab::make('Tous les Quartiers')
-                ->badge(Neighborhood::count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(NeighborhoodResource::class)),
             'active' => Tab::make('Actifs')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('is_active', true))
-                ->badge(Neighborhood::where('is_active', true)->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(NeighborhoodResource::class, fn (Builder $q) => $q->where('is_active', true))),
             'inactive' => Tab::make('Inactifs')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('is_active', false))
-                ->badge(Neighborhood::where('is_active', false)->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(NeighborhoodResource::class, fn (Builder $q) => $q->where('is_active', false))),
         ];
     }
 }

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Components\ImageUploadField;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\CourierResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\Courier;
 use App\Models\User;
@@ -16,6 +17,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -42,16 +44,26 @@ class CourierResource extends Resource
         return $user !== null && $user->hasHabilitationTab('couriers');
     }
 
+    public static function canCreate(): bool
+    {
+        return FilamentCityScope::hasValidLocalCity() && parent::canCreate();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canEdit($record);
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canDelete($record);
+    }
+
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
-        $user = auth()->user();
-
-        if ($user && $user->is_local_admin && $user->city_id) {
-            $query->where('city_id', $user->city_id);
-        }
-
-        return $query;
+        return FilamentCityScope::scopeByCity(parent::getEloquentQuery());
     }
 
     public static function form(Form $form): Form
@@ -64,7 +76,9 @@ class CourierResource extends Resource
                         // Listes déroulantes remontées en haut du formulaire avec recherche live et tri alphabétique
                         SearchableSelect::make('user_id')
                             ->label('Compte Utilisateur (Livreur)')
-                            ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->whereIn('role', ['driver', 'courier'])->orWhereDoesntHave('courier')->orderBy('name'))
+                            ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query)
+                                ->where(fn (Builder $q) => $q->whereIn('role', ['driver', 'courier'])->orWhereDoesntHave('courier'))
+                                ->orderBy('name'))
                             ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} (".($record->phone ?? 'Sans téléphone').')')
                             ->required()
                             ->helperText('Sélectionnez un livreur existant ou créez-en un nouveau via le bouton +.')
@@ -93,12 +107,17 @@ class CourierResource extends Resource
                                     ->dehydrateStateUsing(fn ($state) => Hash::make($state)),
                             ])
                             ->createOptionUsing(function (array $data): int {
+                                if (! FilamentCityScope::hasValidLocalCity()) {
+                                    abort(403, 'Aucune ville rattachée à votre compte administrateur.');
+                                }
+
                                 $user = User::create([
                                     'name' => $data['name'],
                                     'phone' => $data['phone'],
                                     'email' => $data['email'],
                                     'password' => Hash::make($data['password']),
                                     'role' => 'driver',
+                                    'city_id' => FilamentCityScope::localCityId(),
                                     'is_active' => true,
                                     'phone_verified_at' => now(),
                                 ]);
@@ -106,9 +125,9 @@ class CourierResource extends Resource
                                 return $user->id;
                             }),
 
-                        SearchableSelect::make('city_id')
-                            ->label('Ville d\'affectation')
-                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                        FilamentCityScope::configureCitySelect(
+                            SearchableSelect::make('city_id')->label('Ville d\'affectation')
+                        )
                             ->required(),
 
                         SearchableSelect::make('vehicle_type')
@@ -265,7 +284,8 @@ class CourierResource extends Resource
                     ->options(fn () => VehicleType::pluck('name', 'slug')->toArray()),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
-                    ->relationship('city', 'name'),
+                    ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query, 'cities.id'))
+                    ->visible(fn (): bool => ! FilamentCityScope::isLocal()),
                 Tables\Filters\Filter::make('created_at')
                     ->form([
                         Forms\Components\DatePicker::make('created_from')->label('Inscrit à partir du'),
@@ -293,6 +313,8 @@ class CourierResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading(fn (Courier $record): string => $record->is_active ? "Suspendre le livreur {$record->user?->name}" : "Valider et activer {$record->user?->name}")
                     ->action(function (Courier $record): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         $newStatus = ! $record->is_active;
                         $record->update([
                             'is_active' => $newStatus,
@@ -331,6 +353,8 @@ class CourierResource extends Resource
                             ->required(),
                     ])
                     ->action(function (Courier $record, array $data): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         $penaltyUntil = now()->addMinutes((int) $data['minutes']);
                         $record->update([
                             'penalty_until' => $penaltyUntil,

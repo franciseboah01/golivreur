@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Widgets;
 
 use App\Filament\Resources\CourierResource;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\Courier;
 use App\Models\VehicleType;
@@ -19,12 +20,9 @@ class PendingCouriersWidget extends BaseWidget
 
     public function table(Table $table): Table
     {
-        $user = auth()->user();
-        $query = Courier::query()->where('is_active', false)->latest('created_at');
-
-        if ($user && $user->is_local_admin && $user->city_id) {
-            $query->where('city_id', $user->city_id);
-        }
+        $query = FilamentCityScope::scopeByCity(
+            Courier::query()->where('is_active', false)->latest('created_at')
+        );
 
         return $table
             ->query($query)
@@ -79,6 +77,8 @@ class PendingCouriersWidget extends BaseWidget
                     ->modalHeading(fn (Courier $record) => "Valider le profil de {$record->user?->name}")
                     ->modalDescription('Le livreur sera immédiatement activé et pourra se connecter à l\'application GoLivreur Driver pour accepter des courses.')
                     ->action(function (Courier $record): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         $record->update([
                             'is_active' => true,
                             'activated_at' => now(),

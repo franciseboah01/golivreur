@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Enums\PaymentMethod;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\Order;
 use App\Models\Parcel;
 use Filament\Widgets\ChartWidget;
@@ -19,9 +20,7 @@ class PaymentMethodsChart extends ChartWidget
 
     protected function getData(): array
     {
-        $user = auth()->user();
-        $isLocal = $user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id;
-        $cityId = $isLocal ? (int) $user->city_id : null;
+        $hasValidCity = FilamentCityScope::hasValidLocalCity();
 
         $labels = [];
         $data = [];
@@ -29,13 +28,10 @@ class PaymentMethodsChart extends ChartWidget
 
         foreach (PaymentMethod::chartOrder() as $method) {
             $values = $method->valuesWithLegacyAliases();
-            $ordersQ = Order::whereIn('payment_method', $values);
-            $parcelsQ = Parcel::whereIn('payment_method', $values);
-            if ($cityId) {
-                $ordersQ->where('city_id', $cityId);
-                $parcelsQ->where('city_id', $cityId);
-            }
-            $total = $ordersQ->count() + $parcelsQ->count();
+            $total = $hasValidCity
+                ? FilamentCityScope::scopeByCity(Order::whereIn('payment_method', $values))->count()
+                    + FilamentCityScope::scopeByCity(Parcel::whereIn('payment_method', $values))->count()
+                : 0;
 
             $labels[] = $method->label();
             $data[] = $total;

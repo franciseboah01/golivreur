@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\WebhookLogResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\WebhookLog;
 use App\Services\WebhookReplayService;
 use Filament\Forms;
@@ -11,6 +12,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
@@ -37,7 +39,20 @@ class WebhookLogResource extends Resource
     {
         $user = auth()->user();
 
-        return $user !== null && $user->hasHabilitationTab('webhook_logs');
+        return $user !== null
+            && ! FilamentCityScope::isLocal($user)
+            && $user->hasHabilitationTab('webhook_logs');
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        if (FilamentCityScope::isLocal()) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query;
     }
 
     public static function form(Form $form): Form

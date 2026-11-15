@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\NeighborhoodResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\Neighborhood;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,6 +12,8 @@ use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rules\Unique;
 
 /**
@@ -40,15 +43,37 @@ class NeighborhoodResource extends Resource
         return $user !== null && $user->hasHabilitationTab('cities');
     }
 
+    public static function canCreate(): bool
+    {
+        return FilamentCityScope::hasValidLocalCity() && parent::canCreate();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canEdit($record);
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canDelete($record);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return FilamentCityScope::scopeByCity(parent::getEloquentQuery());
+    }
+
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
                 Forms\Components\Section::make('Informations du Quartier')
                     ->schema([
-                        SearchableSelect::make('city_id')
-                            ->label('Ville')
-                            ->relationship('city', 'name')
+                        FilamentCityScope::configureCitySelect(
+                            SearchableSelect::make('city_id')->label('Ville')
+                        )
                             ->required(),
 
                         Forms\Components\TextInput::make('name')
@@ -133,7 +158,8 @@ class NeighborhoodResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Ville')
-                    ->relationship('city', 'name')
+                    ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query, 'cities.id'))
+                    ->visible(fn (): bool => ! FilamentCityScope::isLocal())
                     ->searchable()
                     ->preload(),
 

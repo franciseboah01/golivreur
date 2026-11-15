@@ -4,7 +4,7 @@ namespace App\Filament\Resources\MerchantResource\Pages;
 
 use App\Filament\Resources\MerchantCategoryResource;
 use App\Filament\Resources\MerchantResource;
-use App\Models\Merchant;
+use App\Filament\Support\FilamentCityScope;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
@@ -31,16 +31,16 @@ class ListMerchants extends ListRecords
     {
         return [
             'all' => Tab::make('Tous les Commerces')
-                ->badge(Merchant::count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(MerchantResource::class)),
             'open' => Tab::make('Ouverts')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('is_open', true))
-                ->badge(Merchant::where('is_open', true)->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(MerchantResource::class, fn (Builder $q) => $q->where('is_open', true))),
             'active' => Tab::make('Validés & Actifs')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('is_active', true))
-                ->badge(Merchant::where('is_active', true)->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(MerchantResource::class, fn (Builder $q) => $q->where('is_active', true))),
             'pending' => Tab::make('En Attente de Validation')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('is_active', false))
-                ->badge(Merchant::where('is_active', false)->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(MerchantResource::class, fn (Builder $q) => $q->where('is_active', false))),
         ];
     }
 }

@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\UserResource\Pages;
 
 use App\Filament\Resources\UserResource;
-use App\Models\User;
+use App\Filament\Support\FilamentCityScope;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
@@ -24,16 +24,16 @@ class ListUsers extends ListRecords
     {
         return [
             'all' => Tab::make('Tous les Utilisateurs')
-                ->badge(User::whereNotIn('role', User::ADMIN_ROLES)->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(UserResource::class)),
             'clients' => Tab::make('Clients')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('role', 'client'))
-                ->badge(User::where('role', 'client')->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(UserResource::class, fn (Builder $q) => $q->where('role', 'client'))),
             'merchants' => Tab::make('Commerçants')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('role', 'merchant'))
-                ->badge(User::where('role', 'merchant')->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(UserResource::class, fn (Builder $q) => $q->where('role', 'merchant'))),
             'couriers' => Tab::make('Livreurs')
                 ->modifyQueryUsing(fn (Builder $query) => $query->whereIn('role', ['driver', 'courier']))
-                ->badge(User::whereIn('role', ['driver', 'courier'])->count()),
+                ->badge(fn (): int => FilamentCityScope::scopedTabCount(UserResource::class, fn (Builder $q) => $q->whereIn('role', ['driver', 'courier']))),
         ];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\CityResource\Pages;
 use App\Filament\Resources\CityResource\RelationManagers\NeighborhoodsRelationManager;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\City;
 use Filament\Forms;
@@ -12,6 +13,8 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class CityResource extends Resource
 {
@@ -34,6 +37,35 @@ class CityResource extends Resource
         $user = auth()->user();
 
         return $user !== null && $user->hasHabilitationTab('cities');
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return FilamentCityScope::scopeByCity(parent::getEloquentQuery(), 'id');
+    }
+
+    public static function canCreate(): bool
+    {
+        return ! FilamentCityScope::isLocal() && parent::canCreate();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        if (FilamentCityScope::isLocal()) {
+            return FilamentCityScope::canAccessCityId((int) $record->getKey());
+        }
+
+        return parent::canEdit($record);
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return ! FilamentCityScope::isLocal() && parent::canDelete($record);
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return ! FilamentCityScope::isLocal() && parent::canDeleteAny();
     }
 
     public static function form(Form $form): Form
@@ -175,6 +207,8 @@ class CityResource extends Resource
                     ->icon(fn (City $record): string => $record->rain_mode_active ? 'heroicon-m-sun' : 'heroicon-m-cloud')
                     ->color(fn (City $record): string => $record->rain_mode_active ? 'gray' : 'warning')
                     ->action(function (City $record): void {
+                        FilamentCityScope::authorizeCityId((int) $record->id);
+
                         $newStatus = ! $record->rain_mode_active;
                         $record->update([
                             'rain_mode_active' => $newStatus,
@@ -210,6 +244,10 @@ class CityResource extends Resource
                     ])
                     ->modalHeading(fn (City $record): string => $record->emergency_mode_active ? "Lever l'urgence sur {$record->name}" : "Déclencher l'urgence sur {$record->name}")
                     ->action(function (City $record, array $data): void {
+                        if (! in_array(auth()->user()?->role, ['super_admin', 'dg_national'], true)) {
+                            abort(403, 'Action réservée à la direction nationale.');
+                        }
+
                         $newStatus = ! $record->emergency_mode_active;
                         $record->update([
                             'emergency_mode_active' => $newStatus,

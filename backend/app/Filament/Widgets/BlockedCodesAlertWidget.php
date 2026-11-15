@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\OrderResource;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\Order;
 use Filament\Notifications\Notification;
 use Filament\Tables;
@@ -19,22 +20,20 @@ class BlockedCodesAlertWidget extends BaseWidget
 
     public static function canView(): bool
     {
-        $query = Order::where('confirmation_locked', true);
-        $user = auth()->user();
-        if ($user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id) {
-            $query->where('city_id', $user->city_id);
+        if (! FilamentCityScope::hasValidLocalCity()) {
+            return false;
         }
 
-        return $query->exists();
+        return FilamentCityScope::scopeByCity(
+            Order::where('confirmation_locked', true)
+        )->exists();
     }
 
     public function table(Table $table): Table
     {
-        $query = Order::query()->where('confirmation_locked', true);
-        $user = auth()->user();
-        if ($user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id) {
-            $query->where('city_id', $user->city_id);
-        }
+        $query = FilamentCityScope::scopeByCity(
+            Order::query()->where('confirmation_locked', true)
+        );
 
         return $table
             ->query($query)
@@ -74,6 +73,8 @@ class BlockedCodesAlertWidget extends BaseWidget
                     ->modalHeading('Déblocage du code de confirmation')
                     ->modalDescription('Confirmez-vous le déblocage de cette commande pour permettre au livreur de finaliser la livraison ?')
                     ->action(function (Order $record): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         $record->update([
                             'confirmation_locked' => false,
                             'confirmation_attempts' => 0,

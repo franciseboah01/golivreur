@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Widgets;
 
 use App\Filament\Resources\MerchantResource;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\Merchant;
 use Filament\Notifications\Notification;
@@ -18,12 +19,9 @@ class PendingMerchantsWidget extends BaseWidget
 
     public function table(Table $table): Table
     {
-        $user = auth()->user();
-        $query = Merchant::query()->where('is_active', false)->latest('created_at');
-
-        if ($user && $user->is_local_admin && $user->city_id) {
-            $query->where('city_id', $user->city_id);
-        }
+        $query = FilamentCityScope::scopeByCity(
+            Merchant::query()->where('is_active', false)->latest('created_at')
+        );
 
         return $table
             ->query($query)
@@ -81,6 +79,8 @@ class PendingMerchantsWidget extends BaseWidget
                     ->modalHeading(fn (Merchant $record) => "Confirmer l'activation de {$record->name}")
                     ->modalDescription('Le commerce apparaîtra immédiatement dans l\'application GoLivreur Client pour recevoir des commandes.')
                     ->action(function (Merchant $record): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         $record->update([
                             'is_active' => true,
                             'activated_at' => now(),

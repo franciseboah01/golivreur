@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\OrderResource;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\Order;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -18,11 +19,7 @@ class LatestOrdersWidget extends BaseWidget
 
     public function table(Table $table): Table
     {
-        $query = Order::query()->latest();
-        $user = auth()->user();
-        if ($user && ($user->is_local_admin || str_starts_with((string) $user->role, 'city_')) && $user->city_id) {
-            $query->where('city_id', $user->city_id);
-        }
+        $query = FilamentCityScope::scopeByCity(Order::query()->latest());
 
         return $table
             ->query($query->limit(5))

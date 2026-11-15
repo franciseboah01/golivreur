@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\UserResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class UserResource extends Resource
 {
@@ -35,10 +37,29 @@ class UserResource extends Resource
         return $user !== null && $user->hasHabilitationTab('clients');
     }
 
+    public static function canCreate(): bool
+    {
+        return FilamentCityScope::hasValidLocalCity() && parent::canCreate();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canEdit($record);
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canDelete($record);
+    }
+
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->whereNotIn('role', User::ADMIN_ROLES);
+
+        return FilamentCityScope::scopeByCity($query);
     }
 
     public static function form(Form $form): Form
@@ -55,9 +76,10 @@ class UserResource extends Resource
                                 'driver' => 'Livreur Partenaire',
                             ]))
                             ->required(),
-                        SearchableSelect::make('city_id')
-                            ->label('Ville de rattachement')
-                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name')),
+                        FilamentCityScope::configureCitySelect(
+                            SearchableSelect::make('city_id')->label('Ville de rattachement')
+                        )
+                            ->required(fn (): bool => FilamentCityScope::isLocal()),
                         Forms\Components\TextInput::make('name')
                             ->label('Nom et Prénom')
                             ->required()
@@ -167,7 +189,8 @@ class UserResource extends Resource
                     ->falseLabel('Suspendus / Inactifs'),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
-                    ->relationship('city', 'name'),
+                    ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query, 'cities.id'))
+                    ->visible(fn (): bool => ! FilamentCityScope::isLocal()),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('Modifier'),

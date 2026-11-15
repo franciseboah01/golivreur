@@ -33,7 +33,7 @@ class EditAdministrator extends EditRecord
         }
 
         if ($user && $user->role === 'city_manager') {
-            if ($record->city_id !== $user->city_id) {
+            if ($user->city_id === null || $record->city_id === null || (int) $record->city_id !== (int) $user->city_id) {
                 abort(403, 'Action non autorisée sur un administrateur hors de votre ville.');
             }
             $data['city_id'] = $user->city_id;

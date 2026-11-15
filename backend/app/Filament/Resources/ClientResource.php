@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Components\ImageUploadField;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ClientResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\User;
 use Filament\Forms;
@@ -14,6 +15,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * Ressource Filament dédiée aux Clients GoLivreur.
@@ -42,18 +44,30 @@ class ClientResource extends Resource
         return $user !== null && $user->hasHabilitationTab('clients');
     }
 
+    public static function canCreate(): bool
+    {
+        return FilamentCityScope::hasValidLocalCity() && parent::canCreate();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canEdit($record);
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canDelete($record);
+    }
+
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()
             ->where('role', 'client')
             ->latest();
 
-        $user = auth()->user();
-        if ($user && $user->is_local_admin && $user->city_id) {
-            $query->where('city_id', $user->city_id);
-        }
-
-        return $query;
+        return FilamentCityScope::scopeByCity($query);
     }
 
     public static function form(Form $form): Form
@@ -62,9 +76,9 @@ class ClientResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Fiche Client')
                     ->schema([
-                        SearchableSelect::make('city_id')
-                            ->label('Ville de rattachement')
-                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                        FilamentCityScope::configureCitySelect(
+                            SearchableSelect::make('city_id')->label('Ville de rattachement')
+                        )
                             ->required(),
                         SearchableSelect::make('language')
                             ->label('Langue préférée')
@@ -152,7 +166,8 @@ class ClientResource extends Resource
                     ->falseLabel('Désactivés uniquement'),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Ville')
-                    ->relationship('city', 'name'),
+                    ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query, 'cities.id'))
+                    ->visible(fn (): bool => ! FilamentCityScope::isLocal()),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make()->label('Détail'),
@@ -167,6 +182,8 @@ class ClientResource extends Resource
                         ? 'Le client ne pourra plus se connecter ni commander sur GoLivreur.'
                         : 'Le compte sera rétabli avec accès complet.')
                     ->action(function (User $record): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         $newStatus = ! $record->is_active;
                         $record->update(['is_active' => $newStatus]);
 

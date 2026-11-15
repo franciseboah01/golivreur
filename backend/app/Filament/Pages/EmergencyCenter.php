@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Support\FilamentCityScope;
 use App\Filament\Widgets\EmergencyStatsWidget;
 use App\Models\City;
 use App\Models\Order;
@@ -40,7 +41,16 @@ class EmergencyCenter extends Page implements HasForms, HasTable
     {
         $user = auth()->user();
 
-        return $user !== null && $user->hasHabilitationTab('emergency_center');
+        return $user !== null
+            && ! FilamentCityScope::isLocal($user)
+            && $user->hasHabilitationTab('emergency_center');
+    }
+
+    public function mount(): void
+    {
+        if (FilamentCityScope::isLocal()) {
+            abort(403, 'Le centre d\'urgences est réservé à la direction nationale.');
+        }
     }
 
     protected function getHeaderWidgets(): array

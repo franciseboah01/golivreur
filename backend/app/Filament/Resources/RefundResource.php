@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\RefundResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\Refund;
 use App\Models\User;
 use App\Services\RefundService;
@@ -43,16 +44,11 @@ class RefundResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $user = auth()->user();
         $query = parent::getEloquentQuery()
             ->with(['city', 'order', 'parcel', 'client'])
             ->latest();
 
-        if ($user && in_array($user->role, RefundService::LOCAL_ROLES, true) && $user->city_id) {
-            $query->where('city_id', $user->city_id);
-        }
-
-        return $query;
+        return FilamentCityScope::scopeByCity($query);
     }
 
     public static function form(Form $form): Form

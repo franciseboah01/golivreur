@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\Order;
 use App\Models\Parcel;
@@ -41,10 +42,12 @@ class DisputesPage extends Page implements HasTable
 
     public static function getNavigationBadge(): ?string
     {
-        $lockedOrders = Order::where('confirmation_locked', true)->count();
-        $lockedParcels = Parcel::where('sender_code_locked', true)
-            ->orWhere('recipient_code_locked', true)
-            ->count();
+        $lockedOrders = FilamentCityScope::scopeByCity(
+            Order::where('confirmation_locked', true)
+        )->count();
+        $lockedParcels = FilamentCityScope::scopeByCity(
+            Parcel::where(fn ($q) => $q->where('sender_code_locked', true)->orWhere('recipient_code_locked', true))
+        )->count();
         $total = $lockedOrders + $lockedParcels;
 
         return $total > 0 ? (string) $total : null;
@@ -58,7 +61,7 @@ class DisputesPage extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(Order::query()->where('confirmation_locked', true))
+            ->query(FilamentCityScope::scopeByCity(Order::query()->where('confirmation_locked', true)))
             ->heading('Commandes GoShop Bloquées (Échec de Code OTP Client)')
             ->description('Appelez le client pour confirmer son identité avant de débloquer la livraison.')
             ->columns([
@@ -103,6 +106,8 @@ class DisputesPage extends Page implements HasTable
                     ->modalHeading(fn (Order $record): string => "Débloquer la commande #{$record->id}")
                     ->modalDescription('Confirmez-vous avoir appelé le client et validé verbalement la réception de la livraison ?')
                     ->action(function (Order $record): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         $record->update([
                             'confirmation_locked' => false,
                             'confirmation_attempts' => 0,

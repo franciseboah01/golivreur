@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\PaymentMethod;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\OrderResource\Pages;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\Courier;
 use App\Models\Order;
@@ -17,6 +18,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class OrderResource extends Resource
 {
@@ -41,16 +43,26 @@ class OrderResource extends Resource
         return $user !== null && $user->hasHabilitationTab('orders');
     }
 
+    public static function canCreate(): bool
+    {
+        return FilamentCityScope::hasValidLocalCity() && parent::canCreate();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canEdit($record);
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return FilamentCityScope::canAccessCityId($record->getAttribute('city_id') !== null ? (int) $record->getAttribute('city_id') : null)
+            && parent::canDelete($record);
+    }
+
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
-        $user = auth()->user();
-
-        if ($user && str_starts_with((string) $user->role, 'city_')) {
-            $query->where('city_id', $user->city_id);
-        }
-
-        return $query;
+        return FilamentCityScope::scopeByCity(parent::getEloquentQuery());
     }
 
     public static function form(Form $form): Form
@@ -61,9 +73,9 @@ class OrderResource extends Resource
                     ->description('Détails de la commande et intervenants')
                     ->schema([
                         // Listes déroulantes en haut avec recherche live et tri alphabétique
-                        SearchableSelect::make('city_id')
-                            ->label('Ville')
-                            ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                        FilamentCityScope::configureCitySelect(
+                            SearchableSelect::make('city_id')->label('Ville')
+                        )
                             ->required(),
                         SearchableSelect::make('status')
                             ->label('Statut de la commande')
@@ -81,15 +93,15 @@ class OrderResource extends Resource
                             ->default('pending'),
                         SearchableSelect::make('client_id')
                             ->label('Client')
-                            ->relationship('client', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                            ->relationship('client', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query)->orderBy('name'))
                             ->required(),
                         SearchableSelect::make('merchant_id')
                             ->label('Commerce')
-                            ->relationship('merchant', 'name', modifyQueryUsing: fn (Builder $query) => $query->orderBy('name'))
+                            ->relationship('merchant', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query)->orderBy('name'))
                             ->required(),
                         SearchableSelect::make('courier_id')
                             ->label('Livreur')
-                            ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => $query->with('user')->orderBy('id'))
+                            ->relationship('courier', 'id', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query)->with('user')->orderBy('id'))
                             ->getOptionLabelFromRecordUsing(fn (Courier $record) => ($record->user->name ?? "Livreur #{$record->id}").($record->user?->phone ? " ({$record->user->phone})" : '')),
                     ])->columns(2),
 
@@ -298,7 +310,8 @@ class OrderResource extends Resource
                     ->falseLabel('Codes Normaux'),
                 Tables\Filters\SelectFilter::make('city_id')
                     ->label('Filtrer par Ville')
-                    ->relationship('city', 'name'),
+                    ->relationship('city', 'name', modifyQueryUsing: fn (Builder $query) => FilamentCityScope::scopeByCity($query, 'cities.id'))
+                    ->visible(fn (): bool => ! FilamentCityScope::isLocal()),
                 Tables\Filters\Filter::make('created_at')
                     ->form([
                         Forms\Components\DatePicker::make('created_from')->label('Commandé à partir du'),
@@ -332,6 +345,8 @@ class OrderResource extends Resource
                     ])
                     ->visible(fn (Order $record): bool => ! in_array($record->status, ['delivered', 'cancelled'], true))
                     ->action(function (Order $record, array $data): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         $record->update([
                             'status' => 'cancelled',
                             'cancel_reason' => $data['cancellation_reason'],
@@ -358,19 +373,39 @@ class OrderResource extends Resource
                     ->label('Réassigner')
                     ->icon('heroicon-m-arrow-path')
                     ->color('warning')
-                    ->form([
+                    ->form(fn (Order $record): array => [
                         Forms\Components\Select::make('courier_id')
                             ->label('Nouveau livreur assigné')
-                            ->options(fn () => Courier::where('is_active', true)->with('user')->get()->mapWithKeys(
-                                fn ($courier) => [$courier->id => ($courier->user->name ?? "Livreur #{$courier->id}").($courier->vehicle_plate ? " ({$courier->vehicle_plate})" : '')]
-                            ))
+                            ->options(fn () => Courier::where('is_active', true)
+                                ->where('city_id', $record->city_id)
+                                ->with('user')
+                                ->get()
+                                ->mapWithKeys(
+                                    fn ($courier) => [$courier->id => ($courier->user->name ?? "Livreur #{$courier->id}").($courier->vehicle_plate ? " ({$courier->vehicle_plate})" : '')]
+                                ))
                             ->searchable()
                             ->required(),
                     ])
                     ->visible(fn (Order $record): bool => ! in_array($record->status, ['delivered', 'cancelled'], true))
                     ->action(function (Order $record, array $data): void {
+                        FilamentCityScope::authorizeRecord($record);
+
+                        $courier = Courier::where('id', (int) $data['courier_id'])
+                            ->where('is_active', true)
+                            ->where('city_id', $record->city_id)
+                            ->first();
+
+                        if (! $courier) {
+                            Notification::make()
+                                ->title('Livreur invalide ou hors de la ville de la commande.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
                         $oldCourier = $record->courier_id;
-                        $record->update(['courier_id' => $data['courier_id']]);
+                        $record->update(['courier_id' => $courier->id]);
 
                         ActivityLog::create([
                             'user_id' => auth()->id(),
@@ -394,6 +429,8 @@ class OrderResource extends Resource
                     ->color('success')
                     ->visible(fn (Order $record): bool => (bool) $record->confirmation_locked)
                     ->action(function (Order $record): void {
+                        FilamentCityScope::authorizeRecord($record);
+
                         $record->update([
                             'confirmation_locked' => false,
                             'confirmation_attempts' => 0,

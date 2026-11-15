@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\MerchantResource\Pages;
 
 use App\Filament\Resources\MerchantResource;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\City;
 use App\Models\MerchantCategory;
 use Filament\Resources\Pages\CreateRecord;
@@ -13,6 +14,8 @@ class CreateMerchant extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data = FilamentCityScope::enforceCityOnCreate($data);
+
         if (empty($data['lat']) || empty($data['lng'])) {
             $city = City::find($data['city_id'] ?? null);
             $data['lat'] = $city->center_lat ?? 6.8770;

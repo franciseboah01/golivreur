@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
-use App\Policies\ProfilePolicy;
+use App\Policies\UserPolicy;
 use App\Services\SmsService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -45,7 +45,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Gate::policy(User::class, ProfilePolicy::class);
+        Gate::policy(User::class, UserPolicy::class);
 
         RateLimiter::for('driver-location', function (Request $request) {
             return Limit::perMinute(12)->by($request->user()?->id ?: $request->ip());

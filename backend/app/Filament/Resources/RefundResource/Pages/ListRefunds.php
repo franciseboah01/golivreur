@@ -4,6 +4,7 @@ namespace App\Filament\Resources\RefundResource\Pages;
 
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\RefundResource;
+use App\Filament\Support\FilamentCityScope;
 use App\Models\Order;
 use App\Models\Parcel;
 use App\Models\User;
@@ -39,9 +40,13 @@ class ListRefunds extends ListRecords
                     SearchableSelect::make('order_id')
                         ->label('Commande GoShop concernée')
                         ->options(fn () => SearchableSelect::sortedOptions(
-                            Order::latest()->limit(50)->get()->mapWithKeys(
-                                fn (Order $o) => [$o->id => "#{$o->id} - {$o->total_client} F CFA ({$o->client?->name})"]
-                            )->toArray()
+                            FilamentCityScope::scopeByCity(Order::with('client'))
+                                ->latest()
+                                ->limit(50)
+                                ->get()
+                                ->mapWithKeys(
+                                    fn (Order $o) => [$o->id => "#{$o->id} - {$o->total_client} F CFA ({$o->client?->name})"]
+                                )->toArray()
                         ))
                         ->visible(fn (Forms\Get $get) => $get('contexte') === 'order')
                         ->required(fn (Forms\Get $get) => $get('contexte') === 'order'),
@@ -49,9 +54,13 @@ class ListRefunds extends ListRecords
                     SearchableSelect::make('parcel_id')
                         ->label('Colis GoColis concerné')
                         ->options(fn () => SearchableSelect::sortedOptions(
-                            Parcel::latest()->limit(50)->get()->mapWithKeys(
-                                fn (Parcel $p) => [$p->id => "#{$p->id} - Déclaré {$p->declared_value} F CFA"]
-                            )->toArray()
+                            FilamentCityScope::scopeByCity(Parcel::query())
+                                ->latest()
+                                ->limit(50)
+                                ->get()
+                                ->mapWithKeys(
+                                    fn (Parcel $p) => [$p->id => "#{$p->id} - Déclaré {$p->declared_value} F CFA"]
+                                )->toArray()
                         ))
                         ->visible(fn (Forms\Get $get) => $get('contexte') === 'parcel')
                         ->required(fn (Forms\Get $get) => $get('contexte') === 'parcel'),
@@ -65,7 +74,7 @@ class ListRefunds extends ListRecords
                             /** @var User|null $user */
                             $user = auth()->user();
                             $role = (string) ($user->role ?? 'city_agent');
-                            $monPlafond = app(RefundService::class)->plafondPourRole($role);
+                            $monPlafond = app(RefundService::class)->plafondPourRole($role, $user?->city_id);
                             $labelPlafond = $monPlafond === PHP_INT_MAX ? 'illimité' : "{$monPlafond} F CFA";
 
                             return "Votre rôle ({$role}) vous autorise un plafond maximal de {$labelPlafond}.";
@@ -89,10 +98,28 @@ class ListRefunds extends ListRecords
                     if ($data['contexte'] === 'order') {
                         /** @var Order $order */
                         $order = Order::findOrFail($data['order_id']);
+                        if (! FilamentCityScope::canAccessCityId((int) $order->city_id, $user)) {
+                            Notification::make()
+                                ->title('Remboursement refusé')
+                                ->body('Cette commande n\'appartient pas à votre ville.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
                         $desc = "Remboursement commande #{$order->id} : {$motif}";
                     } else {
                         /** @var Parcel $parcel */
                         $parcel = Parcel::findOrFail($data['parcel_id']);
+                        if (! FilamentCityScope::canAccessCityId((int) $parcel->city_id, $user)) {
+                            Notification::make()
+                                ->title('Remboursement refusé')
+                                ->body('Ce colis n\'appartient pas à votre ville.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
                         $desc = "Indemnisation colis #{$parcel->id} : {$motif}";
                     }
 
