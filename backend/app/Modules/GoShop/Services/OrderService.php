@@ -3,6 +3,7 @@
 namespace App\Modules\GoShop\Services;
 
 use App\Jobs\AlerterAdminCodeBloque;
+use App\Jobs\AnnulerCommandePaiementTimeout;
 use App\Jobs\AnnulerCommandeTimeout;
 use App\Models\City;
 use App\Models\Merchant;
@@ -147,8 +148,13 @@ class OrderService
                 ]);
             }
 
-            // Notifier le commerce (Push FCM via queue default)
-            $this->notificationService->notifierNouvelleCommande($merchant, $order);
+            $estCash = $donnees['payment_method'] === 'cash';
+
+            // Pour une commande cash, notifier le commerce immédiatement et démarrer le timeout d'acceptation.
+            // Pour une commande en ligne, attendre payment_status='paid' (webhook) avant de notifier le commerce.
+            if ($estCash) {
+                $this->notificationService->notifierNouvelleCommande($merchant, $order);
+            }
 
             // Log d'audit
             $this->activityLogService->log(
@@ -159,16 +165,26 @@ class OrderService
                 properties: ['total' => $produitsTotal + $fraisLivraison],
             );
 
-            // Timeout acceptation commerce : planifier l'annulation automatique selon SettingsService
-            $delaiAcceptationCommerce = $this->settingsService->getDelaiRegle('acceptation_commerce_secondes', $city->id, 45);
             $orderId = $order->id;
-            AsyncJobDispatcher::dispatchAfterCommit(
-                static fn () => AnnulerCommandeTimeout::dispatch($orderId)
-                    ->delay(now()->addSeconds($delaiAcceptationCommerce))
-                    ->onQueue('default'),
-                operation: 'annuler_commande_timeout',
-                contexte: ['order_id' => $orderId],
-            );
+            if ($estCash) {
+                $delaiAcceptationCommerce = $this->settingsService->getDelaiRegle('acceptation_commerce_secondes', $city->id, 45);
+                AsyncJobDispatcher::dispatchAfterCommit(
+                    static fn () => AnnulerCommandeTimeout::dispatch($orderId)
+                        ->delay(now()->addSeconds($delaiAcceptationCommerce))
+                        ->onQueue('default'),
+                    operation: 'annuler_commande_timeout',
+                    contexte: ['order_id' => $orderId],
+                );
+            } else {
+                $delaiPaiementMinutes = $this->settingsService->getDelaiRegle('paiement_attente_minutes', $city->id, 10);
+                AsyncJobDispatcher::dispatchAfterCommit(
+                    static fn () => AnnulerCommandePaiementTimeout::dispatch($orderId)
+                        ->delay(now()->addMinutes($delaiPaiementMinutes))
+                        ->onQueue('default'),
+                    operation: 'annuler_commande_paiement_timeout',
+                    contexte: ['order_id' => $orderId],
+                );
+            }
 
             return $order->load('items.product', 'merchant');
         });

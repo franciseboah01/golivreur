@@ -289,7 +289,7 @@ it('P5 Point 5: refuse un webhook dont l\'horodatage a plus de 5 minutes (payloa
     expect($order->fresh()->payment_status)->toBe('pending');
 });
 
-it('P5 Point 5: refuse un webhook avec transaction_id déjà traité (409) et garantit une clé unique en base', function () {
+it('P5 Point 5: ignore un doublon transaction_id avec HTTP 200 "déjà traité" sans retraiter et garantit une clé unique en base', function () {
     $city = City::factory()->create(['name' => 'Daloa']);
     $client = User::factory()->create(['role' => 'client', 'city_id' => $city->id]);
     $order = Order::factory()->create([
@@ -325,7 +325,7 @@ it('P5 Point 5: refuse un webhook avec transaction_id déjà traité (409) et ga
 
     expect($order->fresh()->payment_status)->toBe('paid');
 
-    // Deuxième envoi avec même transaction_id -> refus 409
+    // Deuxième envoi avec même transaction_id -> 200 {succes: true, message: "déjà traité"} sans retraiter
     $this->call(
         'POST',
         '/api/v1/webhooks/payment',
@@ -334,8 +334,13 @@ it('P5 Point 5: refuse un webhook avec transaction_id déjà traité (409) et ga
         [],
         ['CONTENT_TYPE' => 'application/json', 'HTTP_X_HUB2_SIGNATURE' => $sig],
         $raw
-    )->assertStatus(409)
-        ->assertJsonPath('succes', false);
+    )->assertStatus(200)
+        ->assertJson([
+            'succes' => true,
+            'message' => 'déjà traité',
+        ]);
+
+    expect(WebhookLog::where('transaction_id', 'TXN-ANTI-REPLAY-UNIQUE-01')->where('status', 'processed')->count())->toBe(1);
 
     // Preuve clé unique en base : insertion SQL/Eloquent directe d'un second processed avec même transaction_id échoue
     expect(fn () => WebhookLog::create([

@@ -264,6 +264,9 @@ class SettingsPage extends Page implements HasForms
                                         Forms\Components\TextInput::make('delais_regles.acceptation_commerce_secondes')
                                             ->label('Délai acceptation commerce')
                                             ->numeric()->suffix('secondes')->required(),
+                                        Forms\Components\TextInput::make('delais_regles.paiement_attente_minutes')
+                                            ->label('Expiration paiement en ligne')
+                                            ->numeric()->suffix('minutes')->required(),
                                         Forms\Components\TextInput::make('delais_regles.acceptation_livreur_secondes')
                                             ->label('Délai sonnerie livreur')
                                             ->numeric()->suffix('secondes')->required(),

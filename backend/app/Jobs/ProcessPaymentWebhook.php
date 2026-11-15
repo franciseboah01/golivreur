@@ -2,12 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Parcel;
 use App\Models\User;
 use App\Models\WebhookLog;
 use App\Services\ActivityLogService;
+use App\Services\AsyncJobDispatcher;
 use App\Services\NotificationService;
+use App\Services\SettingsService;
 use App\Services\WalletService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -46,7 +49,9 @@ class ProcessPaymentWebhook implements ShouldQueue
         WalletService $walletService,
         NotificationService $notificationService,
         ActivityLogService $activityLogService,
+        ?SettingsService $settingsService = null,
     ): void {
+        $settingsService ??= app(SettingsService::class);
         $webhookLog = WebhookLog::find($this->webhookLogId);
 
         if (! $webhookLog || $webhookLog->status === 'processed') {
@@ -72,7 +77,7 @@ class ProcessPaymentWebhook implements ShouldQueue
         }
 
         try {
-            DB::transaction(function () use ($webhookLog, $notificationService, $activityLogService) {
+            DB::transaction(function () use ($webhookLog, $notificationService, $activityLogService, $settingsService) {
                 $payload = $this->payload;
 
                 // Extraire la référence de transaction et le statut
@@ -119,10 +124,32 @@ class ProcessPaymentWebhook implements ShouldQueue
                         }
 
                         if ($order->payment_status !== 'paid') {
-                            $order->update(['payment_status' => 'paid']);
+                            $order->update([
+                                'payment_status' => 'paid',
+                                'paid_at' => now(),
+                            ]);
                             if ($order->client instanceof User) {
                                 $notificationService->notifierPaiementConfirme($order->client, $order);
                             }
+
+                            $merchant = $order->merchant;
+                            if ($merchant instanceof Merchant && $order->status === Order::STATUS_PENDING) {
+                                $notificationService->notifierNouvelleCommande($merchant, $order);
+                                $delaiAcceptationCommerce = $settingsService->getDelaiRegle(
+                                    'acceptation_commerce_secondes',
+                                    $order->city_id ? (int) $order->city_id : null,
+                                    45,
+                                );
+                                $orderId = $order->id;
+                                AsyncJobDispatcher::dispatchAfterCommit(
+                                    static fn () => AnnulerCommandeTimeout::dispatch($orderId)
+                                        ->delay(now()->addSeconds($delaiAcceptationCommerce))
+                                        ->onQueue('default'),
+                                    operation: 'annuler_commande_timeout',
+                                    contexte: ['order_id' => $orderId],
+                                );
+                            }
+
                             $activityLogService->log(
                                 userId: null,
                                 action: 'payment_confirmed',
@@ -179,6 +206,9 @@ class ProcessPaymentWebhook implements ShouldQueue
                             'status' => Parcel::STATUS_CANCELLED,
                             'cancelled_at' => now(),
                         ]);
+                        if ($parcel->sender instanceof User) {
+                            $notificationService->notifierPaiementEchoue($parcel->sender, null, $parcel);
+                        }
                     }
                 }
 

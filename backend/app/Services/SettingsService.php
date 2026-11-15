@@ -55,6 +55,7 @@ class SettingsService
 
         'delais_regles' => [
             'acceptation_commerce_secondes' => 45,
+            'paiement_attente_minutes' => 10,
             'acceptation_livreur_secondes' => 30,
             'refus_avant_penalite' => 3,
             'duree_penalite_minutes' => 15,

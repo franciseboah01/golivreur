@@ -304,7 +304,7 @@ class WebhookController extends Controller
         $webhookLog->update([
             'signature_valid' => true,
             'status' => 'rejected',
-            'error_message' => "Rejeu bloqué : transaction {$transactionId} déjà traitée.",
+            'error_message' => "Doublon webhook ignoré : transaction {$transactionId} déjà traitée.",
         ]);
 
         $this->activityLogService->log(
@@ -317,12 +317,12 @@ class WebhookController extends Controller
                 'transaction_id' => $transactionId,
                 'ip' => $request->ip(),
             ],
-            severity: 'warning',
+            severity: 'info',
         );
 
         return response()->json([
-            'succes' => false,
-            'message' => 'Transaction déjà traitée (rejeu bloqué).',
-        ], 409);
+            'succes' => true,
+            'message' => 'déjà traité',
+        ], 200);
     }
 }
