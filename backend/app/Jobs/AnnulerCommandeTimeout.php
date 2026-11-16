@@ -23,34 +23,48 @@ class AnnulerCommandeTimeout implements ShouldQueue
 
     public function handle(NotificationService $notificationService, SettingsService $settingsService): void
     {
-        DB::transaction(function () use ($notificationService, $settingsService): void {
+        self::annulerSiExpiree($this->orderId, $notificationService, $settingsService);
+    }
+
+    public static function annulerSiExpiree(
+        int $orderId,
+        NotificationService $notificationService,
+        SettingsService $settingsService,
+        int $margeSecondes = 0,
+    ): bool {
+        return DB::transaction(function () use ($orderId, $notificationService, $settingsService, $margeSecondes): bool {
             /** @var Order|null $order */
-            $order = Order::lockForUpdate()->find($this->orderId);
+            $order = Order::lockForUpdate()->find($orderId);
             if (! $order || $order->status !== Order::STATUS_PENDING || ! $order->created_at) {
-                return;
+                return false;
             }
 
             // Pour un paiement en ligne, le délai d'acceptation commerce ne démarre qu'une fois le paiement confirmé.
             if ($order->payment_method !== 'cash' && $order->payment_status !== 'paid') {
-                return;
+                return false;
             }
 
+            $cityId = $order->city_id ? (int) $order->city_id : null;
             $delaiSecondes = $settingsService->getDelaiRegle(
                 'acceptation_commerce_secondes',
-                $order->city_id ? (int) $order->city_id : null,
-                45,
+                $cityId,
             );
+            $seuilTotalSecondes = $delaiSecondes + max(0, $margeSecondes);
 
             $reference = $order->paid_at ?? $order->created_at;
-            if ($reference->diffInSeconds(now(), false) >= $delaiSecondes) {
+            if ($reference->diffInSeconds(now(), false) >= $seuilTotalSecondes) {
                 $order->update([
                     'status' => Order::STATUS_CANCELLED,
                     'cancelled_at' => now(),
                     'cancel_reason' => "Délai d'acceptation dépassé ({$delaiSecondes}s).",
                 ]);
                 $notificationService->notifierCommandeRefusee($order);
-                Log::info("Commande #{$this->orderId} annulée pour timeout {$delaiSecondes}s.");
+                Log::info("Commande #{$orderId} annulée pour timeout {$delaiSecondes}s.");
+
+                return true;
             }
+
+            return false;
         });
     }
 }

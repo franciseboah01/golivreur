@@ -55,8 +55,10 @@ class SettingsService
 
         'delais_regles' => [
             'acceptation_commerce_secondes' => 45,
+            'marge_balayage_commerce_secondes' => 15,
             'paiement_attente_minutes' => 10,
             'acceptation_livreur_secondes' => 30,
+            'marge_balayage_livreur_secondes' => 15,
             'gps_fraicheur_minutes' => 2,
             'refus_avant_penalite' => 3,
             'duree_penalite_minutes' => 15,
@@ -143,13 +145,13 @@ class SettingsService
     /**
      * Retourne une règle numérique de `delais_regles` (avec repli sur le défaut CDC).
      */
-    public function getDelaiRegle(string $cle, ?int $cityId = null, int $fallback = 1): int
+    public function getDelaiRegle(string $cle, ?int $cityId = null, int $fallback = 1, int $minimum = 1): int
     {
         $delais = $this->get('delais_regles', $cityId);
         $defautCdc = self::DEFAULTS['delais_regles'][$cle] ?? $fallback;
         $valeur = is_array($delais) ? ($delais[$cle] ?? $defautCdc) : $defautCdc;
 
-        return max(1, (int) $valeur);
+        return max($minimum, (int) $valeur);
     }
 
     /**

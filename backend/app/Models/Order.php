@@ -16,7 +16,7 @@ class Order extends Model
 
     protected $fillable = [
         'client_id', 'merchant_id', 'courier_id', 'city_id',
-        'status', 'assignment_attempts', 'products_total', 'delivery_fee',
+        'status', 'assignment_attempts', 'last_assignment_attempt_at', 'products_total', 'delivery_fee',
         'platform_commission', 'merchant_amount', 'courier_amount',
         'rain_mode_applied', 'peak_hours_applied',
         'payment_method', 'payment_status', 'payment_reference', 'paid_at',
@@ -35,6 +35,7 @@ class Order extends Model
 
     protected $casts = [
         'assignment_attempts' => 'integer',
+        'last_assignment_attempt_at' => 'datetime',
         'rain_mode_applied' => 'boolean',
         'peak_hours_applied' => 'boolean',
         'confirmation_locked' => 'boolean',

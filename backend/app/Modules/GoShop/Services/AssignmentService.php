@@ -26,7 +26,7 @@ class AssignmentService
 
     private const RAYON_ETENDU_KM = 10;
 
-    private const MAX_TENTATIVES = 3;
+    public const MAX_TENTATIVES = 3;
 
     private readonly WalletService $walletService;
 
@@ -267,7 +267,10 @@ class AssignmentService
                 $course->update([
                     'status' => $waitingStatus,
                     'assignment_attempts' => max((int) $course->assignment_attempts, $tentative - 1),
+                    ...($course instanceof Order ? ['last_assignment_attempt_at' => now()] : []),
                 ]);
+            } elseif ($course instanceof Order) {
+                $course->update(['last_assignment_attempt_at' => now()]);
             }
 
             if (class_exists(AlerterAdminPasDelivreur::class)) {
@@ -286,7 +289,10 @@ class AssignmentService
             return;
         }
 
-        $course->update(['assignment_attempts' => $tentative]);
+        $course->update([
+            'assignment_attempts' => $tentative,
+            ...($course instanceof Order ? ['last_assignment_attempt_at' => now()] : []),
+        ]);
 
         $delaiSecondes = $this->settingsService->getDelaiRegle('acceptation_livreur_secondes', $cityId, 30);
 
