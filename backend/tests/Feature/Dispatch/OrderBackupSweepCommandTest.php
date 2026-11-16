@@ -305,4 +305,3 @@ it('lit dynamiquement les delais et marges depuis SettingsService sans constante
         ->and($acceptedNotDue->fresh()->assignment_attempts)->toBe(1)
         ->and($acceptedDue->fresh()->assignment_attempts)->toBe(2);
 });
-

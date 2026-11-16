@@ -24,4 +24,3 @@ class SweepOrderTimeoutsCommand extends Command
         return self::SUCCESS;
     }
 }
-
