@@ -1,3 +1,4 @@
+export '../providers/branding_provider.dart';
 export 'golivreur_logo.dart';
 export 'animated_splash_screen.dart';
 export 'golivreur_loading.dart';

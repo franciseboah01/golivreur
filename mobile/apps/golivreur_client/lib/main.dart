@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'features/auth/screens/login_screen.dart';
-import 'features/goshop/providers/goshop_provider.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 import 'features/auth/providers/auth_provider.dart';
 

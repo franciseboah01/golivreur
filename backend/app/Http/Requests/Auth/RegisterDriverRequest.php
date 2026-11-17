@@ -59,4 +59,3 @@ class RegisterDriverRequest extends FormRequest
         ];
     }
 }
-

@@ -125,16 +125,18 @@ class SettingsPage extends Page implements HasForms
 
                                                     return new HtmlString(
                                                         '<div style="display:flex;align-items:center;gap:12px;">'
-                                                        .'<img src="'.$url.'" alt="GoLivreur" style="height:48px;width:48px;object-fit:contain;border-radius:12px;border:1px solid #e5e7eb;background:#fff;padding:4px;" />'
-                                                        .'<span style="font-weight:700;">Logo personnalisé actif (affiché partout)</span>'
+                                                        .'<img src="'.$url.'" alt="GoLivreur" style="height:48px;width:48px;object-fit:cover;border-radius:12px;border:1px solid #e5e7eb;background:#fff;box-shadow:0 6px 14px rgba(244,166,35,0.28);padding:2px;" />'
+                                                        .'<div><div style="font-weight:800;font-size:16px;"><span style="color:#F4A623;">Go</span>Livreur</div>'
+                                                        .'<div style="font-size:12px;color:#059669;font-weight:600;">Logo personnalisé actif (synchronisé auto Web + Client + Business + Driver)</div></div>'
                                                         .'</div>'
                                                     );
                                                 }
 
                                                 return new HtmlString(
                                                     '<div style="display:flex;align-items:center;gap:12px;">'
-                                                    .'<span style="display:inline-flex;align-items:center;justify-content:center;height:48px;width:48px;border-radius:12px;background:#fef3c7;font-size:28px;">'.e($emoji).'</span>'
-                                                    .'<span>Aucun logo — emoji par défaut actif</span>'
+                                                    .'<span style="display:inline-flex;align-items:center;justify-content:center;height:48px;width:48px;border-radius:12px;background:linear-gradient(135deg,#FFB732 0%,#F4A623 100%);box-shadow:0 6px 14px rgba(244,166,35,0.35);font-size:26px;">'.e($emoji).'</span>'
+                                                    .'<div><div style="font-weight:800;font-size:16px;"><span style="color:#F4A623;">Go</span>Livreur</div>'
+                                                    .'<div style="font-size:12px;color:#6b7280;">Logo unique par défaut actif sur toutes les plateformes</div></div>'
                                                     .'</div>'
                                                 );
                                             }),

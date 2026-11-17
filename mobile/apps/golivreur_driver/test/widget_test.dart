@@ -208,4 +208,42 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('GoLivreurLogo - affiche le logo unique par défaut et se met à jour dynamiquement via appBrandingProvider',
+      (WidgetTester tester) async {
+    final fakeApi = ApiClient(
+      baseUrl: 'http://localhost/api/v1',
+      storage: _FakeSecureStorage(),
+      onDeconnexionForcee: () {},
+      httpClientAdapter: _FakeHttpClientAdapter(),
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(fakeApi),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: DriverLoginScreen(apiClientOverride: fakeApi),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Par défaut : emoji 🛵 affiché dans le badge ambre
+    expect(find.text('🛵'), findsOneWidget);
+
+    // Quand l'admin met à jour le logo dans les paramètres, toutes les vues réagissent automatiquement
+    container
+        .read(appBrandingProvider.notifier)
+        .updateFromValues('http://localhost:8080/storage/branding/logo.png', '🛵');
+    await tester.pump();
+
+    expect(find.byType(Image), findsOneWidget);
+  });
 }

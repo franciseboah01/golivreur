@@ -113,4 +113,3 @@ it('bloque la connexion login-password en 403 tant que le dossier livreur nest p
         ->assertJsonPath('succes', true)
         ->assertJsonStructure(['donnees' => ['access_token', 'refresh_token', 'user']]);
 });
-

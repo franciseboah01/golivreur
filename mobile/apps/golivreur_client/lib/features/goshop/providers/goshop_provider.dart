@@ -2,8 +2,11 @@ import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/models/modeles.dart';
+import 'package:golivreur_core/providers/branding_provider.dart';
 import 'package:golivreur_core/services/api_client.dart' hide apiClientProvider;
 import '../../auth/providers/auth_provider.dart';
+
+export 'package:golivreur_core/providers/branding_provider.dart';
 
 // ─── Quartiers & Tarification proportionnelle ────────────────────────────────
 class DeliveryNeighborhood {
@@ -165,48 +168,6 @@ class WeatherState {
     return selectedTier.normal;
   }
 }
-
-class AppBranding {
-  final String? logoUrl;
-  final String defaultEmoji;
-
-  const AppBranding({
-    this.logoUrl,
-    this.defaultEmoji = '🛵',
-  });
-}
-
-class AppBrandingNotifier extends StateNotifier<AppBranding> {
-  final ApiClient _apiClient;
-
-  AppBrandingNotifier(this._apiClient) : super(const AppBranding()) {
-    chargerBranding();
-  }
-
-  Future<void> chargerBranding() async {
-    try {
-      final res = await _apiClient.get('/branding');
-      if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
-        final d = res.data['donnees'] as Map<String, dynamic>;
-        updateFromValues(d['logo_url'] as String?, d['default_emoji'] as String?);
-      }
-    } catch (_) {}
-  }
-
-  void updateFromValues(String? rawLogoUrl, String? rawEmoji) {
-    final trimmedLogo = rawLogoUrl?.trim();
-    final emoji = (rawEmoji ?? '').trim();
-    state = AppBranding(
-      logoUrl: (trimmedLogo != null && trimmedLogo.isNotEmpty) ? trimmedLogo : null,
-      defaultEmoji: emoji.isNotEmpty ? emoji : '🛵',
-    );
-  }
-}
-
-final appBrandingProvider = StateNotifierProvider<AppBrandingNotifier, AppBranding>((ref) {
-  final api = ref.watch(apiClientProvider);
-  return AppBrandingNotifier(api);
-});
 
 class WeatherNotifier extends StateNotifier<WeatherState> {
   final ApiClient _apiClient;

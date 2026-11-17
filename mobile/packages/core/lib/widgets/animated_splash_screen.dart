@@ -208,15 +208,29 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                             strokeWidth: 3.5,
                           ),
                         ),
-                        // Logo configuré ou emoji par défaut centré
+                        // Logo configuré ou badge ambre unifié par défaut centré
                         Transform.scale(
                           scale: _motorcycleScale.value,
                           child: Container(
                             width: 80,
                             height: 80,
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: GoLivreurTheme.primaire.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(80 * 0.24),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFFFFB732),
+                                  Color(0xFFF4A623),
+                                ],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: GoLivreurTheme.primaire.withValues(alpha: 0.35),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
                             ),
                             clipBehavior: Clip.antiAlias,
                             child: GoLivreurBrandMark(

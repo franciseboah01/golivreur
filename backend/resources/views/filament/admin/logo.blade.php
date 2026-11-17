@@ -13,21 +13,23 @@
         <img
             src="{{ $logoUrl }}"
             alt="GoLivreur"
-            class="h-10 w-10 rounded-xl shadow-md ring-2 ring-amber-500/20 object-contain bg-amber-500/10 p-0.5"
+            style="height: 42px; width: 42px; border-radius: 10px; box-shadow: 0 6px 14px rgba(244, 166, 35, 0.30);"
+            class="object-cover bg-white p-0.5 ring-1 ring-amber-500/30"
         />
     @else
         <span
             role="img"
             aria-label="GoLivreur"
-            class="inline-flex h-10 w-10 items-center justify-center rounded-xl shadow-md ring-2 ring-amber-500/20 bg-amber-500/10 text-2xl leading-none"
+            style="height: 42px; width: 42px; border-radius: 10px; background: linear-gradient(135deg, #FFB732 0%, #F4A623 100%); box-shadow: 0 6px 14px rgba(244, 166, 35, 0.35); font-size: 22px;"
+            class="inline-flex items-center justify-center leading-none select-none"
         >{{ $defaultEmoji }}</span>
     @endif
     <div class="flex flex-col text-left">
         <span class="text-2xl font-black tracking-tight text-gray-900 dark:text-white leading-none">
-            Go<span class="text-amber-500">Livreur</span>
+            <span style="color: #F4A623;">Go</span><span>Livreur</span>
         </span>
-        <span class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mt-1">
-            Portail Administration
+        <span class="text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 mt-1">
+            ADMINISTRATION
         </span>
     </div>
 </div>

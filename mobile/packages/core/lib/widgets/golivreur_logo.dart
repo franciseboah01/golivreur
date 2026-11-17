@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_theme.dart';
 import '../config/env_config.dart';
+import '../providers/branding_provider.dart';
 
 /// Type d'application GoLivreur pour la déclinaison du logo.
 enum GoLivreurAppType {
@@ -9,8 +11,14 @@ enum GoLivreurAppType {
   driver,
 }
 
+bool _hasProviderScope(BuildContext context) {
+  return context.findAncestorWidgetOfExactType<ProviderScope>() != null ||
+      context.findAncestorWidgetOfExactType<UncontrolledProviderScope>() != null;
+}
+
 /// Badge visuel GoLivreur : affiche le logo configuré en base s'il existe,
 /// sinon l'emoji par défaut (🛵).
+/// Écoute automatiquement [appBrandingProvider] si aucun [logoUrl] explicite n'est fourni.
 class GoLivreurBrandMark extends StatelessWidget {
   final String? logoUrl;
   final String defaultEmoji;
@@ -23,10 +31,10 @@ class GoLivreurBrandMark extends StatelessWidget {
     this.size = 48.0,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final resolvedUrl = GoLivreurEnv.resolveMediaUrl(logoUrl);
-    final emoji = defaultEmoji.trim().isNotEmpty ? defaultEmoji.trim() : '🛵';
+  Widget _buildMark(String? effectiveLogoUrl, String effectiveEmoji) {
+    final resolvedUrl = GoLivreurEnv.resolveMediaUrl(effectiveLogoUrl);
+    final emoji =
+        effectiveEmoji.trim().isNotEmpty ? effectiveEmoji.trim() : '🛵';
 
     if (resolvedUrl != null && resolvedUrl.isNotEmpty) {
       return Image.network(
@@ -50,12 +58,34 @@ class GoLivreurBrandMark extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasProviderScope(context)) {
+      return Consumer(
+        builder: (context, ref, _) {
+          final branding = ref.watch(appBrandingProvider);
+          final effectiveLogoUrl =
+              (logoUrl != null && logoUrl!.trim().isNotEmpty)
+                  ? logoUrl
+                  : branding.logoUrl;
+          final effectiveEmoji =
+              (defaultEmoji.trim().isNotEmpty && defaultEmoji.trim() != '🛵')
+                  ? defaultEmoji
+                  : branding.defaultEmoji;
+          return _buildMark(effectiveLogoUrl, effectiveEmoji);
+        },
+      );
+    }
+    return _buildMark(logoUrl, defaultEmoji);
+  }
 }
 
 /// Logo officiel GoLivreur conforme aux spécifications :
-///  - Logo configuré par l'admin si présent, sinon emoji par défaut (🛵)
+///  - Logo configuré par l'admin si présent, sinon badge dégradé ambre + emoji par défaut (🛵)
 ///  - Texte "GoLivreur" centré
 ///  - Déclinaison "Client", "Business" ou "Driver" en dessous centré
+/// Écoute automatiquement [appBrandingProvider] sur toutes les plateformes.
 class GoLivreurLogo extends StatelessWidget {
   final GoLivreurAppType type;
   final double size;
@@ -94,9 +124,8 @@ class GoLivreurLogo extends StatelessWidget {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final resolvedLogo = GoLivreurEnv.resolveMediaUrl(logoUrl);
+  Widget _buildLogo(String? effectiveLogoUrl, String effectiveEmoji) {
+    final resolvedLogo = GoLivreurEnv.resolveMediaUrl(effectiveLogoUrl);
     final hasCustomLogo = resolvedLogo != null && resolvedLogo.isNotEmpty;
 
     return Column(
@@ -131,7 +160,7 @@ class GoLivreurLogo extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: GoLivreurBrandMark(
             logoUrl: resolvedLogo,
-            defaultEmoji: defaultEmoji,
+            defaultEmoji: effectiveEmoji,
             size: size,
           ),
         ),
@@ -185,6 +214,27 @@ class GoLivreurLogo extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasProviderScope(context)) {
+      return Consumer(
+        builder: (context, ref, _) {
+          final branding = ref.watch(appBrandingProvider);
+          final effectiveLogoUrl =
+              (logoUrl != null && logoUrl!.trim().isNotEmpty)
+                  ? logoUrl
+                  : branding.logoUrl;
+          final effectiveEmoji =
+              (defaultEmoji.trim().isNotEmpty && defaultEmoji.trim() != '🛵')
+                  ? defaultEmoji
+                  : branding.defaultEmoji;
+          return _buildLogo(effectiveLogoUrl, effectiveEmoji);
+        },
+      );
+    }
+    return _buildLogo(logoUrl, defaultEmoji);
   }
 }
 
