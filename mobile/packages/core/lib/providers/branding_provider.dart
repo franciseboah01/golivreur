@@ -117,6 +117,9 @@ class AppBrandingNotifier extends StateNotifier<AppBranding>
       }
     } catch (_) {
       // Conserve le logo par défaut unifié en cas d'indisponibilité réseau
+      if (mounted && !state.isLoaded) {
+        state = state.copyWith(isLoaded: true);
+      }
     }
   }
 

@@ -13,8 +13,8 @@
         <img
             src="{{ $logoUrl }}"
             alt="GoLivreur"
-            style="height: 42px; width: 42px; border-radius: 10px; box-shadow: 0 6px 14px rgba(244, 166, 35, 0.30);"
-            class="object-cover bg-white p-0.5 ring-1 ring-amber-500/30"
+            style="height: 42px; width: 42px; border-radius: 10px;"
+            class="object-contain bg-transparent"
         />
     @else
         <span

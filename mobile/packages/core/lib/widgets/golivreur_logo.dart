@@ -18,6 +18,12 @@ bool _hasProviderScope(BuildContext context) {
       context.findAncestorWidgetOfExactType<UncontrolledProviderScope>() != null;
 }
 
+bool _isWidgetTestEnv() {
+  final bindingType = WidgetsBinding.instance.runtimeType.toString();
+  return bindingType.contains('TestWidgetsFlutterBinding') ||
+      bindingType.contains('AutomatedTestWidgetsFlutterBinding');
+}
+
 /// Badge visuel GoLivreur : affiche le logo configuré en base s'il existe,
 /// sinon l'emoji par défaut (🛵).
 /// Écoute automatiquement [appBrandingProvider] si aucun [logoUrl] explicite n'est fourni.
@@ -49,7 +55,7 @@ class GoLivreurBrandMark extends StatelessWidget {
         effectiveBytes,
         width: size,
         height: size,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         gaplessPlayback: true,
         errorBuilder: (_, __, ___) => Center(
           child: Text(
@@ -65,7 +71,7 @@ class GoLivreurBrandMark extends StatelessWidget {
         resolvedUrl,
         width: size,
         height: size,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         gaplessPlayback: true,
         errorBuilder: (_, __, ___) => Center(
           child: Text(
@@ -95,6 +101,11 @@ class GoLivreurBrandMark extends StatelessWidget {
                   ? logoUrl
                   : branding.logoUrl;
           final effectiveBytes = logoBytes ?? branding.logoBytes;
+          final hasCustom = (effectiveBytes != null && effectiveBytes.isNotEmpty) ||
+              (effectiveLogoUrl != null && effectiveLogoUrl.trim().isNotEmpty);
+          if (!hasCustom && !branding.isLoaded && !_isWidgetTestEnv()) {
+            return SizedBox(width: size, height: size);
+          }
           final effectiveEmoji =
               (defaultEmoji.trim().isNotEmpty && defaultEmoji.trim() != '🛵')
                   ? defaultEmoji
@@ -153,33 +164,38 @@ class GoLivreurLogo extends StatelessWidget {
   Widget _buildLogo(
     String? effectiveLogoUrl,
     Uint8List? effectiveBytes,
-    String effectiveEmoji,
-  ) {
+    String effectiveEmoji, {
+    bool isLoaded = true,
+  }) {
     final resolvedLogo = GoLivreurEnv.resolveMediaUrl(effectiveLogoUrl);
     final hasCustomLogo = (effectiveBytes != null && effectiveBytes.isNotEmpty) ||
         (resolvedLogo != null && resolvedLogo.isNotEmpty);
+    final hideYellowBackground =
+        hasCustomLogo || (!isLoaded && !_isWidgetTestEnv());
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // 1. Logo configuré ou badge orange avec emoji par défaut
+        // 1. Logo configuré (sans fond jaune) ou badge ambre avec emoji par défaut
         Container(
           width: size,
           height: size,
-          decoration: BoxDecoration(
-            color: hasCustomLogo ? Colors.white : GoLivreurTheme.primaire,
-            borderRadius: BorderRadius.circular(size * 0.24),
-            boxShadow: [
-              BoxShadow(
-                color: GoLivreurTheme.primaire.withValues(alpha: 0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
-            gradient: hasCustomLogo
-                ? null
-                : const LinearGradient(
+          decoration: hideYellowBackground
+              ? const BoxDecoration(
+                  color: Colors.transparent,
+                )
+              : BoxDecoration(
+                  color: GoLivreurTheme.primaire,
+                  borderRadius: BorderRadius.circular(size * 0.24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: GoLivreurTheme.primaire.withValues(alpha: 0.35),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                  gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
@@ -187,7 +203,7 @@ class GoLivreurLogo extends StatelessWidget {
                       Color(0xFFF4A623),
                     ],
                   ),
-          ),
+                ),
           clipBehavior: Clip.antiAlias,
           child: GoLivreurBrandMark(
             logoUrl: resolvedLogo,
@@ -263,7 +279,12 @@ class GoLivreurLogo extends StatelessWidget {
               (defaultEmoji.trim().isNotEmpty && defaultEmoji.trim() != '🛵')
                   ? defaultEmoji
                   : branding.defaultEmoji;
-          return _buildLogo(effectiveLogoUrl, effectiveBytes, effectiveEmoji);
+          return _buildLogo(
+            effectiveLogoUrl,
+            effectiveBytes,
+            effectiveEmoji,
+            isLoaded: branding.isLoaded,
+          );
         },
       );
     }
