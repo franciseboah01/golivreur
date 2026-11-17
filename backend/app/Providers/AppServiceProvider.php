@@ -63,5 +63,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('client-courier-location', function (Request $request) {
             return Limit::perMinute(12)->by('client_courier_loc:'.($request->user()?->id ?: $request->ip()));
         });
+
+        RateLimiter::for('device-token', function (Request $request) {
+            $userId = auth('api')->id() ?: $request->user()?->id;
+
+            return Limit::perMinute(10)->by('device-token:'.($userId ?: $request->ip()));
+        });
     }
 }

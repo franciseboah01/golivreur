@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Admin\AdminController;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Client\ClientController;
+use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\Driver\DriverController;
 use App\Http\Controllers\Api\V1\GoColis\ParcelController;
 use App\Http\Controllers\Api\V1\Merchant\MerchantController;
@@ -87,6 +88,10 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
     Route::put('profile/password', [ProfileController::class, 'updatePassword']);
     Route::get('profile/{user}', [ProfileController::class, 'showForUser']);
     Route::match(['put', 'post'], 'profile/{user}', [ProfileController::class, 'updateForUser']);
+
+    // ─── Jeton FCM appareil ───────────────────────────────────────────────────
+    Route::post('devices/token', [DeviceTokenController::class, 'store'])
+        ->middleware('throttle:device-token');
 
     // ─── Client (GoShop + GoColis) ────────────────────────────────────────────
     Route::prefix('client')->middleware('role:client')->group(function () {

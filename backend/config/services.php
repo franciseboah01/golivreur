@@ -14,7 +14,7 @@ return [
     ],
 
     'fcm' => [
-        'credentials_path' => env('FCM_CREDENTIALS_PATH', ''),
+        'credentials_path' => env('FIREBASE_CREDENTIALS', env('FCM_CREDENTIALS_PATH', '')),
     ],
 
     'sms' => [

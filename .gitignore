@@ -11,6 +11,15 @@ backend/.env.production
 # MCP config & local keys
 mcp_config.json
 **/google-services.json
+**/GoogleService-Info.plist
+*firebase*.json
+**/*firebase*.json
+*firebase-adminsdk*.json
+**/*firebase-adminsdk*.json
+firebase-service-account*.json
+**/firebase-service-account*.json
+service-account*.json
+**/service-account*.json
 *.keystore
 **/*.keystore
 *.jks

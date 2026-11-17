@@ -9,6 +9,7 @@ use App\Models\Notification;
 use App\Models\Order;
 use App\Models\Parcel;
 use App\Models\User;
+use App\Support\FcmChannels;
 
 class NotificationService
 {
@@ -247,8 +248,22 @@ class NotificationService
         $user = User::find($userId);
         if ($user && $user->device_token) {
             $deviceToken = (string) $user->device_token;
+            [$channelId, $highPriority, $ttlSeconds] = match ($type) {
+                'new_order' => [FcmChannels::ORDERS_NEW, true, FcmChannels::URGENT_TTL_SECONDS],
+                'course_offer_goshop', 'course_offer_gocolis' => [FcmChannels::COURSES_NEW, true, FcmChannels::URGENT_TTL_SECONDS],
+                default => [FcmChannels::GENERAL, false, null],
+            };
+
             AsyncJobDispatcher::dispatchAfterCommit(
-                static fn () => SendPushNotification::dispatch($deviceToken, $title, $body, $data),
+                static fn () => SendPushNotification::dispatch(
+                    $deviceToken,
+                    $title,
+                    $body,
+                    $data,
+                    $channelId,
+                    $highPriority,
+                    $ttlSeconds,
+                )->onQueue('default'),
                 operation: 'send_push_notification',
                 contexte: ['user_id' => $userId, 'type' => $type],
             );

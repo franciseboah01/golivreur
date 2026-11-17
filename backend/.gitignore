@@ -20,6 +20,14 @@
 /public/hot
 /public/storage
 /storage/*.key
+*firebase*.json
+**/*firebase*.json
+*firebase-adminsdk*.json
+**/*firebase-adminsdk*.json
+firebase-service-account*.json
+**/firebase-service-account*.json
+service-account*.json
+**/service-account*.json
 /storage/pail
 /vendor
 _ide_helper.php
