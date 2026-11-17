@@ -245,7 +245,7 @@ class SettingsService
 
         return [
             'logo_path' => $hasLogo ? $logoPath : null,
-            'logo_url' => $hasLogo ? url('storage/'.$logoPath) : null,
+            'logo_url' => $hasLogo ? url('api/v1/branding/logo?f='.rawurlencode((string) $logoPath)) : null,
             'default_emoji' => $defaultEmoji,
         ];
     }

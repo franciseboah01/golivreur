@@ -14,6 +14,7 @@ use App\Models\City;
 use App\Models\VehicleType;
 use App\Services\SettingsService;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,6 +24,26 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+Route::middleware('throttle:120,1')->group(function () {
+    Route::get('/branding', fn (SettingsService $settingsService) => response()->json([
+        'succes' => true,
+        'donnees' => $settingsService->getBranding(),
+    ]));
+
+    Route::get('/branding/logo', function (SettingsService $settingsService) {
+        $branding = $settingsService->getBranding();
+        $logoPath = $branding['logo_path'] ?? null;
+        if (! is_string($logoPath) || $logoPath === '' || ! Storage::disk('public')->exists($logoPath)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response($logoPath, null, [
+            'Access-Control-Allow-Origin' => '*',
+            'Cache-Control' => 'no-cache, public',
+        ]);
+    });
+});
+
 // ─── Routes publiques throttlées (20 req/min - CDC 11.4) ───────────────────────
 Route::middleware('throttle:20,1')->group(function () {
     Route::get('/health', fn () => response()->json([
@@ -30,10 +51,6 @@ Route::middleware('throttle:20,1')->group(function () {
         'version' => '5.0',
         'timestamp' => now()->toIso8601String(),
         'service' => 'GoLivreur API',
-    ]));
-    Route::get('/branding', fn (SettingsService $settingsService) => response()->json([
-        'succes' => true,
-        'donnees' => $settingsService->getBranding(),
     ]));
 
     // Catalogue GoShop Public
