@@ -66,6 +66,7 @@ Route::middleware('throttle:20,1')->group(function () {
 // ─── Authentification (60 req/min - CDC 11.4) ─────────────────────────────────
 Route::prefix('auth')->middleware('throttle:60,1')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
+    Route::post('register-driver', [AuthController::class, 'registerDriver']);
     Route::post('verify-register', [AuthController::class, 'verifierOtpInscription']);
     Route::post('login', [AuthController::class, 'login']);
     Route::post('login-password', [AuthController::class, 'loginPassword']);

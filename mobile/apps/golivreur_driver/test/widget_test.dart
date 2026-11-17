@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
+import 'package:golivreur_driver/features/auth/screens/driver_login_screen.dart';
 import 'package:golivreur_driver/features/navigation/screens/driver_main_navigation_screen.dart';
 import 'package:golivreur_driver/main.dart';
 
@@ -67,12 +68,27 @@ class _FakeHttpClientAdapter implements HttpClientAdapter {
       '/driver/wallet' => {
           'wallet': {'balance': 15000},
         },
+      '/cities' => [
+          {'id': 1, 'name': 'Daloa'},
+        ],
+      '/vehicle-types' => [
+          {'slug': 'moto', 'name': 'Moto'},
+        ],
+      '/auth/register-driver' => {
+          'courier_id': 99,
+          'status': 'pending_validation',
+          'is_active': false,
+        },
       _ => <dynamic>[],
     };
 
+    final String message = options.path == '/auth/register-driver'
+        ? 'Pré-inscription enregistrée. Passez en agence GoLivreur pour vérifier vos pièces et activer votre compte.'
+        : 'OK';
+
     return ResponseBody.fromString(
-      jsonEncode({'succes': true, 'donnees': payload}),
-      200,
+      jsonEncode({'succes': true, 'message': message, 'donnees': payload}),
+      options.path == '/auth/register-driver' ? 201 : 200,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
       },
@@ -135,5 +151,61 @@ void main() {
     expect(find.text('Portefeuille'), findsOneWidget);
     expect(find.text('Gains'), findsOneWidget);
     expect(find.text('Profil'), findsOneWidget);
+  });
+
+  testWidgets(
+      'DriverLoginScreen affiche Mot de passe et permet la pre-inscription Devenir livreur',
+      (WidgetTester tester) async {
+    final fakeApi = ApiClient(
+      baseUrl: 'http://localhost/api/v1',
+      storage: _FakeSecureStorage(),
+      onDeconnexionForcee: () {},
+      httpClientAdapter: _FakeHttpClientAdapter(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DriverLoginScreen(apiClientOverride: fakeApi),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mot de passe'), findsOneWidget);
+    expect(find.text('Devenir livreur'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Devenir livreur'));
+    await tester.tap(find.text('Devenir livreur'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Devenir livreur GoLivreur'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nom et prénom'),
+      'Kouamé Yao',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Numéro de téléphone'),
+      '0708112233',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mot de passe (min. 6 caractères)'),
+      'DriverSecret2026',
+    );
+    await tester.enterText(
+      find.widgetWithText(
+          TextFormField, 'Plaque d\'immatriculation (ex: 1234-JK-01)'),
+      '4589-JK-01',
+    );
+
+    await tester.ensureVisible(find.text('Envoyer ma pré-inscription'));
+    await tester.tap(find.text('Envoyer ma pré-inscription'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Pré-inscription enregistrée. Passez en agence GoLivreur pour vérifier vos pièces et activer votre compte.',
+      ),
+      findsOneWidget,
+    );
   });
 }

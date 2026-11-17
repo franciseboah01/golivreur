@@ -4,17 +4,22 @@ namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterDriverRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Jobs\SendPushNotification;
 use App\Models\City;
+use App\Models\Courier;
 use App\Models\OtpCode;
 use App\Models\User;
+use App\Models\VehicleType;
+use App\Models\Wallet;
 use App\Services\ActivityLogService;
 use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -222,6 +227,80 @@ class AuthController extends Controller
     }
 
     /**
+     * Pré-inscription d'un candidat livreur depuis l'application GoLivreur Driver.
+     * Crée le compte User (role='driver') et la fiche Courier avec is_active=false
+     * en attente de vérification physique en agence (Validations en attente Filament).
+     */
+    public function registerDriver(RegisterDriverRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $vehicleType = strtolower(trim((string) $validated['vehicle_type']));
+
+        if (
+            VehicleType::where('is_active', true)->exists()
+            && ! VehicleType::where('slug', $vehicleType)->where('is_active', true)->exists()
+        ) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Le type de véhicule sélectionné n\'est pas disponible.',
+                'errors' => ['vehicle_type' => ['Le type de véhicule sélectionné n\'est pas disponible.']],
+            ], 422);
+        }
+
+        $courier = DB::transaction(function () use ($validated, $vehicleType): Courier {
+            $user = User::create([
+                'name' => trim((string) $validated['name']),
+                'phone' => (string) $validated['phone'],
+                'password' => Hash::make((string) $validated['password']),
+                'role' => 'driver',
+                'city_id' => (int) $validated['city_id'],
+                'is_active' => false,
+            ]);
+
+            $courier = Courier::create([
+                'user_id' => $user->id,
+                'city_id' => (int) $validated['city_id'],
+                'vehicle_type' => $vehicleType,
+                'vehicle_plate' => trim((string) $validated['vehicle_plate']),
+                'is_active' => false,
+                'is_online' => false,
+                'current_lat' => null,
+                'current_lng' => null,
+                'location_updated_at' => null,
+            ]);
+
+            Wallet::firstOrCreate(
+                ['owner_type' => 'courier', 'owner_id' => $courier->id],
+                ['balance' => 0, 'total_earned' => 0, 'total_withdrawn' => 0],
+            );
+
+            $this->activityLogService->log(
+                userId: $user->id,
+                action: 'driver_pre_registered',
+                entityType: 'courier',
+                entityId: $courier->id,
+                properties: [
+                    'city_id' => $courier->city_id,
+                    'vehicle_type' => $courier->vehicle_type,
+                    'vehicle_plate' => $courier->vehicle_plate,
+                ],
+            );
+
+            return $courier;
+        });
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Pré-inscription enregistrée. Passez en agence GoLivreur pour vérifier vos pièces et activer votre compte.',
+            'donnees' => [
+                'courier_id' => $courier->id,
+                'status' => 'pending_validation',
+                'is_active' => false,
+            ],
+        ], 201);
+    }
+
+    /**
      * Connexion directe par mot de passe / identifiants (Gérants Commerces, Livreurs).
      */
     public function loginPassword(Request $request): JsonResponse
@@ -231,11 +310,20 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $phone = $validated['phone'];
+        $rawPhone = preg_replace('/[\s\.\-\(\)]+/', '', trim((string) $validated['phone'])) ?? '';
+        if (str_starts_with($rawPhone, '+225')) {
+            $phone = substr($rawPhone, 4);
+        } elseif (str_starts_with($rawPhone, '00225')) {
+            $phone = substr($rawPhone, 5);
+        } elseif (strlen($rawPhone) === 13 && str_starts_with($rawPhone, '225')) {
+            $phone = substr($rawPhone, 3);
+        } else {
+            $phone = $rawPhone;
+        }
+
         $password = $validated['password'];
 
         $user = User::where('phone', $phone)
-            ->where('is_active', true)
             ->whereNull('deleted_at')
             ->first();
 
@@ -253,6 +341,25 @@ class AuthController extends Controller
                 'succes' => false,
                 'message' => 'Mot de passe ou identifiant incorrect.',
             ], 422);
+        }
+
+        if (in_array($user->role, ['driver', 'courier'], true)) {
+            $courier = Courier::where('user_id', $user->id)->first();
+            if (! $user->is_active || ($courier && ! $courier->is_active)) {
+                $isPendingAgency = $courier && $courier->activated_at === null;
+
+                return response()->json([
+                    'succes' => false,
+                    'message' => $isPendingAgency
+                        ? 'Votre dossier livreur est en attente de validation. Passez en agence GoLivreur pour vérifier vos pièces et activer votre compte.'
+                        : 'Votre compte livreur est actuellement désactivé. Contactez l\'agence GoLivreur.',
+                ], 403);
+            }
+        } elseif (! $user->is_active) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Numéro de téléphone non reconnu ou compte désactivé.',
+            ], 403);
         }
 
         if (in_array($user->role, ['merchant', 'driver', 'courier'])) {

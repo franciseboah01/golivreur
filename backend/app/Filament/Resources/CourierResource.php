@@ -322,6 +322,10 @@ class CourierResource extends Resource
                             'activated_by' => $newStatus ? auth()->id() : null,
                         ]);
 
+                        if ($record->user) {
+                            $record->user->update(['is_active' => $newStatus]);
+                        }
+
                         ActivityLog::create([
                             'user_id' => auth()->id(),
                             'action' => $newStatus ? 'courier_activated' : 'courier_suspended',

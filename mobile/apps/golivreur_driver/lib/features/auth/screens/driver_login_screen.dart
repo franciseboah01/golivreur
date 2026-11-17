@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
@@ -6,9 +7,15 @@ import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
 import 'package:golivreur_core/widgets/golivreur_logo.dart';
 import '../../navigation/screens/driver_main_navigation_screen.dart';
+import 'driver_register_screen.dart';
 
 class DriverLoginScreen extends StatefulWidget {
-  const DriverLoginScreen({super.key});
+  final ApiClient? apiClientOverride;
+
+  const DriverLoginScreen({
+    super.key,
+    this.apiClientOverride,
+  });
 
   @override
   State<DriverLoginScreen> createState() => _DriverLoginScreenState();
@@ -16,7 +23,8 @@ class DriverLoginScreen extends StatefulWidget {
 
 class _DriverLoginScreenState extends State<DriverLoginScreen> {
   late final TextEditingController _phoneController;
-  late final TextEditingController _plateController;
+  late final TextEditingController _passwordController;
+  bool _obscurePassword = true;
   bool _chargement = false;
   String? _erreur;
 
@@ -24,30 +32,47 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
   void initState() {
     super.initState();
     _phoneController = TextEditingController(text: '0703000001');
-    _plateController = TextEditingController(text: '1234-JK-01');
+    _passwordController = TextEditingController(text: '123456');
   }
 
   @override
   void dispose() {
     _phoneController.dispose();
-    _plateController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   void _remplirDemo() {
     setState(() {
       _phoneController.text = '0703000001';
-      _plateController.text = '1234-JK-01';
+      _passwordController.text = '123456';
       _erreur = null;
     });
   }
 
-  void _login() async {
-    final phone = _phoneController.text.trim();
-    final plate = _plateController.text.trim();
+  Future<void> _ouvrirPreInscription() async {
+    final phoneInscrit = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => DriverRegisterScreen(
+          apiClientOverride: widget.apiClientOverride,
+        ),
+      ),
+    );
+    if (phoneInscrit != null && phoneInscrit.isNotEmpty && mounted) {
+      setState(() {
+        _phoneController.text = phoneInscrit;
+        _passwordController.clear();
+        _erreur = null;
+      });
+    }
+  }
 
-    if (phone.isEmpty || plate.isEmpty) {
-      setState(() => _erreur = 'Veuillez saisir le numéro et l\'immatriculation.');
+  Future<void> _login() async {
+    final phone = _phoneController.text.trim();
+    final password = _passwordController.text;
+
+    if (phone.isEmpty || password.isEmpty) {
+      setState(() => _erreur = 'Veuillez saisir votre numéro et votre mot de passe.');
       return;
     }
 
@@ -58,33 +83,60 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
 
     try {
       const storage = FlutterSecureStorage();
-      final api = ApiClient(
-        baseUrl: GoLivreurEnv.apiBaseUrl,
-        storage: storage,
-        onDeconnexionForcee: () {},
-      );
+      final api = widget.apiClientOverride ??
+          ApiClient(
+            baseUrl: GoLivreurEnv.apiBaseUrl,
+            storage: storage,
+            onDeconnexionForcee: () {},
+          );
 
       final res = await api.post('/auth/login-password', data: {
         'phone': phone,
-        'password': plate,
+        'password': password,
       });
 
-      if (res.statusCode == 200 && res.data['donnees'] != null) {
-        final token = res.data['donnees']['access_token'] as String?;
-        final refresh = res.data['donnees']['refresh_token'] as String?;
+      if (res.statusCode == 200 && res.data is Map && res.data['donnees'] != null) {
+        final donnees = res.data['donnees'] as Map;
+        final token = donnees['access_token'] as String?;
+        final refresh = donnees['refresh_token'] as String?;
         if (token != null) await storage.write(key: 'access_token', value: token);
         if (refresh != null) await storage.write(key: 'refresh_token', value: refresh);
+
+        if (mounted) {
+          setState(() => _chargement = false);
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => const DriverMainNavigationScreen(),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _chargement = false;
+          _erreur = 'Impossible de vous connecter. Vérifiez vos identifiants.';
+        });
+      }
+    } on DioException catch (e) {
+      String message = 'Numéro ou mot de passe incorrect.';
+      final data = e.response?.data;
+      if (data is Map && data['message'] is String) {
+        message = data['message'] as String;
+      }
+      if (mounted) {
+        setState(() {
+          _chargement = false;
+          _erreur = message;
+        });
       }
     } catch (_) {
-      // Secours démo locale si serveur temporairement inaccessible
-    } finally {
       if (mounted) {
-        setState(() => _chargement = false);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const DriverMainNavigationScreen(),
-          ),
-        );
+        setState(() {
+          _chargement = false;
+          _erreur = 'Serveur inaccessible. Vérifiez votre connexion.';
+        });
       }
     }
   }
@@ -117,7 +169,7 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Espace Livreurs Moto Daloa',
+                'Espace Livreurs Partenaires',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: GoLivreurTheme.texteSecondaire,
@@ -147,7 +199,7 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1B5E20)),
                           ),
                           Text(
-                            'Tél: 0703000001 • Moto: 1234-JK-01',
+                            'Tél: 0703000001 • MDP: 123456',
                             style: TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
                           ),
                         ],
@@ -189,10 +241,21 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
               ),
               const SizedBox(height: 16),
               TextFormField(
-                controller: _plateController,
-                decoration: const InputDecoration(
-                  labelText: 'Immatriculation moto (ex: 1234-JK-01)',
-                  prefixIcon: Icon(Icons.badge_outlined),
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  labelText: 'Mot de passe',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -200,6 +263,15 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
                 label: 'Prendre mon service',
                 estEnChargement: _chargement,
                 onPressed: _login,
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: _ouvrirPreInscription,
+                icon: const Icon(Icons.person_add_alt_1_outlined),
+                label: const Text('Devenir livreur'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
               ),
             ],
           ),

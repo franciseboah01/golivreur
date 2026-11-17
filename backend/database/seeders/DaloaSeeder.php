@@ -212,6 +212,7 @@ class DaloaSeeder extends Seeder
             $userMerchant = User::create([
                 'name' => $commerceData['name'],
                 'phone' => "0702{$phoneIndex}0001",
+                'password' => Hash::make('123456'),
                 'role' => 'merchant',
                 'city_id' => $daloa->id,
                 'is_active' => true,
@@ -274,6 +275,7 @@ class DaloaSeeder extends Seeder
             $userDriver = User::create([
                 'name' => $livreurData['name'],
                 'phone' => $livreurData['phone'],
+                'password' => Hash::make('123456'),
                 'role' => 'driver',
                 'city_id' => $daloa->id,
                 'is_active' => true,
