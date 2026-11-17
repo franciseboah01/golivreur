@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,27 +13,33 @@ import '../services/api_client.dart';
 /// soit le logo unique par défaut GoLivreur (badge ambre dégradé + emoji 🛵).
 class AppBranding {
   final String? logoUrl;
+  final Uint8List? logoBytes;
   final String defaultEmoji;
   final bool isLoaded;
 
   const AppBranding({
     this.logoUrl,
+    this.logoBytes,
     this.defaultEmoji = '🛵',
     this.isLoaded = false,
   });
 
-  bool get hasCustomLogo => logoUrl != null && logoUrl!.trim().isNotEmpty;
+  bool get hasCustomLogo =>
+      (logoBytes != null && logoBytes!.isNotEmpty) ||
+      (logoUrl != null && logoUrl!.trim().isNotEmpty);
 
   String? get resolvedLogoUrl => GoLivreurEnv.resolveMediaUrl(logoUrl);
 
   AppBranding copyWith({
     String? logoUrl,
+    Uint8List? logoBytes,
     String? defaultEmoji,
     bool? isLoaded,
     bool clearLogo = false,
   }) {
     return AppBranding(
       logoUrl: clearLogo ? null : (logoUrl ?? this.logoUrl),
+      logoBytes: clearLogo ? null : (logoBytes ?? this.logoBytes),
       defaultEmoji: (defaultEmoji != null && defaultEmoji.trim().isNotEmpty)
           ? defaultEmoji.trim()
           : this.defaultEmoji,
@@ -41,11 +49,11 @@ class AppBranding {
 }
 
 /// Notifier global synchronisant automatiquement le logo depuis `GET /api/v1/branding`
-/// au démarrage et à chaque retour au premier plan de l'application.
+/// au démarrage, à chaque retour au premier plan et périodiquement.
 class AppBrandingNotifier extends StateNotifier<AppBranding>
     with WidgetsBindingObserver {
   final ApiClient _api;
-  bool _isFetching = false;
+  Future<void>? _inFlightFetch;
   Timer? _pollTimer;
 
   AppBrandingNotifier(this._api) : super(const AppBranding()) {
@@ -68,9 +76,19 @@ class AppBrandingNotifier extends StateNotifier<AppBranding>
     }
   }
 
-  Future<void> loadBranding() async {
-    if (_isFetching) return;
-    _isFetching = true;
+  Future<void> loadBranding() {
+    if (_inFlightFetch != null) {
+      return _inFlightFetch!;
+    }
+    final future = _doLoadBranding();
+    _inFlightFetch = future;
+    future.whenComplete(() {
+      _inFlightFetch = null;
+    });
+    return future;
+  }
+
+  Future<void> _doLoadBranding() async {
     try {
       final res = await _api.get('/branding');
       if (!mounted) return;
@@ -78,19 +96,27 @@ class AppBrandingNotifier extends StateNotifier<AppBranding>
       if (data != null) {
         final rawLogo = data['logo_url'] as String?;
         final resolvedLogo = GoLivreurEnv.resolveMediaUrl(rawLogo);
+        final rawBase64 = (data['logo_base64'] as String?)?.trim();
+        Uint8List? decodedBytes;
+        if (rawBase64 != null && rawBase64.isNotEmpty) {
+          try {
+            decodedBytes = base64Decode(rawBase64);
+          } catch (_) {
+            decodedBytes = null;
+          }
+        }
         final emoji = (data['default_emoji'] as String?)?.trim();
         state = AppBranding(
           logoUrl: (resolvedLogo != null && resolvedLogo.isNotEmpty)
               ? resolvedLogo
               : null,
+          logoBytes: decodedBytes,
           defaultEmoji: (emoji != null && emoji.isNotEmpty) ? emoji : '🛵',
           isLoaded: true,
         );
       }
     } catch (_) {
       // Conserve le logo par défaut unifié en cas d'indisponibilité réseau
-    } finally {
-      _isFetching = false;
     }
   }
 
@@ -99,11 +125,11 @@ class AppBrandingNotifier extends StateNotifier<AppBranding>
   void updateFromValues(String? rawLogoUrl, String? rawEmoji) {
     if (!mounted) return;
     final resolvedLogo = GoLivreurEnv.resolveMediaUrl(rawLogoUrl);
+    final hasLogo = resolvedLogo != null && resolvedLogo.isNotEmpty;
     final emoji = (rawEmoji ?? '').trim();
     state = AppBranding(
-      logoUrl: (resolvedLogo != null && resolvedLogo.isNotEmpty)
-          ? resolvedLogo
-          : null,
+      logoUrl: hasLogo ? resolvedLogo : null,
+      logoBytes: hasLogo ? state.logoBytes : null,
       defaultEmoji: emoji.isNotEmpty ? emoji : '🛵',
       isLoaded: true,
     );

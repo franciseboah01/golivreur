@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_theme.dart';
@@ -21,20 +23,42 @@ bool _hasProviderScope(BuildContext context) {
 /// Écoute automatiquement [appBrandingProvider] si aucun [logoUrl] explicite n'est fourni.
 class GoLivreurBrandMark extends StatelessWidget {
   final String? logoUrl;
+  final Uint8List? logoBytes;
   final String defaultEmoji;
   final double size;
 
   const GoLivreurBrandMark({
     super.key,
     this.logoUrl,
+    this.logoBytes,
     this.defaultEmoji = '🛵',
     this.size = 48.0,
   });
 
-  Widget _buildMark(String? effectiveLogoUrl, String effectiveEmoji) {
+  Widget _buildMark(
+    String? effectiveLogoUrl,
+    Uint8List? effectiveBytes,
+    String effectiveEmoji,
+  ) {
     final resolvedUrl = GoLivreurEnv.resolveMediaUrl(effectiveLogoUrl);
     final emoji =
         effectiveEmoji.trim().isNotEmpty ? effectiveEmoji.trim() : '🛵';
+
+    if (effectiveBytes != null && effectiveBytes.isNotEmpty) {
+      return Image.memory(
+        effectiveBytes,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => Center(
+          child: Text(
+            emoji,
+            style: TextStyle(fontSize: size * 0.54, height: 1.0),
+          ),
+        ),
+      );
+    }
 
     if (resolvedUrl != null && resolvedUrl.isNotEmpty) {
       return Image.network(
@@ -42,6 +66,7 @@ class GoLivreurBrandMark extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.cover,
+        gaplessPlayback: true,
         errorBuilder: (_, __, ___) => Center(
           child: Text(
             emoji,
@@ -69,15 +94,16 @@ class GoLivreurBrandMark extends StatelessWidget {
               (logoUrl != null && logoUrl!.trim().isNotEmpty)
                   ? logoUrl
                   : branding.logoUrl;
+          final effectiveBytes = logoBytes ?? branding.logoBytes;
           final effectiveEmoji =
               (defaultEmoji.trim().isNotEmpty && defaultEmoji.trim() != '🛵')
                   ? defaultEmoji
                   : branding.defaultEmoji;
-          return _buildMark(effectiveLogoUrl, effectiveEmoji);
+          return _buildMark(effectiveLogoUrl, effectiveBytes, effectiveEmoji);
         },
       );
     }
-    return _buildMark(logoUrl, defaultEmoji);
+    return _buildMark(logoUrl, logoBytes, defaultEmoji);
   }
 }
 
@@ -124,9 +150,14 @@ class GoLivreurLogo extends StatelessWidget {
     }
   }
 
-  Widget _buildLogo(String? effectiveLogoUrl, String effectiveEmoji) {
+  Widget _buildLogo(
+    String? effectiveLogoUrl,
+    Uint8List? effectiveBytes,
+    String effectiveEmoji,
+  ) {
     final resolvedLogo = GoLivreurEnv.resolveMediaUrl(effectiveLogoUrl);
-    final hasCustomLogo = resolvedLogo != null && resolvedLogo.isNotEmpty;
+    final hasCustomLogo = (effectiveBytes != null && effectiveBytes.isNotEmpty) ||
+        (resolvedLogo != null && resolvedLogo.isNotEmpty);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -160,6 +191,7 @@ class GoLivreurLogo extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: GoLivreurBrandMark(
             logoUrl: resolvedLogo,
+            logoBytes: effectiveBytes,
             defaultEmoji: effectiveEmoji,
             size: size,
           ),
@@ -226,15 +258,15 @@ class GoLivreurLogo extends StatelessWidget {
               (logoUrl != null && logoUrl!.trim().isNotEmpty)
                   ? logoUrl
                   : branding.logoUrl;
+          final effectiveBytes = branding.logoBytes;
           final effectiveEmoji =
               (defaultEmoji.trim().isNotEmpty && defaultEmoji.trim() != '🛵')
                   ? defaultEmoji
                   : branding.defaultEmoji;
-          return _buildLogo(effectiveLogoUrl, effectiveEmoji);
+          return _buildLogo(effectiveLogoUrl, effectiveBytes, effectiveEmoji);
         },
       );
     }
-    return _buildLogo(logoUrl, defaultEmoji);
+    return _buildLogo(logoUrl, null, defaultEmoji);
   }
 }
-

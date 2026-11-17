@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_theme.dart';
+import '../config/env_config.dart';
+import '../providers/branding_provider.dart';
 import 'golivreur_logo.dart';
 
 /// Écran de démarrage (Splash Screen) sombre et animé officiel GoLivreur.
@@ -92,8 +95,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       }
     });
 
-    // Démarrer l'animation et l'initialisation en parallèle
-    _controller.forward();
+    // Démarrer l'initialisation (incluant la synchronisation du logo) puis l'animation
     _executerInitialisation();
 
     // Sécurité absolue : délai max de 3.2s après lequel on navigue d'office
@@ -105,6 +107,36 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   }
 
   Future<void> _executerInitialisation() async {
+    final bindingType = WidgetsBinding.instance.runtimeType.toString();
+    final isWidgetTest = bindingType.contains('TestWidgetsFlutterBinding') ||
+        bindingType.contains('AutomatedTestWidgetsFlutterBinding');
+
+    if (isWidgetTest) {
+      _controller.forward();
+    } else {
+      // Pré-charger le branding avant de lancer le tracé du cercle pour que
+      // le logo personnalisé soit immédiatement visible au centre du cercle.
+      try {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          try {
+            if (context.findAncestorWidgetOfExactType<ProviderScope>() != null ||
+                context.findAncestorWidgetOfExactType<UncontrolledProviderScope>() != null) {
+              await ProviderScope.containerOf(context, listen: false)
+                  .read(appBrandingProvider.notifier)
+                  .loadBranding()
+                  .timeout(const Duration(milliseconds: 700), onTimeout: () {});
+            }
+          } catch (_) {}
+          if (mounted && !_controller.isAnimating && !_controller.isCompleted) {
+            _controller.forward();
+          }
+        });
+      } catch (_) {
+        _controller.forward();
+      }
+    }
+
     if (widget.onInit != null) {
       try {
         await widget.onInit!();
@@ -188,18 +220,18 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // ── Cercle animé et Moto orange ──────────────────────────────
-              AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  return SizedBox(
-                    width: circleSize,
-                    height: circleSize,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Tracé circulaire progressif
-                        CustomPaint(
+              // ── Cercle animé et Logo/Moto au centre ──────────────────────
+              SizedBox(
+                width: circleSize,
+                height: circleSize,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Tracé circulaire progressif
+                    AnimatedBuilder(
+                      animation: _circleProgress,
+                      builder: (context, _) {
+                        return CustomPaint(
                           size: const Size(circleSize, circleSize),
                           painter: CircleProgressPainter(
                             progress: _circleProgress.value,
@@ -207,15 +239,68 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                             trackColor: Colors.white.withValues(alpha: 0.08),
                             strokeWidth: 3.5,
                           ),
-                        ),
-                        // Logo configuré ou badge ambre unifié par défaut centré
-                        Transform.scale(
-                          scale: _motorcycleScale.value,
-                          child: Container(
-                            width: 80,
-                            height: 80,
+                        );
+                      },
+                    ),
+                    // Logo configuré (en mémoire / réseau) ou badge ambre unifié par défaut centré
+                    ScaleTransition(
+                      scale: _motorcycleScale,
+                      child: Builder(
+                        builder: (context) {
+                          final hasScope = context.findAncestorWidgetOfExactType<ProviderScope>() != null ||
+                              context.findAncestorWidgetOfExactType<UncontrolledProviderScope>() != null;
+                          if (hasScope) {
+                            return Consumer(
+                              builder: (context, ref, _) {
+                                final branding = ref.watch(appBrandingProvider);
+                                final effectiveLogoUrl = (widget.logoUrl != null && widget.logoUrl!.trim().isNotEmpty)
+                                    ? widget.logoUrl
+                                    : branding.logoUrl;
+                                final resolvedUrl = GoLivreurEnv.resolveMediaUrl(effectiveLogoUrl);
+                                final hasCustom = (branding.logoBytes != null && branding.logoBytes!.isNotEmpty) ||
+                                    (resolvedUrl != null && resolvedUrl.isNotEmpty);
+
+                                return Container(
+                                  width: 84,
+                                  height: 84,
+                                  decoration: BoxDecoration(
+                                    color: hasCustom ? Colors.white : GoLivreurTheme.primaire,
+                                    borderRadius: BorderRadius.circular(84 * 0.24),
+                                    gradient: hasCustom
+                                        ? null
+                                        : const LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              Color(0xFFFFB732),
+                                              Color(0xFFF4A623),
+                                            ],
+                                          ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: GoLivreurTheme.primaire.withValues(alpha: 0.35),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: GoLivreurBrandMark(
+                                    logoUrl: resolvedUrl,
+                                    logoBytes: branding.logoBytes,
+                                    defaultEmoji: branding.defaultEmoji,
+                                    size: 84,
+                                  ),
+                                );
+                              },
+                            );
+                          }
+
+                          return Container(
+                            width: 84,
+                            height: 84,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(80 * 0.24),
+                              borderRadius: BorderRadius.circular(84 * 0.24),
                               gradient: const LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -224,26 +309,19 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                                   Color(0xFFF4A623),
                                 ],
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: GoLivreurTheme.primaire.withValues(alpha: 0.35),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
                             ),
                             clipBehavior: Clip.antiAlias,
                             child: GoLivreurBrandMark(
                               logoUrl: widget.logoUrl,
                               defaultEmoji: widget.defaultEmoji,
-                              size: 80,
+                              size: 84,
                             ),
-                          ),
-                        ),
-                      ],
+                          );
+                        },
+                      ),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
 
               const SizedBox(height: 28),

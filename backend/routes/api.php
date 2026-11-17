@@ -25,10 +25,25 @@ use Illuminate\Support\Facades\Storage;
 */
 
 Route::middleware('throttle:120,1')->group(function () {
-    Route::get('/branding', fn (SettingsService $settingsService) => response()->json([
-        'succes' => true,
-        'donnees' => $settingsService->getBranding(),
-    ]));
+    Route::get('/branding', function (SettingsService $settingsService) {
+        $branding = $settingsService->getBranding();
+        $logoPath = $branding['logo_path'] ?? null;
+        $logoBase64 = null;
+        if (is_string($logoPath) && $logoPath !== '' && Storage::disk('public')->exists($logoPath)) {
+            $rawBytes = Storage::disk('public')->get($logoPath);
+            if (is_string($rawBytes) && $rawBytes !== '') {
+                $logoBase64 = base64_encode($rawBytes);
+            }
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                ...$branding,
+                'logo_base64' => $logoBase64,
+            ],
+        ]);
+    });
 
     Route::get('/branding/logo', function (SettingsService $settingsService) {
         $branding = $settingsService->getBranding();
