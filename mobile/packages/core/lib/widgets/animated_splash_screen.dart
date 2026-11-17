@@ -56,27 +56,27 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2400),
+      duration: const Duration(milliseconds: 5000),
     );
 
-    // 1. Cercle tracé de 0 à 100% entre 0.0 et 0.65 de la durée
+    // 1. Cercle tracé de 0 à 100% entre 0.0 et 0.50 de la durée (0s -> 2.5s)
     _circleProgress = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.0, 0.65, curve: Curves.easeInOutCubic),
+      curve: const Interval(0.0, 0.50, curve: Curves.easeInOutCubic),
     );
 
-    // 2. Légère pulsation / apparition dynamique de la moto
+    // 2. Légère pulsation / apparition dynamique du logo (0.05 -> 0.50)
     _motorcycleScale = Tween<double>(begin: 0.75, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.1, 0.65, curve: Curves.easeOutBack),
+        curve: const Interval(0.05, 0.50, curve: Curves.easeOutBack),
       ),
     );
 
-    // 3. Texte "GoLivreur" apparaissant en fondu après le cercle (0.60 à 0.90)
+    // 3. Texte "GoLivreur" apparaissant en fondu après le cercle (0.45 -> 0.70), puis maintien jusqu'à 5s
     _textFade = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.60, 0.90, curve: Curves.easeIn),
+      curve: const Interval(0.45, 0.70, curve: Curves.easeIn),
     );
 
     _textSlide = Tween<Offset>(
@@ -85,7 +85,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.60, 0.90, curve: Curves.easeOutCubic),
+        curve: const Interval(0.45, 0.70, curve: Curves.easeOutCubic),
       ),
     );
 
@@ -98,8 +98,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     // Démarrer l'initialisation (incluant la synchronisation du logo) puis l'animation
     _executerInitialisation();
 
-    // Sécurité absolue : délai max de 3.2s après lequel on navigue d'office
-    _fallbackTimer = Timer(const Duration(milliseconds: 3200), () {
+    // Sécurité absolue : délai max de 5.8s après lequel on navigue d'office
+    _fallbackTimer = Timer(const Duration(milliseconds: 5800), () {
       if (mounted && !_hasNavigated) {
         _terminerEtNaviguer(force: true);
       }
