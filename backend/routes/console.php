@@ -12,3 +12,13 @@ Schedule::command('orders:sweep-timeouts')
     ->everyMinute()
     ->withoutOverlapping()
     ->onOneServer();
+
+Schedule::command('horizon:snapshot')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
+
+Schedule::command('queue:prune-failed --hours=168')
+    ->daily()
+    ->withoutOverlapping()
+    ->onOneServer();

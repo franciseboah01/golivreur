@@ -93,7 +93,7 @@ class AssignmentService
                             $proposeeLe,
                         )
                             ->delay(now()->addSeconds($delaySeconds))
-                            ->onQueue('default'),
+                            ->onQueue('high'),
                         operation: 'notifier_livreur_goshop',
                         contexte: ['order_id' => $orderId, 'courier_id' => $courierId, 'tentative' => $currentAttempt],
                     );
@@ -152,7 +152,7 @@ class AssignmentService
                             $proposeeLe,
                         )
                             ->delay(now()->addSeconds($delaySeconds))
-                            ->onQueue('default'),
+                            ->onQueue('high'),
                         operation: 'notifier_livreur_gocolis',
                         contexte: ['parcel_id' => $parcelId, 'courier_id' => $courierId, 'tentative' => $currentAttempt],
                     );
