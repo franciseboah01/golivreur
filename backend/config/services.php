@@ -30,6 +30,6 @@ return [
     'admin_alert_email' => env('ADMIN_ALERT_EMAIL', 'admin@golivreur.ci'),
 
     'health' => [
-        'token' => env('HEALTH_CHECK_TOKEN', 'golivreur-secret-health-token'),
+        'token' => env('HEALTH_TOKEN', env('HEALTH_CHECK_TOKEN', '')),
     ],
 ];
