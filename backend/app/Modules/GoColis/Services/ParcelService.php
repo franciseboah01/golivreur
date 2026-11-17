@@ -19,6 +19,7 @@ use App\Services\ParcelPhotoStorageService;
 use App\Services\SettingsService;
 use App\Services\SmsService;
 use App\Services\WalletService;
+use App\Support\PhoneHelper;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -645,9 +646,7 @@ class ParcelService
     private function signalerEchecSmsDestinataire(Parcel $parcel, ?int $actorId = null): void
     {
         $phone = (string) $parcel->recipient_phone;
-        $phoneMasked = strlen($phone) >= 5
-            ? substr($phone, 0, 2).'****'.substr($phone, -3)
-            : '****';
+        $phoneMasked = PhoneHelper::mask($phone);
 
         $this->activityLogService->log(
             userId: $actorId,

@@ -56,7 +56,7 @@ class AuthController extends Controller
 
         // Générer et envoyer l'OTP (jamais loggé)
         $code = (string) random_int(1000, 9999);
-        OtpCode::create([
+        $otpRecord = OtpCode::create([
             'phone' => $phone,
             'code_hash' => Hash::make($code),
             'purpose' => 'register',
@@ -73,7 +73,14 @@ class AuthController extends Controller
             ], now()->addMinutes(15));
         }
 
-        $this->smsService->envoyerOtp($phone, $code, 'inscription');
+        if (! $this->smsService->envoyerOtp($phone, $code, 'inscription')) {
+            $otpRecord->delete();
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Impossible d\'envoyer le code SMS pour le moment. Veuillez réessayer.',
+            ], 503);
+        }
 
         return response()->json([
             'succes' => true,
@@ -192,14 +199,21 @@ class AuthController extends Controller
         }
 
         $code = (string) random_int(1000, 9999);
-        OtpCode::create([
+        $otpRecord = OtpCode::create([
             'phone' => $phone,
             'code_hash' => Hash::make($code),
             'purpose' => 'login',
             'expires_at' => now()->addMinutes(5),
         ]);
 
-        $this->smsService->envoyerOtp($phone, $code, 'connexion');
+        if (! $this->smsService->envoyerOtp($phone, $code, 'connexion')) {
+            $otpRecord->delete();
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Impossible d\'envoyer le code SMS pour le moment. Veuillez réessayer.',
+            ], 503);
+        }
 
         return response()->json([
             'succes' => true,

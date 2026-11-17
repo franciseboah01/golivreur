@@ -4,13 +4,17 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Policies\UserPolicy;
+use App\Services\SettingsService;
+use App\Services\Sms\Contracts\SmsGateway;
+use App\Services\Sms\InvalidDriverSmsGateway;
+use App\Services\Sms\LogSmsGateway;
+use App\Services\Sms\YellikaSmsGateway;
 use App\Services\SmsService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use Twilio\Rest\Client;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,17 +30,22 @@ class AppServiceProvider extends ServiceProvider
             class_alias('PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth', 'Tymon\JWTAuth\Facades\JWTAuth');
         }
 
-        $this->app->singleton(SmsService::class, function ($app) {
-            $sid = config('services.twilio.sid');
-            $token = config('services.twilio.token');
-            $from = config('services.twilio.from');
-            $alertEmail = config('services.admin_alert_email', config('mail.from.address', 'admin@golivreur.ci'));
+        $this->app->bind(SmsGateway::class, function ($app): SmsGateway {
+            $driver = strtolower(trim((string) config('sms.driver', 'log')));
 
-            $client = ($sid && $token && class_exists('\Twilio\Rest\Client'))
-                ? new Client($sid, $token)
-                : null;
+            return match ($driver) {
+                'log' => $app->make(LogSmsGateway::class),
+                'yellika' => $app->make(YellikaSmsGateway::class),
+                default => new InvalidDriverSmsGateway($driver),
+            };
+        });
 
-            return new SmsService($client, $from ?? '', $alertEmail);
+        $this->app->bind(SmsService::class, function ($app): SmsService {
+            return new SmsService(
+                gateway: $app->make(SmsGateway::class),
+                alertEmail: '',
+                settingsService: $app->make(SettingsService::class),
+            );
         });
     }
 

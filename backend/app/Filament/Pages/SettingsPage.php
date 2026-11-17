@@ -372,10 +372,14 @@ class SettingsPage extends Page implements HasForms
                                     ->label('Seuil d\'alerte consommation SMS / mois')
                                     ->numeric()->required()
                                     ->helperText('Une alerte est envoyée dès que ce quota mensuel est atteint.'),
+                                Forms\Components\TextInput::make('sms.seuil_alerte_quotidien')
+                                    ->label('Seuil d\'alerte consommation SMS / jour')
+                                    ->numeric()->required()
+                                    ->helperText('Une alerte est envoyée si les envois quotidiens dépassent ce seuil.'),
                                 Forms\Components\TextInput::make('sms.alert_email')
                                     ->label('Email de réception de l\'alerte')
                                     ->email()->required(),
-                            ])->columns(2),
+                            ])->columns(3),
 
                         // ── 9. Sécurité ──────────────────────────────────────
                         Forms\Components\Tabs\Tab::make('Sécurité')

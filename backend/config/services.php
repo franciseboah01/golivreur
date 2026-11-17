@@ -17,10 +17,14 @@ return [
         'credentials_path' => env('FCM_CREDENTIALS_PATH', ''),
     ],
 
-    'twilio' => [
-        'sid' => env('TWILIO_SID', ''),
-        'token' => env('TWILIO_AUTH_TOKEN', ''),
-        'from' => env('TWILIO_FROM', ''),
+    'sms' => [
+        'driver' => env('SMS_DRIVER', 'log'),
+    ],
+
+    'yellika' => [
+        'base_url' => env('YELLIKA_BASE_URL', 'https://panel.yellikasms.com/api/v3/sms/send'),
+        'api_token' => env('YELLIKA_API_TOKEN', ''),
+        'sender_id' => env('YELLIKA_SENDER_ID', 'GoLivreur'),
     ],
 
     'admin_alert_email' => env('ADMIN_ALERT_EMAIL', 'admin@golivreur.ci'),

@@ -91,6 +91,7 @@ class SettingsService
 
         'sms' => [
             'seuil_alerte_mensuel' => 2500,
+            'seuil_alerte_quotidien' => 200,
             'alert_email' => 'francis@golivreur.ci',
         ],
 

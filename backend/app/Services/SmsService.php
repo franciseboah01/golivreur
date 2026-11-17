@@ -3,15 +3,22 @@
 namespace App\Services;
 
 use App\Mail\SmsBudgetAlertMail;
+use App\Mail\SmsDailyAlertMail;
+use App\Models\ActivityLog;
 use App\Models\Parcel;
+use App\Models\SmsLog;
+use App\Services\Sms\Contracts\SmsGateway;
+use App\Services\Sms\LogSmsGateway;
+use App\Services\Sms\YellikaSmsGateway;
+use App\Support\PhoneHelper;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * Envoie les SMS via Twilio ou Orange API.
- * Gère le compteur mensuel avec alerte automatique à 2 500 SMS/mois.
- * Les codes OTP et de confirmation ne sont JAMAIS loggés.
+ * Orchestration applicative des envois SMS (OTP, GoColis, secours).
+ * Délègue exclusivement l'envoi à l'interface SmsGateway (aucun appel HTTP/fournisseur direct).
+ * Journalise dans `sms_logs` et les logs applicatifs sans jamais exposer le message, le code ou le téléphone complet.
  */
 class SmsService
 {
@@ -20,14 +27,14 @@ class SmsService
     private const CACHE_KEY = 'sms_count_mensuel';
 
     public function __construct(
-        private readonly ?object $twilioClient = null,
-        private readonly string $twilioFrom = '',
+        private readonly ?SmsGateway $gateway = null,
         private readonly string $alertEmail = '',
+        private readonly ?SettingsService $settingsService = null,
     ) {}
 
     /**
      * Envoie un OTP d'inscription ou de connexion.
-     * Le code n'apparaît jamais dans les logs.
+     * Le code n'apparaît jamais dans les logs de production ni dans `sms_logs`.
      */
     public function envoyerOtp(string $phone, string $code, string $contexte): bool
     {
@@ -42,7 +49,7 @@ class SmsService
 
     /**
      * Envoie le code destinataire GoColis par SMS.
-     * Le code n'apparaît jamais dans les logs.
+     * Le code n'apparaît jamais dans les logs ni dans `sms_logs`.
      */
     public function envoyerCodeDestinataire(string $phone, string $code, string $expediteurNom): bool
     {
@@ -81,44 +88,82 @@ class SmsService
         return $this->envoyer($phone, $message, type: 'secours');
     }
 
-    // ─── Méthode privée d'envoi ───────────────────────────────────────────────
+    // ─── Envoi délégué à la passerelle ─────────────────────────────────────────
 
     private function envoyer(string $phone, string $message, string $type): bool
     {
-        try {
-            // Normaliser le numéro ivoirien (+225 + numéro)
-            $phoneInternational = $this->normaliserPhone($phone);
+        $gateway = $this->gateway ?? app(SmsGateway::class);
+        $driverName = $this->resoudreNomPilote($gateway);
+        $phoneMasked = PhoneHelper::mask($phone);
+        $phoneE164 = PhoneHelper::toE164($phone);
 
-            if (app()->environment('testing', 'local') || ! $this->twilioClient) {
-                $this->incrementerCompteur();
-                Log::info("SMS simulé ({$type})", [
-                    'phone_masked' => substr($phone, 0, 2).'****'.substr($phone, -3),
-                ]);
+        if ($phoneE164 === null) {
+            $this->enregistrerSmsLog(
+                phoneMasked: $phoneMasked,
+                motif: $type,
+                driver: $driverName,
+                status: 'failed',
+                providerMessageId: null,
+                errorMessage: 'Numéro de téléphone invalide.',
+            );
 
-                return true;
-            }
-
-            $this->twilioClient->messages->create($phoneInternational, [
-                'from' => $this->twilioFrom,
-                'body' => $message,
+            Log::warning('SMS annulé : numéro de téléphone invalide', [
+                'phone_masked' => $phoneMasked,
+                'motif' => $type,
+                'driver' => $driverName,
             ]);
 
-            // Incrémenter le compteur mensuel
-            $this->incrementerCompteur();
+            return false;
+        }
 
-            // Logger l'envoi SANS le code
+        try {
+            $result = $gateway->send($phoneE164, $message);
+
+            $this->enregistrerSmsLog(
+                phoneMasked: $phoneMasked,
+                motif: $type,
+                driver: $driverName,
+                status: $result->succes ? 'sent' : 'failed',
+                providerMessageId: $result->identifiantFournisseur,
+                errorMessage: $result->erreur,
+            );
+
+            if (! $result->succes) {
+                Log::error('Échec envoi SMS', [
+                    'phone_masked' => $phoneMasked,
+                    'motif' => $type,
+                    'driver' => $driverName,
+                    'error' => $result->erreur,
+                ]);
+
+                return false;
+            }
+
+            $this->incrementerCompteur();
+            $this->verifierSeuilQuotidien();
+
             Log::info('SMS envoyé', [
-                'phone_masked' => substr($phone, 0, 2).'****'.substr($phone, -3),
-                'type' => $type,
-                // Le code n'est JAMAIS loggé
+                'phone_masked' => $phoneMasked,
+                'motif' => $type,
+                'driver' => $driverName,
+                'provider_message_id' => $result->identifiantFournisseur,
             ]);
 
             return true;
+        } catch (\Throwable $e) {
+            $this->enregistrerSmsLog(
+                phoneMasked: $phoneMasked,
+                motif: $type,
+                driver: $driverName,
+                status: 'failed',
+                providerMessageId: null,
+                errorMessage: substr($e->getMessage(), 0, 250),
+            );
 
-        } catch (\Exception $e) {
-            Log::error('Échec envoi SMS', [
-                'phone_masked' => substr($phone, 0, 2).'****'.substr($phone, -3),
-                'type' => $type,
+            Log::error('Échec envoi SMS (exception)', [
+                'phone_masked' => $phoneMasked,
+                'motif' => $type,
+                'driver' => $driverName,
                 'error' => $e->getMessage(),
             ]);
 
@@ -126,50 +171,152 @@ class SmsService
         }
     }
 
+    private function resoudreNomPilote(SmsGateway $gateway): string
+    {
+        return match (true) {
+            $gateway instanceof LogSmsGateway => 'log',
+            $gateway instanceof YellikaSmsGateway => 'yellika',
+            default => (string) config('sms.driver', 'custom'),
+        };
+    }
+
+    private function enregistrerSmsLog(
+        string $phoneMasked,
+        string $motif,
+        string $driver,
+        string $status,
+        ?string $providerMessageId,
+        ?string $errorMessage,
+    ): void {
+        try {
+            SmsLog::create([
+                'phone_masked' => $phoneMasked,
+                'motif' => $motif,
+                'driver' => $driver,
+                'status' => $status,
+                'provider_message_id' => $providerMessageId,
+                'error_message' => $errorMessage !== null ? mb_substr($errorMessage, 0, 255) : null,
+                'sent_at' => $status === 'sent' ? now() : null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("Impossible d'enregistrer dans sms_logs : {$e->getMessage()}");
+        }
+    }
+
     private function incrementerCompteur(): void
     {
-        // Clé de cache mensuelle : sms_count_mensuel_2026_06
         $cle = self::CACHE_KEY.'_'.date('Y_m');
 
         $compteur = Cache::increment($cle);
 
-        // Si la clé vient d'être créée, définir l'expiration à fin du mois
         if ($compteur === 1) {
             Cache::put($cle, 1, now()->endOfMonth());
         }
 
-        // Alerte si seuil atteint (une seule alerte par mois)
-        if ($compteur === self::SEUIL_ALERTE) {
+        $seuilMensuel = $this->resoudreSeuilMensuel();
+        if ($compteur === $seuilMensuel) {
             $this->envoyerAlertesBudget($compteur);
         }
     }
 
-    private function envoyerAlertesBudget(int $compteur): void
+    private function verifierSeuilQuotidien(): void
     {
-        $mois = date('F Y');
+        $seuilQuotidien = $this->resoudreSeuilQuotidien();
+        if ($seuilQuotidien <= 0) {
+            return;
+        }
+
+        $compteurJour = SmsLog::where('status', 'sent')
+            ->whereDate('created_at', today())
+            ->count();
+
+        if ($compteurJour <= $seuilQuotidien) {
+            return;
+        }
+
+        $cacheKey = 'sms_daily_alert_sent_'.now()->format('Y_m_d');
+        if (! Cache::add($cacheKey, true, now()->endOfDay())) {
+            return;
+        }
+
+        Log::warning('Seuil quotidien SMS dépassé', [
+            'daily_count' => $compteurJour,
+            'daily_threshold' => $seuilQuotidien,
+        ]);
+
         try {
-            Mail::to($this->alertEmail)->send(new SmsBudgetAlertMail($compteur));
-        } catch (\Exception $e) {
-            Log::error("Impossible d'envoyer l'alerte budget SMS : {$e->getMessage()}");
+            ActivityLog::create([
+                'user_id' => null,
+                'action' => 'sms_daily_threshold_exceeded',
+                'entity_type' => 'sms',
+                'entity_id' => null,
+                'properties' => [
+                    'daily_count' => $compteurJour,
+                    'daily_threshold' => $seuilQuotidien,
+                ],
+                'severity' => 'warning',
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("Impossible de journaliser l'alerte SMS quotidienne : {$e->getMessage()}");
+        }
+
+        $destinataire = $this->resoudreEmailAlerte();
+        if ($destinataire === '') {
+            return;
+        }
+
+        try {
+            Mail::to($destinataire)->send(new SmsDailyAlertMail($compteurJour, $seuilQuotidien));
+        } catch (\Throwable $e) {
+            Log::error("Impossible d'envoyer l'alerte SMS quotidienne : {$e->getMessage()}");
         }
     }
 
-    private function normaliserPhone(string $phone): string
+    private function resoudreSeuilMensuel(): int
     {
-        // Supprimer les espaces et tirets
-        $phone = preg_replace('/[\s\-]/', '', $phone);
+        $settingsService = $this->settingsService ?? app(SettingsService::class);
+        $sms = $settingsService->get('sms');
 
-        // Si commence par 0, remplacer par +225
-        if (str_starts_with($phone, '0')) {
-            return '+225'.$phone;
+        return max(1, (int) ($sms['seuil_alerte_mensuel'] ?? self::SEUIL_ALERTE));
+    }
+
+    private function resoudreSeuilQuotidien(): int
+    {
+        $settingsService = $this->settingsService ?? app(SettingsService::class);
+        $sms = $settingsService->get('sms');
+
+        return (int) ($sms['seuil_alerte_quotidien'] ?? SettingsService::DEFAULTS['sms']['seuil_alerte_quotidien']);
+    }
+
+    private function resoudreEmailAlerte(): string
+    {
+        if (trim($this->alertEmail) !== '') {
+            return trim($this->alertEmail);
         }
 
-        // Si commence par 225, ajouter +
-        if (str_starts_with($phone, '225')) {
-            return '+'.$phone;
+        $settingsService = $this->settingsService ?? app(SettingsService::class);
+        $sms = $settingsService->get('sms');
+        $email = is_array($sms) ? ($sms['alert_email'] ?? null) : null;
+
+        if (is_string($email) && trim($email) !== '') {
+            return trim($email);
         }
 
-        return $phone;
+        return (string) config('services.admin_alert_email', config('mail.from.address', 'admin@golivreur.ci'));
+    }
+
+    private function envoyerAlertesBudget(int $compteur): void
+    {
+        $destinataire = $this->resoudreEmailAlerte();
+        if ($destinataire === '') {
+            return;
+        }
+
+        try {
+            Mail::to($destinataire)->send(new SmsBudgetAlertMail($compteur));
+        } catch (\Exception $e) {
+            Log::error("Impossible d'envoyer l'alerte budget SMS : {$e->getMessage()}");
+        }
     }
 
     /**
