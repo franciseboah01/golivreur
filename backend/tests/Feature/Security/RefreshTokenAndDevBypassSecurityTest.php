@@ -3,10 +3,14 @@
 use App\Models\OtpCode;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 
 afterEach(function () {
     app()->detectEnvironment(fn () => 'testing');
-    config(['app.env' => 'testing']);
+    config([
+        'app.env' => 'testing',
+        'sms.driver' => 'log',
+    ]);
 });
 
 it('renouvelle access_token et refresh_token avec un refresh token opaque de 7 jours', function () {
@@ -60,9 +64,17 @@ it('configure le refresh_ttl par defaut a 10080 minutes (7 jours) selon le CDC 1
 });
 
 it('prouve qu en environnement de production AUCUN bypass dev ne fonctionne', function () {
-    // Forcer l'environnement applicatif en 'production'
+    // Forcer l'environnement applicatif en 'production' (SMS_DRIVER=log interdit en prod -> Yellika simulé)
     app()->detectEnvironment(fn () => 'production');
-    config(['app.env' => 'production']);
+    config([
+        'app.env' => 'production',
+        'sms.driver' => 'yellika',
+        'sms.yellika.api_token' => 'test-prod-yellika-token',
+        'sms.yellika.base_url' => 'https://panel.yellikasms.com/api/v3/sms/send',
+    ]);
+    Http::fake([
+        'panel.yellikasms.com/*' => Http::response(['status' => 'success', 'uid' => 'yell-prod-1'], 200),
+    ]);
 
     $user = User::factory()->create([
         'phone' => '0709998877',
