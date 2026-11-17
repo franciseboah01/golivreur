@@ -150,7 +150,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.text('Connexion GoLivreur'), findsOneWidget);
+    expect(find.text('Achetez en toute simplicité.'), findsOneWidget);
+    expect(find.text('Se connecter en tant que client'), findsOneWidget);
+    expect(find.text('Remplir'), findsNothing);
   });
 
   testWidgets('MainNavigationScreen - affiche la barre avec 4 onglets',

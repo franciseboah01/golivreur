@@ -23,8 +23,8 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
   @override
   void initState() {
     super.initState();
-    _phoneController = TextEditingController(text: '0702010001');
-    _passwordController = TextEditingController(text: '123456');
+    _phoneController = TextEditingController();
+    _passwordController = TextEditingController();
   }
 
   @override
@@ -32,14 +32,6 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  void _remplirDemo() {
-    setState(() {
-      _phoneController.text = '0702010001';
-      _passwordController.text = '123456';
-      _erreur = null;
-    });
   }
 
   void _login() async {
@@ -108,7 +100,7 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'GoLivreur Business',
+                'Vendez en toute confiance.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
@@ -117,7 +109,7 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Espace Commerces & Restaurants partenaires',
+                'Se connecter en tant que commerçant',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: GoLivreurTheme.texteSecondaire,
@@ -125,42 +117,6 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Carte info démo pour faciliter le test
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2E75B6).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF2E75B6).withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.storefront, color: Color(0xFF2E75B6), size: 28),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Maquis Chez Tantie Adjoua (Daloa)',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2E75B6)),
-                          ),
-                          Text(
-                            'Tél: 0702010001 • MDP: 123456',
-                            style: TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
-                          ),
-                        ],
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _remplirDemo,
-                      child: const Text('Remplir', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
 
               if (_erreur != null) ...[
                 Container(

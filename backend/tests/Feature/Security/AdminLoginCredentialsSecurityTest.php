@@ -1,19 +1,6 @@
 <?php
 
-it('affiche les identifiants de test sur /admin/login uniquement lorsque APP_ENV est local', function () {
-    app()->detectEnvironment(fn () => 'local');
-
-    $response = $this->get('/admin/login');
-
-    $response->assertOk()
-        ->assertSee('Identifiants de test (Daloa)')
-        ->assertSee('superadmin@golivreur.ci')
-        ->assertSee('SuperAdmin2026!')
-        ->assertSee('manager.daloa@golivreur.ci')
-        ->assertSee('Manager2026!');
-});
-
-it('masque totalement login-credentials sur /admin/login et au rendu direct hors environnement local', function (string $env) {
+it('masque totalement login-credentials sur /admin/login et au rendu direct dans tous les environnements', function (string $env) {
     app()->detectEnvironment(fn () => $env);
 
     $response = $this->get('/admin/login');
@@ -34,4 +21,4 @@ it('masque totalement login-credentials sur /admin/login et au rendu direct hors
         ->not->toContain('SuperAdmin2026!')
         ->not->toContain('manager.daloa@golivreur.ci')
         ->not->toContain('Manager2026!');
-})->with(['staging', 'production', 'testing']);
+})->with(['local', 'staging', 'production', 'testing']);

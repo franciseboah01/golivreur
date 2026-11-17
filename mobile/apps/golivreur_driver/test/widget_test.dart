@@ -131,7 +131,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('GoLivreur Driver'), findsOneWidget);
+    expect(find.text('Livrez en toute liberté.'), findsOneWidget);
+    expect(find.text('Se connecter en tant que livreur'), findsOneWidget);
+    expect(find.text('Remplir'), findsNothing);
   });
 
   testWidgets('DriverMainNavigationScreen - affiche les 4 onglets avec Profil',

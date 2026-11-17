@@ -170,17 +170,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                 estEnChargement: authState.status == AuthStatus.loading,
                 onPressed: _verify,
               ),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton.icon(
-                  onPressed: () {
-                    _otpController.text = '1234';
-                    _verify();
-                  },
-                  icon: const Icon(Icons.flash_on, size: 18),
-                  label: const Text('Remplir code test (1234) & Valider', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ),
               const SizedBox(height: 16),
               Center(
                 child: _rebours > 0

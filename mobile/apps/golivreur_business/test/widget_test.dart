@@ -115,7 +115,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('GoLivreur Business'), findsOneWidget);
+    expect(find.text('Vendez en toute confiance.'), findsOneWidget);
+    expect(find.text('Se connecter en tant que commerçant'), findsOneWidget);
+    expect(find.text('Remplir'), findsNothing);
   });
 
   testWidgets('BusinessMainNavigationScreen - affiche les 4 onglets avec Profil',
