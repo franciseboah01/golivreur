@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,6 +46,7 @@ class AppBrandingNotifier extends StateNotifier<AppBranding>
     with WidgetsBindingObserver {
   final ApiClient _api;
   bool _isFetching = false;
+  Timer? _pollTimer;
 
   AppBrandingNotifier(this._api) : super(const AppBranding()) {
     WidgetsBinding.instance.addObserver(this);
@@ -51,6 +54,10 @@ class AppBrandingNotifier extends StateNotifier<AppBranding>
     if (!bindingType.contains('TestWidgetsFlutterBinding') &&
         !bindingType.contains('AutomatedTestWidgetsFlutterBinding')) {
       loadBranding();
+      _pollTimer = Timer.periodic(
+        const Duration(seconds: 8),
+        (_) => loadBranding(),
+      );
     }
   }
 
@@ -111,6 +118,7 @@ class AppBrandingNotifier extends StateNotifier<AppBranding>
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

@@ -105,7 +105,14 @@ class SettingsPage extends Page implements HasForms
                                             'branding.logo_path',
                                             'branding',
                                             'Logo de GoLivreur (JPG, PNG, WEBP — Max 2 Mo)'
-                                        )->columnSpanFull(),
+                                        )
+                                            ->live()
+                                            ->afterStateUpdated(function (): void {
+                                                if (! app()->runningUnitTests()) {
+                                                    $this->save();
+                                                }
+                                            })
+                                            ->columnSpanFull(),
 
                                         Forms\Components\TextInput::make('branding.default_emoji')
                                             ->label('Emoji par défaut (si aucun logo)')
@@ -469,6 +476,10 @@ class SettingsPage extends Page implements HasForms
 
             $existing = $settingsService->get($key, $this->selectedCityId);
             $mergedValue = $this->mergePreservingHiddenKeys($existing, $value);
+
+            if ($mergedValue == $existing) {
+                continue;
+            }
 
             $settingsService->set(
                 key: $key,
