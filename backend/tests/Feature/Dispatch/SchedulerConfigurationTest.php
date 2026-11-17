@@ -44,4 +44,3 @@ it('enregistre un heartbeat horodate dans le cache a chaque execution de orders:
     expect($heartbeat)->toBeString()
         ->and(Carbon::parse($heartbeat)->diffInSeconds(now()))->toBeLessThanOrEqual(5);
 });
-
