@@ -105,6 +105,7 @@ class DaloaSeeder extends Seeder
 
         $clients = collect($clientsData)->map(fn ($data) => User::create([
             ...$data,
+            'password' => Hash::make('123456'),
             'role' => 'client',
             'city_id' => $daloa->id,
             'is_active' => true,

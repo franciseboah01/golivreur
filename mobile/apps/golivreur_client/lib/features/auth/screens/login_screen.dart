@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
 import 'package:golivreur_core/widgets/golivreur_logo.dart';
+import '../../gocolis/providers/gocolis_provider.dart';
 import '../../goshop/providers/goshop_provider.dart';
+import '../../goshop/providers/order_provider.dart';
 import '../providers/auth_provider.dart';
-import 'otp_verification_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -17,11 +18,14 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _phoneController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -29,17 +33,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final phone = AuthNotifier.normalizePhone(_phoneController.text);
-    final success = await ref.read(authProvider.notifier).demanderOtpConnexion(phone);
+    final password = _passwordController.text;
+    final success = await ref
+        .read(authProvider.notifier)
+        .connexionParMotDePasse(phone, password);
 
     if (success && mounted) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => OtpVerificationScreen(
-            phone: phone,
-            isRegister: false,
-          ),
-        ),
-      );
+      ref.read(cartProvider.notifier).clear();
+      ref.read(searchQueryProvider.notifier).state = '';
+      ref.invalidate(clientAddressesProvider);
+      ref.invalidate(favoritesProvider);
+      ref.invalidate(clientNotificationsProvider);
+      ref.invalidate(ordersHistoryProvider);
+      ref.invalidate(parcelsHistoryProvider);
+      ref.read(weatherProvider.notifier).chargerStatutVille();
+      ref.read(clientAddressesProvider.notifier).chargerAdresses();
+      ref.read(favoritesProvider.notifier).chargerFavoris();
     }
   }
 
@@ -110,15 +119,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     prefixText: '+225 ',
                   ),
                   validator: (val) {
-                    if (val == null || AuthNotifier.normalizePhone(val).length != 10) {
+                    if (val == null ||
+                        AuthNotifier.normalizePhone(val).length != 10) {
                       return 'Veuillez saisir un numéro à 10 chiffres';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Mot de passe',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
+                    ),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Veuillez saisir votre mot de passe';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 24),
                 BoutonPrimaire(
-                  label: 'Recevoir le code SMS',
+                  label: 'Se connecter',
                   estEnChargement: authState.status == AuthStatus.loading,
                   onPressed: _submit,
                 ),
@@ -131,7 +166,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       onPressed: () {
                         ref.read(authProvider.notifier).clearError();
                         Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const RegisterScreen(),
+                          ),
                         );
                       },
                       child: const Text('Créer un compte'),

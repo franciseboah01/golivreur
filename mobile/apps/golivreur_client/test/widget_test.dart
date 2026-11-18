@@ -152,6 +152,8 @@ void main() {
     expect(find.byType(LoginScreen), findsOneWidget);
     expect(find.text('Achetez en toute simplicité.'), findsOneWidget);
     expect(find.text('Se connecter en tant que client'), findsOneWidget);
+    expect(find.text('Mot de passe'), findsOneWidget);
+    expect(find.text('Se connecter'), findsOneWidget);
     expect(find.text('Remplir'), findsNothing);
   });
 

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golivreur_business/features/auth/screens/business_login_screen.dart';
 import 'package:golivreur_business/features/navigation/screens/business_main_navigation_screen.dart';
 import 'package:golivreur_business/main.dart';
 import 'package:golivreur_core/services/api_client.dart';
@@ -54,7 +55,32 @@ class _FakeHttpClientAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    if (options.path == '/auth/register-merchant' && options.method == 'POST') {
+      return ResponseBody.fromString(
+        jsonEncode({
+          'succes': true,
+          'message':
+              'Pré-inscription enregistrée. Passez en agence GoLivreur ou avec un agent terrain pour valider et compléter votre dossier.',
+          'donnees': {
+            'merchant_id': 15,
+            'status': 'pending_validation',
+            'is_active': false,
+          },
+        }),
+        201,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
+
     final dynamic payload = switch (options.path) {
+      '/cities' => [
+          {'id': 1, 'name': 'Daloa'},
+        ],
+      '/categories' => [
+          {'slug': 'maquis', 'name': 'Maquis & Grillades'},
+        ],
       '/merchant/profile' => {
           'id': 1,
           'business_name': 'Maquis Test',
@@ -137,5 +163,63 @@ void main() {
     expect(find.text('Catalogue'), findsOneWidget);
     expect(find.text('Revenus'), findsOneWidget);
     expect(find.text('Profil'), findsOneWidget);
+  });
+
+  testWidgets('BusinessLoginScreen permet la pré-inscription commerçant (agence ou agent terrain)',
+      (WidgetTester tester) async {
+    final fakeApi = ApiClient(
+      baseUrl: 'http://localhost/api/v1',
+      storage: _FakeSecureStorage(),
+      onDeconnexionForcee: () {},
+      httpClientAdapter: _FakeHttpClientAdapter(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BusinessLoginScreen(apiClientOverride: fakeApi),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Devenir commerçant partenaire'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Devenir commerçant partenaire'));
+    await tester.tap(find.text('Devenir commerçant partenaire'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Devenir commerçant GoLivreur'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nom du commerce / restaurant'),
+      'Maquis Le Palmier',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nom et prénom du gérant'),
+      'Kouassi Adjoua',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Numéro de téléphone gérant'),
+      '0708445566',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mot de passe (min. 6 caractères)'),
+      'MerchantPass2026',
+    );
+    await tester.enterText(
+      find.widgetWithText(
+          TextFormField, 'Adresse / Quartier (ex: Quartier Commerce, Daloa)'),
+      'Quartier Lobia, Daloa',
+    );
+
+    await tester.ensureVisible(find.text('Envoyer ma pré-inscription'));
+    await tester.tap(find.text('Envoyer ma pré-inscription'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Pré-inscription enregistrée. Passez en agence GoLivreur ou avec un agent terrain pour valider et compléter votre dossier.',
+      ),
+      findsOneWidget,
+    );
   });
 }

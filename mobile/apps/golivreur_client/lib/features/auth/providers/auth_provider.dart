@@ -35,6 +35,7 @@ class AuthState {
   final String? phoneNumber;
   final String? pendingName;
   final int? pendingCityId;
+  final String? pendingPassword;
   final String? errorMessage;
 
   const AuthState({
@@ -43,6 +44,7 @@ class AuthState {
     this.phoneNumber,
     this.pendingName,
     this.pendingCityId,
+    this.pendingPassword,
     this.errorMessage,
   });
 
@@ -53,6 +55,7 @@ class AuthState {
     String? phoneNumber,
     String? pendingName,
     int? pendingCityId,
+    String? pendingPassword,
     bool clearPendingRegistration = false,
     String? errorMessage,
   }) {
@@ -62,6 +65,7 @@ class AuthState {
       phoneNumber: clearUser ? null : (phoneNumber ?? this.phoneNumber),
       pendingName: clearPendingRegistration ? null : (pendingName ?? this.pendingName),
       pendingCityId: clearPendingRegistration ? null : (pendingCityId ?? this.pendingCityId),
+      pendingPassword: clearPendingRegistration ? null : (pendingPassword ?? this.pendingPassword),
       errorMessage: errorMessage,
     );
   }
@@ -100,14 +104,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String phone,
     required String name,
     required int cityId,
+    String? password,
   }) async {
     final cleanPhone = normalizePhone(phone);
     final cleanName = name.trim();
+    final cleanPassword = password?.trim();
     state = state.copyWith(
       status: AuthStatus.loading,
       phoneNumber: cleanPhone,
       pendingName: cleanName,
       pendingCityId: cityId,
+      pendingPassword: cleanPassword,
       errorMessage: null,
     );
     try {
@@ -115,6 +122,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'phone': cleanPhone,
         'name': cleanName,
         'city_id': cityId,
+        if (cleanPassword != null && cleanPassword.isNotEmpty)
+          'password': cleanPassword,
         'role': 'client',
       });
 
@@ -124,6 +133,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           phoneNumber: cleanPhone,
           pendingName: cleanName,
           pendingCityId: cityId,
+          pendingPassword: cleanPassword,
           errorMessage: null,
         );
         return true;
@@ -151,10 +161,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String code,
     String? name,
     int? cityId,
+    String? password,
   }) async {
     final cleanPhone = normalizePhone(phone);
     final effectiveName = (name ?? state.pendingName ?? '').trim();
     final effectiveCityId = cityId ?? state.pendingCityId;
+    final effectivePassword = (password ?? state.pendingPassword ?? '').trim();
 
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
     try {
@@ -164,6 +176,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'otp': code.trim(),
         if (effectiveName.isNotEmpty) 'name': effectiveName,
         if (effectiveCityId != null) 'city_id': effectiveCityId,
+        if (effectivePassword.isNotEmpty) 'password': effectivePassword,
       });
 
       if (res.statusCode == 200 || res.statusCode == 201) {
@@ -213,6 +226,71 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: 'Code OTP invalide ou expiré.',
+      );
+    }
+    return false;
+  }
+
+  Future<bool> connexionParMotDePasse(String phone, String password) async {
+    final cleanPhone = normalizePhone(phone);
+    state = state.copyWith(
+      status: AuthStatus.loading,
+      clearPendingRegistration: true,
+      errorMessage: null,
+    );
+    try {
+      final res = await _apiClient.post('/auth/login-password', data: {
+        'phone': cleanPhone,
+        'password': password.trim(),
+      });
+
+      if (res.statusCode == 200 && res.data['succes'] == true) {
+        final data = res.data['donnees'] as Map<String, dynamic>;
+        final accessToken = data['access_token'] as String?;
+        final refreshToken = data['refresh_token'] as String?;
+        final userJson = data['user'] as Map<String, dynamic>?;
+
+        if (accessToken == null || accessToken.isEmpty || userJson == null) {
+          state = state.copyWith(
+            status: AuthStatus.error,
+            errorMessage: 'Réponse de connexion incomplète du serveur.',
+          );
+          return false;
+        }
+
+        await _storage.deleteAll();
+        await _storage.write(key: 'access_token', value: accessToken);
+        if (refreshToken != null) {
+          await _storage.write(key: 'refresh_token', value: refreshToken);
+        }
+
+        final user = UserModel.fromJson(userJson);
+        state = state.copyWith(
+          status: AuthStatus.authenticated,
+          user: user,
+          phoneNumber: user.phone,
+          errorMessage: null,
+        );
+        await chargerProfil();
+        return true;
+      }
+
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Identifiants incorrects.',
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.statusCode == 404
+          ? 'Aucun compte trouvé avec ce numéro. Veuillez vous inscrire.'
+          : ApiClient.messageErreur(e);
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: msg,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Impossible de contacter le serveur.',
       );
     }
     return false;

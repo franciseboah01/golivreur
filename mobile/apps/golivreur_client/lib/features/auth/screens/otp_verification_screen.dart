@@ -14,6 +14,7 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
   final bool isRegister;
   final String? name;
   final int? cityId;
+  final String? password;
 
   const OtpVerificationScreen({
     super.key,
@@ -21,6 +22,7 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
     required this.isRegister,
     this.name,
     this.cityId,
+    this.password,
   });
 
   @override
@@ -68,6 +70,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
             code: code,
             name: widget.name,
             cityId: widget.cityId,
+            password: widget.password,
           )
         : await notifier.verifierOtpConnexion(phone: widget.phone, code: code);
 
@@ -182,6 +185,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                                   phone: widget.phone,
                                   name: widget.name ?? '',
                                   cityId: widget.cityId ?? 1,
+                                  password: widget.password,
                                 );
                           } else {
                             ref.read(authProvider.notifier).demanderOtpConnexion(widget.phone);

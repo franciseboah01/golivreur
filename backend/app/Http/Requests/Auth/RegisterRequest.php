@@ -27,6 +27,7 @@ class RegisterRequest extends FormRequest
             'phone' => ['required', 'string'],
             'name' => ['nullable', 'string', 'max:255'],
             'city_id' => ['nullable', 'integer'],
+            'password' => ['nullable', 'string', 'min:6', 'max:100'],
         ];
     }
 }

@@ -19,12 +19,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
   int? _selectedCityId;
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -34,12 +37,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     final phone = AuthNotifier.normalizePhone(_phoneController.text);
     final name = _nameController.text.trim();
+    final password = _passwordController.text.trim();
     final cityId = _selectedCityId!;
 
     final success = await ref.read(authProvider.notifier).demanderOtpInscription(
           phone: phone,
           name: name,
           cityId: cityId,
+          password: password,
         );
 
     if (success && mounted) {
@@ -50,6 +55,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             isRegister: true,
             name: name,
             cityId: cityId,
+            password: password,
           ),
         ),
       );
@@ -82,7 +88,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Inscription GoLivreur',
+                  'Achetez en toute simplicité.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -91,7 +97,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Créez votre compte GoLivreur',
+                  'Créez votre compte et vérifiez votre numéro par SMS',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: GoLivreurTheme.texteSecondaire,
@@ -137,8 +143,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     prefixText: '+225 ',
                   ),
                   validator: (val) {
-                    if (val == null || AuthNotifier.normalizePhone(val).length != 10) {
+                    if (val == null ||
+                        AuthNotifier.normalizePhone(val).length != 10) {
                       return 'Le numéro ivoirien doit comporter 10 chiffres';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Mot de passe (min. 6 caractères)',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
+                    ),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().length < 6) {
+                      return 'Le mot de passe doit contenir au moins 6 caractères';
                     }
                     return null;
                   },
@@ -147,11 +179,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ref.watch(citiesListProvider).when(
                   loading: () => const Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
-                    child: LinearProgressIndicator(color: GoLivreurTheme.primaire),
+                    child: LinearProgressIndicator(
+                      color: GoLivreurTheme.primaire,
+                    ),
                   ),
                   error: (_, __) => const Text(
                     'Impossible de charger la liste des villes.',
-                    style: TextStyle(color: GoLivreurTheme.erreur, fontSize: 13),
+                    style: TextStyle(
+                      color: GoLivreurTheme.erreur,
+                      fontSize: 13,
+                    ),
                   ),
                   data: (cities) {
                     if (cities.isEmpty) {
@@ -164,7 +201,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ),
                         child: const Text(
                           'Aucune ville disponible pour le moment.',
-                          style: TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 13),
+                          style: TextStyle(
+                            color: GoLivreurTheme.texteSecondaire,
+                            fontSize: 13,
+                          ),
                         ),
                       );
                     }
@@ -184,13 +224,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ))
                           .toList(),
                       onChanged: (val) => setState(() => _selectedCityId = val),
-                      validator: (val) => val == null ? 'Veuillez choisir votre ville' : null,
+                      validator: (val) =>
+                          val == null ? 'Veuillez choisir votre ville' : null,
                     );
                   },
                 ),
                 const SizedBox(height: 24),
                 BoutonPrimaire(
-                  label: 'S\'inscrire par SMS',
+                  label: 'Vérifier mon numéro par SMS',
                   estEnChargement: authState.status == AuthStatus.loading,
                   onPressed: _submit,
                 ),
@@ -203,7 +244,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       onPressed: () {
                         ref.read(authProvider.notifier).clearError();
                         Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
+                          ),
                         );
                       },
                       child: const Text('Se connecter'),

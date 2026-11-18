@@ -387,6 +387,10 @@ class MerchantResource extends Resource
 
                         $record->update($updateData);
 
+                        if ($record->user) {
+                            $record->user->update(['is_active' => $newStatus]);
+                        }
+
                         ActivityLog::create([
                             'user_id' => auth()->id(),
                             'action' => $newStatus ? 'merchant_activated' : 'merchant_deactivated',

@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api\V1\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterDriverRequest;
+use App\Http\Requests\Auth\RegisterMerchantRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Jobs\SendPushNotification;
 use App\Models\City;
 use App\Models\Courier;
+use App\Models\Merchant;
+use App\Models\MerchantCategory;
 use App\Models\OtpCode;
 use App\Models\User;
 use App\Models\VehicleType;
@@ -71,10 +74,15 @@ class AuthController extends Controller
         // Mémoriser les informations d'inscription pour l'étape 2 (/verify-register)
         $pendingName = trim((string) $request->input('name', ''));
         $pendingCityId = $request->input('city_id');
-        if ($pendingName !== '' || $pendingCityId !== null) {
+        $rawPassword = $request->input('password');
+        $pendingPasswordHash = is_string($rawPassword) && $rawPassword !== ''
+            ? Hash::make($rawPassword)
+            : null;
+        if ($pendingName !== '' || $pendingCityId !== null || $pendingPasswordHash !== null) {
             Cache::put("register_meta:{$phone}", [
                 'name' => $pendingName,
                 'city_id' => $pendingCityId,
+                'password_hash' => $pendingPasswordHash,
             ], now()->addMinutes(15));
         }
 
@@ -146,11 +154,16 @@ class AuthController extends Controller
         $validCityId = $requestedCityId && City::whereKey($requestedCityId)->exists()
             ? (int) $requestedCityId
             : null;
+        $rawPassword = $request->input('password');
+        $passwordHash = is_string($rawPassword) && $rawPassword !== ''
+            ? Hash::make($rawPassword)
+            : ($meta['password_hash'] ?? null);
 
         // Créer l'utilisateur
         $user = User::create([
             'name' => $name,
             'phone' => $phone,
+            'password' => $passwordHash,
             'role' => 'client',
             'city_id' => $validCityId,
             'is_active' => true,
@@ -301,7 +314,90 @@ class AuthController extends Controller
     }
 
     /**
-     * Connexion directe par mot de passe / identifiants (Gérants Commerces, Livreurs).
+     * Pré-inscription d'un commerce partenaire depuis l'application GoLivreur Business.
+     * Crée le compte User (role='merchant') et la fiche Merchant avec is_active=false
+     * en attente de validation finale en agence ou par un agent terrain.
+     */
+    public function registerMerchant(RegisterMerchantRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $categorySlug = strtolower(trim((string) $validated['category']));
+
+        if (
+            MerchantCategory::where('is_active', true)->exists()
+            && ! MerchantCategory::where('slug', $categorySlug)->where('is_active', true)->exists()
+        ) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'La catégorie sélectionnée n\'est pas disponible.',
+                'errors' => ['category' => ['La catégorie sélectionnée n\'est pas disponible.']],
+            ], 422);
+        }
+
+        $city = City::findOrFail((int) $validated['city_id']);
+        $businessName = trim((string) $validated['name']);
+        $managerName = trim((string) ($validated['manager_name'] ?? ''));
+        if ($managerName === '') {
+            $managerName = $businessName;
+        }
+
+        $merchant = DB::transaction(function () use ($validated, $city, $businessName, $managerName, $categorySlug): Merchant {
+            $user = User::create([
+                'name' => $managerName,
+                'phone' => (string) $validated['phone'],
+                'password' => Hash::make((string) $validated['password']),
+                'role' => 'merchant',
+                'city_id' => $city->id,
+                'is_active' => false,
+            ]);
+
+            $merchant = Merchant::create([
+                'user_id' => $user->id,
+                'city_id' => $city->id,
+                'name' => $businessName,
+                'category' => $categorySlug,
+                'address' => trim((string) $validated['address']),
+                'lat' => $city->center_lat ?? 6.8770,
+                'lng' => $city->center_lng ?? -6.4502,
+                'prep_time_minutes' => 20,
+                'is_open' => false,
+                'is_active' => false,
+                'commission_rate' => 15.0,
+            ]);
+
+            Wallet::firstOrCreate(
+                ['owner_type' => 'merchant', 'owner_id' => $merchant->id],
+                ['balance' => 0, 'total_earned' => 0, 'total_withdrawn' => 0],
+            );
+
+            $this->activityLogService->log(
+                userId: $user->id,
+                action: 'merchant_pre_registered',
+                entityType: 'merchant',
+                entityId: $merchant->id,
+                properties: [
+                    'city_id' => $merchant->city_id,
+                    'category' => $merchant->category,
+                    'address' => $merchant->address,
+                ],
+            );
+
+            return $merchant;
+        });
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Pré-inscription enregistrée. Passez en agence GoLivreur ou avec un agent terrain pour valider et compléter votre dossier.',
+            'donnees' => [
+                'merchant_id' => $merchant->id,
+                'status' => 'pending_validation',
+                'is_active' => false,
+            ],
+        ], 201);
+    }
+
+    /**
+     * Connexion directe par mot de passe / identifiants (Clients, Gérants Commerces, Livreurs).
      */
     public function loginPassword(Request $request): JsonResponse
     {
@@ -353,6 +449,18 @@ class AuthController extends Controller
                     'message' => $isPendingAgency
                         ? 'Votre dossier livreur est en attente de validation. Passez en agence GoLivreur pour vérifier vos pièces et activer votre compte.'
                         : 'Votre compte livreur est actuellement désactivé. Contactez l\'agence GoLivreur.',
+                ], 403);
+            }
+        } elseif ($user->role === 'merchant') {
+            $merchant = Merchant::where('user_id', $user->id)->first();
+            if (! $user->is_active || ($merchant && ! $merchant->is_active)) {
+                $isPendingAgency = $merchant && $merchant->activated_at === null;
+
+                return response()->json([
+                    'succes' => false,
+                    'message' => $isPendingAgency
+                        ? 'Votre dossier commerçant est en attente de validation. Passez en agence GoLivreur ou avec un agent terrain pour compléter votre dossier et activer votre compte.'
+                        : 'Votre compte commerçant est actuellement désactivé. Contactez l\'agence GoLivreur.',
                 ], 403);
             }
         } elseif (! $user->is_active) {

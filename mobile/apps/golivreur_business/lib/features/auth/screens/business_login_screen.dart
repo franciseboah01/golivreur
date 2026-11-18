@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
@@ -6,9 +7,15 @@ import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
 import 'package:golivreur_core/widgets/golivreur_logo.dart';
 import '../../navigation/screens/business_main_navigation_screen.dart';
+import 'business_register_screen.dart';
 
 class BusinessLoginScreen extends StatefulWidget {
-  const BusinessLoginScreen({super.key});
+  final ApiClient? apiClientOverride;
+
+  const BusinessLoginScreen({
+    super.key,
+    this.apiClientOverride,
+  });
 
   @override
   State<BusinessLoginScreen> createState() => _BusinessLoginScreenState();
@@ -17,6 +24,7 @@ class BusinessLoginScreen extends StatefulWidget {
 class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
   late final TextEditingController _phoneController;
   late final TextEditingController _passwordController;
+  bool _obscurePassword = true;
   bool _chargement = false;
   String? _erreur;
 
@@ -34,12 +42,31 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
     super.dispose();
   }
 
+  Future<void> _ouvrirPreInscription() async {
+    final phoneInscrit = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => BusinessRegisterScreen(
+          apiClientOverride: widget.apiClientOverride,
+        ),
+      ),
+    );
+    if (phoneInscrit != null && phoneInscrit.isNotEmpty && mounted) {
+      setState(() {
+        _phoneController.text = phoneInscrit;
+        _passwordController.clear();
+        _erreur = null;
+      });
+    }
+  }
+
   void _login() async {
     final phone = _phoneController.text.trim();
-    final pwd = _passwordController.text.trim();
+    final pwd = _passwordController.text;
 
     if (phone.isEmpty || pwd.isEmpty) {
-      setState(() => _erreur = 'Veuillez saisir votre téléphone et mot de passe.');
+      setState(
+        () => _erreur = 'Veuillez saisir votre téléphone et mot de passe.',
+      );
       return;
     }
 
@@ -50,11 +77,12 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
 
     try {
       const storage = FlutterSecureStorage();
-      final api = ApiClient(
-        baseUrl: GoLivreurEnv.apiBaseUrl,
-        storage: storage,
-        onDeconnexionForcee: () {},
-      );
+      final api = widget.apiClientOverride ??
+          ApiClient(
+            baseUrl: GoLivreurEnv.apiBaseUrl,
+            storage: storage,
+            onDeconnexionForcee: () {},
+          );
 
       final res = await api.post('/auth/login-password', data: {
         'phone': phone,
@@ -64,19 +92,43 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
       if (res.statusCode == 200 && res.data['donnees'] != null) {
         final token = res.data['donnees']['access_token'] as String?;
         final refresh = res.data['donnees']['refresh_token'] as String?;
-        if (token != null) await storage.write(key: 'access_token', value: token);
-        if (refresh != null) await storage.write(key: 'refresh_token', value: refresh);
+        if (token != null) {
+          await storage.write(key: 'access_token', value: token);
+        }
+        if (refresh != null) {
+          await storage.write(key: 'refresh_token', value: refresh);
+        }
+
+        if (mounted) {
+          setState(() => _chargement = false);
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => const BusinessMainNavigationScreen(),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _chargement = false;
+          _erreur = res.data['message'] as String? ?? 'Identifiants incorrects.';
+        });
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() {
+          _chargement = false;
+          _erreur = ApiClient.messageErreur(e);
+        });
       }
     } catch (_) {
-      // Secours démo locale si serveur temporairement inaccessible
-    } finally {
       if (mounted) {
-        setState(() => _chargement = false);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const BusinessMainNavigationScreen(),
-          ),
-        );
+        setState(() {
+          _chargement = false;
+          _erreur = 'Impossible de se connecter au serveur. Vérifiez votre réseau.';
+        });
       }
     }
   }
@@ -146,10 +198,20 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
                   labelText: 'Mot de passe',
-                  prefixIcon: Icon(Icons.lock_outline),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -157,6 +219,20 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
                 label: 'Accéder à ma boutique',
                 estEnChargement: _chargement,
                 onPressed: _login,
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: _chargement ? null : _ouvrirPreInscription,
+                icon: const Icon(Icons.add_business_outlined),
+                label: const Text('Devenir commerçant partenaire'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  foregroundColor: const Color(0xFF2E75B6),
+                  side: const BorderSide(color: Color(0xFF2E75B6)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
             ],
           ),
