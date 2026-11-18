@@ -56,4 +56,3 @@ class RegisterMerchantRequest extends FormRequest
         ];
     }
 }
-
