@@ -26,6 +26,7 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
+  bool _detectingCity = false;
 
   @override
   void initState() {
@@ -35,7 +36,64 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
       ref.read(weatherProvider.notifier).chargerStatutVille(cityId: authState.user?.cityId);
       ref.read(clientAddressesProvider.notifier).chargerAdresses();
       ref.read(favoritesProvider.notifier).chargerFavoris();
+      _synchroniserVilleGps(silent: true);
     });
+  }
+
+  Future<void> _synchroniserVilleGps({bool silent = false}) async {
+    if (_detectingCity) return;
+    if (!silent && mounted) {
+      setState(() => _detectingCity = true);
+    }
+
+    final result = await ref
+        .read(authProvider.notifier)
+        .detecterVilleParGps(silent: silent);
+
+    if (!mounted) return;
+    if (!silent) {
+      setState(() => _detectingCity = false);
+    }
+
+    if (result == null) return;
+
+    if (result.changed && result.cityId != null) {
+      if (ref.read(cartProvider).items.isNotEmpty) {
+        ref.read(cartProvider.notifier).clear();
+      }
+      ref.read(selectedNeighborhoodProvider.notifier).state = '';
+      await ref
+          .read(weatherProvider.notifier)
+          .chargerStatutVille(cityId: result.cityId);
+      await ref
+          .read(clientAddressesProvider.notifier)
+          .chargerAdresses(syncNeighborhood: true);
+      await ref.read(favoritesProvider.notifier).chargerFavoris();
+      ref.invalidate(merchantsListProvider);
+      ref.invalidate(promoBannersProvider);
+      ref.invalidate(categoriesProvider);
+      ref.invalidate(clientNotificationsProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '📍 Ville détectée : ${result.cityName ?? ''} — commerces, livraisons et expéditions mis à jour.',
+            ),
+            backgroundColor: GoLivreurTheme.succes,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } else if (!silent && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor:
+              result.detected ? GoLivreurTheme.secondaire : GoLivreurTheme.erreur,
+        ),
+      );
+    }
   }
 
   @override
@@ -1420,6 +1478,63 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                         label: const Text('Mes adresses'),
                       ),
                     ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () async {
+                      Navigator.pop(sheetCtx);
+                      await _synchroniserVilleGps(silent: false);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: GoLivreurTheme.secondaire.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: GoLivreurTheme.secondaire.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.my_location,
+                            color: GoLivreurTheme.secondaire,
+                            size: 20,
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Détecter ma ville automatiquement (GPS)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: GoLivreurTheme.secondaire,
+                                  ),
+                                ),
+                                Text(
+                                  'Vous changez de localité ? Met à jour commerces, livraisons et expéditions.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: GoLivreurTheme.texteSecondaire,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            color: GoLivreurTheme.secondaire,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 const Divider(height: 1),

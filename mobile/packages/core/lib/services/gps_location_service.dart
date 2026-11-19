@@ -32,6 +32,37 @@ class GpsPositionResult {
 class GpsLocationService {
   GpsLocationService._();
 
+  /// Lit silencieusement la position GPS uniquement si le service GPS est actif
+  /// ET l'autorisation a déjà été accordée (n'affiche aucune demande de permission).
+  static Future<GpsPositionResult?> obtenirPositionSilencieuse() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
+
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) {
+        return null;
+      }
+
+      Position? pos;
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.medium,
+          timeLimit: const Duration(seconds: 8),
+        );
+      } catch (_) {
+        pos = await Geolocator.getLastKnownPosition();
+      }
+
+      if (pos == null) return null;
+
+      return GpsPositionResult(lat: pos.latitude, lng: pos.longitude);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Récupère la position GPS actuelle du téléphone (et optionnellement le nom de rue/quartier).
   static Future<GpsPositionResult> obtenirPositionActuelle({
     bool withAddressLookup = true,

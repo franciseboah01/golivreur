@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/services/api_client.dart';
+import 'package:golivreur_core/services/gps_location_service.dart';
 import 'package:golivreur_core/services/secure_token_storage.dart';
 import 'package:golivreur_core/services/sso_switch_service.dart';
 import 'package:golivreur_core/widgets/role_missing_dialog.dart';
@@ -738,6 +739,100 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Détecte automatiquement la ville du client via le GPS gratuit de l'appareil
+  /// et met à jour son rattachement côté serveur (`POST /client/detect-city`).
+  ///
+  /// En mode `silent = true` (au démarrage), n'affiche aucune boîte de permission :
+  /// n'exécute la détection que si l'autorisation GPS est déjà accordée.
+  Future<CityAutoDetectResult?> detecterVilleParGps({bool silent = false}) async {
+    if (state.status != AuthStatus.authenticated) return null;
+
+    double? lat;
+    double? lng;
+
+    if (silent) {
+      final gps = await GpsLocationService.obtenirPositionSilencieuse();
+      if (gps == null || !gps.isSuccess || gps.lat == null || gps.lng == null) {
+        return null;
+      }
+      lat = gps.lat;
+      lng = gps.lng;
+    } else {
+      final gps = await GpsLocationService.obtenirPositionActuelle(
+        withAddressLookup: false,
+      );
+      if (!gps.isSuccess || gps.lat == null || gps.lng == null) {
+        return CityAutoDetectResult(
+          detected: false,
+          changed: false,
+          message: gps.errorMessage ?? 'Impossible d\'obtenir votre position GPS.',
+        );
+      }
+      lat = gps.lat;
+      lng = gps.lng;
+    }
+
+    try {
+      final res = await _apiClient.post(
+        '/client/detect-city',
+        data: {'lat': lat, 'lng': lng},
+      );
+
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map) {
+        final data = Map<String, dynamic>.from(res.data['donnees'] as Map);
+        final detected = data['detected'] == true;
+        final changed = data['changed'] == true;
+        final cityId = (data['city_id'] as num?)?.toInt();
+        final cityName = data['city_name']?.toString();
+        final message = res.data['message']?.toString() ??
+            (changed && cityName != null
+                ? 'Ville détectée : $cityName'
+                : 'Position vérifiée.');
+
+        if (data['user'] is Map) {
+          final updatedUser = UserModel.fromJson(
+            Map<String, dynamic>.from(data['user'] as Map),
+          );
+          await _cacheUser(updatedUser);
+          state = state.copyWith(
+            status: AuthStatus.authenticated,
+            user: updatedUser,
+            phoneNumber: updatedUser.phone,
+            errorMessage: null,
+          );
+        }
+
+        return CityAutoDetectResult(
+          detected: detected,
+          changed: changed,
+          cityId: cityId,
+          cityName: cityName,
+          message: message,
+        );
+      }
+    } on DioException catch (e) {
+      if (!silent) {
+        return CityAutoDetectResult(
+          detected: false,
+          changed: false,
+          message: ApiClient.messageErreur(e),
+        );
+      }
+    } catch (_) {
+      if (!silent) {
+        return const CityAutoDetectResult(
+          detected: false,
+          changed: false,
+          message: 'Impossible de détecter votre ville pour le moment.',
+        );
+      }
+    }
+    return null;
+  }
+
   Future<void> deconnecter() async {
     try {
       await _apiClient.post('/auth/logout').timeout(const Duration(seconds: 3));
@@ -765,6 +860,22 @@ final StateNotifierProvider<AuthNotifier, AuthState> authProvider =
   final storage = ref.watch(secureStorageProvider);
   return AuthNotifier(apiClient, storage);
 });
+
+class CityAutoDetectResult {
+  final bool detected;
+  final bool changed;
+  final int? cityId;
+  final String? cityName;
+  final String message;
+
+  const CityAutoDetectResult({
+    required this.detected,
+    required this.changed,
+    this.cityId,
+    this.cityName,
+    required this.message,
+  });
+}
 
 class CityOption {
   final int id;

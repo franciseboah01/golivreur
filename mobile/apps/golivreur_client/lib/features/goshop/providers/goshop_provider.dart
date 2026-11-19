@@ -649,13 +649,16 @@ final activeDeliveryDestinationProvider = Provider<ActiveDeliveryDestination>((r
     fullAddress = activeCityName;
   }
 
+  final resolvedLat = matched?.lat ?? (q.lat != 0 ? q.lat : (weather.centerLat ?? 0.0));
+  final resolvedLng = matched?.lng ?? (q.lng != 0 ? q.lng : (weather.centerLng ?? 0.0));
+
   return ActiveDeliveryDestination(
     cityName: activeCityName,
     neighborhood: neighborhood,
     matchedAddress: matched,
     fullAddress: fullAddress,
-    lat: matched?.lat ?? q.lat,
-    lng: matched?.lng ?? q.lng,
+    lat: resolvedLat,
+    lng: resolvedLng,
   );
 });
 
