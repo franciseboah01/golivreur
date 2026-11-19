@@ -69,7 +69,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.all_inbox_outlined),
               activeIcon: Icon(Icons.all_inbox),
-              label: 'GoColis',
+              label: 'Colis',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.receipt_long_outlined),

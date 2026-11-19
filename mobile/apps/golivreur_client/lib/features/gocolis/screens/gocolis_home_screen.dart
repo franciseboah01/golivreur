@@ -26,7 +26,7 @@ class GoColisHomeScreen extends ConsumerWidget {
             const Icon(Icons.inventory_2, color: GoLivreurTheme.primaire),
             const SizedBox(width: 8),
             Text(
-              cityName.isNotEmpty ? 'GoColis $cityName' : 'GoColis',
+              cityName.isNotEmpty ? 'Colis $cityName' : 'Colis',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
           ],

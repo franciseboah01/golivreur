@@ -175,9 +175,9 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Vérifie la présence des 4 onglets définis dans Stitch
+    // Vérifie la présence des 4 onglets de navigation client
     expect(find.text('Accueil'), findsOneWidget);
-    expect(find.text('GoColis'), findsOneWidget);
+    expect(find.text('Colis'), findsOneWidget);
     expect(find.text('Commandes'), findsOneWidget);
     expect(find.text('Profil'), findsOneWidget);
   });
