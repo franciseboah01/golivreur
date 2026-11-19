@@ -20,6 +20,10 @@ class BusinessProfileState {
   final String? photoUrl;
   final String quarter;
   final String? cityName;
+  final double? lat;
+  final double? lng;
+  final double? cityCenterLat;
+  final double? cityCenterLng;
   final String? description;
   final String openHoursText;
   final String ownerName;
@@ -47,6 +51,10 @@ class BusinessProfileState {
     this.photoUrl,
     this.quarter = '',
     this.cityName,
+    this.lat,
+    this.lng,
+    this.cityCenterLat,
+    this.cityCenterLng,
     this.description,
     this.openHoursText = '',
     this.ownerName = '',
@@ -75,6 +83,10 @@ class BusinessProfileState {
     String? photoUrl,
     String? quarter,
     String? cityName,
+    double? lat,
+    double? lng,
+    double? cityCenterLat,
+    double? cityCenterLng,
     String? description,
     String? openHoursText,
     String? ownerName,
@@ -102,6 +114,10 @@ class BusinessProfileState {
       photoUrl: photoUrl ?? this.photoUrl,
       quarter: quarter ?? this.quarter,
       cityName: cityName ?? this.cityName,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      cityCenterLat: cityCenterLat ?? this.cityCenterLat,
+      cityCenterLng: cityCenterLng ?? this.cityCenterLng,
       description: description ?? this.description,
       openHoursText: openHoursText ?? this.openHoursText,
       ownerName: ownerName ?? this.ownerName,
@@ -150,6 +166,12 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
       ),
       quarter: d['address'] as String? ?? state.quarter,
       cityName: d['city_name'] as String? ?? state.cityName,
+      lat: (d['lat'] as num?)?.toDouble() ?? state.lat,
+      lng: (d['lng'] as num?)?.toDouble() ?? state.lng,
+      cityCenterLat:
+          (d['city_center_lat'] as num?)?.toDouble() ?? state.cityCenterLat,
+      cityCenterLng:
+          (d['city_center_lng'] as num?)?.toDouble() ?? state.cityCenterLng,
       description: d['description'] as String?,
       openHoursText: (d['open_hours_text'] as String?) ?? state.openHoursText,
       ownerName: d['name'] as String? ?? state.ownerName,
@@ -195,6 +217,8 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
     required String categorySlug,
     String? emoji,
     required String address,
+    double? lat,
+    double? lng,
     String? description,
     String? openHoursText,
     String language = 'fr',
@@ -223,6 +247,8 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
           'category': categorySlug,
           'emoji': emoji ?? '',
           'address': address,
+          if (lat != null) 'lat': lat.toString(),
+          if (lng != null) 'lng': lng.toString(),
           'description': description ?? '',
           'open_hours': openHoursText ?? '',
           'language': language,

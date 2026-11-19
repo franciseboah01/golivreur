@@ -57,6 +57,9 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
 
   bool _isInitialLoading = true;
   bool _isSaving = false;
+  bool _locatingGps = false;
+  double? _shopLat;
+  double? _shopLng;
   String? _errorMsg;
 
   static const Color _businessColor = Color(0xFF2E75B6);
@@ -76,6 +79,8 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
     _categorySlug = p.categorySlug;
     _language = p.language;
     _notificationsEnabled = p.notificationsEnabled;
+    _shopLat = p.lat;
+    _shopLng = p.lng;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitialData());
   }
@@ -117,6 +122,8 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
     _categorySlug = p.categorySlug;
     _language = p.language;
     _notificationsEnabled = p.notificationsEnabled;
+    _shopLat = p.lat;
+    _shopLng = p.lng;
 
     setState(() => _isInitialLoading = false);
   }
@@ -139,6 +146,65 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
     } catch (_) {}
   }
 
+  Future<void> _detecterGpsBoutique() async {
+    setState(() => _locatingGps = true);
+    final res = await GpsLocationService.obtenirPositionActuelle(
+      withAddressLookup: true,
+    );
+    if (!mounted) return;
+    setState(() => _locatingGps = false);
+
+    if (res.isSuccess && res.lat != null && res.lng != null) {
+      setState(() {
+        _shopLat = res.lat;
+        _shopLng = res.lng;
+        if (_addressCtrl.text.trim().isEmpty &&
+            res.formattedAddress != null &&
+            res.formattedAddress!.trim().isNotEmpty) {
+          _addressCtrl.text = res.formattedAddress!.trim();
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('📍 Position GPS de la boutique capturée ! Pensez à enregistrer.'),
+          backgroundColor: GoLivreurTheme.succes,
+        ),
+      );
+    } else if (res.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.errorMessage!),
+          backgroundColor: GoLivreurTheme.erreur,
+        ),
+      );
+    }
+  }
+
+  Future<void> _choisirSurCarteBoutique() async {
+    final profile = ref.read(businessProfileProvider);
+    final picked = await Navigator.of(context).push<PickedLocation>(
+      MaterialPageRoute(
+        builder: (_) => OsmLocationPickerScreen(
+          title: 'Localisation de la boutique',
+          initialLat: _shopLat ?? profile.cityCenterLat ?? 6.8770,
+          initialLng: _shopLng ?? profile.cityCenterLng ?? -6.4502,
+          confirmLabel: 'Valider l\'emplacement',
+        ),
+      ),
+    );
+    if (!mounted || picked == null) return;
+
+    setState(() {
+      _shopLat = picked.lat;
+      _shopLng = picked.lng;
+      if (_addressCtrl.text.trim().isEmpty &&
+          picked.addressLabel != null &&
+          picked.addressLabel!.trim().isNotEmpty) {
+        _addressCtrl.text = picked.addressLabel!.trim();
+      }
+    });
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -155,6 +221,8 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
           categorySlug: _categorySlug,
           emoji: _emojiCtrl.text.trim().isNotEmpty ? _emojiCtrl.text.trim() : null,
           address: _addressCtrl.text.trim(),
+          lat: _shopLat,
+          lng: _shopLng,
           description: _descCtrl.text.trim().isNotEmpty ? _descCtrl.text.trim() : null,
           openHoursText: _hoursCtrl.text.trim().isNotEmpty ? _hoursCtrl.text.trim() : null,
           language: _language,
@@ -375,6 +443,102 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
                               border: OutlineInputBorder(),
                             ),
                             validator: ProfileFormHelpers.validateRequiredName,
+                          ),
+                          const SizedBox(height: 10),
+                          // ─── Géolocalisation GPS gratuite + OpenStreetMap ─────────
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: GoLivreurTheme.fond,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: GoLivreurTheme.bordure),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _shopLat != null && _shopLng != null
+                                          ? Icons.gps_fixed
+                                          : Icons.gps_not_fixed,
+                                      size: 16,
+                                      color: _shopLat != null && _shopLng != null
+                                          ? GoLivreurTheme.succes
+                                          : GoLivreurTheme.texteSecondaire,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        _shopLat != null && _shopLng != null
+                                            ? 'Position GPS : ${_shopLat!.toStringAsFixed(5)}, ${_shopLng!.toStringAsFixed(5)}'
+                                            : 'Position GPS de la boutique non définie',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: _shopLat != null && _shopLng != null
+                                              ? GoLivreurTheme.succes
+                                              : GoLivreurTheme.texteSecondaire,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: _locatingGps ? null : _detecterGpsBoutique,
+                                        icon: _locatingGps
+                                            ? const SizedBox(
+                                                width: 14,
+                                                height: 14,
+                                                child: CircularProgressIndicator(strokeWidth: 2),
+                                              )
+                                            : const Icon(Icons.my_location, size: 16),
+                                        label: Text(
+                                          _locatingGps ? 'GPS...' : 'Ma position',
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: _choisirSurCarteBoutique,
+                                        icon: const Icon(Icons.map_outlined, size: 16),
+                                        label: const Text(
+                                          'Sur la carte',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.info_outline,
+                                      size: 15,
+                                      color: _businessColor,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Ville d\'implantation fixe${(profile.cityName ?? '').isNotEmpty ? ' (${profile.cityName})' : ''} : un commerce qui change de ville doit recréer sa boutique dans la nouvelle ville.',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: GoLivreurTheme.texteSecondaire,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 14),
                           TextFormField(

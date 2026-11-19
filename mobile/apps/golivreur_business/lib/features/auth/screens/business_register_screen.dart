@@ -28,6 +28,9 @@ class _BusinessRegisterScreenState extends State<BusinessRegisterScreen> {
   bool _obscurePassword = true;
   bool _chargement = false;
   bool _chargementOptions = true;
+  bool _locatingGps = false;
+  double? _shopLat;
+  double? _shopLng;
   String? _erreur;
   String? _succesMessage;
 
@@ -83,6 +86,8 @@ class _BusinessRegisterScreenState extends State<BusinessRegisterScreen> {
             .map((e) => {
                   'id': e['id'] as int? ?? 1,
                   'name': (e['name'] ?? 'Ville').toString(),
+                  'center_lat': (e['center_lat'] as num?)?.toDouble(),
+                  'center_lng': (e['center_lng'] as num?)?.toDouble(),
                 })
             .toList();
         if (parsedCities.isNotEmpty) {
@@ -112,6 +117,62 @@ class _BusinessRegisterScreenState extends State<BusinessRegisterScreen> {
         setState(() => _chargementOptions = false);
       }
     }
+  }
+
+  Map<String, dynamic>? get _selectedCityMap {
+    for (final c in _cities) {
+      if (c['id'] == _selectedCityId) return c;
+    }
+    return null;
+  }
+
+  Future<void> _detecterGpsInscription() async {
+    setState(() => _locatingGps = true);
+    final res = await GpsLocationService.obtenirPositionActuelle(
+      withAddressLookup: true,
+    );
+    if (!mounted) return;
+    setState(() => _locatingGps = false);
+
+    if (res.isSuccess && res.lat != null && res.lng != null) {
+      setState(() {
+        _shopLat = res.lat;
+        _shopLng = res.lng;
+        if (_addressController.text.trim().isEmpty &&
+            res.formattedAddress != null &&
+            res.formattedAddress!.trim().isNotEmpty) {
+          _addressController.text = res.formattedAddress!.trim();
+        }
+      });
+    } else if (res.errorMessage != null) {
+      setState(() => _erreur = res.errorMessage);
+    }
+  }
+
+  Future<void> _choisirSurCarteInscription() async {
+    final city = _selectedCityMap;
+    final initLat = _shopLat ?? (city?['center_lat'] as double?) ?? 6.8770;
+    final initLng = _shopLng ?? (city?['center_lng'] as double?) ?? -6.4502;
+    final picked = await Navigator.of(context).push<PickedLocation>(
+      MaterialPageRoute(
+        builder: (_) => OsmLocationPickerScreen(
+          title: 'Position de votre commerce',
+          initialLat: initLat,
+          initialLng: initLng,
+          confirmLabel: 'Valider l\'emplacement',
+        ),
+      ),
+    );
+    if (!mounted || picked == null) return;
+    setState(() {
+      _shopLat = picked.lat;
+      _shopLng = picked.lng;
+      if (_addressController.text.trim().isEmpty &&
+          picked.addressLabel != null &&
+          picked.addressLabel!.trim().isNotEmpty) {
+        _addressController.text = picked.addressLabel!.trim();
+      }
+    });
   }
 
   Future<void> _soumettrePreInscription() async {
@@ -164,6 +225,8 @@ class _BusinessRegisterScreenState extends State<BusinessRegisterScreen> {
         'city_id': _selectedCityId,
         'category': _selectedCategory,
         'address': address,
+        if (_shopLat != null && _shopLng != null) 'lat': _shopLat,
+        if (_shopLat != null && _shopLng != null) 'lng': _shopLng,
       });
 
       if (!mounted) return;
@@ -433,6 +496,49 @@ class _BusinessRegisterScreenState extends State<BusinessRegisterScreen> {
             prefixIcon: Icon(Icons.place_outlined),
           ),
         ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _locatingGps ? null : _detecterGpsInscription,
+                icon: _locatingGps
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.my_location, size: 16),
+                label: Text(
+                  _locatingGps ? 'GPS...' : 'Position GPS',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _choisirSurCarteInscription,
+                icon: const Icon(Icons.map_outlined, size: 16),
+                label: const Text(
+                  'Pointer sur la carte',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_shopLat != null && _shopLng != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            '📍 GPS sélectionné : ${_shopLat!.toStringAsFixed(5)}, ${_shopLng!.toStringAsFixed(5)}',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: GoLivreurTheme.succes,
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         BoutonPrimaire(
           label: 'Envoyer ma pré-inscription',
