@@ -1605,20 +1605,15 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                     leading: const Icon(Icons.storefront, color: GoLivreurTheme.primaire),
                     title: Text(
                       cityName.isNotEmpty
-                          ? 'GoShop - Commerces $cityName'
-                          : 'GoShop - Commerces locaux',
+                          ? 'Shop - Commerces $cityName'
+                          : 'Shop - Commerces locaux',
                     ),
-                    subtitle: const Text('Restaurants, Maquis & Boutiques'),
                     onTap: () => Navigator.pop(context),
                   ),
                   ListTile(
                     leading: const Icon(Icons.all_inbox, color: Colors.blue),
-                    title: const Text('GoColis - Envoi de colis'),
-                    subtitle: Text(
-                      cityName.isNotEmpty
-                          ? 'Expéditions express moto à $cityName'
-                          : 'Expéditions express moto dans votre ville',
-                    ),
+                    title: const Text('Colis - Envoi de colis'),
+                    subtitle: const Text('Expédition Express'),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.of(context).push(
