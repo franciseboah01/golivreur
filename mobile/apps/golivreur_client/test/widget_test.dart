@@ -181,4 +181,50 @@ void main() {
     expect(find.text('Commandes'), findsOneWidget);
     expect(find.text('Profil'), findsOneWidget);
   });
+
+  testWidgets(
+      'GoLivreur Client - ouvre directement Accueil si le client est déjà connecté (sans flash LoginScreen)',
+      (WidgetTester tester) async {
+    final storage = _FakeSecureStorage();
+    await storage.write(key: 'access_token', value: 'valid-jwt-token');
+    await storage.write(
+      key: auth_api.AuthNotifier.cachedUserKey,
+      value: jsonEncode({
+        'id': 42,
+        'name': 'Awa Koné',
+        'phone': '0701000042',
+        'role': 'client',
+        'roles': ['client'],
+        'city_id': 1,
+        'city_name': 'Daloa',
+        'is_active': true,
+      }),
+    );
+
+    final fakeApi = core_api.ApiClient(
+      baseUrl: 'http://localhost/api/v1',
+      storage: storage,
+      onDeconnexionForcee: () {},
+      httpClientAdapter: _FakeHttpClientAdapter(),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          auth_api.secureStorageProvider.overrideWithValue(storage),
+          auth_api.apiClientProvider.overrideWithValue(fakeApi),
+          core_api.apiClientProvider.overrideWithValue(fakeApi),
+          merchantsListProvider.overrideWith((ref) => Future.value([])),
+          ordersHistoryProvider.overrideWith((ref) => Future.value([])),
+          parcelsHistoryProvider.overrideWith((ref) => Future.value([])),
+        ],
+        child: const GoLivreurClientApp(showSplash: false),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(MainNavigationScreen), findsOneWidget);
+    expect(find.text('Accueil'), findsOneWidget);
+  });
 }

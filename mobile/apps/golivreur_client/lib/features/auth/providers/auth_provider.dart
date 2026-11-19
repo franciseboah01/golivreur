@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -26,6 +27,7 @@ final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
 
 enum AuthStatus {
   initial,
+  restoringSession,
   loading,
   otpSent,
   authenticated,
@@ -87,11 +89,73 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
+  static const String cachedUserKey = 'cached_client_user_json';
+
   final ApiClient _apiClient;
   final FlutterSecureStorage _storage;
+  bool _bootstrapped = false;
 
   AuthNotifier(this._apiClient, this._storage) : super(const AuthState()) {
     _forcedLogoutHandler = forcerDeconnexionLocale;
+  }
+
+  Future<void> _cacheUser(UserModel user) async {
+    try {
+      await _storage.write(
+        key: cachedUserKey,
+        value: jsonEncode(user.toJson()),
+      );
+    } catch (_) {}
+  }
+
+  /// Hydrate instantanément la session locale au démarrage (exécuté dès le Splash Screen)
+  /// afin d'éviter tout flash ou latence de 2-3s sur l'écran de connexion.
+  Future<void> initialiserSessionAuDemarrage() async {
+    if (_bootstrapped || state.status == AuthStatus.authenticated) return;
+    _bootstrapped = true;
+
+    final accessToken = await SecureTokenStorage.readAccessToken(_storage);
+    final refreshToken = await SecureTokenStorage.readRefreshToken(_storage);
+    final hasSessionToken =
+        (accessToken != null && accessToken.isNotEmpty) ||
+            (refreshToken != null && refreshToken.isNotEmpty);
+
+    if (!hasSessionToken) {
+      if (state.status == AuthStatus.restoringSession) {
+        state = const AuthState(status: AuthStatus.initial);
+      }
+      return;
+    }
+
+    // 1. Hydratation instantanée (<5 ms) depuis le profil mis en cache localement
+    final rawCachedUser = await _storage.read(key: cachedUserKey);
+    if (rawCachedUser != null && rawCachedUser.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawCachedUser);
+        if (decoded is Map<String, dynamic>) {
+          final cachedUser = UserModel.fromJson(decoded);
+          state = state.copyWith(
+            status: AuthStatus.authenticated,
+            user: cachedUser,
+            phoneNumber: cachedUser.phone,
+            errorMessage: null,
+          );
+          // Synchronisation silencieuse en arrière-plan (ne bloque jamais l'accès à Accueil)
+          chargerProfil();
+          return;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Token existant mais pas encore de profil en cache : restaurer sans afficher LoginScreen
+    state = state.copyWith(
+      status: AuthStatus.restoringSession,
+      errorMessage: null,
+    );
+    final restored = await restaurerSessionLocale();
+    if (!restored && state.status == AuthStatus.restoringSession) {
+      state = const AuthState(status: AuthStatus.initial);
+    }
   }
 
   static String normalizePhone(String raw) {
@@ -218,6 +282,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         if (user.name.trim().isEmpty && effectiveName.isNotEmpty) {
           user = user.copyWith(name: effectiveName);
         }
+        await _cacheUser(user);
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -284,6 +349,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
 
         final user = UserModel.fromJson(userJson);
+        await _cacheUser(user);
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -403,6 +469,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
 
         final user = UserModel.fromJson(userJson);
+        await _cacheUser(user);
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -436,6 +503,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiClient.get('/client/profile');
       if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
         final user = UserModel.fromJson(res.data['donnees'] as Map<String, dynamic>);
+        await _cacheUser(user);
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -477,6 +545,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       if (result == null) return false;
       final user = UserModel.fromJson(result.userJson);
+      await _cacheUser(user);
       state = state.copyWith(
         status: AuthStatus.authenticated,
         user: user,
@@ -520,6 +589,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (res.statusCode == 200 && res.data['succes'] == true) {
         final user = UserModel.fromJson(res.data['donnees'] as Map<String, dynamic>);
+        await _cacheUser(user);
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -577,6 +647,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           res.data['donnees'] is Map<String, dynamic>) {
         final user =
             UserModel.fromJson(res.data['donnees'] as Map<String, dynamic>);
+        await _cacheUser(user);
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -642,6 +713,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           res.data['donnees'] is Map<String, dynamic>) {
         final user =
             UserModel.fromJson(res.data['donnees'] as Map<String, dynamic>);
+        await _cacheUser(user);
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -676,7 +748,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> forcerDeconnexionLocale() async {
+    _bootstrapped = false;
     await SecureTokenStorage.clearSessionTokens(_storage);
+    try {
+      await _storage.delete(key: cachedUserKey);
+    } catch (_) {}
     state = const AuthState(status: AuthStatus.initial);
   }
 

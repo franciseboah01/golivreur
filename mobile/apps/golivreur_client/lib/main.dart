@@ -44,60 +44,34 @@ class ClientRootGate extends ConsumerStatefulWidget {
 
 class _ClientRootGateState extends ConsumerState<ClientRootGate> {
   late bool _splashFinished;
+  bool _bootCompleted = false;
 
   @override
   void initState() {
     super.initState();
     _splashFinished = !widget.showSplash;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final branding = ref.watch(appBrandingProvider);
-
-    if (!_splashFinished) {
-      return AnimatedSplashScreen(
-        appType: GoLivreurAppType.client,
-        logoUrl: branding.logoUrl,
-        defaultEmoji: branding.defaultEmoji,
-        onFinished: () {
-          if (mounted) {
-            setState(() => _splashFinished = true);
-          }
-        },
-      );
-    }
-    return const ClientAuthGate();
-  }
-}
-
-class ClientAuthGate extends ConsumerStatefulWidget {
-  const ClientAuthGate({super.key});
-
-  @override
-  ConsumerState<ClientAuthGate> createState() => _ClientAuthGateState();
-}
-
-class _ClientAuthGateState extends ConsumerState<ClientAuthGate> {
-  @override
-  void initState() {
-    super.initState();
     DeepLinkBridge.listen(_handleIncomingUri);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapSession());
+    // Démarre l'hydratation locale de session IMMÉDIATEMENT en parallèle du Splash Screen
+    // afin d'arriver directement sur Accueil sans jamais flasher LoginScreen.
+    Future.microtask(_bootstrapSession);
   }
 
   Future<void> _bootstrapSession() async {
-    final initialUri = await DeepLinkBridge.getInitialUri();
-    if (initialUri != null && initialUri.host == 'sso') {
-      await _handleIncomingUri(initialUri);
-      return;
+    try {
+      await ref.read(authProvider.notifier).initialiserSessionAuDemarrage();
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() => _bootCompleted = true);
     }
 
-    final storage = ref.read(secureStorageProvider);
-    final existingToken = await SecureTokenStorage.readAccessToken(storage);
-    if (existingToken != null && existingToken.isNotEmpty) {
-      await ref.read(authProvider.notifier).restaurerSessionLocale();
-    }
+    // Vérifie un éventuel Deep Link SSO entrant sans jamais bloquer le démarrage
+    try {
+      final initialUri = await DeepLinkBridge.getInitialUri();
+      if (initialUri != null && initialUri.host == 'sso') {
+        await _handleIncomingUri(initialUri);
+      }
+    } catch (_) {}
   }
 
   Future<void> _handleIncomingUri(Uri uri) async {
@@ -117,6 +91,31 @@ class _ClientAuthGateState extends ConsumerState<ClientAuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    final branding = ref.watch(appBrandingProvider);
+
+    if (!_splashFinished) {
+      return AnimatedSplashScreen(
+        appType: GoLivreurAppType.client,
+        logoUrl: branding.logoUrl,
+        defaultEmoji: branding.defaultEmoji,
+        onFinished: () {
+          if (mounted) {
+            setState(() => _splashFinished = true);
+          }
+        },
+      );
+    }
+    return ClientAuthGate(bootCompleted: _bootCompleted);
+  }
+}
+
+class ClientAuthGate extends ConsumerWidget {
+  final bool bootCompleted;
+
+  const ClientAuthGate({super.key, this.bootCompleted = true});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
 
     if (authState.status == AuthStatus.authenticated) {
@@ -132,6 +131,17 @@ class _ClientAuthGateState extends ConsumerState<ClientAuthGate> {
 
       return MainNavigationScreen(
         key: ValueKey('main_${authState.user?.id ?? "guest"}'),
+      );
+    }
+
+    // Tant que la vérification locale de session n'est pas terminée (ou restauration en cours),
+    // affiche un fond sombre neutre identique au splash — jamais de flash LoginScreen.
+    if (!bootCompleted || authState.status == AuthStatus.restoringSession) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121212),
+        body: Center(
+          child: GoLivreurBrandMark(size: 72, borderRadius: 18),
+        ),
       );
     }
 

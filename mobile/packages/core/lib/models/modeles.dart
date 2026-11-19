@@ -122,6 +122,25 @@ class UserModel {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'phone': phone,
+        'email': email,
+        'role': role,
+        'roles': roles,
+        'city_id': cityId,
+        'city_name': cityName,
+        'default_address': defaultAddress,
+        'language': language,
+        'notifications_enabled': notificationsEnabled,
+        'avatar_url': avatarUrl,
+        'photo_url': photoUrl,
+        'is_active': isActive,
+        'must_change_password': mustChangePassword,
+        'pin_reset_required_at': pinResetRequiredAt,
+      };
+
   bool get estClient   => role == 'client';
   bool get estMerchant => role == 'merchant';
   bool get estDriver   => role == 'driver' || role == 'courier';
