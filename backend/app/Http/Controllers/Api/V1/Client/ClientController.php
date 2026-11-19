@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1\Client;
 
 use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ClientProfileResource;
 use App\Http\Resources\MerchantCategoryResource;
 use App\Http\Resources\MerchantResource;
+use App\Models\ActivityLog;
 use App\Models\City;
 use App\Models\ClientAddress;
 use App\Models\Merchant;
@@ -15,6 +17,7 @@ use App\Models\Notification;
 use App\Models\Order;
 use App\Models\User;
 use App\Modules\GoShop\Services\OrderService;
+use App\Services\CityGeolocationService;
 use App\Services\ConfirmationCodeService;
 use App\Services\CourierLocationPollingService;
 use App\Services\SettingsService;
@@ -26,6 +29,87 @@ use Illuminate\Validation\Rule;
 
 class ClientController extends Controller
 {
+    /**
+     * Détection automatique de la ville du client par GPS (100% gratuit via Haversine).
+     * Si le client change de ville, son profil est automatiquement rattaché à la ville active
+     * la plus proche afin d'afficher les commerces, expéditions et livraisons de sa localité.
+     */
+    public function detectCity(Request $request, CityGeolocationService $geoService): JsonResponse
+    {
+        $validated = $request->validate([
+            'lat' => ['required', 'numeric', 'between:-90,90'],
+            'lng' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        $lat = (float) $validated['lat'];
+        $lng = (float) $validated['lng'];
+
+        $match = $geoService->findNearestActiveCity($lat, $lng);
+
+        if ($match === null) {
+            $user->loadMissing('city');
+
+            return response()->json([
+                'succes' => true,
+                'message' => 'Aucune ville active GoLivreur détectée autour de votre position GPS.',
+                'donnees' => [
+                    'detected' => false,
+                    'changed' => false,
+                    'city_id' => $user->city_id,
+                    'city_name' => $user->city?->name,
+                    'previous_city_id' => $user->city_id,
+                    'distance_km' => null,
+                    'user' => new ClientProfileResource($user),
+                ],
+            ]);
+        }
+
+        /** @var City $detectedCity */
+        $detectedCity = $match['city'];
+        $distanceKm = $match['distance_km'];
+        $previousCityId = $user->city_id ? (int) $user->city_id : null;
+        $changed = $previousCityId !== (int) $detectedCity->id;
+
+        if ($changed) {
+            $user->update(['city_id' => $detectedCity->id]);
+
+            ActivityLog::create([
+                'user_id' => $user->id,
+                'action' => 'client_city_auto_detected',
+                'entity_type' => 'user',
+                'entity_id' => $user->id,
+                'properties' => [
+                    'previous_city_id' => $previousCityId,
+                    'new_city_id' => $detectedCity->id,
+                    'new_city_name' => $detectedCity->name,
+                    'distance_km' => $distanceKm,
+                ],
+                'ip_address' => $request->ip(),
+                'severity' => 'info',
+            ]);
+        }
+
+        $freshUser = $user->fresh(['city']) ?? $user->load('city');
+
+        return response()->json([
+            'succes' => true,
+            'message' => $changed
+                ? "Ville détectée automatiquement : {$detectedCity->name}. Commerces, expéditions et livraisons mis à jour."
+                : "Vous êtes localisé à {$detectedCity->name}.",
+            'donnees' => [
+                'detected' => true,
+                'changed' => $changed,
+                'city_id' => $detectedCity->id,
+                'city_name' => $detectedCity->name,
+                'previous_city_id' => $previousCityId,
+                'distance_km' => $distanceKm,
+                'user' => new ClientProfileResource($freshUser),
+            ],
+        ]);
+    }
+
     /**
      * Liste des Catégories d'Activité actives avec emoji et logo depuis la base de données.
      */

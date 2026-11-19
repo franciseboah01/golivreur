@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\User;
 use App\Models\VehicleType;
+use App\Services\CityGeolocationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,6 +22,10 @@ class DriverProfileResource extends JsonResource
         $vehicleTypeName = $vehicleType
             ? (VehicleType::where('slug', $vehicleType)->value('name') ?? ucfirst($vehicleType))
             : null;
+        $reidFlag = $courier !== null
+            ? app(CityGeolocationService::class)->getCourierReidentificationFlag($courier)
+            : null;
+        $city = $courier->city ?? $this->city;
 
         return [
             'id' => $this->id,
@@ -32,7 +37,11 @@ class DriverProfileResource extends JsonResource
             'role' => $this->role,
             'roles' => $this->effectiveRoles(),
             'city_id' => $courier->city_id ?? $this->city_id,
-            'city_name' => ($courier->city ?? $this->city)?->name,
+            'city_name' => $city?->name,
+            'city_center_lat' => $city?->center_lat !== null ? (float) $city->center_lat : null,
+            'city_center_lng' => $city?->center_lng !== null ? (float) $city->center_lng : null,
+            'city_reidentification_required' => $reidFlag !== null,
+            'city_reidentification_info' => $reidFlag,
             'language' => $this->language ?? 'fr',
             'notifications_enabled' => (bool) ($this->notifications_enabled ?? true),
             'photo_url' => $courier->photo_url ?? $this->photo_url ?? url('images/placeholder-driver.png'),

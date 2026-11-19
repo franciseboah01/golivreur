@@ -40,6 +40,14 @@ class BusinessProfileResource extends JsonResource
             'roles' => $this->effectiveRoles(),
             'city_id' => $merchant->city_id ?? $this->city_id,
             'city_name' => ($merchant->city ?? $this->city)?->name,
+            'city_center_lat' => ($merchant->city ?? $this->city)?->center_lat !== null
+                ? (float) ($merchant->city ?? $this->city)->center_lat
+                : null,
+            'city_center_lng' => ($merchant->city ?? $this->city)?->center_lng !== null
+                ? (float) ($merchant->city ?? $this->city)->center_lng
+                : null,
+            'lat' => $merchant?->lat !== null ? (float) $merchant->lat : null,
+            'lng' => $merchant?->lng !== null ? (float) $merchant->lng : null,
             'language' => $this->language ?? 'fr',
             'notifications_enabled' => (bool) ($this->notifications_enabled ?? true),
             'photo_url' => $this->photo_url,

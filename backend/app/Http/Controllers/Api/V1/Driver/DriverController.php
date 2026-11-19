@@ -10,6 +10,7 @@ use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Modules\GoShop\Services\AssignmentService;
 use App\Modules\GoShop\Services\OrderService;
+use App\Services\CityGeolocationService;
 use App\Services\CourierCapacityService;
 use App\Services\CourierRefusalService;
 use App\Services\NotificationService;
@@ -41,20 +42,53 @@ class DriverController extends Controller
         return $service->verifierEligibilite($courier);
     }
 
-    public function availability(Request $request): JsonResponse
+    public function availability(Request $request, CityGeolocationService $geoService): JsonResponse
     {
+        $validated = $request->validate([
+            'is_online' => 'sometimes|boolean',
+            'lat' => 'nullable|numeric|between:-90,90',
+            'lng' => 'nullable|numeric|between:-180,180',
+        ]);
+
         $courier = $this->getCourier();
 
-        return DB::transaction(function () use ($request, $courier): JsonResponse {
+        return DB::transaction(function () use ($request, $validated, $courier, $geoService): JsonResponse {
             /** @var Courier $lockedCourier */
-            $lockedCourier = Courier::with('user')->lockForUpdate()->findOrFail($courier->id);
+            $lockedCourier = Courier::with(['user', 'city'])->lockForUpdate()->findOrFail($courier->id);
             $isOnline = $request->boolean('is_online', ! $lockedCourier->is_online);
 
             if ($isOnline && ($refusal = $this->verifierEligibiliteLivreur($lockedCourier)) !== null) {
                 return $refusal;
             }
 
-            $lockedCourier->update(['is_online' => $isOnline]);
+            $hasGps = isset($validated['lat'], $validated['lng']);
+            if ($isOnline && $hasGps) {
+                $lat = (float) $validated['lat'];
+                $lng = (float) $validated['lng'];
+                $cityChange = $geoService->detectCityChange($lockedCourier->city, $lat, $lng);
+
+                if ($cityChange !== null) {
+                    $flag = $geoService->flagCourierReidentificationRequired(
+                        courier: $lockedCourier,
+                        detectedCity: $cityChange['detected_city'],
+                        lat: $lat,
+                        lng: $lng,
+                        distanceFromRegisteredKm: $cityChange['distance_from_registered_km'],
+                        ipAddress: $request->ip(),
+                    );
+
+                    return $geoService->buildReidentificationDeniedResponse($flag);
+                }
+
+                $lockedCourier->update([
+                    'is_online' => true,
+                    'current_lat' => $lat,
+                    'current_lng' => $lng,
+                    'location_updated_at' => now(),
+                ]);
+            } else {
+                $lockedCourier->update(['is_online' => $isOnline]);
+            }
 
             return response()->json([
                 'succes' => true,
@@ -64,14 +98,14 @@ class DriverController extends Controller
         });
     }
 
-    public function updateLocation(Request $request): JsonResponse
+    public function updateLocation(Request $request, CityGeolocationService $geoService): JsonResponse
     {
         $validated = $request->validate([
             'lat' => 'required|numeric|between:-90,90',
             'lng' => 'required|numeric|between:-180,180',
         ]);
 
-        $courier = $this->getCourier()->load('user');
+        $courier = $this->getCourier()->load(['user', 'city']);
 
         if (! $courier->is_active || ($courier->user && ! $courier->user->is_active)) {
             return response()->json([
@@ -90,11 +124,37 @@ class DriverController extends Controller
         }
         RateLimiter::hit($rateKey, 5);
 
+        $lat = (float) $validated['lat'];
+        $lng = (float) $validated['lng'];
+
         $courier->update([
-            'current_lat' => $validated['lat'],
-            'current_lng' => $validated['lng'],
+            'current_lat' => $lat,
+            'current_lng' => $lng,
             'location_updated_at' => now(),
         ]);
+
+        $existingFlag = $geoService->getCourierReidentificationFlag($courier);
+        if ($existingFlag !== null) {
+            if ($courier->is_online) {
+                $courier->update(['is_online' => false]);
+            }
+
+            return $geoService->buildReidentificationDeniedResponse($existingFlag);
+        }
+
+        $cityChange = $geoService->detectCityChange($courier->city, $lat, $lng);
+        if ($cityChange !== null) {
+            $flag = $geoService->flagCourierReidentificationRequired(
+                courier: $courier,
+                detectedCity: $cityChange['detected_city'],
+                lat: $lat,
+                lng: $lng,
+                distanceFromRegisteredKm: $cityChange['distance_from_registered_km'],
+                ipAddress: $request->ip(),
+            );
+
+            return $geoService->buildReidentificationDeniedResponse($flag);
+        }
 
         return response()->json([
             'succes' => true,

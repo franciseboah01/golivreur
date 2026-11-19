@@ -35,6 +35,16 @@ class CourierRefusalService
             ], 403);
         }
 
+        $geoService = app(CityGeolocationService::class);
+        $reidFlag = $geoService->getCourierReidentificationFlag($courier);
+        if ($reidFlag !== null) {
+            if ($courier->is_online) {
+                $courier->update(['is_online' => false]);
+            }
+
+            return $geoService->buildReidentificationDeniedResponse($reidFlag);
+        }
+
         if ($courier->penalty_until !== null) {
             if ($courier->penalty_until->isFuture()) {
                 if ($courier->is_online) {

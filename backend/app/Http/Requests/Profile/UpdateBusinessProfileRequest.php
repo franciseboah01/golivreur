@@ -12,6 +12,8 @@ class UpdateBusinessProfileRequest extends BaseProfileRequest
             'category' => ['sometimes', 'required', 'string', 'max:100'],
             'emoji' => ['sometimes', 'nullable', 'string', 'max:32'],
             'address' => ['sometimes', 'required', 'string', 'max:255'],
+            'lat' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
+            'lng' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
             'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'open_hours' => ['sometimes', 'nullable'],
             'prep_time_minutes' => ['sometimes', 'integer', 'min:1', 'max:240'],

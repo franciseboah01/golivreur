@@ -134,6 +134,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
 
     // ─── Client (GoShop + GoColis) ────────────────────────────────────────────
     Route::prefix('client')->middleware('role:client')->group(function () {
+        Route::post('detect-city', [ClientController::class, 'detectCity']);
         Route::get('profile', [ProfileController::class, 'showClient']);
         Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateClient']);
         Route::post('profile/phone/request-otp', [ProfileController::class, 'requestClientPhoneChangeOtp']);

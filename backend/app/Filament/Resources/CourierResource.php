@@ -7,9 +7,11 @@ use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\CourierResource\Pages;
 use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
+use App\Models\City;
 use App\Models\Courier;
 use App\Models\User;
 use App\Models\VehicleType;
+use App\Services\CityGeolocationService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -232,6 +234,23 @@ class CourierResource extends Resource
                     ->label('Ville')
                     ->sortable(),
 
+                Tables\Columns\TextColumn::make('city_reidentification_status')
+                    ->label('Contrôle Ville GPS')
+                    ->badge()
+                    ->getStateUsing(function (Courier $record): string {
+                        $flag = app(CityGeolocationService::class)->getCourierReidentificationFlag($record);
+                        if ($flag === null) {
+                            return 'En règle';
+                        }
+
+                        $detected = is_string($flag['detected_city_name'] ?? null) && $flag['detected_city_name'] !== ''
+                            ? $flag['detected_city_name']
+                            : 'Hors zone';
+
+                        return "Réidentification ({$detected})";
+                    })
+                    ->color(fn (string $state): string => $state === 'En règle' ? 'success' : 'danger'),
+
                 Tables\Columns\TextColumn::make('vehicle_type')
                     ->label('Véhicule')
                     ->badge()
@@ -349,6 +368,67 @@ class CourierResource extends Resource
                         Notification::make()
                             ->title("Livreur {$record->user?->name} ".($newStatus ? 'validé et activé' : 'suspendu'))
                             ->color($newStatus ? 'success' : 'danger')
+                            ->send();
+                    }),
+
+                Tables\Actions\Action::make('reidentifyCity')
+                    ->label('Réidentifier / Ville')
+                    ->icon('heroicon-m-identification')
+                    ->color('warning')
+                    ->visible(fn (Courier $record): bool => app(CityGeolocationService::class)->getCourierReidentificationFlag($record) !== null || ! FilamentCityScope::isLocal())
+                    ->modalHeading(fn (Courier $record): string => "Réidentification & Affectation Ville — {$record->user?->name}")
+                    ->modalDescription(function (Courier $record): string {
+                        $flag = app(CityGeolocationService::class)->getCourierReidentificationFlag($record);
+                        if ($flag !== null) {
+                            $detected = (string) ($flag['detected_city_name'] ?? 'une autre localité');
+
+                            return "Changement de ville détecté par GPS ({$detected}). Vérifiez physiquement la pièce d'identité et le véhicule du livreur avant de valider sa ville d'affectation.";
+                        }
+
+                        return 'Validez la réidentification du livreur ou mettez à jour sa ville d\'affectation.';
+                    })
+                    ->form(fn (Courier $record): array => [
+                        Forms\Components\Select::make('city_id')
+                            ->label('Nouvelle ville d\'affectation validée')
+                            ->options(function (): array {
+                                $query = City::query()->where('is_active', true)->orderBy('name');
+                                if (FilamentCityScope::isLocal() && FilamentCityScope::localCityId() !== null) {
+                                    $query->whereKey(FilamentCityScope::localCityId());
+                                }
+
+                                return $query->pluck('name', 'id')->toArray();
+                            })
+                            ->default(function () use ($record): ?int {
+                                $flag = app(CityGeolocationService::class)->getCourierReidentificationFlag($record);
+                                if ($flag !== null && ! empty($flag['detected_city_id']) && ! FilamentCityScope::isLocal()) {
+                                    return (int) $flag['detected_city_id'];
+                                }
+
+                                return $record->city_id ? (int) $record->city_id : null;
+                            })
+                            ->required(),
+                    ])
+                    ->action(function (Courier $record, array $data): void {
+                        FilamentCityScope::authorizeRecord($record);
+
+                        $targetCityId = (int) $data['city_id'];
+                        if (FilamentCityScope::isLocal() && FilamentCityScope::localCityId() !== null) {
+                            $targetCityId = FilamentCityScope::localCityId();
+                        }
+
+                        app(CityGeolocationService::class)->clearCourierReidentification(
+                            courier: $record,
+                            adminUserId: (int) auth()->id(),
+                            newCityId: $targetCityId,
+                            ipAddress: request()->ip(),
+                        );
+
+                        $cityName = City::whereKey($targetCityId)->value('name') ?? '';
+
+                        Notification::make()
+                            ->title("Livreur {$record->user?->name} réidentifié sur {$cityName}")
+                            ->body('Le verrou de changement de ville a été levé. Le livreur peut reprendre service.')
+                            ->success()
                             ->send();
                     }),
 

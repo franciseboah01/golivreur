@@ -358,6 +358,18 @@ class AuthController extends Controller
         }
 
         $city = City::findOrFail((int) $validated['city_id']);
+        $shopLat = isset($validated['lat']) && isset($validated['lng']) ? (float) $validated['lat'] : null;
+        $shopLng = isset($validated['lat']) && isset($validated['lng']) ? (float) $validated['lng'] : null;
+        if ($shopLat !== null && $shopLng !== null && ! $city->estDansLaVille($shopLat, $shopLng)) {
+            return response()->json([
+                'succes' => false,
+                'message' => "La position GPS sélectionnée se situe hors de {$city->name}. Sélectionnez la ville correspondante ou ajustez votre position sur la carte.",
+                'errors' => [
+                    'lat' => ["Position GPS hors du périmètre de {$city->name}."],
+                ],
+            ], 422);
+        }
+
         $businessName = trim((string) $validated['name']);
         $managerName = trim((string) ($validated['manager_name'] ?? ''));
         if ($managerName === '') {
@@ -386,7 +398,7 @@ class AuthController extends Controller
             }
         }
 
-        $merchant = DB::transaction(function () use ($validated, $city, $businessName, $managerName, $categorySlug, $existingUser): Merchant {
+        $merchant = DB::transaction(function () use ($validated, $city, $businessName, $managerName, $categorySlug, $existingUser, $shopLat, $shopLng): Merchant {
             $user = $existingUser ?? User::create([
                 'name' => $managerName,
                 'phone' => (string) $validated['phone'],
@@ -402,8 +414,8 @@ class AuthController extends Controller
                 'name' => $businessName,
                 'category' => $categorySlug,
                 'address' => trim((string) $validated['address']),
-                'lat' => $city->center_lat ?? 6.8770,
-                'lng' => $city->center_lng ?? -6.4502,
+                'lat' => $shopLat ?? $city->center_lat ?? 6.8770,
+                'lng' => $shopLng ?? $city->center_lng ?? -6.4502,
                 'prep_time_minutes' => 20,
                 'is_open' => false,
                 'is_active' => false,

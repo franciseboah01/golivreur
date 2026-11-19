@@ -13,6 +13,7 @@ use App\Http\Resources\DriverProfileResource;
 use App\Models\ActivityLog;
 use App\Models\OtpCode;
 use App\Models\User;
+use App\Services\CityGeolocationService;
 use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -607,7 +608,34 @@ class ProfileController extends Controller
 
         $validated = $request->validated();
 
-        DB::transaction(function () use ($user, $merchant, $validated, $request) {
+        $hasLat = array_key_exists('lat', $validated) && $validated['lat'] !== null && $validated['lat'] !== '';
+        $hasLng = array_key_exists('lng', $validated) && $validated['lng'] !== null && $validated['lng'] !== '';
+        if ($hasLat && $hasLng) {
+            $newLat = (float) $validated['lat'];
+            $newLng = (float) $validated['lng'];
+            $merchant->loadMissing('city');
+
+            if ($merchant->city && ! $merchant->city->estDansLaVille($newLat, $newLng)) {
+                $cityChange = app(CityGeolocationService::class)->detectCityChange($merchant->city, $newLat, $newLng);
+                $detectedCityName = $cityChange !== null && $cityChange['detected_city'] !== null
+                    ? $cityChange['detected_city']->name
+                    : null;
+                $cityHint = $detectedCityName !== null
+                    ? " (position détectée vers {$detectedCityName})"
+                    : '';
+
+                return response()->json([
+                    'succes' => false,
+                    'code' => 'MERCHANT_CITY_CHANGE_FORBIDDEN',
+                    'message' => "Position GPS hors de la ville d'implantation ({$merchant->city->name}){$cityHint}. Un commerce qui change de ville doit recréer sa boutique dans la nouvelle ville.",
+                    'errors' => [
+                        'lat' => ['Un commerce ne peut pas changer de ville. Créez une nouvelle boutique dans la nouvelle ville.'],
+                    ],
+                ], 422);
+            }
+        }
+
+        DB::transaction(function () use ($user, $merchant, $validated, $request, $hasLat, $hasLng) {
             $userData = $this->extractCommonUserData($validated);
 
             if ($request->hasFile('photo')) {
@@ -633,6 +661,11 @@ class ProfileController extends Controller
                 if (array_key_exists($field, $validated)) {
                     $merchantData[$field] = $validated[$field];
                 }
+            }
+
+            if ($hasLat && $hasLng) {
+                $merchantData['lat'] = (float) $validated['lat'];
+                $merchantData['lng'] = (float) $validated['lng'];
             }
 
             if (array_key_exists('open_hours', $validated)) {
