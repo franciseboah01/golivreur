@@ -14,6 +14,8 @@ class GoColisHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final parcelsAsync = ref.watch(parcelsHistoryProvider);
     final destination = ref.watch(activeDeliveryDestinationProvider);
+    final weather = ref.watch(weatherProvider);
+    final tarifsColis = weather.tarifsColis;
     final cityName = destination.cityName;
 
     return Scaffold(
@@ -32,8 +34,15 @@ class GoColisHomeScreen extends ConsumerWidget {
           ],
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: RefreshIndicator(
+        color: GoLivreurTheme.primaire,
+        onRefresh: () async {
+          await ref.read(weatherProvider.notifier).chargerStatutVille();
+          ref.invalidate(parcelsHistoryProvider);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -119,9 +128,9 @@ class GoColisHomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
 
-            // ─── Tarifs & Formats Transparents ──────────────────────────────
+            // ─── Tarifs & Formats Dynamiques (Admin) ────────────────────────
             const Text(
-              'Nos Formats & Tarifs Fixes',
+              'Nos Formats et Tarifs',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -131,18 +140,42 @@ class GoColisHomeScreen extends ConsumerWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                _buildSizeCard('Petit', '500 F', 'Documents, clés, enveloppes', Icons.markunread_mailbox),
+                _buildSizeCard(
+                  'Petit',
+                  _formatFcfa(tarifsColis.petit.base),
+                  tarifsColis.petit.parKm > 0
+                      ? '+${_formatFcfa(tarifsColis.petit.parKm)}/km sup.'
+                      : null,
+                  'Documents, clés, enveloppes',
+                  Icons.markunread_mailbox,
+                ),
                 const SizedBox(width: 8),
-                _buildSizeCard('Moyen', '1 000 F', 'Boîte, chaussures, habits', Icons.inventory_2),
+                _buildSizeCard(
+                  'Moyen',
+                  _formatFcfa(tarifsColis.moyen.base),
+                  tarifsColis.moyen.parKm > 0
+                      ? '+${_formatFcfa(tarifsColis.moyen.parKm)}/km sup.'
+                      : null,
+                  'Boîte, chaussures, habits',
+                  Icons.inventory_2,
+                ),
                 const SizedBox(width: 8),
-                _buildSizeCard('Grand', '1 500 F', 'Carton, électro, sac riz', Icons.all_inbox),
+                _buildSizeCard(
+                  'Grand',
+                  _formatFcfa(tarifsColis.grand.base),
+                  tarifsColis.grand.parKm > 0
+                      ? '+${_formatFcfa(tarifsColis.grand.parKm)}/km sup.'
+                      : null,
+                  'Carton, électro, sac riz',
+                  Icons.all_inbox,
+                ),
               ],
             ),
             const SizedBox(height: 24),
 
             // ─── Expéditions en cours & Historique ───────────────────────────
             const Text(
-              'Mes Expéditions GoColis',
+              'Historique des expéditions',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -257,10 +290,31 @@ class GoColisHomeScreen extends ConsumerWidget {
           ],
         ),
       ),
+      ),
     );
   }
 
-  Widget _buildSizeCard(String title, String price, String desc, IconData icon) {
+  static String _formatFcfa(double amount) {
+    final rounded = amount.round();
+    final digits = rounded.toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      final posFromEnd = digits.length - i;
+      buf.write(digits[i]);
+      if (posFromEnd > 1 && posFromEnd % 3 == 1) {
+        buf.write(' ');
+      }
+    }
+    return '${buf.toString()} F';
+  }
+
+  Widget _buildSizeCard(
+    String title,
+    String price,
+    String? perKmHint,
+    String desc,
+    IconData icon,
+  ) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -283,6 +337,20 @@ class GoColisHomeScreen extends ConsumerWidget {
                 fontSize: 14,
               ),
             ),
+            if (perKmHint != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                perKmHint,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  color: GoLivreurTheme.primaire,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
             const SizedBox(height: 4),
             Text(
               desc,

@@ -60,6 +60,91 @@ const List<DeliveryTariffTier> defaultGoShopBareme = [
   DeliveryTariffTier(maxKm: 99, normal: 1500, pointe: 1800, pluie: 2000),
 ];
 
+class ParcelSizeTariff {
+  final double base;
+  final double parKm;
+
+  const ParcelSizeTariff({
+    required this.base,
+    required this.parKm,
+  });
+
+  factory ParcelSizeTariff.fromJson(
+    Map<String, dynamic>? json, {
+    required double fallbackBase,
+    required double fallbackParKm,
+  }) {
+    if (json == null) {
+      return ParcelSizeTariff(base: fallbackBase, parKm: fallbackParKm);
+    }
+    return ParcelSizeTariff(
+      base: num.tryParse('${json['base'] ?? ''}')?.toDouble() ?? fallbackBase,
+      parKm: num.tryParse('${json['par_km'] ?? ''}')?.toDouble() ?? fallbackParKm,
+    );
+  }
+}
+
+class ParcelTariffsConfig {
+  final ParcelSizeTariff petit;
+  final ParcelSizeTariff moyen;
+  final ParcelSizeTariff grand;
+  final double seuilAssurance;
+  final double tauxAssurance;
+
+  const ParcelTariffsConfig({
+    this.petit = const ParcelSizeTariff(base: 800, parKm: 200),
+    this.moyen = const ParcelSizeTariff(base: 1200, parKm: 300),
+    this.grand = const ParcelSizeTariff(base: 2000, parKm: 400),
+    this.seuilAssurance = 20000,
+    this.tauxAssurance = 3.0,
+  });
+
+  factory ParcelTariffsConfig.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const ParcelTariffsConfig();
+    final rawBareme = json['bareme'] is Map
+        ? Map<String, dynamic>.from(json['bareme'] as Map)
+        : const <String, dynamic>{};
+
+    Map<String, dynamic>? sizeMap(String key) => rawBareme[key] is Map
+        ? Map<String, dynamic>.from(rawBareme[key] as Map)
+        : null;
+
+    return ParcelTariffsConfig(
+      petit: ParcelSizeTariff.fromJson(
+        sizeMap('petit'),
+        fallbackBase: 800,
+        fallbackParKm: 200,
+      ),
+      moyen: ParcelSizeTariff.fromJson(
+        sizeMap('moyen'),
+        fallbackBase: 1200,
+        fallbackParKm: 300,
+      ),
+      grand: ParcelSizeTariff.fromJson(
+        sizeMap('grand'),
+        fallbackBase: 2000,
+        fallbackParKm: 400,
+      ),
+      seuilAssurance:
+          num.tryParse('${json['seuil_assurance'] ?? ''}')?.toDouble() ?? 20000,
+      tauxAssurance:
+          num.tryParse('${json['taux_assurance'] ?? ''}')?.toDouble() ?? 3.0,
+    );
+  }
+
+  ParcelSizeTariff forSize(String size) {
+    switch (size.toLowerCase()) {
+      case 'petit':
+        return petit;
+      case 'grand':
+        return grand;
+      case 'moyen':
+      default:
+        return moyen;
+    }
+  }
+}
+
 // ─── État Météo / Mode Pluie synchronisé avec le Backend ──────────────────────
 class WeatherState {
   final int? cityId;
@@ -74,6 +159,7 @@ class WeatherState {
   final int rainDelayMinutes;
   final bool isLoaded;
   final List<DeliveryTariffTier> bareme;
+  final ParcelTariffsConfig tarifsColis;
   final List<DeliveryNeighborhood> neighborhoods;
 
   const WeatherState({
@@ -89,6 +175,7 @@ class WeatherState {
     this.rainDelayMinutes = 0,
     this.isLoaded = false,
     this.bareme = defaultGoShopBareme,
+    this.tarifsColis = const ParcelTariffsConfig(),
     this.neighborhoods = const [],
   });
 
@@ -105,6 +192,7 @@ class WeatherState {
     int? rainDelayMinutes,
     bool? isLoaded,
     List<DeliveryTariffTier>? bareme,
+    ParcelTariffsConfig? tarifsColis,
     List<DeliveryNeighborhood>? neighborhoods,
   }) {
     return WeatherState(
@@ -120,6 +208,7 @@ class WeatherState {
       rainDelayMinutes: rainDelayMinutes ?? this.rainDelayMinutes,
       isLoaded: isLoaded ?? this.isLoaded,
       bareme: bareme ?? this.bareme,
+      tarifsColis: tarifsColis ?? this.tarifsColis,
       neighborhoods: neighborhoods ?? this.neighborhoods,
     );
   }
@@ -204,6 +293,9 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
         final rainActive = d['rain_mode_active'] as bool? ?? false;
         final cName = (d['city_name'] as String? ?? '').trim();
         final rawBareme = d['bareme'] as List<dynamic>?;
+        final rawTarifsColis = d['tarifs_colis'] is Map
+            ? Map<String, dynamic>.from(d['tarifs_colis'] as Map)
+            : null;
         final rawNeighborhoods = d['neighborhoods'] as List<dynamic>? ?? const [];
 
         _onBranding?.call(
@@ -229,6 +321,9 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
               ? rawBareme
                   .map((e) => DeliveryTariffTier.fromJson(e as Map<String, dynamic>))
                   .toList()
+              : null,
+          tarifsColis: rawTarifsColis != null
+              ? ParcelTariffsConfig.fromJson(rawTarifsColis)
               : null,
           neighborhoods: rawNeighborhoods
               .map((e) => DeliveryNeighborhood.fromJson(e as Map<String, dynamic>))

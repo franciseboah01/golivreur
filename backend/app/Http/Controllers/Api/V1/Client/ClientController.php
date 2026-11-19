@@ -339,12 +339,14 @@ class ClientController extends Controller
         }
 
         $tarifs = $settingsService->get('tarifs_goshop', $city?->id);
+        $tarifsColis = $settingsService->get('tarifs_gocolis', $city?->id);
         $defaultBareme = [
             ['max_km' => 2,  'normal' => 500,  'pointe' => 700,  'pluie' => 1000],
             ['max_km' => 4,  'normal' => 800,  'pointe' => 1000, 'pluie' => 1300],
             ['max_km' => 7,  'normal' => 1200, 'pointe' => 1500, 'pluie' => 1800],
             ['max_km' => 99, 'normal' => 1500, 'pointe' => 1800, 'pluie' => 2000],
         ];
+        $defaultTarifsColis = SettingsService::DEFAULTS['tarifs_gocolis'];
 
         $isRainMode = (bool) ($city->rain_mode_active ?? false);
         $branding = $settingsService->getBranding();
@@ -377,6 +379,7 @@ class ClientController extends Controller
                 'center_lat' => $city?->center_lat !== null ? (float) $city->center_lat : null,
                 'center_lng' => $city?->center_lng !== null ? (float) $city->center_lng : null,
                 'bareme' => $tarifs['bareme'] ?? $defaultBareme,
+                'tarifs_colis' => is_array($tarifsColis) ? $tarifsColis : $defaultTarifsColis,
                 'neighborhoods' => $neighborhoods,
                 'app_logo_url' => $branding['logo_url'],
                 'app_default_emoji' => $branding['default_emoji'],

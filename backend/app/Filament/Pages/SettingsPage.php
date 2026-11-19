@@ -203,11 +203,12 @@ class SettingsPage extends Page implements HasForms
                                     ]),
                             ]),
 
-                        // ── 2. Tarifs GoColis ─────────────────────────────────
-                        Forms\Components\Tabs\Tab::make('Tarifs GoColis')
+                        // ── 2. Tarifs Colis ───────────────────────────────────
+                        Forms\Components\Tabs\Tab::make('Tarifs Colis')
                             ->icon('heroicon-o-cube')
                             ->schema([
-                                Forms\Components\Section::make('Barème d\'expédition selon la taille du colis')
+                                Forms\Components\Section::make('Barème d\'expédition selon le format du colis')
+                                    ->description('Ces tarifs sont synchronisés en temps réel dans « Nos Formats et Tarifs » sur l\'application GL Client (globaux ou surchargés par ville).')
                                     ->schema([
                                         Forms\Components\Grid::make(3)
                                             ->schema([

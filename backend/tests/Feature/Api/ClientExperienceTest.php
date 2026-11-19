@@ -9,6 +9,7 @@ use App\Models\ClientAddress;
 use App\Models\Merchant;
 use App\Models\Neighborhood;
 use App\Models\User;
+use App\Services\SettingsService;
 use Livewire\Livewire;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
@@ -269,4 +270,33 @@ it('permet à un admin de gérer Villes et Quartiers avec formulaires vides sans
     Livewire::test(ListNeighborhoods::class)
         ->assertOk()
         ->assertCanSeeTableRecords(Neighborhood::where('city_id', $city->id)->get());
+});
+
+it('expose dans city-status les tarifs Colis modifiés par l\'admin (globaux ou par ville)', function () {
+    $city = City::factory()->create([
+        'name' => 'Korhogo',
+        'is_active' => true,
+    ]);
+    $admin = User::factory()->create([
+        'role' => 'super_admin',
+        'is_active' => true,
+    ]);
+
+    app(SettingsService::class)->set('tarifs_gocolis', [
+        'bareme' => [
+            'petit' => ['base' => 600, 'par_km' => 150],
+            'moyen' => ['base' => 1100, 'par_km' => 250],
+            'grand' => ['base' => 1800, 'par_km' => 350],
+        ],
+        'seuil_assurance' => 25000,
+        'taux_assurance' => 3.5,
+    ], $city->id, $admin->id);
+
+    $this->getJson("/api/v1/client/city-status?city_id={$city->id}")
+        ->assertOk()
+        ->assertJsonPath('donnees.tarifs_colis.bareme.petit.base', 600)
+        ->assertJsonPath('donnees.tarifs_colis.bareme.petit.par_km', 150)
+        ->assertJsonPath('donnees.tarifs_colis.bareme.moyen.base', 1100)
+        ->assertJsonPath('donnees.tarifs_colis.bareme.grand.base', 1800)
+        ->assertJsonPath('donnees.tarifs_colis.seuil_assurance', 25000);
 });
