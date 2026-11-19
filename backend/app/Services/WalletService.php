@@ -28,6 +28,12 @@ class WalletService
      */
     public function crediterLivreur(Order $order): WalletTransaction
     {
+        $merchantUserId = $order->merchant()->value('user_id');
+        $courierUserId = $order->courier()->value('user_id');
+        if ($merchantUserId !== null && $courierUserId !== null && (int) $merchantUserId === (int) $courierUserId) {
+            throw new AuthorizationException('Conflit financier : impossible de créditer une auto-livraison commerçant-livreur.');
+        }
+
         $wallet = $this->obtenirOuCreerWallet('courier', (int) $order->courier_id);
 
         return $this->effectuerTransaction(

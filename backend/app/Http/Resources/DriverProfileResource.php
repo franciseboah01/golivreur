@@ -30,6 +30,7 @@ class DriverProfileResource extends JsonResource
             'phone' => $this->phone,
             'email' => $this->email,
             'role' => $this->role,
+            'roles' => $this->effectiveRoles(),
             'city_id' => $courier->city_id ?? $this->city_id,
             'city_name' => ($courier->city ?? $this->city)?->name,
             'language' => $this->language ?? 'fr',
@@ -45,6 +46,8 @@ class DriverProfileResource extends JsonResource
             'is_active' => (bool) ($courier->is_active ?? $this->is_active),
             'average_rating' => (float) ($courier->average_rating ?? 0),
             'total_ratings' => (int) ($courier->total_ratings ?? 0),
+            'must_change_password' => $this->mustChangePassword(),
+            'pin_reset_required_at' => $this->pinResetRequiredAt(),
         ];
     }
 }

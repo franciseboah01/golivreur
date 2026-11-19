@@ -32,7 +32,7 @@ class RegisterDriverRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'min:2', 'max:100'],
-            'phone' => ['required', 'string', 'regex:/^(07|05|01)[0-9]{8}$/', 'unique:users,phone'],
+            'phone' => ['required', 'string', 'regex:/^(07|05|01)[0-9]{8}$/'],
             'password' => ['required', 'string', 'min:6', 'max:100'],
             'city_id' => ['required', 'integer', 'exists:cities,id'],
             'vehicle_type' => ['required', 'string', 'max:50'],

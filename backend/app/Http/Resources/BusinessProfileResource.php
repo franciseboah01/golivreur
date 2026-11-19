@@ -37,6 +37,7 @@ class BusinessProfileResource extends JsonResource
             'phone' => $this->phone,
             'email' => $this->email,
             'role' => $this->role,
+            'roles' => $this->effectiveRoles(),
             'city_id' => $merchant->city_id ?? $this->city_id,
             'city_name' => ($merchant->city ?? $this->city)?->name,
             'language' => $this->language ?? 'fr',
@@ -57,6 +58,8 @@ class BusinessProfileResource extends JsonResource
             'is_active' => (bool) ($merchant->is_active ?? $this->is_active),
             'average_rating' => (float) ($merchant->average_rating ?? 0),
             'total_ratings' => (int) ($merchant->total_ratings ?? 0),
+            'must_change_password' => $this->mustChangePassword(),
+            'pin_reset_required_at' => $this->pinResetRequiredAt(),
         ];
     }
 }

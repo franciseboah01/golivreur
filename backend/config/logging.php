@@ -65,6 +65,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'support_audit' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/support-audit.log'),
+            'level' => 'info',
+            'permission' => 0640,
+            'replace_placeholders' => false,
+        ],
+
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),

@@ -308,6 +308,10 @@ class ProfileController extends Controller
             'password' => Hash::make((string) $request->validated('password')),
         ]);
 
+        if ($user->mustChangePassword()) {
+            $user->setMustChangePassword(false, $user->id);
+        }
+
         $this->logProfileUpdate($user, 'profile_password_updated', $request->ip());
 
         return response()->json([

@@ -67,6 +67,14 @@ class AssignmentService
             ? $this->walletService->calculerMontantAReverserOrder($order)
             : null;
 
+        $merchantUserId = (int) ($order->merchant()->value('user_id') ?? 0);
+        $priorityConfig = $tentative === 1
+            ? $this->settingsService->get("merchant_priority_courier:{$order->merchant_id}", null, null)
+            : null;
+        $priorityCourierId = is_array($priorityConfig) && isset($priorityConfig['courier_id'])
+            ? (int) $priorityConfig['courier_id']
+            : null;
+
         $this->attribuerCourse(
             course: $order,
             type: 'goshop',
@@ -77,6 +85,8 @@ class AssignmentService
             tentative: $tentative,
             exclusions: $exclusions,
             montantRequisCash: $montantRequisCash,
+            excludeUserId: $merchantUserId > 0 ? $merchantUserId : null,
+            priorityCourierId: $priorityCourierId,
             onOffer: function (Courier $livreur, int $currentAttempt, array $updatedExclusions, int $delaySeconds) use ($order): void {
                 $this->notificationService->proposerCourseGoShop($livreur, $order);
 
@@ -230,6 +240,8 @@ class AssignmentService
         ?int $montantRequisCash,
         callable $onOffer,
         callable $onWaiting,
+        ?int $excludeUserId = null,
+        ?int $priorityCourierId = null,
     ): void {
         if ($tentative > self::MAX_TENTATIVES) {
             $wasAlreadyWaiting = $course->status === $waitingStatus;
@@ -258,6 +270,8 @@ class AssignmentService
             cityId: $cityId,
             excludeIds: $exclusions,
             montantRequisCash: $montantRequisCash,
+            excludeUserId: $excludeUserId,
+            priorityCourierId: $priorityCourierId,
         );
 
         if (! $livreur) {
@@ -310,6 +324,8 @@ class AssignmentService
         int $cityId,
         array $excludeIds = [],
         ?int $montantRequisCash = null,
+        ?int $excludeUserId = null,
+        ?int $priorityCourierId = null,
     ): ?Courier {
         $fraicheurMinutes = $this->settingsService->getDelaiRegle(
             'gps_fraicheur_minutes',
@@ -317,9 +333,50 @@ class AssignmentService
             2,
         );
 
+        $estCandidatValide = function (Courier $candidat) use ($cityId, $montantRequisCash, $excludeUserId): bool {
+            if ($excludeUserId !== null && (int) $candidat->user_id === $excludeUserId) {
+                return false;
+            }
+
+            if (! $this->capacityService->peutAccepterNouvelleCourse($candidat->id, $cityId)) {
+                return false;
+            }
+
+            if ($montantRequisCash === null) {
+                return true;
+            }
+
+            return $this->walletService->verifierSoldeCashSuffisant(
+                courier: $candidat,
+                montantAReverser: $montantRequisCash,
+                settingsService: $this->settingsService,
+                lockWallet: false,
+            )['ok'];
+        };
+
+        // 1. Priorité au livreur assigné manuellement par le commerce (hors auto-assignation)
+        if ($priorityCourierId !== null && ! in_array($priorityCourierId, $excludeIds, true)) {
+            $prioritaire = Courier::whereKey($priorityCourierId)
+                ->where('city_id', $cityId)
+                ->where('is_online', true)
+                ->where('is_active', true)
+                ->when($excludeUserId !== null, fn ($q) => $q->where('user_id', '!=', $excludeUserId))
+                ->where(function ($q) {
+                    $q->whereNull('penalty_until')
+                        ->orWhere('penalty_until', '<', now());
+                })
+                ->first();
+
+            if ($prioritaire && $estCandidatValide($prioritaire)) {
+                return $prioritaire;
+            }
+        }
+
+        // 2. Attribution standard par proximité géographique Haversine (en excluant le commerçant-livreur)
         $baseQuery = Courier::where('city_id', $cityId)
             ->where('is_online', true)
             ->where('is_active', true)
+            ->when($excludeUserId !== null, fn ($q) => $q->where('user_id', '!=', $excludeUserId))
             ->whereNotNull('current_lat')
             ->whereNotNull('current_lng')
             ->whereNotNull('location_updated_at')
@@ -340,22 +397,7 @@ class AssignmentService
         }
 
         /** @var Courier|null $eligible */
-        $eligible = $baseQuery->get()->first(function (Courier $candidat) use ($cityId, $montantRequisCash): bool {
-            if (! $this->capacityService->peutAccepterNouvelleCourse($candidat->id, $cityId)) {
-                return false;
-            }
-
-            if ($montantRequisCash === null) {
-                return true;
-            }
-
-            return $this->walletService->verifierSoldeCashSuffisant(
-                courier: $candidat,
-                montantAReverser: $montantRequisCash,
-                settingsService: $this->settingsService,
-                lockWallet: false,
-            )['ok'];
-        });
+        $eligible = $baseQuery->get()->first($estCandidatValide);
 
         return $eligible;
     }

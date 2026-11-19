@@ -20,6 +20,7 @@ use App\Services\CourierLocationPollingService;
 use App\Services\SettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -42,14 +43,73 @@ class ClientController extends Controller
     }
 
     /**
+     * Bannières promotionnelles dynamiques actives (auto-expiration stricte par plage de dates).
+     */
+    public function banners(Request $request, SettingsService $settingsService): JsonResponse
+    {
+        $cityId = $request->input('city_id', auth('api')->user()?->city_id);
+        $raw = $settingsService->get('promotional_banners', $cityId !== null && $cityId !== '' ? (int) $cityId : null, []);
+        $now = now();
+
+        $activeBanners = collect(is_array($raw) ? $raw : [])
+            ->filter(function (mixed $banner) use ($now): bool {
+                if (! is_array($banner)) {
+                    return false;
+                }
+                if (isset($banner['is_active']) && ! $banner['is_active']) {
+                    return false;
+                }
+                $startsAt = ! empty($banner['starts_at']) ? Carbon::parse((string) $banner['starts_at']) : null;
+                $endsAt = ! empty($banner['ends_at']) ? Carbon::parse((string) $banner['ends_at']) : null;
+
+                if ($startsAt !== null && $now->lt($startsAt)) {
+                    return false;
+                }
+                if ($endsAt !== null && $now->gt($endsAt)) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->sortBy(fn (array $b): int => (int) ($b['sort_order'] ?? 0))
+            ->map(function (array $banner): array {
+                $imagePath = isset($banner['image_path']) && is_string($banner['image_path']) ? trim($banner['image_path']) : '';
+                $imageUrl = $imagePath !== ''
+                    ? url('storage/'.ltrim($imagePath, '/'))
+                    : (isset($banner['image_url']) && is_string($banner['image_url']) ? $banner['image_url'] : null);
+
+                return [
+                    'id' => (string) ($banner['id'] ?? ''),
+                    'title' => (string) ($banner['title'] ?? ''),
+                    'subtitle' => (string) ($banner['subtitle'] ?? ''),
+                    'image_url' => $imageUrl,
+                    'deep_link' => isset($banner['deep_link']) && is_string($banner['deep_link']) && trim($banner['deep_link']) !== ''
+                        ? trim($banner['deep_link'])
+                        : null,
+                    'starts_at' => $banner['starts_at'] ?? null,
+                    'ends_at' => $banner['ends_at'] ?? null,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $activeBanners,
+        ]);
+    }
+
+    /**
      * Liste des Commerces Partenaires actifs avec nom, emoji, logo_url, photo_url et catalogue.
+     * Filtre invisible : un commerçant (même multi-rôle client) ne voit jamais son propre commerce.
      */
     public function merchants(Request $request): JsonResponse
     {
-        $cityId = $request->input('city_id', auth('api')->user()?->city_id);
+        $authUser = auth('api')->user();
+        $cityId = $request->input('city_id', $authUser?->city_id);
 
         $merchants = Merchant::query()
             ->when($cityId !== null && $cityId !== '', fn ($q) => $q->where('city_id', (int) $cityId))
+            ->when($authUser !== null, fn ($q) => $q->where('user_id', '!=', $authUser->id))
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->input('category')))
             ->where('is_active', true)
             ->with([
@@ -74,6 +134,15 @@ class ClientController extends Controller
                 'succes' => false,
                 'message' => 'Commerce introuvable.',
             ], 404);
+        }
+
+        $authUser = auth('api')->user();
+        if ($authUser !== null && (int) $merchant->user_id === (int) $authUser->id) {
+            return response()->json([
+                'succes' => false,
+                'code' => 'SELF_PURCHASE_FORBIDDEN',
+                'message' => 'Un commerçant ne peut pas consulter ou commander ses propres produits.',
+            ], 403);
         }
 
         $merchant->load('categoryModel');

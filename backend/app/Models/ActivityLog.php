@@ -28,6 +28,20 @@ class ActivityLog extends Model
         'entity_id' => 'integer',
     ];
 
+    protected static function booted(): void
+    {
+        static::updating(function (): void {
+            throw new \RuntimeException('Les journaux d\'audit sont strictement immuables (append-only) et ne peuvent pas être modifiés.');
+        });
+
+        static::deleting(function (): void {
+            throw new \RuntimeException('Les journaux d\'audit sont strictement immuables (append-only) et ne peuvent pas être supprimés.');
+        });
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

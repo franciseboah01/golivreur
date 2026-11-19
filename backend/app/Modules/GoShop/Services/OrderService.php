@@ -55,6 +55,29 @@ class OrderService
         return DB::transaction(function () use ($client, $donnees) {
             $merchant = Merchant::findOrFail($donnees['merchant_id']);
 
+            // Sécurité anti-auto-achat : un commerçant (même multi-rôle client) ne peut jamais acheter ses propres produits
+            $productIds = array_values(array_unique(array_map(
+                static fn (array $item): int => (int) ($item['product_id'] ?? 0),
+                $donnees['items'] ?? [],
+            )));
+
+            $ownsAnyProduct = ! empty($productIds) && Product::whereIn('id', $productIds)
+                ->whereHas('merchant', fn ($q) => $q->where('user_id', $client->id))
+                ->exists();
+
+            if ((int) $merchant->user_id === (int) $client->id || $ownsAnyProduct) {
+                $this->activityLogService->log(
+                    userId: $client->id,
+                    action: 'self_purchase_blocked',
+                    entityType: 'merchant',
+                    entityId: $merchant->id,
+                    properties: ['merchant_id' => $merchant->id, 'product_ids' => $productIds],
+                    severity: 'warning',
+                );
+
+                throw new HttpException(403, 'Achat interdit : un commerçant ne peut pas commander ses propres produits.');
+            }
+
             // Calculer les montants selon la ville du commerce
             $cityId = $merchant->city_id ?? $client->city_id ?? 1;
             $city = City::findOrFail($cityId);

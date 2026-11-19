@@ -88,6 +88,15 @@ class SmsService
         return $this->envoyer($phone, $message, type: 'secours');
     }
 
+    /**
+     * Envoie un SMS de sécurité hors bande (réinitialisation mot de passe temporaire / PIN).
+     * Le message n'est jamais enregistré dans les logs ni dans `sms_logs`.
+     */
+    public function envoyerNotificationSecurite(string $phone, string $message): bool
+    {
+        return $this->envoyer($phone, $message, type: 'security');
+    }
+
     // ─── Envoi délégué à la passerelle ─────────────────────────────────────────
 
     private function envoyer(string $phone, string $message, string $type): bool

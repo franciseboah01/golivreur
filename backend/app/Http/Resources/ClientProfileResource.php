@@ -22,6 +22,7 @@ class ClientProfileResource extends JsonResource
             'phone' => $this->phone,
             'email' => $this->email,
             'role' => $this->role,
+            'roles' => $this->effectiveRoles(),
             'city_id' => $this->city_id,
             'city_name' => $this->city?->name,
             'default_address' => $this->default_address,
@@ -30,6 +31,8 @@ class ClientProfileResource extends JsonResource
             'photo_url' => $this->photo_url,
             'avatar_url' => $this->photo_url,
             'is_active' => (bool) $this->is_active,
+            'must_change_password' => $this->mustChangePassword(),
+            'pin_reset_required_at' => $this->pinResetRequiredAt(),
         ];
     }
 }

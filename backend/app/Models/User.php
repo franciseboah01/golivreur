@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\SettingsService;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -137,6 +138,137 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
         };
     }
 
+    // ─── Multi-Rôles & Sécurité (sans modification de schéma) ─────────────────
+
+    /**
+     * Retourne l'ensemble des rôles actifs cumulés par cette identité unique.
+     *
+     * @return list<string>
+     */
+    public function effectiveRoles(): array
+    {
+        $roles = [];
+
+        if (is_string($this->role) && $this->role !== '') {
+            $roles[] = $this->role === 'courier' ? 'driver' : $this->role;
+        }
+
+        // Un profil merchant actif confère le rôle merchant
+        if ($this->relationLoaded('merchant')) {
+            if ($this->merchant && $this->merchant->is_active) {
+                $roles[] = 'merchant';
+            }
+        } elseif ($this->merchant()->where('is_active', true)->exists()) {
+            $roles[] = 'merchant';
+        }
+
+        // Un profil courier actif confère le rôle driver
+        if ($this->relationLoaded('courier')) {
+            if ($this->courier && $this->courier->is_active) {
+                $roles[] = 'driver';
+            }
+        } elseif ($this->courier()->where('is_active', true)->exists()) {
+            $roles[] = 'driver';
+        }
+
+        // Rôles complémentaires stockés dans settings (ex: user_extra_roles:<id>)
+        $extraRoles = app(SettingsService::class)->get("user_extra_roles:{$this->id}", null, []);
+        if (is_array($extraRoles)) {
+            foreach ($extraRoles as $extra) {
+                if (is_string($extra) && $extra !== '') {
+                    $roles[] = $extra === 'courier' ? 'driver' : $extra;
+                }
+            }
+        }
+
+        return array_values(array_unique($roles));
+    }
+
+    /**
+     * Attribue un rôle supplémentaire à cette identité unique (ex: client + merchant/driver).
+     */
+    public function grantExtraRole(string $role, ?int $actorId = null): void
+    {
+        $normalized = $role === 'courier' ? 'driver' : strtolower(trim($role));
+        if ($normalized === '' || in_array($normalized, $this->effectiveRoles(), true)) {
+            return;
+        }
+
+        $settings = app(SettingsService::class);
+        $current = $settings->get("user_extra_roles:{$this->id}", null, []);
+        $list = is_array($current) ? $current : [];
+        $list[] = $normalized;
+        $settings->set("user_extra_roles:{$this->id}", array_values(array_unique($list)), null, $actorId ?? $this->id);
+    }
+
+    public function hasRole(string $role): bool
+    {
+        $target = strtolower(trim($role));
+        $roles = $this->effectiveRoles();
+
+        if ($target === 'admin') {
+            return in_array($this->role, self::ADMIN_ROLES, true);
+        }
+
+        if ($target === 'driver' || $target === 'courier') {
+            return in_array('driver', $roles, true) || in_array('courier', $roles, true);
+        }
+
+        return in_array($target, $roles, true);
+    }
+
+    /**
+     * @param  array<int, string>  $roles
+     */
+    public function hasAnyRole(array $roles): bool
+    {
+        foreach ($roles as $role) {
+            if ($this->hasRole($role)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Indique si l'utilisateur doit obligatoirement changer son mot de passe à la prochaine connexion.
+     */
+    public function mustChangePassword(): bool
+    {
+        $flags = app(SettingsService::class)->get("user_security_flags:{$this->id}", null, []);
+
+        return is_array($flags) && ! empty($flags['must_change_password']);
+    }
+
+    public function setMustChangePassword(bool $required, ?int $actorId = null): void
+    {
+        $settings = app(SettingsService::class);
+        $flags = $settings->get("user_security_flags:{$this->id}", null, []);
+        $data = is_array($flags) ? $flags : [];
+        $data['must_change_password'] = $required;
+        $data['password_reset_updated_at'] = now()->toIso8601String();
+        $settings->set("user_security_flags:{$this->id}", $data, null, $actorId ?? $this->id);
+    }
+
+    public function pinResetRequiredAt(): ?string
+    {
+        $flags = app(SettingsService::class)->get("user_security_flags:{$this->id}", null, []);
+
+        return is_array($flags) && isset($flags['pin_reset_at']) && is_string($flags['pin_reset_at'])
+            ? $flags['pin_reset_at']
+            : null;
+    }
+
+    public function markPinResetRequired(?int $actorId = null): void
+    {
+        $settings = app(SettingsService::class);
+        $flags = $settings->get("user_security_flags:{$this->id}", null, []);
+        $data = is_array($flags) ? $flags : [];
+        $data['pin_reset_at'] = now()->toIso8601String();
+        $settings->set("user_security_flags:{$this->id}", $data, null, $actorId ?? $this->id);
+    }
+
     // ─── JWT ──────────────────────────────────────────────────────────────────
 
     public function getJWTIdentifier(): mixed
@@ -148,6 +280,7 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     {
         return [
             'role' => $this->role,
+            'roles' => $this->effectiveRoles(),
             'city_id' => $this->city_id,
         ];
     }

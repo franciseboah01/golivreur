@@ -150,9 +150,18 @@ class DriverController extends Controller
 
         return DB::transaction(function () use ($order, $courier, $settingsService, $walletService, $notificationService) {
             /** @var Order $lockedOrder */
-            $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
+            $lockedOrder = Order::with('merchant:id,user_id')->lockForUpdate()->findOrFail($order->id);
             /** @var Courier $lockedCourier */
             $lockedCourier = Courier::with('user')->lockForUpdate()->findOrFail($courier->id);
+
+            // Interdiction stricte d'auto-livraison pour un commerçant-livreur
+            if ($lockedOrder->merchant && (int) $lockedOrder->merchant->user_id === (int) $lockedCourier->user_id) {
+                return response()->json([
+                    'succes' => false,
+                    'code' => 'SELF_ASSIGNMENT_FORBIDDEN',
+                    'message' => 'Auto-assignation interdite : un commerçant-livreur ne peut pas livrer les commandes de sa propre boutique.',
+                ], 403);
+            }
 
             if ($denied = $this->verifierLivreurEnLigneEtEligible(
                 lockedCourier: $lockedCourier,

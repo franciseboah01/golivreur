@@ -260,8 +260,30 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $courier = DB::transaction(function () use ($validated, $vehicleType): Courier {
-            $user = User::create([
+        $existingUser = User::where('phone', (string) $validated['phone'])
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($existingUser) {
+            if ($existingUser->courier()->exists()) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Ce numéro de téléphone est déjà associé à un profil livreur.',
+                    'errors' => ['phone' => ['Ce numéro de téléphone est déjà associé à un profil livreur.']],
+                ], 422);
+            }
+
+            if (! $existingUser->password || ! Hash::check((string) $validated['password'], $existingUser->password)) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Ce numéro existe déjà. Saisissez le mot de passe de votre compte existant pour ajouter le profil livreur.',
+                    'errors' => ['password' => ['Mot de passe du compte existant incorrect.']],
+                ], 422);
+            }
+        }
+
+        $courier = DB::transaction(function () use ($validated, $vehicleType, $existingUser): Courier {
+            $user = $existingUser ?? User::create([
                 'name' => trim((string) $validated['name']),
                 'phone' => (string) $validated['phone'],
                 'password' => Hash::make((string) $validated['password']),
@@ -296,6 +318,7 @@ class AuthController extends Controller
                     'city_id' => $courier->city_id,
                     'vehicle_type' => $courier->vehicle_type,
                     'vehicle_plate' => $courier->vehicle_plate,
+                    'multi_role_attached' => $existingUser !== null,
                 ],
             );
 
@@ -341,8 +364,30 @@ class AuthController extends Controller
             $managerName = $businessName;
         }
 
-        $merchant = DB::transaction(function () use ($validated, $city, $businessName, $managerName, $categorySlug): Merchant {
-            $user = User::create([
+        $existingUser = User::where('phone', (string) $validated['phone'])
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($existingUser) {
+            if ($existingUser->merchant()->exists()) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Ce numéro de téléphone est déjà associé à un commerce partenaire.',
+                    'errors' => ['phone' => ['Ce numéro de téléphone est déjà associé à un commerce partenaire.']],
+                ], 422);
+            }
+
+            if (! $existingUser->password || ! Hash::check((string) $validated['password'], $existingUser->password)) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Ce numéro existe déjà. Saisissez le mot de passe de votre compte existant pour ajouter votre commerce.',
+                    'errors' => ['password' => ['Mot de passe du compte existant incorrect.']],
+                ], 422);
+            }
+        }
+
+        $merchant = DB::transaction(function () use ($validated, $city, $businessName, $managerName, $categorySlug, $existingUser): Merchant {
+            $user = $existingUser ?? User::create([
                 'name' => $managerName,
                 'phone' => (string) $validated['phone'],
                 'password' => Hash::make((string) $validated['password']),
@@ -379,6 +424,7 @@ class AuthController extends Controller
                     'city_id' => $merchant->city_id,
                     'category' => $merchant->category,
                     'address' => $merchant->address,
+                    'multi_role_attached' => $existingUser !== null,
                 ],
             );
 
@@ -404,7 +450,10 @@ class AuthController extends Controller
         $validated = $request->validate([
             'phone' => 'required|string',
             'password' => 'required|string',
+            'app_type' => 'nullable|string|in:client,driver,business',
         ]);
+
+        $appType = isset($validated['app_type']) ? strtolower((string) $validated['app_type']) : null;
 
         $rawPhone = preg_replace('/[\s\.\-\(\)]+/', '', trim((string) $validated['phone'])) ?? '';
         if (str_starts_with($rawPhone, '+225')) {
@@ -445,8 +494,70 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if (in_array($user->role, ['driver', 'courier'], true)) {
-            $courier = Courier::where('user_id', $user->id)->first();
+        $user->load(['city', 'merchant', 'courier']);
+
+        // Vérification stricte du rôle attendu par l'application mobile (client | driver | business)
+        if ($appType !== null) {
+            if ($appType === 'driver') {
+                $courier = $user->courier;
+                if ($courier && ! $courier->is_active) {
+                    $isPendingAgency = $courier->activated_at === null;
+
+                    return response()->json([
+                        'succes' => false,
+                        'message' => $isPendingAgency
+                            ? 'Votre dossier livreur est en attente de validation. Passez en agence GoLivreur pour vérifier vos pièces et activer votre compte.'
+                            : 'Votre compte livreur est actuellement désactivé. Contactez l\'agence GoLivreur.',
+                    ], 403);
+                }
+
+                if (! $user->hasRole('driver')) {
+                    return response()->json([
+                        'succes' => false,
+                        'code' => 'ROLE_MISSING',
+                        'required_role' => 'driver',
+                        'user_roles' => $user->effectiveRoles(),
+                        'suggested_action' => 'register_driver',
+                        'message' => 'Ce compte ne dispose pas du profil Livreur. Inscrivez-vous comme livreur ou connectez-vous sur l\'application adaptée à votre profil.',
+                    ], 403);
+                }
+            } elseif ($appType === 'business') {
+                $merchant = $user->merchant;
+                if ($merchant && ! $merchant->is_active) {
+                    $isPendingAgency = $merchant->activated_at === null;
+
+                    return response()->json([
+                        'succes' => false,
+                        'message' => $isPendingAgency
+                            ? 'Votre dossier commerçant est en attente de validation. Passez en agence GoLivreur ou avec un agent terrain pour compléter votre dossier et activer votre compte.'
+                            : 'Votre compte commerçant est actuellement désactivé. Contactez l\'agence GoLivreur.',
+                    ], 403);
+                }
+
+                if (! $user->hasRole('merchant')) {
+                    return response()->json([
+                        'succes' => false,
+                        'code' => 'ROLE_MISSING',
+                        'required_role' => 'merchant',
+                        'user_roles' => $user->effectiveRoles(),
+                        'suggested_action' => 'register_merchant',
+                        'message' => 'Ce compte ne dispose pas du profil Commerçant. Inscrivez votre commerce ou ouvrez l\'application adaptée à votre profil.',
+                    ], 403);
+                }
+            } elseif ($appType === 'client' && ! $user->hasRole('client')) {
+                return response()->json([
+                    'succes' => false,
+                    'code' => 'ROLE_MISSING',
+                    'required_role' => 'client',
+                    'user_roles' => $user->effectiveRoles(),
+                    'suggested_action' => 'register_client',
+                    'message' => 'Ce compte ne dispose pas du profil Client. Ouvrez GL Driver ou GL Business, ou créez un profil Client.',
+                ], 403);
+            }
+        }
+
+        if (in_array($user->role, ['driver', 'courier'], true) && ($appType === null || $appType === 'driver')) {
+            $courier = $user->courier;
             if (! $user->is_active || ($courier && ! $courier->is_active)) {
                 $isPendingAgency = $courier && $courier->activated_at === null;
 
@@ -457,8 +568,8 @@ class AuthController extends Controller
                         : 'Votre compte livreur est actuellement désactivé. Contactez l\'agence GoLivreur.',
                 ], 403);
             }
-        } elseif ($user->role === 'merchant') {
-            $merchant = Merchant::where('user_id', $user->id)->first();
+        } elseif ($user->role === 'merchant' && ($appType === null || $appType === 'business')) {
+            $merchant = $user->merchant;
             if (! $user->is_active || ($merchant && ! $merchant->is_active)) {
                 $isPendingAgency = $merchant && $merchant->activated_at === null;
 
@@ -476,16 +587,17 @@ class AuthController extends Controller
             ], 403);
         }
 
-        if (in_array($user->role, ['merchant', 'driver', 'courier'])) {
+        if (in_array($user->role, ['merchant', 'driver', 'courier'], true) || in_array($appType, ['business', 'driver'], true)) {
             $this->revoquerSessionPrecedente($user);
         }
 
         $token = JWTAuth::fromUser($user);
-        if (in_array($user->role, ['merchant', 'driver', 'courier'])) {
+        if (in_array($user->role, ['merchant', 'driver', 'courier'], true) || in_array($appType, ['business', 'driver'], true)) {
             $jti = (string) JWTAuth::setToken($token)->getPayload()->get('jti');
             $user->update(['session_token' => $jti]);
         }
-        $user->load('city');
+
+        $mustChangePassword = $user->mustChangePassword();
 
         return response()->json([
             'succes' => true,
@@ -494,7 +606,8 @@ class AuthController extends Controller
                 'access_token' => $token,
                 'refresh_token' => $this->genererRefreshToken($user),
                 'token_type' => 'bearer',
-                'expires_in' => config('jwt.ttl') * 60,
+                'expires_in' => (int) config('jwt.ttl', 20) * 60,
+                'must_change_password' => $mustChangePassword,
                 'user' => $this->formatUserPayload($user),
             ],
         ]);
@@ -606,9 +719,39 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Cas 1 : Refresh token opaque stocké en cache (émis au login/register)
-        $userId = Cache::get("refresh_token:{$rawToken}");
-        if ($userId) {
+        // Cas 1 : Refresh token opaque stocké en cache (émis au login/register/SSO) avec rotation & détection de réutilisation
+        $cached = Cache::get("refresh_token:{$rawToken}");
+        if ($cached !== null) {
+            $userId = is_array($cached) ? (int) ($cached['user_id'] ?? 0) : (int) $cached;
+            $familyId = is_array($cached) ? ($cached['family_id'] ?? null) : null;
+            $alreadyUsed = is_array($cached) && ! empty($cached['used']);
+
+            if ($alreadyUsed) {
+                // Réutilisation suspecte d'un refresh token déjà tourné : révoquer toute la famille !
+                if (is_string($familyId) && $familyId !== '') {
+                    $activeFamilyToken = Cache::pull("refresh_family_active:{$familyId}");
+                    if (is_string($activeFamilyToken) && $activeFamilyToken !== '') {
+                        Cache::forget("refresh_token:{$activeFamilyToken}");
+                    }
+                }
+                if ($userId > 0) {
+                    User::whereKey($userId)->update(['session_token' => null]);
+                    $this->activityLogService->log(
+                        userId: $userId,
+                        action: 'refresh_token_reuse_detected',
+                        entityType: 'user',
+                        entityId: $userId,
+                        properties: ['family_revoked' => $familyId !== null],
+                        severity: 'critical',
+                    );
+                }
+
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Session révoquée par sécurité (jeton déjà utilisé). Veuillez vous reconnecter.',
+                ], 401);
+            }
+
             $user = User::find($userId);
             if (! $user || ! $user->is_active) {
                 return response()->json([
@@ -617,13 +760,22 @@ class AuthController extends Controller
                 ], 403);
             }
 
-            // Rotation du refresh token : invalide l'ancien et en génère un nouveau
-            Cache::forget("refresh_token:{$rawToken}");
-            $newRefreshToken = $this->genererRefreshToken($user);
+            // Rotation stricte : marque l'ancien token comme consommé (tombstone pour détecter le replay)
+            $ttlMinutes = max(60, (int) config('jwt.refresh_ttl', 10080));
+            if (is_string($familyId) && $familyId !== '') {
+                Cache::put(
+                    "refresh_token:{$rawToken}",
+                    ['user_id' => $user->id, 'family_id' => $familyId, 'used' => true],
+                    now()->addMinutes($ttlMinutes),
+                );
+            } else {
+                Cache::forget("refresh_token:{$rawToken}");
+            }
+
+            $newRefreshToken = self::issueRotatingRefreshToken($user, is_string($familyId) ? $familyId : null);
             $newAccessToken = JWTAuth::fromUser($user);
 
-            // Pour merchant/driver, mettre à jour le session_token
-            if (in_array($user->role, ['merchant', 'driver', 'courier'])) {
+            if (in_array($user->role, ['merchant', 'driver', 'courier'], true)) {
                 $jti = (string) JWTAuth::setToken($newAccessToken)->getPayload()->get('jti');
                 $user->update(['session_token' => $jti]);
             }
@@ -634,7 +786,7 @@ class AuthController extends Controller
                     'access_token' => $newAccessToken,
                     'refresh_token' => $newRefreshToken,
                     'token_type' => 'bearer',
-                    'expires_in' => config('jwt.ttl') * 60,
+                    'expires_in' => (int) config('jwt.ttl', 20) * 60,
                 ],
             ]);
         }
@@ -706,6 +858,7 @@ class AuthController extends Controller
             'phone' => $user->phone,
             'email' => $user->email,
             'role' => $user->role,
+            'roles' => $user->effectiveRoles(),
             'city_id' => $user->city_id,
             'city_name' => $user->city?->name,
             'default_address' => $user->default_address,
@@ -713,6 +866,8 @@ class AuthController extends Controller
             'notifications_enabled' => (bool) ($user->notifications_enabled ?? true),
             'photo_url' => $user->photo_url,
             'is_active' => (bool) ($user->is_active ?? true),
+            'must_change_password' => $user->mustChangePassword(),
+            'pin_reset_required_at' => $user->pinResetRequiredAt(),
         ];
     }
 
@@ -723,12 +878,49 @@ class AuthController extends Controller
 
     private function genererRefreshToken(User $user): string
     {
-        // Refresh token opaque stocké en cache Redis (7 jours selon CDC 11.4)
+        return self::issueRotatingRefreshToken($user);
+    }
+
+    /**
+     * Génère un refresh token opaque rattaché à une famille de rotation (détection de rejeu).
+     */
+    public static function issueRotatingRefreshToken(User $user, ?string $familyId = null): string
+    {
+        $ttlMinutes = max(60, (int) config('jwt.refresh_ttl', 10080));
+        $expiresAt = now()->addMinutes($ttlMinutes);
+        $family = $familyId ?: Str::uuid()->toString();
         $token = Str::random(64);
-        Cache::put("refresh_token_user:{$user->id}", $token, now()->addDays(7));
-        Cache::put("refresh_token:{$token}", $user->id, now()->addDays(7));
+
+        Cache::put("refresh_token_user:{$user->id}", ['token' => $token, 'family_id' => $family], $expiresAt);
+        Cache::put("refresh_family_active:{$family}", $token, $expiresAt);
+        Cache::put(
+            "refresh_token:{$token}",
+            ['user_id' => $user->id, 'family_id' => $family, 'used' => false],
+            $expiresAt,
+        );
 
         return $token;
+    }
+
+    /**
+     * Révoque immédiatement le refresh token actif d'un utilisateur.
+     */
+    public static function revokeUserRefreshTokens(int $userId): void
+    {
+        $meta = Cache::pull("refresh_token_user:{$userId}");
+        if (is_string($meta) && $meta !== '') {
+            Cache::forget("refresh_token:{$meta}");
+        } elseif (is_array($meta)) {
+            if (! empty($meta['token']) && is_string($meta['token'])) {
+                Cache::forget("refresh_token:{$meta['token']}");
+            }
+            if (! empty($meta['family_id']) && is_string($meta['family_id'])) {
+                $active = Cache::pull("refresh_family_active:{$meta['family_id']}");
+                if (is_string($active) && $active !== '') {
+                    Cache::forget("refresh_token:{$active}");
+                }
+            }
+        }
     }
 
     private function revoquerSessionPrecedente(User $user): void

@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Api\V1\Merchant;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
+use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Modules\GoShop\Services\OrderService;
+use App\Services\SettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -266,6 +269,144 @@ class MerchantController extends Controller
                     'commandes_mois' => (clone $monthQuery)->count(),
                 ],
                 'versements_recents' => $versements,
+            ],
+        ]);
+    }
+
+    /**
+     * Retourne le livreur prioritaire configuré pour ce commerce + la liste des livreurs éligibles de la ville.
+     * Exclut strictement le profil livreur appartenant au même utilisateur (anti-auto-assignation).
+     */
+    public function priorityCourier(SettingsService $settingsService): JsonResponse
+    {
+        $merchant = $this->getMerchant();
+        $config = $settingsService->get("merchant_priority_courier:{$merchant->id}", null, null);
+        $priorityCourierId = is_array($config) && isset($config['courier_id']) ? (int) $config['courier_id'] : null;
+
+        $priorityCourier = $priorityCourierId
+            ? Courier::with('user:id,name,phone')
+                ->whereKey($priorityCourierId)
+                ->where('is_active', true)
+                ->where('city_id', $merchant->city_id)
+                ->where('user_id', '!=', $merchant->user_id)
+                ->first()
+            : null;
+
+        $eligibleCouriers = Courier::with('user:id,name,phone')
+            ->where('is_active', true)
+            ->where('city_id', $merchant->city_id)
+            ->where('user_id', '!=', $merchant->user_id)
+            ->orderByDesc('is_online')
+            ->orderByDesc('average_rating')
+            ->limit(50)
+            ->get()
+            ->map(fn (Courier $c): array => [
+                'id' => $c->id,
+                'name' => $c->user->name ?? "Livreur #{$c->id}",
+                'phone' => $c->user->phone ?? '',
+                'vehicle_type' => $c->vehicle_type,
+                'vehicle_plate' => $c->vehicle_plate,
+                'is_online' => (bool) $c->is_online,
+                'average_rating' => (float) ($c->average_rating ?? 0),
+            ])
+            ->values();
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'priority_courier_id' => $priorityCourier?->id,
+                'priority_courier' => $priorityCourier ? [
+                    'id' => $priorityCourier->id,
+                    'name' => $priorityCourier->user->name ?? "Livreur #{$priorityCourier->id}",
+                    'phone' => $priorityCourier->user->phone ?? '',
+                    'vehicle_type' => $priorityCourier->vehicle_type,
+                    'vehicle_plate' => $priorityCourier->vehicle_plate,
+                    'is_online' => (bool) $priorityCourier->is_online,
+                    'average_rating' => (float) ($priorityCourier->average_rating ?? 0),
+                ] : null,
+                'available_couriers' => $eligibleCouriers,
+            ],
+        ]);
+    }
+
+    /**
+     * Assigne (ou retire) un livreur prioritaire pour les commandes du commerce.
+     * Bloque strictement toute auto-assignation (commerçant-livreur sur sa propre boutique).
+     */
+    public function updatePriorityCourier(Request $request, SettingsService $settingsService): JsonResponse
+    {
+        $merchant = $this->getMerchant();
+        $validated = $request->validate([
+            'courier_id' => ['nullable', 'integer', 'exists:couriers,id'],
+        ]);
+
+        $courierId = $validated['courier_id'] ?? null;
+        if ($courierId === null) {
+            $settingsService->set(
+                "merchant_priority_courier:{$merchant->id}",
+                null,
+                null,
+                (int) auth()->id(),
+            );
+
+            return response()->json([
+                'succes' => true,
+                'message' => 'Livreur prioritaire retiré. Attribution automatique standard rétablie.',
+                'donnees' => ['priority_courier_id' => null],
+            ]);
+        }
+
+        /** @var Courier $courier */
+        $courier = Courier::with('user:id,name,phone')->findOrFail((int) $courierId);
+
+        if ((int) $courier->user_id === (int) $merchant->user_id) {
+            ActivityLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'merchant_self_courier_assignment_blocked',
+                'entity_type' => 'merchant',
+                'entity_id' => $merchant->id,
+                'properties' => ['courier_id' => $courier->id],
+                'ip_address' => $request->ip(),
+                'severity' => 'warning',
+            ]);
+
+            return response()->json([
+                'succes' => false,
+                'code' => 'SELF_ASSIGNMENT_FORBIDDEN',
+                'message' => 'Conflit d\'intérêts : un commerçant-livreur ne peut pas s\'auto-assigner ses propres livraisons.',
+            ], 403);
+        }
+
+        if (! $courier->is_active || (int) $courier->city_id !== (int) $merchant->city_id) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Ce livreur n\'est pas actif dans votre ville.',
+            ], 422);
+        }
+
+        $settingsService->set(
+            "merchant_priority_courier:{$merchant->id}",
+            [
+                'courier_id' => $courier->id,
+                'assigned_at' => now()->toIso8601String(),
+                'assigned_by' => auth()->id(),
+            ],
+            null,
+            (int) auth()->id(),
+        );
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Livreur prioritaire assigné à votre commerce.',
+            'donnees' => [
+                'priority_courier_id' => $courier->id,
+                'priority_courier' => [
+                    'id' => $courier->id,
+                    'name' => $courier->user->name ?? "Livreur #{$courier->id}",
+                    'phone' => $courier->user->phone ?? '',
+                    'vehicle_plate' => $courier->vehicle_plate,
+                    'is_online' => (bool) $courier->is_online,
+                ],
             ],
         ]);
     }

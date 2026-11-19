@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\Admin\AdminController;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
+use App\Http\Controllers\Api\V1\Auth\SsoController;
 use App\Http\Controllers\Api\V1\Client\ClientController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\Driver\DriverController;
@@ -71,6 +72,7 @@ Route::middleware('throttle:20,1')->group(function () {
     // Catalogue GoShop Public
     Route::prefix('client')->group(function () {
         Route::get('city-status', [ClientController::class, 'cityStatus']);
+        Route::get('banners', [ClientController::class, 'banners']);
         Route::get('payment-methods', [ClientController::class, 'paymentMethods']);
         Route::get('categories', [ClientController::class, 'categories']);
         Route::get('merchants', [ClientController::class, 'merchants']);
@@ -106,6 +108,9 @@ Route::prefix('auth')->middleware('throttle:60,1')->group(function () {
     Route::post('verify-login', [AuthController::class, 'verifierOtpConnexion']);
     Route::post('refresh', [AuthController::class, 'refresh']);
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:api');
+    Route::post('sso/authorize', [SsoController::class, 'authorizeSwitch'])
+        ->middleware(['auth:api', 'active_account']);
+    Route::post('sso/exchange', [SsoController::class, 'exchangeCode']);
 });
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
@@ -179,6 +184,8 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
             Route::put('products/{product}', [MerchantController::class, 'updateProduct']);
             Route::delete('products/{product}', [MerchantController::class, 'deleteProduct']);
             Route::get('wallet', [MerchantController::class, 'wallet']);
+            Route::get('priority-courier', [MerchantController::class, 'priorityCourier']);
+            Route::put('priority-courier', [MerchantController::class, 'updatePriorityCourier']);
         });
     });
 

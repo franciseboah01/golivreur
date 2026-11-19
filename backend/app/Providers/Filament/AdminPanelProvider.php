@@ -9,6 +9,8 @@ use App\Filament\Widgets\PaymentMethodsChart;
 use App\Filament\Widgets\StatsOverview;
 use App\Filament\Widgets\WeeklyOrdersChart;
 use App\Filament\Widgets\WeeklyRevenueChart;
+use App\Http\Middleware\AdminIpWhitelistMiddleware;
+use App\Http\Middleware\EnsureAdminTwoFactorVerified;
 use App\Services\SettingsService;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -32,7 +34,7 @@ class AdminPanelProvider extends PanelProvider
         return $panel
             ->default()
             ->id('admin')
-            ->path('admin')
+            ->path(config('admin.path', 'admin'))
             ->login()
             ->brandLogo(fn () => view('filament.admin.logo'))
             ->brandLogoHeight('auto')
@@ -72,6 +74,7 @@ class AdminPanelProvider extends PanelProvider
                 BlockedCodesAlertWidget::class,
             ])
             ->middleware([
+                AdminIpWhitelistMiddleware::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
@@ -84,6 +87,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                EnsureAdminTwoFactorVerified::class,
             ]);
     }
 }

@@ -17,8 +17,8 @@ return [
         'passphrase' => env('JWT_PASSPHRASE'),
     ],
 
-    // Duree de vie de l'access token, en minutes.
-    'ttl' => env('JWT_TTL', 60),
+    // Duree de vie de l'access token, en minutes (15-30 min, défaut 20 min).
+    'ttl' => (int) env('JWT_TTL', 20),
 
     // Duree de vie du refresh token, en minutes (7 jours = 10080 min selon CDC 11.4).
     'refresh_ttl' => (int) env('JWT_REFRESH_TTL', 10080),
