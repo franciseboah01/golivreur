@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/services/gps_location_service.dart';
+import 'package:golivreur_core/widgets/osm_live_tracking_map.dart';
 import '../../auth/screens/driver_login_screen.dart';
 import '../../driver/providers/driver_provider.dart';
 
@@ -31,6 +33,50 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
     _countdownTimer?.cancel();
     _codeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleToggleOnline({bool loadJobsOnSuccess = false}) async {
+    final (ok, msg) =
+        await ref.read(driverProfileProvider.notifier).toggleOnline();
+    if (!mounted) return;
+    final updatedProfile = ref.read(driverProfileProvider);
+
+    if (!ok) {
+      if (updatedProfile.cityReidentificationRequired) {
+        await showDialog<void>(
+          context: context,
+          builder: (dlgCtx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.verified_user_outlined, color: GoLivreurTheme.erreur),
+                SizedBox(width: 8),
+                Expanded(child: Text('Réidentification requise')),
+              ],
+            ),
+            content: Text(
+              msg ??
+                  updatedProfile.cityReidentificationMessage ??
+                  'Changement de ville détecté. Vous devez vous faire réidentifier par un administrateur GoLivreur avant de prendre service.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dlgCtx),
+                child: const Text('Compris'),
+              ),
+            ],
+          ),
+        );
+      } else if (msg != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg)),
+        );
+      }
+      return;
+    }
+
+    if (loadJobsOnSuccess) {
+      await ref.read(driverActiveJobProvider.notifier).chargerCourses();
+    }
   }
 
   @override
@@ -83,14 +129,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: InkWell(
-              onTap: () async {
-                final (ok, msg) = await ref.read(driverProfileProvider.notifier).toggleOnline();
-                if (!ok && msg != null && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(msg)),
-                  );
-                }
-              },
+              onTap: () => _handleToggleOnline(loadJobsOnSuccess: true),
               borderRadius: BorderRadius.circular(20),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -141,6 +180,83 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
     final citySuffix = (profile.cityName != null && profile.cityName!.isNotEmpty)
         ? ' à ${profile.cityName}'
         : '';
+
+    if (profile.cityReidentificationRequired) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: GoLivreurTheme.erreur.withValues(alpha: 0.45),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: GoLivreurTheme.erreur.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.badge_outlined,
+                    size: 48,
+                    color: GoLivreurTheme.erreur,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Réidentification Admin obligatoire',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: GoLivreurTheme.erreur,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  profile.cityReidentificationMessage ??
+                      'Un changement de ville a été détecté par GPS. Présentez-vous à l\'agence GoLivreur pour vous faire réidentifier par un administrateur avant de prendre service.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    height: 1.4,
+                    color: GoLivreurTheme.textePrincipal,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: GoLivreurTheme.secondaire,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () async {
+                      await ref.read(driverProfileProvider.notifier).chargerProfil();
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text(
+                      'Vérifier ma réidentification',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -165,16 +281,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                 backgroundColor: GoLivreurTheme.secondaire,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
-              onPressed: () async {
-                final (ok, msg) = await ref.read(driverProfileProvider.notifier).toggleOnline();
-                if (!ok && msg != null && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(msg)),
-                  );
-                } else if (ok) {
-                  await ref.read(driverActiveJobProvider.notifier).chargerCourses();
-                }
-              },
+              onPressed: () => _handleToggleOnline(loadJobsOnSuccess: true),
               child: const Text('Passer en ligne', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
             ),
           ],
@@ -222,14 +329,46 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
             style: TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 13),
           ),
           const SizedBox(height: 24),
-          Center(
-            child: OutlinedButton.icon(
-              onPressed: () {
-                ref.read(driverActiveJobProvider.notifier).chargerCourses();
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Actualiser les courses'),
-            ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () {
+                  ref.read(driverActiveJobProvider.notifier).chargerCourses();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Actualiser les courses'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final (ok, msg) = await ref
+                      .read(driverProfileProvider.notifier)
+                      .envoyerPositionGps(silent: false);
+                  if (!context.mounted) return;
+                  if (ok) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('📍 Position GPS synchronisée avec le serveur.'),
+                        backgroundColor: GoLivreurTheme.succes,
+                      ),
+                    );
+                  } else if (msg != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(msg),
+                        backgroundColor: GoLivreurTheme.erreur,
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.my_location, color: GoLivreurTheme.secondaire),
+                label: Text(
+                  profile.currentLat != null ? 'GPS actif ✓' : 'Actualiser GPS',
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -250,6 +389,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
           context,
           ref,
           job,
+          profile,
           title: 'Aller au commerce / expéditeur',
           destination: job.pickupAddress,
           buttonLabel: 'Je suis arrivé sur place',
@@ -258,7 +398,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
       case DriverJobStep.atMerchant:
         return _buildAtMerchantStep(context, ref, job);
       case DriverJobStep.inTransit:
-        return _buildDeliveryStep(context, ref, job);
+        return _buildDeliveryStep(context, ref, job, profile);
       case DriverJobStep.securityLocked:
         return _buildSecurityLockedView(context, profile);
       case DriverJobStep.completed:
@@ -405,32 +545,30 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
   Widget _buildNavigationStep(
     BuildContext context,
     WidgetRef ref,
-    DriverJob job, {
+    DriverJob job,
+    DriverProfileState profile, {
     required String title,
     required String destination,
     required String buttonLabel,
     required VoidCallback onAction,
   }) {
+    final targetLat = job.pickupLat;
+    final targetLng = job.pickupLng;
+
     return Column(
       children: [
-        // Carte de simulation GPS
+        // Carte OpenStreetMap temps réel (100 % gratuite)
         Expanded(
-          child: Container(
-            color: Colors.grey.shade200,
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.navigation, size: 54, color: GoLivreurTheme.secondaire),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Text(destination, style: const TextStyle(color: GoLivreurTheme.texteSecondaire)),
-              ],
-            ),
+          child: OsmLiveTrackingMap(
+            courierLat: profile.currentLat,
+            courierLng: profile.currentLng,
+            pickupLat: job.pickupLat,
+            pickupLng: job.pickupLng,
+            destinationLat: job.pickupLat,
+            destinationLng: job.pickupLng,
+            fallbackLat: profile.cityCenterLat ?? 6.8770,
+            fallbackLng: profile.cityCenterLng ?? -6.4502,
+            destinationLabel: 'Ramassage',
           ),
         ),
         // Panneau d'action bas
@@ -438,8 +576,61 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
           padding: const EdgeInsets.all(16),
           color: Colors.white,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: GoLivreurTheme.textePrincipal,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          destination,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: GoLivreurTheme.texteSecondaire,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (targetLat != null && targetLng != null) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: GoLivreurTheme.secondaire,
+                        side: const BorderSide(color: GoLivreurTheme.secondaire),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      ),
+                      onPressed: () {
+                        GpsLocationService.ouvrirNavigationExterne(
+                          targetLat,
+                          targetLng,
+                          label: destination,
+                        );
+                      },
+                      icon: const Icon(Icons.directions, size: 18),
+                      label: const Text(
+                        'Itinéraire',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -589,7 +780,15 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
     }
   }
 
-  Widget _buildDeliveryStep(BuildContext context, WidgetRef ref, DriverJob job) {
+  Widget _buildDeliveryStep(
+    BuildContext context,
+    WidgetRef ref,
+    DriverJob job,
+    DriverProfileState profile,
+  ) {
+    final destLat = job.deliveryLat;
+    final destLng = job.deliveryLng;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -601,7 +800,52 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
           ),
           const SizedBox(height: 6),
           Text('Destination : ${job.deliveryAddress}', style: const TextStyle(color: GoLivreurTheme.texteSecondaire)),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              height: 200,
+              width: double.infinity,
+              child: OsmLiveTrackingMap(
+                courierLat: profile.currentLat,
+                courierLng: profile.currentLng,
+                pickupLat: job.pickupLat,
+                pickupLng: job.pickupLng,
+                destinationLat: destLat,
+                destinationLng: destLng,
+                fallbackLat: profile.cityCenterLat ?? 6.8770,
+                fallbackLng: profile.cityCenterLng ?? -6.4502,
+                destinationLabel: 'Client',
+              ),
+            ),
+          ),
+          if (destLat != null && destLng != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: GoLivreurTheme.secondaire,
+                  side: const BorderSide(color: GoLivreurTheme.secondaire),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  GpsLocationService.ouvrirNavigationExterne(
+                    destLat,
+                    destLng,
+                    label: job.deliveryAddress,
+                  );
+                },
+                icon: const Icon(Icons.directions),
+                label: const Text(
+                  'Ouvrir l\'itinéraire GPS vers le client',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(

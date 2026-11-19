@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/env_config.dart';
 import 'package:golivreur_core/services/api_client.dart';
+import 'package:golivreur_core/services/gps_location_service.dart';
 import 'package:image_picker/image_picker.dart';
 
 void _safeIgnore(Future<dynamic>? f) {
@@ -97,6 +99,13 @@ class DriverProfileState {
   final String? idCardNumber;
   final String? driverLicenseNumber;
   final String? cityName;
+  final double? cityCenterLat;
+  final double? cityCenterLng;
+  final double? currentLat;
+  final double? currentLng;
+  final bool cityReidentificationRequired;
+  final String? cityReidentificationMessage;
+  final String? detectedCityName;
   final String language;
   final bool notificationsEnabled;
   final bool isOnline;
@@ -125,6 +134,13 @@ class DriverProfileState {
     this.idCardNumber,
     this.driverLicenseNumber,
     this.cityName,
+    this.cityCenterLat,
+    this.cityCenterLng,
+    this.currentLat,
+    this.currentLng,
+    this.cityReidentificationRequired = false,
+    this.cityReidentificationMessage,
+    this.detectedCityName,
     this.language = 'fr',
     this.notificationsEnabled = true,
     this.isOnline = false,
@@ -154,6 +170,14 @@ class DriverProfileState {
     String? idCardNumber,
     String? driverLicenseNumber,
     String? cityName,
+    double? cityCenterLat,
+    double? cityCenterLng,
+    double? currentLat,
+    double? currentLng,
+    bool? cityReidentificationRequired,
+    String? cityReidentificationMessage,
+    bool clearReidentification = false,
+    String? detectedCityName,
     String? language,
     bool? notificationsEnabled,
     bool? isOnline,
@@ -182,6 +206,19 @@ class DriverProfileState {
       idCardNumber: idCardNumber ?? this.idCardNumber,
       driverLicenseNumber: driverLicenseNumber ?? this.driverLicenseNumber,
       cityName: cityName ?? this.cityName,
+      cityCenterLat: cityCenterLat ?? this.cityCenterLat,
+      cityCenterLng: cityCenterLng ?? this.cityCenterLng,
+      currentLat: currentLat ?? this.currentLat,
+      currentLng: currentLng ?? this.currentLng,
+      cityReidentificationRequired: clearReidentification
+          ? false
+          : (cityReidentificationRequired ?? this.cityReidentificationRequired),
+      cityReidentificationMessage: clearReidentification
+          ? null
+          : (cityReidentificationMessage ?? this.cityReidentificationMessage),
+      detectedCityName: clearReidentification
+          ? null
+          : (detectedCityName ?? this.detectedCityName),
       language: language ?? this.language,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       isOnline: isOnline ?? this.isOnline,
@@ -203,14 +240,94 @@ class DriverProfileState {
 
 class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
   final ApiClient? _api;
+  Timer? _gpsTimer;
 
   DriverProfileNotifier([this._api]) : super(const DriverProfileState());
 
   void reinitialiser() {
+    stopGpsTracking();
     state = const DriverProfileState();
   }
 
+  @override
+  void dispose() {
+    stopGpsTracking();
+    super.dispose();
+  }
+
+  void startGpsTracking() {
+    _gpsTimer?.cancel();
+    if (_api == null) return;
+    _gpsTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (state.isOnline) {
+        envoyerPositionGps(silent: true);
+      } else {
+        stopGpsTracking();
+      }
+    });
+  }
+
+  void stopGpsTracking() {
+    _gpsTimer?.cancel();
+    _gpsTimer = null;
+  }
+
+  Future<(bool, String?)> envoyerPositionGps({bool silent = true}) async {
+    if (_api == null) return (false, null);
+
+    final gps = silent
+        ? await GpsLocationService.obtenirPositionSilencieuse()
+        : await GpsLocationService.obtenirPositionActuelle(
+            withAddressLookup: false,
+          );
+    if (gps == null || !gps.isSuccess || gps.lat == null || gps.lng == null) {
+      return (false, silent ? null : gps?.errorMessage);
+    }
+
+    state = state.copyWith(currentLat: gps.lat, currentLng: gps.lng);
+
+    try {
+      final res = await _api.post('/driver/location', data: {
+        'lat': gps.lat,
+        'lng': gps.lng,
+      });
+      if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
+        return (true, null);
+      }
+      return (false, null);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 403 &&
+          e.response?.data is Map &&
+          e.response?.data['code'] == 'CITY_REIDENTIFICATION_REQUIRED') {
+        stopGpsTracking();
+        final data = Map<String, dynamic>.from(e.response!.data as Map);
+        final msg = data['message']?.toString() ??
+            'Changement de ville détecté. Vous devez vous faire réidentifier par un administrateur GoLivreur avant de prendre service.';
+        final donnees = data['donnees'] is Map
+            ? Map<String, dynamic>.from(data['donnees'] as Map)
+            : const <String, dynamic>{};
+        state = state.copyWith(
+          isOnline: false,
+          cityReidentificationRequired: true,
+          cityReidentificationMessage: msg,
+          detectedCityName: donnees['detected_city_name']?.toString(),
+        );
+        return (false, msg);
+      }
+      return (false, silent ? null : ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, null);
+    }
+  }
+
   void _appliquerDonneesProfil(Map<String, dynamic> d) {
+    final reidRequired = d['city_reidentification_required'] == true;
+    final reidInfo = d['city_reidentification_info'] is Map
+        ? Map<String, dynamic>.from(d['city_reidentification_info'] as Map)
+        : null;
+    final detectedCity = reidInfo?['detected_city_name']?.toString();
+    final isOnline = reidRequired ? false : (d['is_online'] as bool? ?? state.isOnline);
+
     state = state.copyWith(
       id: d['id'] as int? ?? state.id,
       name: d['name'] as String? ?? state.name,
@@ -224,10 +341,20 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
       idCardNumber: d['id_card_number'] as String?,
       driverLicenseNumber: d['driver_license_number'] as String?,
       cityName: d['city_name'] as String? ?? state.cityName,
+      cityCenterLat:
+          (d['city_center_lat'] as num?)?.toDouble() ?? state.cityCenterLat,
+      cityCenterLng:
+          (d['city_center_lng'] as num?)?.toDouble() ?? state.cityCenterLng,
+      clearReidentification: !reidRequired,
+      cityReidentificationRequired: reidRequired,
+      detectedCityName: detectedCity,
+      cityReidentificationMessage: reidRequired
+          ? 'Changement de ville détecté${(detectedCity ?? '').isNotEmpty ? ' ($detectedCity)' : ''}. Faites-vous réidentifier par un administrateur GoLivreur avant de prendre service.'
+          : null,
       language: d['language'] as String? ?? state.language,
       notificationsEnabled:
           d['notifications_enabled'] as bool? ?? state.notificationsEnabled,
-      isOnline: d['is_online'] as bool? ?? state.isOnline,
+      isOnline: isOnline,
       averageRating:
           (d['average_rating'] as num?)?.toDouble() ?? state.averageRating,
       totalRatings: (d['total_ratings'] as num?)?.toInt() ?? state.totalRatings,
@@ -237,6 +364,12 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
       mustChangePassword: d['must_change_password'] == true,
       pinResetRequiredAt: d['pin_reset_required_at']?.toString(),
     );
+
+    if (isOnline) {
+      startGpsTracking();
+    } else {
+      stopGpsTracking();
+    }
   }
 
   Future<void> chargerProfil() async {
@@ -366,19 +499,62 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
       return (true, null);
     }
 
+    double? lat;
+    double? lng;
+    if (nextOnline) {
+      final gps = await GpsLocationService.obtenirPositionActuelle(
+        withAddressLookup: false,
+      );
+      if (gps.isSuccess && gps.lat != null && gps.lng != null) {
+        lat = gps.lat;
+        lng = gps.lng;
+      }
+    }
+
     try {
-      final res =
-          await _api.post('/driver/availability', data: {'is_online': nextOnline});
+      final res = await _api.post('/driver/availability', data: {
+        'is_online': nextOnline,
+        if (lat != null && lng != null) 'lat': lat,
+        if (lat != null && lng != null) 'lng': lng,
+      });
       if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
         final serverOnline =
             res.data['donnees'] is Map && res.data['donnees']['is_online'] is bool
                 ? res.data['donnees']['is_online'] as bool
                 : nextOnline;
-        state = state.copyWith(isOnline: serverOnline);
+        state = state.copyWith(
+          isOnline: serverOnline,
+          currentLat: lat ?? state.currentLat,
+          currentLng: lng ?? state.currentLng,
+          clearReidentification: serverOnline,
+        );
+        if (serverOnline) {
+          startGpsTracking();
+        } else {
+          stopGpsTracking();
+        }
         return (true, res.data['message'] as String?);
       }
       return (false, 'Impossible de modifier votre disponibilité.');
     } on DioException catch (e) {
+      if (e.response?.statusCode == 403 &&
+          e.response?.data is Map &&
+          e.response?.data['code'] == 'CITY_REIDENTIFICATION_REQUIRED') {
+        stopGpsTracking();
+        final data = Map<String, dynamic>.from(e.response!.data as Map);
+        final msg = data['message']?.toString() ??
+            'Changement de ville détecté. Vous devez vous faire réidentifier par un administrateur GoLivreur avant de prendre service.';
+        final donnees = data['donnees'] is Map
+            ? Map<String, dynamic>.from(data['donnees'] as Map)
+            : const <String, dynamic>{};
+        state = state.copyWith(
+          isOnline: false,
+          cityReidentificationRequired: true,
+          cityReidentificationMessage: msg,
+          detectedCityName: donnees['detected_city_name']?.toString(),
+        );
+        return (false, msg);
+      }
       return (false, ApiClient.messageErreur(e));
     } catch (_) {
       return (false, 'Erreur réseau lors du changement de statut.');
@@ -410,6 +586,10 @@ class DriverJob {
   final String title;
   final String pickupAddress;
   final String deliveryAddress;
+  final double? pickupLat;
+  final double? pickupLng;
+  final double? deliveryLat;
+  final double? deliveryLng;
   final double distanceKm;
   final double payout;
   final String? parcelSize; // Pour GoColis (Petit, Moyen, Grand)
@@ -422,6 +602,10 @@ class DriverJob {
     required this.title,
     required this.pickupAddress,
     required this.deliveryAddress,
+    this.pickupLat,
+    this.pickupLng,
+    this.deliveryLat,
+    this.deliveryLng,
     required this.distanceKm,
     required this.payout,
     this.parcelSize,
@@ -439,6 +623,10 @@ class DriverJob {
       title: title,
       pickupAddress: pickupAddress,
       deliveryAddress: deliveryAddress,
+      pickupLat: pickupLat,
+      pickupLng: pickupLng,
+      deliveryLat: deliveryLat,
+      deliveryLng: deliveryLng,
       distanceKm: distanceKm,
       payout: payout,
       parcelSize: parcelSize,
@@ -495,6 +683,14 @@ class DriverActiveJobNotifier extends StateNotifier<DriverJob?> {
             title: (merchant['name'] ?? 'Commande #${o['id']}').toString(),
             pickupAddress: (merchant['address'] ?? 'Adresse commerce').toString(),
             deliveryAddress: (o['delivery_address'] ?? 'Adresse client').toString(),
+            pickupLat: num.tryParse('${o['pickup_lat'] ?? merchant['lat'] ?? ''}')
+                ?.toDouble(),
+            pickupLng: num.tryParse('${o['pickup_lng'] ?? merchant['lng'] ?? ''}')
+                ?.toDouble(),
+            deliveryLat:
+                num.tryParse('${o['delivery_lat'] ?? ''}')?.toDouble(),
+            deliveryLng:
+                num.tryParse('${o['delivery_lng'] ?? ''}')?.toDouble(),
             distanceKm: (o['distance_km'] as num?)?.toDouble() ?? 0,
             payout:
                 num.tryParse('${o['courier_amount'] ?? 0}')?.toDouble() ?? 0,
@@ -521,6 +717,12 @@ class DriverActiveJobNotifier extends StateNotifier<DriverJob?> {
             pickupAddress: (p['pickup_address'] ?? 'Adresse expéditeur').toString(),
             deliveryAddress:
                 (p['delivery_address'] ?? 'Adresse destinataire').toString(),
+            pickupLat: num.tryParse('${p['pickup_lat'] ?? ''}')?.toDouble(),
+            pickupLng: num.tryParse('${p['pickup_lng'] ?? ''}')?.toDouble(),
+            deliveryLat:
+                num.tryParse('${p['delivery_lat'] ?? ''}')?.toDouble(),
+            deliveryLng:
+                num.tryParse('${p['delivery_lng'] ?? ''}')?.toDouble(),
             distanceKm: (p['distance_km'] as num?)?.toDouble() ?? 0,
             payout:
                 num.tryParse('${p['courier_amount'] ?? 0}')?.toDouble() ?? 0,
