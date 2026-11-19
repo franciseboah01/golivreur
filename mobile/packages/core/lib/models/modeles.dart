@@ -12,6 +12,7 @@ class UserModel {
   final String phone;
   final String? email;
   final String role;
+  final List<String> roles;
   final int? cityId;
   final String? cityName;
   final String? defaultAddress;
@@ -20,6 +21,8 @@ class UserModel {
   final String? avatarUrl;
   final String? photoUrl;
   final bool isActive;
+  final bool mustChangePassword;
+  final String? pinResetRequiredAt;
 
   const UserModel({
     required this.id,
@@ -27,6 +30,7 @@ class UserModel {
     required this.phone,
     this.email,
     required this.role,
+    this.roles = const [],
     this.cityId,
     this.cityName,
     this.defaultAddress,
@@ -35,12 +39,32 @@ class UserModel {
     this.avatarUrl,
     this.photoUrl,
     required this.isActive,
+    this.mustChangePassword = false,
+    this.pinResetRequiredAt,
   });
+
+  bool hasRole(String target) {
+    final normalized = target.toLowerCase().trim();
+    if (roles.isNotEmpty) {
+      if (normalized == 'driver' || normalized == 'courier') {
+        return roles.contains('driver') || roles.contains('courier');
+      }
+      return roles.contains(normalized);
+    }
+    if (normalized == 'driver' || normalized == 'courier') {
+      return role == 'driver' || role == 'courier';
+    }
+    return role == normalized;
+  }
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     final resolvedPhoto = GoLivreurEnv.resolveMediaUrl(
       (json['photo_url'] as String?) ?? (json['avatar_url'] as String?),
     );
+    final rawRoles = json['roles'];
+    final parsedRoles = rawRoles is List
+        ? rawRoles.map((e) => e.toString()).where((e) => e.isNotEmpty).toList()
+        : <String>[if (json['role'] != null) json['role'].toString()];
 
     return UserModel(
       id: json['id'] as int,
@@ -48,6 +72,7 @@ class UserModel {
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String?,
       role: json['role'] as String? ?? 'client',
+      roles: parsedRoles,
       cityId: json['city_id'] as int?,
       cityName: json['city_name'] as String?,
       defaultAddress: json['default_address'] as String?,
@@ -56,6 +81,8 @@ class UserModel {
       avatarUrl: resolvedPhoto,
       photoUrl: resolvedPhoto,
       isActive: json['is_active'] as bool? ?? true,
+      mustChangePassword: json['must_change_password'] == true,
+      pinResetRequiredAt: json['pin_reset_required_at'] as String?,
     );
   }
 
@@ -63,6 +90,7 @@ class UserModel {
     String? name,
     String? phone,
     String? email,
+    List<String>? roles,
     int? cityId,
     String? cityName,
     String? defaultAddress,
@@ -71,6 +99,8 @@ class UserModel {
     String? avatarUrl,
     String? photoUrl,
     bool? isActive,
+    bool? mustChangePassword,
+    String? pinResetRequiredAt,
   }) {
     return UserModel(
       id: id,
@@ -78,6 +108,7 @@ class UserModel {
       phone: phone ?? this.phone,
       email: email ?? this.email,
       role: role,
+      roles: roles ?? this.roles,
       cityId: cityId ?? this.cityId,
       cityName: cityName ?? this.cityName,
       defaultAddress: defaultAddress ?? this.defaultAddress,
@@ -86,6 +117,8 @@ class UserModel {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       photoUrl: photoUrl ?? this.photoUrl,
       isActive: isActive ?? this.isActive,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+      pinResetRequiredAt: pinResetRequiredAt ?? this.pinResetRequiredAt,
     );
   }
 

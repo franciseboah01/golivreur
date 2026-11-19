@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_theme.dart';
@@ -24,70 +25,105 @@ bool _isWidgetTestEnv() {
       bindingType.contains('AutomatedTestWidgetsFlutterBinding');
 }
 
-/// Badge visuel GoLivreur : affiche le logo configuré en base s'il existe,
-/// sinon l'emoji par défaut (🛵).
-/// Écoute automatiquement [appBrandingProvider] si aucun [logoUrl] explicite n'est fourni.
+/// Monogramme vectoriel propre "GL" utilisé uniquement si aucun logo image
+/// n'a encore été téléchargé — aucun emoji n'est jamais affiché en fallback.
+class _GlMonogramFallback extends StatelessWidget {
+  final double size;
+
+  const _GlMonogramFallback({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(size * 0.24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFB732), Color(0xFFF4A623)],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        'GL',
+        style: TextStyle(
+          color: const Color(0xFF1A1A2E),
+          fontSize: size * 0.42,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -1.0,
+          height: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+/// Badge visuel GoLivreur : affiche en priorité le logo en cache local (bytes),
+/// puis le logo réseau via [CachedNetworkImage] (cache disque hors-ligne),
+/// et le monogramme vectoriel "GL" si aucun logo n'existe (aucun emoji fallback).
 class GoLivreurBrandMark extends StatelessWidget {
   final String? logoUrl;
   final Uint8List? logoBytes;
   final String defaultEmoji;
   final double size;
+  final double? borderRadius;
 
   const GoLivreurBrandMark({
     super.key,
     this.logoUrl,
     this.logoBytes,
-    this.defaultEmoji = '🛵',
+    this.defaultEmoji = '',
     this.size = 48.0,
+    this.borderRadius,
   });
 
   Widget _buildMark(
     String? effectiveLogoUrl,
     Uint8List? effectiveBytes,
-    String effectiveEmoji,
   ) {
     final resolvedUrl = GoLivreurEnv.resolveMediaUrl(effectiveLogoUrl);
-    final emoji =
-        effectiveEmoji.trim().isNotEmpty ? effectiveEmoji.trim() : '🛵';
+    final radius = BorderRadius.circular(borderRadius ?? (size * 0.24));
 
     if (effectiveBytes != null && effectiveBytes.isNotEmpty) {
-      return Image.memory(
-        effectiveBytes,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        gaplessPlayback: true,
-        errorBuilder: (_, __, ___) => Center(
-          child: Text(
-            emoji,
-            style: TextStyle(fontSize: size * 0.54, height: 1.0),
-          ),
+      return ClipRRect(
+        borderRadius: radius,
+        child: Image.memory(
+          effectiveBytes,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => _GlMonogramFallback(size: size),
         ),
       );
     }
 
     if (resolvedUrl != null && resolvedUrl.isNotEmpty) {
-      return Image.network(
-        resolvedUrl,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        gaplessPlayback: true,
-        errorBuilder: (_, __, ___) => Center(
-          child: Text(
-            emoji,
-            style: TextStyle(fontSize: size * 0.54, height: 1.0),
-          ),
-        ),
+      return ClipRRect(
+        borderRadius: radius,
+        child: _isWidgetTestEnv()
+            ? Image.network(
+                resolvedUrl,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => _GlMonogramFallback(size: size),
+              )
+            : CachedNetworkImage(
+                imageUrl: resolvedUrl,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => _GlMonogramFallback(size: size),
+                errorWidget: (_, __, ___) => _GlMonogramFallback(size: size),
+              ),
       );
     }
 
-    return Center(
-      child: Text(
-        emoji,
-        style: TextStyle(fontSize: size * 0.54, height: 1.0),
-      ),
-    );
+    return _GlMonogramFallback(size: size);
   }
 
   @override
@@ -101,28 +137,15 @@ class GoLivreurBrandMark extends StatelessWidget {
                   ? logoUrl
                   : branding.logoUrl;
           final effectiveBytes = logoBytes ?? branding.logoBytes;
-          final hasCustom = (effectiveBytes != null && effectiveBytes.isNotEmpty) ||
-              (effectiveLogoUrl != null && effectiveLogoUrl.trim().isNotEmpty);
-          if (!hasCustom && !branding.isLoaded && !_isWidgetTestEnv()) {
-            return SizedBox(width: size, height: size);
-          }
-          final effectiveEmoji =
-              (defaultEmoji.trim().isNotEmpty && defaultEmoji.trim() != '🛵')
-                  ? defaultEmoji
-                  : branding.defaultEmoji;
-          return _buildMark(effectiveLogoUrl, effectiveBytes, effectiveEmoji);
+          return _buildMark(effectiveLogoUrl, effectiveBytes);
         },
       );
     }
-    return _buildMark(logoUrl, logoBytes, defaultEmoji);
+    return _buildMark(logoUrl, logoBytes);
   }
 }
 
-/// Logo officiel GoLivreur conforme aux spécifications :
-///  - Logo configuré par l'admin si présent, sinon badge dégradé ambre + emoji par défaut (🛵)
-///  - Texte "GoLivreur" centré
-///  - Déclinaison "Client", "Business" ou "Driver" en dessous centré
-/// Écoute automatiquement [appBrandingProvider] sur toutes les plateformes.
+/// Logo officiel GoLivreur avec coins arrondis, cache hors-ligne et sans emoji fallback.
 class GoLivreurLogo extends StatelessWidget {
   final GoLivreurAppType type;
   final double size;
@@ -136,7 +159,7 @@ class GoLivreurLogo extends StatelessWidget {
     this.size = 88.0,
     this.showSubtitle = true,
     this.logoUrl,
-    this.defaultEmoji = '🛵',
+    this.defaultEmoji = '',
   });
 
   String get _badgeText {
@@ -153,68 +176,48 @@ class GoLivreurLogo extends StatelessWidget {
   Color get _badgeColor {
     switch (type) {
       case GoLivreurAppType.client:
-        return GoLivreurTheme.secondaire; // #1B5E20 Vert Confiance
+        return GoLivreurTheme.secondaire;
       case GoLivreurAppType.business:
-        return const Color(0xFF2E75B6); // #2E75B6 Bleu Info
+        return const Color(0xFF2E75B6);
       case GoLivreurAppType.driver:
-        return const Color(0xFF1B5E20); // #1B5E20 Vert Confiance
+        return const Color(0xFF1B5E20);
     }
   }
 
   Widget _buildLogo(
     String? effectiveLogoUrl,
     Uint8List? effectiveBytes,
-    String effectiveEmoji, {
-    bool isLoaded = true,
-  }) {
+  ) {
     final resolvedLogo = GoLivreurEnv.resolveMediaUrl(effectiveLogoUrl);
-    final hasCustomLogo = (effectiveBytes != null && effectiveBytes.isNotEmpty) ||
-        (resolvedLogo != null && resolvedLogo.isNotEmpty);
-    final hideYellowBackground =
-        hasCustomLogo || (!isLoaded && !_isWidgetTestEnv());
+    final radius = BorderRadius.circular(size * 0.24);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // 1. Logo configuré (sans fond jaune) ou badge ambre avec emoji par défaut
         Container(
           width: size,
           height: size,
-          decoration: hideYellowBackground
-              ? const BoxDecoration(
-                  color: Colors.transparent,
-                )
-              : BoxDecoration(
-                  color: GoLivreurTheme.primaire,
-                  borderRadius: BorderRadius.circular(size * 0.24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: GoLivreurTheme.primaire.withValues(alpha: 0.35),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFFFB732),
-                      Color(0xFFF4A623),
-                    ],
-                  ),
-                ),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: radius,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
           clipBehavior: Clip.antiAlias,
           child: GoLivreurBrandMark(
             logoUrl: resolvedLogo,
             logoBytes: effectiveBytes,
-            defaultEmoji: effectiveEmoji,
             size: size,
+            borderRadius: size * 0.24,
           ),
         ),
         const SizedBox(height: 14),
-
-        // 2. Nom de marque "GoLivreur"
         RichText(
           textAlign: TextAlign.center,
           text: const TextSpan(
@@ -235,8 +238,6 @@ class GoLivreurLogo extends StatelessWidget {
             ],
           ),
         ),
-
-        // 3. Déclinaison Client / Business / Driver en dessous centré
         if (showSubtitle) ...[
           const SizedBox(height: 6),
           Container(
@@ -274,20 +275,10 @@ class GoLivreurLogo extends StatelessWidget {
               (logoUrl != null && logoUrl!.trim().isNotEmpty)
                   ? logoUrl
                   : branding.logoUrl;
-          final effectiveBytes = branding.logoBytes;
-          final effectiveEmoji =
-              (defaultEmoji.trim().isNotEmpty && defaultEmoji.trim() != '🛵')
-                  ? defaultEmoji
-                  : branding.defaultEmoji;
-          return _buildLogo(
-            effectiveLogoUrl,
-            effectiveBytes,
-            effectiveEmoji,
-            isLoaded: branding.isLoaded,
-          );
+          return _buildLogo(effectiveLogoUrl, branding.logoBytes);
         },
       );
     }
-    return _buildLogo(logoUrl, null, defaultEmoji);
+    return _buildLogo(logoUrl, null);
   }
 }

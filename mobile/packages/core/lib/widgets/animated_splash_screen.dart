@@ -31,7 +31,7 @@ class AnimatedSplashScreen extends StatefulWidget {
     this.onFinished,
     this.onInit,
     this.logoUrl,
-    this.defaultEmoji = '🛵',
+    this.defaultEmoji = '',
   });
 
   @override
@@ -257,46 +257,29 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                                     ? widget.logoUrl
                                     : branding.logoUrl;
                                 final resolvedUrl = GoLivreurEnv.resolveMediaUrl(effectiveLogoUrl);
-                                final hasCustom = (branding.logoBytes != null && branding.logoBytes!.isNotEmpty) ||
-                                    (resolvedUrl != null && resolvedUrl.isNotEmpty);
-                                final bindingType = WidgetsBinding.instance.runtimeType.toString();
-                                final isWidgetTest = bindingType.contains('TestWidgetsFlutterBinding') ||
-                                    bindingType.contains('AutomatedTestWidgetsFlutterBinding');
-                                final hideYellowBackground =
-                                    hasCustom || (!branding.isLoaded && !isWidgetTest);
-
                                 return Container(
                                   width: 84,
                                   height: 84,
-                                  decoration: hideYellowBackground
-                                      ? const BoxDecoration(
-                                          color: Colors.transparent,
-                                        )
-                                      : BoxDecoration(
-                                          color: GoLivreurTheme.primaire,
-                                          borderRadius: BorderRadius.circular(84 * 0.24),
-                                          gradient: const LinearGradient(
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                            colors: [
-                                              Color(0xFFFFB732),
-                                              Color(0xFFF4A623),
-                                            ],
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: GoLivreurTheme.primaire.withValues(alpha: 0.35),
-                                              blurRadius: 16,
-                                              offset: const Offset(0, 6),
-                                            ),
-                                          ],
-                                        ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.transparent,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.25),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
                                   clipBehavior: Clip.antiAlias,
-                                  child: GoLivreurBrandMark(
-                                    logoUrl: resolvedUrl,
-                                    logoBytes: branding.logoBytes,
-                                    defaultEmoji: branding.defaultEmoji,
-                                    size: 84,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: GoLivreurBrandMark(
+                                      logoUrl: resolvedUrl,
+                                      logoBytes: branding.logoBytes,
+                                      size: 84,
+                                      borderRadius: 20,
+                                    ),
                                   ),
                                 );
                               },
@@ -307,21 +290,17 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                             width: 84,
                             height: 84,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(84 * 0.24),
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFFFFB732),
-                                  Color(0xFFF4A623),
-                                ],
-                              ),
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(20),
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: GoLivreurBrandMark(
-                              logoUrl: widget.logoUrl,
-                              defaultEmoji: widget.defaultEmoji,
-                              size: 84,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: GoLivreurBrandMark(
+                                logoUrl: widget.logoUrl,
+                                size: 84,
+                                borderRadius: 20,
+                              ),
                             ),
                           );
                         },

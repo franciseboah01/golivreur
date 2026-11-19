@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../config/env_config.dart';
+import 'pin_lock_service.dart';
+import 'secure_token_storage.dart';
 
 /// Client HTTP Dio configuré pour l'API GoLivreur.
 ///
@@ -22,6 +25,7 @@ class ApiClient {
   final void Function() _onDeconnexionForcee;
   final HttpClientAdapter? _httpClientAdapter;
   final Dio Function()? _refreshDioBuilder;
+  Completer<String?>? _refreshCompleter;
 
   @visibleForTesting
   Dio get dioForTest => _dio;
@@ -73,48 +77,22 @@ class ApiClient {
           return handler.next(response);
         },
 
-        // ── Erreur : gérer 401 avec refresh automatique ───────────────────
+        // ── Erreur : gérer 401 avec refresh automatique et rotation sécurisée ─
         onError: (DioException e, handler) async {
-          if (e.response?.statusCode == 401) {
-            // Tentative de refresh du token
-            final refreshToken = await _storage.read(key: 'refresh_token');
+          if (e.response?.statusCode == 401 &&
+              e.requestOptions.extra['_retried_after_refresh'] != true) {
+            final nouveauToken = await _refreshAccessTokenSerialized();
 
-            if (refreshToken == null) {
-              // Pas de refresh token → déconnexion forcée
-              _onDeconnexionForcee();
+            if (nouveauToken == null) {
               return handler.next(e);
             }
 
             try {
-              // Appel direct sans intercepteur pour éviter la boucle infinie
-              final dioRefresh = _refreshDioBuilder?.call() ??
-                  Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
-              if (_refreshDioBuilder == null && _httpClientAdapter != null) {
-                dioRefresh.httpClientAdapter = _httpClientAdapter;
-              }
-              final response = await dioRefresh.post(
-                '/auth/refresh',
-                options: Options(
-                  headers: {'Authorization': 'Bearer $refreshToken'},
-                ),
-              );
-
-              final nouveauToken = response.data['donnees']['access_token'];
-              final nouveauRefresh = response.data['donnees']['refresh_token'];
-
-              // Sauvegarder les nouveaux tokens en stockage sécurisé
-              await _storage.write(key: 'access_token', value: nouveauToken);
-              await _storage.write(key: 'refresh_token', value: nouveauRefresh);
-
-              // Rejouer la requête originale avec le nouveau token
+              e.requestOptions.extra['_retried_after_refresh'] = true;
               e.requestOptions.headers['Authorization'] = 'Bearer $nouveauToken';
               final cloneResponse = await _dio.fetch(e.requestOptions);
               return handler.resolve(cloneResponse);
-
             } catch (_) {
-              // Refresh échoué → déconnexion forcée
-              await _storage.deleteAll();
-              _onDeconnexionForcee();
               return handler.next(e);
             }
           }
@@ -123,6 +101,64 @@ class ApiClient {
         },
       ),
     );
+  }
+
+  /// Sérialise les renouvellements de jeton afin qu'un refresh token rotatif
+  /// ne soit jamais soumis deux fois en parallèle (prévention faux positif replay).
+  Future<String?> _refreshAccessTokenSerialized() async {
+    if (_refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
+
+    final completer = Completer<String?>();
+    _refreshCompleter = completer;
+
+    try {
+      final refreshToken = PinLockService.unlockedRefreshToken ??
+          await _storage.read(key: SecureTokenStorage.refreshTokenKey);
+
+      if (refreshToken == null || refreshToken.isEmpty) {
+        _onDeconnexionForcee();
+        completer.complete(null);
+        return null;
+      }
+
+      final dioRefresh = _refreshDioBuilder?.call() ??
+          Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
+      if (_refreshDioBuilder == null && _httpClientAdapter != null) {
+        dioRefresh.httpClientAdapter = _httpClientAdapter;
+      }
+
+      final response = await dioRefresh.post(
+        '/auth/refresh',
+        options: Options(
+          headers: {'Authorization': 'Bearer $refreshToken'},
+        ),
+      );
+
+      final nouveauToken = response.data['donnees']['access_token'] as String;
+      final nouveauRefresh =
+          response.data['donnees']['refresh_token'] as String?;
+
+      await _storage.write(
+        key: SecureTokenStorage.accessTokenKey,
+        value: nouveauToken,
+      );
+      if (nouveauRefresh != null && nouveauRefresh.isNotEmpty) {
+        await PinLockService.syncRotatedRefreshToken(_storage, nouveauRefresh);
+      }
+
+      completer.complete(nouveauToken);
+      return nouveauToken;
+    } catch (_) {
+      PinLockService.lockInMemory();
+      await _storage.deleteAll();
+      _onDeconnexionForcee();
+      completer.complete(null);
+      return null;
+    } finally {
+      _refreshCompleter = null;
+    }
   }
 
   // ─── Méthodes HTTP ────────────────────────────────────────────────────────
@@ -243,7 +279,7 @@ class ApiClient {
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(
     baseUrl: GoLivreurEnv.apiBaseUrl,
-    storage: const FlutterSecureStorage(),
+    storage: SecureTokenStorage.createStorage(),
     onDeconnexionForcee: () {},
   );
 });
