@@ -29,10 +29,8 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
   String? _erreur;
   String? _succesMessage;
 
-  List<Map<String, dynamic>> _villes = [
-    {'id': 1, 'name': 'Daloa'},
-  ];
-  int _selectedCityId = 1;
+  List<Map<String, dynamic>> _villes = [];
+  int? _selectedCityId;
 
   List<Map<String, dynamic>> _typesVehicule = [
     {'slug': 'moto', 'name': 'Moto'},
@@ -120,6 +118,13 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
     if (name.isEmpty || phone.isEmpty || password.isEmpty || plate.isEmpty) {
       setState(() {
         _erreur = 'Veuillez renseigner tous les champs obligatoires.';
+      });
+      return;
+    }
+
+    if (_selectedCityId == null) {
+      setState(() {
+        _erreur = 'Veuillez sélectionner votre ville d\'activité.';
       });
       return;
     }
@@ -357,11 +362,13 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
         ),
         const SizedBox(height: 14),
         DropdownButtonFormField<int>(
+          key: ValueKey('city_$_selectedCityId'),
           initialValue: _selectedCityId,
           decoration: const InputDecoration(
             labelText: 'Ville d\'activité',
             prefixIcon: Icon(Icons.location_city_outlined),
           ),
+          hint: const Text('Sélectionner une ville'),
           items: _villes
               .map(
                 (v) => DropdownMenuItem<int>(

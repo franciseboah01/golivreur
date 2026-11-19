@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/config/env_config.dart';
 import '../../driver/providers/driver_provider.dart';
@@ -54,10 +55,13 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.help_outline, color: GoLivreurTheme.texteSecondaire),
-            tooltip: 'Support Dispatch Daloa',
+            tooltip: 'Support Agence',
             onPressed: () {
+              final citySuffix = (profile.cityName != null && profile.cityName!.isNotEmpty)
+                  ? ' (${profile.cityName})'
+                  : '';
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Dispatch Daloa d\'urgence : +225 07 00 00 00 01')),
+                SnackBar(content: Text('Contactez votre agence Support GoLivreur$citySuffix.')),
               );
             },
           ),
@@ -154,17 +158,21 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                                   const Icon(Icons.star, size: 13, color: Colors.amber),
                                   const SizedBox(width: 3),
                                   Text(
-                                    '${profile.averageRating} (${profile.coursesToday} courses)',
+                                    profile.totalRatings > 0
+                                        ? '${profile.averageRating.toStringAsFixed(1)} (${profile.totalRatings} avis)'
+                                        : 'Nouveau livreur',
                                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              profile.cityName ?? 'Daloa Centre',
-                              style: const TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
-                            ),
+                            if (profile.cityName != null && profile.cityName!.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                profile.cityName!,
+                                style: const TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
+                              ),
+                            ],
                           ],
                         ),
                       ],
@@ -227,14 +235,20 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                   value: profile.isOnline,
                   activeThumbColor: GoLivreurTheme.secondaire,
                   activeTrackColor: GoLivreurTheme.secondaire.withValues(alpha: 0.5),
-                  onChanged: (val) {
-                    ref.read(driverProfileProvider.notifier).toggleOnline();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(val ? '🟢 Vous êtes en service. Prêt à livrer !' : '⏸️ Vous êtes passé hors service.'),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
+                  onChanged: (val) async {
+                    final (ok, msg) = await ref.read(driverProfileProvider.notifier).toggleOnline();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            ok
+                                ? (val ? '🟢 Vous êtes en service. Prêt à livrer !' : '⏸️ Vous êtes passé hors service.')
+                                : (msg ?? 'Impossible de modifier votre disponibilité.'),
+                          ),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
                   },
                 ),
               ],
@@ -292,21 +306,12 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                 },
               ),
               _buildQuickCard(
-                icon: Icons.lock_open,
+                icon: Icons.manage_accounts_outlined,
                 color: Colors.deepOrange,
-                title: 'Déblocage Test',
-                badge: 'Code 1234',
+                title: 'Mon Profil',
+                badge: 'Modifier',
                 badgeColor: Colors.deepOrange,
-                onTap: () {
-                  ref.read(driverActiveJobProvider.notifier).unblockSecurity();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('🔓 Sécurité débloquée & code test 1234 réactivé !'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  widget.onSwitchTab?.call(0);
-                },
+                onTap: _openEditProfile,
               ),
             ],
           ),
@@ -328,25 +333,20 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.shield_outlined, color: GoLivreurTheme.texteSecondaire),
-                  title: const Text('Code de sécurité universel'),
-                  subtitle: const Text('En mode démo : saisissez 1234'),
-                  trailing: const Icon(Icons.info_outline, color: GoLivreurTheme.primaire),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Astuce : Le code de livraison client universel en test est toujours 1234')),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
                   leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.texteSecondaire),
-                  title: const Text('Appeler Dispatcher Daloa'),
-                  subtitle: const Text('Kouadio Serge (+225 0700000001)'),
+                  title: Text(
+                    (profile.cityName != null && profile.cityName!.isNotEmpty)
+                        ? 'Support Agence ${profile.cityName}'
+                        : 'Support Agence GoLivreur',
+                  ),
+                  subtitle: const Text('Assistance opérationnelle & dispatch'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
+                    final citySuffix = (profile.cityName != null && profile.cityName!.isNotEmpty)
+                        ? ' (${profile.cityName})'
+                        : '';
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Appel du responsable opérationnel Daloa : 0700000001')),
+                      SnackBar(content: Text('Contactez le responsable opérationnel de votre agence$citySuffix.')),
                     );
                   },
                 ),
@@ -357,11 +357,17 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                     'Fin de service / Déconnexion',
                     style: TextStyle(color: GoLivreurTheme.erreur, fontWeight: FontWeight.bold),
                   ),
-                  onTap: () {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const DriverLoginScreen()),
-                      (route) => false,
-                    );
+                  onTap: () async {
+                    const storage = FlutterSecureStorage();
+                    await storage.deleteAll();
+                    ref.read(driverProfileProvider.notifier).reinitialiser();
+                    ref.read(driverActiveJobProvider.notifier).reinitialiser();
+                    if (context.mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const DriverLoginScreen()),
+                        (route) => false,
+                      );
+                    }
                   },
                 ),
               ],

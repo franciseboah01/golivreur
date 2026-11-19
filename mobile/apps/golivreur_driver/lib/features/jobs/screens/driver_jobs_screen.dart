@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import '../../auth/screens/driver_login_screen.dart';
 import '../../driver/providers/driver_provider.dart';
 
 class DriverJobsScreen extends ConsumerStatefulWidget {
-  const DriverJobsScreen({super.key});
+  final void Function(int)? onSwitchTab;
+
+  const DriverJobsScreen({super.key, this.onSwitchTab});
 
   @override
   ConsumerState<DriverJobsScreen> createState() => _DriverJobsScreenState();
@@ -14,24 +18,12 @@ class DriverJobsScreen extends ConsumerStatefulWidget {
 class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
   final _codeController = TextEditingController();
   Timer? _countdownTimer;
-  int _secondsLeft = 30;
+  final int _secondsLeft = 30;
+  bool _verifying = false;
 
   @override
   void initState() {
     super.initState();
-    _startCountdown();
-  }
-
-  void _startCountdown() {
-    _countdownTimer?.cancel();
-    _secondsLeft = 30;
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_secondsLeft > 0) {
-        setState(() => _secondsLeft--);
-      } else {
-        timer.cancel();
-      }
-    });
   }
 
   @override
@@ -75,7 +67,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  profile.name,
+                  profile.name.isNotEmpty ? profile.name : 'Livreur GoLivreur',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: GoLivreurTheme.textePrincipal),
                 ),
                 Text(
@@ -91,8 +83,13 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: InkWell(
-              onTap: () {
-                ref.read(driverProfileProvider.notifier).toggleOnline();
+              onTap: () async {
+                final (ok, msg) = await ref.read(driverProfileProvider.notifier).toggleOnline();
+                if (!ok && msg != null && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(msg)),
+                  );
+                }
               },
               borderRadius: BorderRadius.circular(20),
               child: Container(
@@ -133,92 +130,52 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
         ],
       ),
       body: !profile.isOnline
-          ? _buildOfflineView()
+          ? _buildOfflineView(context, profile)
           : activeJob == null
-              ? _buildIdleView(context, ref)
-              : _buildJobFlow(context, ref, activeJob),
+              ? _buildIdleView(context, ref, profile)
+              : _buildJobFlow(context, ref, activeJob, profile),
     );
   }
 
-  Widget _buildOfflineView() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
-          const SizedBox(height: 16),
-          const Text(
-            'Vous êtes actuellement hors-ligne',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: GoLivreurTheme.textePrincipal),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Passez en ligne pour recevoir des courses GoShop et GoColis à Daloa.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: GoLivreurTheme.texteSecondaire),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: GoLivreurTheme.secondaire,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            onPressed: () {
-              ref.read(driverProfileProvider.notifier).toggleOnline();
-            },
-            child: const Text('Passer en ligne', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIdleView(BuildContext context, WidgetRef ref) {
+  Widget _buildOfflineView(BuildContext context, DriverProfileState profile) {
+    final citySuffix = (profile.cityName != null && profile.cityName!.isNotEmpty)
+        ? ' à ${profile.cityName}'
+        : '';
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: GoLivreurTheme.secondaire.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.radar, size: 48, color: GoLivreurTheme.secondaire),
-            ),
-            const SizedBox(height: 20),
+            const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
             const Text(
-              'En attente de courses sur Daloa...',
+              'Vous êtes actuellement hors-ligne',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: GoLivreurTheme.textePrincipal),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Restez disponible, les commandes Chez Tantie Adjoua, Speed Burger et expéditions GoColis arrivent.',
+            Text(
+              'Passez en ligne pour recevoir des courses GoShop et GoColis$citySuffix.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 13),
+              style: const TextStyle(color: GoLivreurTheme.texteSecondaire),
             ),
             const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                OutlinedButton(
-                  onPressed: () {
-                    ref.read(driverActiveJobProvider.notifier).resetJobDemo(DriverJobType.goshop);
-                    _startCountdown();
-                  },
-                  child: const Text('Simuler GoShop'),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton(
-                  onPressed: () {
-                    ref.read(driverActiveJobProvider.notifier).resetJobDemo(DriverJobType.gocolis);
-                    _startCountdown();
-                  },
-                  child: const Text('Simuler GoColis'),
-                ),
-              ],
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GoLivreurTheme.secondaire,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              onPressed: () async {
+                final (ok, msg) = await ref.read(driverProfileProvider.notifier).toggleOnline();
+                if (!ok && msg != null && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(msg)),
+                  );
+                } else if (ok) {
+                  await ref.read(driverActiveJobProvider.notifier).chargerCourses();
+                }
+              },
+              child: const Text('Passer en ligne', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
             ),
           ],
         ),
@@ -226,7 +183,65 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
     );
   }
 
-  Widget _buildJobFlow(BuildContext context, WidgetRef ref, DriverJob job) {
+  Widget _buildIdleView(BuildContext context, WidgetRef ref, DriverProfileState profile) {
+    final cityTitle = (profile.cityName != null && profile.cityName!.isNotEmpty)
+        ? 'En attente de courses sur ${profile.cityName}...'
+        : 'En attente de courses...';
+    return RefreshIndicator(
+      color: GoLivreurTheme.secondaire,
+      onRefresh: () async {
+        await Future.wait([
+          ref.read(driverActiveJobProvider.notifier).chargerCourses(),
+          ref.read(driverProfileProvider.notifier).chargerPortefeuille(),
+        ]);
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 72),
+        children: [
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: GoLivreurTheme.secondaire.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.radar, size: 48, color: GoLivreurTheme.secondaire),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            cityTitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: GoLivreurTheme.textePrincipal),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Restez disponible, les nouvelles commandes GoShop et expéditions GoColis de votre zone apparaîtront automatiquement ici.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 13),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: OutlinedButton.icon(
+              onPressed: () {
+                ref.read(driverActiveJobProvider.notifier).chargerCourses();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Actualiser les courses'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJobFlow(
+    BuildContext context,
+    WidgetRef ref,
+    DriverJob job,
+    DriverProfileState profile,
+  ) {
     switch (job.step) {
       case DriverJobStep.incoming:
         return _buildIncomingAlert(context, ref, job);
@@ -245,7 +260,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
       case DriverJobStep.inTransit:
         return _buildDeliveryStep(context, ref, job);
       case DriverJobStep.securityLocked:
-        return _buildSecurityLockedView(context);
+        return _buildSecurityLockedView(context, profile);
       case DriverJobStep.completed:
         return _buildSuccessView(context, ref, job);
     }
@@ -511,7 +526,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                     maxLength: 4,
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
-                    decoration: const InputDecoration(hintText: '7391', counterText: ''),
+                    decoration: const InputDecoration(hintText: '••••', counterText: ''),
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -523,10 +538,25 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                       backgroundColor: GoLivreurTheme.secondaire,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: () {
-                      _codeController.clear();
-                      ref.read(driverActiveJobProvider.notifier).pickedUp();
-                    },
+                    onPressed: _verifying
+                        ? null
+                        : () async {
+                            final code = _codeController.text.trim();
+                            setState(() => _verifying = true);
+                            final (ok, err) = await ref
+                                .read(driverActiveJobProvider.notifier)
+                                .pickedUp(senderCode: isGoColis ? code : null);
+                            if (mounted) {
+                              setState(() => _verifying = false);
+                              if (ok) {
+                                _codeController.clear();
+                              } else if (err != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(err)),
+                                );
+                              }
+                            }
+                          },
                     child: Text(
                       isGoColis ? 'Valider le ramassage' : 'Commande récupérée (En route client)',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
@@ -539,6 +569,24 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _soumettreCodeLivraison(String inputCode) async {
+    if (_verifying || inputCode.trim().length != 4) return;
+    setState(() => _verifying = true);
+    final (ok, err) =
+        await ref.read(driverActiveJobProvider.notifier).verifyCode(inputCode.trim());
+    if (mounted) {
+      setState(() => _verifying = false);
+      if (ok) {
+        _codeController.clear();
+        await ref.read(driverProfileProvider.notifier).chargerPortefeuille();
+      } else if (err != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err)),
+        );
+      }
+    }
   }
 
   Widget _buildDeliveryStep(BuildContext context, WidgetRef ref, DriverJob job) {
@@ -575,35 +623,6 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
                 ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: GoLivreurTheme.primaire.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: GoLivreurTheme.primaire.withValues(alpha: 0.4)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '💡 Code client : ${job.clientCode ?? '1234'} (ou code dev : 1234)',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GoLivreurTheme.textePrincipal),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          _codeController.text = job.clientCode ?? '1234';
-                          final ok = ref.read(driverActiveJobProvider.notifier).verifyCode(_codeController.text.trim());
-                          if (ok) {
-                            ref.read(driverProfileProvider.notifier).addEarnings(job.payout);
-                          }
-                        },
-                        child: const Text('Remplir 1234', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _codeController,
@@ -617,10 +636,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                   ),
                   onChanged: (val) {
                     if (val.length == 4) {
-                      final ok = ref.read(driverActiveJobProvider.notifier).verifyCode(val.trim());
-                      if (ok) {
-                        ref.read(driverProfileProvider.notifier).addEarnings(job.payout);
-                      }
+                      _soumettreCodeLivraison(val);
                     }
                   },
                 ),
@@ -640,14 +656,19 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                       backgroundColor: GoLivreurTheme.secondaire,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: () {
-                      final input = _codeController.text.trim();
-                      final ok = ref.read(driverActiveJobProvider.notifier).verifyCode(input);
-                      if (ok) {
-                        ref.read(driverProfileProvider.notifier).addEarnings(job.payout);
-                      }
-                    },
-                    child: const Text('Valider la livraison', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                    onPressed: _verifying
+                        ? null
+                        : () => _soumettreCodeLivraison(_codeController.text),
+                    child: _verifying
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Valider la livraison', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                   ),
                 ),
               ],
@@ -658,7 +679,10 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
     );
   }
 
-  Widget _buildSecurityLockedView(BuildContext context) {
+  Widget _buildSecurityLockedView(BuildContext context, DriverProfileState profile) {
+    final citySuffix = (profile.cityName != null && profile.cityName!.isNotEmpty)
+        ? ' ${profile.cityName}'
+        : '';
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -680,7 +704,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              '3 tentatives de code erronées consécutives. Par mesure de sécurité anti-fraude, la livraison est suspendue.',
+              '3 tentatives de code erronées consécutives. Par mesure de sécurité anti-fraude, la livraison est suspendue. Contactez le support de votre agence pour débloquer la course.',
               textAlign: TextAlign.center,
               style: TextStyle(color: GoLivreurTheme.texteSecondaire),
             ),
@@ -695,31 +719,11 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                 ),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Appel d\'urgence Support Daloa : +225 07 00 00 00 02')),
+                    SnackBar(content: Text('Contactez votre agence Support GoLivreur$citySuffix.')),
                   );
                 },
                 icon: const Icon(Icons.support_agent, color: Colors.white),
-                label: const Text('Appeler le Support Daloa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: GoLivreurTheme.primaire,
-                  side: const BorderSide(color: GoLivreurTheme.primaire, width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: () {
-                  ref.read(driverActiveJobProvider.notifier).unblockSecurity();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Course débloquée ! Code de validation : 1234')),
-                  );
-                },
-                icon: const Icon(Icons.lock_open),
-                label: const Text('Débloquer la course (Mode Test)', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: Text('Contacter le Support$citySuffix', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
               ),
             ),
           ],
@@ -762,8 +766,12 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                   backgroundColor: GoLivreurTheme.secondaire,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                onPressed: () {
-                  ref.read(driverActiveJobProvider.notifier).refuseJob();
+                onPressed: () async {
+                  ref.read(driverActiveJobProvider.notifier).clearCompletedJob();
+                  await Future.wait([
+                    ref.read(driverActiveJobProvider.notifier).chargerCourses(),
+                    ref.read(driverProfileProvider.notifier).chargerPortefeuille(),
+                  ]);
                 },
                 child: const Text('Prêt pour la course suivante', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
               ),
@@ -823,11 +831,13 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              profile.name,
+                              profile.name.isNotEmpty ? profile.name : 'Livreur GoLivreur',
                               style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              'Moto: ${profile.motoPlate}',
+                              profile.motoPlate.isNotEmpty
+                                  ? '${profile.vehicleTypeName.isNotEmpty ? profile.vehicleTypeName : "Véhicule"} : ${profile.motoPlate}'
+                                  : (profile.cityName ?? ''),
                               style: const TextStyle(color: Colors.white70, fontSize: 12),
                             ),
                           ],
@@ -856,7 +866,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
               subtitle: const Text('Coordonnées, véhicule, documents'),
               onTap: () {
                 Navigator.pop(context);
-                // Navigue vers l'onglet Profil
+                widget.onSwitchTab?.call(3);
               },
             ),
             const Divider(height: 1),
@@ -864,22 +874,36 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
               leading: const Icon(Icons.account_balance_wallet, color: GoLivreurTheme.secondaire),
               title: const Text('Portefeuille & Retraits'),
               subtitle: const Text('Wave, Orange Money, historique'),
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onSwitchTab?.call(1);
+              },
             ),
             ListTile(
               leading: const Icon(Icons.trending_up, color: GoLivreurTheme.secondaire),
               title: const Text('Historique des Gains'),
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onSwitchTab?.call(2);
+              },
             ),
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.primaire),
-              title: const Text('Support d\'urgence Daloa'),
-              subtitle: const Text('+225 07 00 00 00 02'),
+              title: Text(
+                (profile.cityName != null && profile.cityName!.isNotEmpty)
+                    ? 'Support Agence ${profile.cityName}'
+                    : 'Support Agence GoLivreur',
+              ),
+              subtitle: const Text('Assistance & dispatch en direct'),
               onTap: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Appel d\'urgence Support Daloa : +225 07 00 00 00 02')),
+                  SnackBar(
+                    content: Text(
+                      'Contactez votre agence GoLivreur${(profile.cityName != null && profile.cityName!.isNotEmpty) ? " (${profile.cityName})" : ""}.',
+                    ),
+                  ),
                 );
               },
             ),
@@ -888,9 +912,18 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
             ListTile(
               leading: const Icon(Icons.exit_to_app, color: GoLivreurTheme.erreur),
               title: const Text('Terminer mon service', style: TextStyle(color: GoLivreurTheme.erreur, fontWeight: FontWeight.bold)),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                Navigator.of(context).pushReplacementNamed('/');
+                const storage = FlutterSecureStorage();
+                await storage.deleteAll();
+                ref.read(driverProfileProvider.notifier).reinitialiser();
+                ref.read(driverActiveJobProvider.notifier).reinitialiser();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const DriverLoginScreen()),
+                    (route) => false,
+                  );
+                }
               },
             ),
           ],
