@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import '../../auth/screens/business_login_screen.dart';
 import '../../business/providers/business_provider.dart';
 
 class BusinessOrdersScreen extends ConsumerStatefulWidget {
-  const BusinessOrdersScreen({super.key});
+  final void Function(int)? onSwitchTab;
+
+  const BusinessOrdersScreen({super.key, this.onSwitchTab});
 
   @override
   ConsumerState<BusinessOrdersScreen> createState() => _BusinessOrdersScreenState();
@@ -70,22 +74,24 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
                   'GoLivreur Business',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: GoLivreurTheme.textePrincipal),
                 ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E75B6).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
+                if (profile.cityName != null && profile.cityName!.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E75B6).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      profile.cityName!.toUpperCase(),
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2E75B6)),
+                    ),
                   ),
-                  child: const Text(
-                    'DALOA',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2E75B6)),
-                  ),
-                ),
+                ],
               ],
             ),
             Text(
-              profile.name,
+              profile.name.isNotEmpty ? profile.name : 'Mon commerce',
               style: const TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
             ),
           ],
@@ -520,30 +526,46 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
               leading: const Icon(Icons.person, color: Color(0xFF2E75B6)),
               title: const Text('Mon Profil Commerce', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Horaires, temps de prépa, coordonnées'),
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onSwitchTab?.call(3);
+              },
             ),
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.restaurant_menu, color: Color(0xFF2E75B6)),
               title: const Text('Gestion du Catalogue & Plats'),
               subtitle: const Text('Mettre en rupture, modifier prix'),
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onSwitchTab?.call(1);
+              },
             ),
             ListTile(
               leading: const Icon(Icons.payments_outlined, color: Color(0xFF2E75B6)),
               title: const Text('Revenus & Versements'),
               subtitle: const Text('Demande de retrait Orange / Wave'),
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onSwitchTab?.call(2);
+              },
             ),
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.primaire),
-              title: const Text('Support Partenaires Daloa'),
-              subtitle: const Text('+225 07 00 00 00 02'),
+              title: Text(
+                (profile.cityName != null && profile.cityName!.isNotEmpty)
+                    ? 'Support Partenaires ${profile.cityName}'
+                    : 'Support Partenaires GoLivreur',
+              ),
+              subtitle: const Text('Assistance commerçants'),
               onTap: () {
                 Navigator.pop(context);
+                final cityLabel = (profile.cityName != null && profile.cityName!.isNotEmpty)
+                    ? ' (${profile.cityName})'
+                    : '';
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Support Partenaires Daloa : +225 07 00 00 00 02')),
+                  SnackBar(content: Text('Contactez votre agence Support Partenaires GoLivreur$cityLabel.')),
                 );
               },
             ),
@@ -552,9 +574,20 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
             ListTile(
               leading: const Icon(Icons.exit_to_app, color: GoLivreurTheme.erreur),
               title: const Text('Fermer la session', style: TextStyle(color: GoLivreurTheme.erreur, fontWeight: FontWeight.bold)),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                Navigator.of(context).pushReplacementNamed('/');
+                const storage = FlutterSecureStorage();
+                await storage.deleteAll();
+                ref.read(businessProfileProvider.notifier).reinitialiser();
+                ref.read(businessCatalogProvider.notifier).reinitialiser();
+                ref.read(businessOrdersProvider.notifier).reinitialiser();
+                ref.read(revenueStatsProvider.notifier).reinitialiser();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const BusinessLoginScreen()),
+                    (route) => false,
+                  );
+                }
               },
             ),
           ],

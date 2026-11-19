@@ -207,8 +207,8 @@ void main() {
     );
     await tester.enterText(
       find.widgetWithText(
-          TextFormField, 'Adresse / Quartier (ex: Quartier Commerce, Daloa)'),
-      'Quartier Lobia, Daloa',
+          TextFormField, 'Adresse / Quartier (ex: Quartier Commerce)'),
+      'Quartier Commerce, Bouaké',
     );
 
     await tester.ensureVisible(find.text('Envoyer ma pré-inscription'));

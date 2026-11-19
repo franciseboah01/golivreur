@@ -19,6 +19,7 @@ class BusinessProfileState {
   final String? logoUrl;
   final String? photoUrl;
   final String quarter;
+  final String? cityName;
   final String? description;
   final String openHoursText;
   final String ownerName;
@@ -34,27 +35,28 @@ class BusinessProfileState {
   final double walletBalance;
 
   const BusinessProfileState({
-    this.id = 1,
-    this.name = 'Maquis Chez Tantie Adjoua',
-    this.category = 'Maquis & Grillades',
-    this.categorySlug = 'maquis',
-    this.emoji = '🍖',
+    this.id = 0,
+    this.name = '',
+    this.category = '',
+    this.categorySlug = '',
+    this.emoji,
     this.logoUrl,
     this.photoUrl,
-    this.quarter = 'Quartier Commerce, Daloa',
+    this.quarter = '',
+    this.cityName,
     this.description,
-    this.openHoursText = 'Lun - Dim : 08h00 - 22h00',
-    this.ownerName = 'Adjoua Kouassi',
-    this.ownerPhone = '0702010001',
+    this.openHoursText = '',
+    this.ownerName = '',
+    this.ownerPhone = '',
     this.ownerEmail,
     this.ownerPhotoUrl,
     this.language = 'fr',
     this.notificationsEnabled = true,
-    this.isOpen = true,
+    this.isOpen = false,
     this.prepTimeMinutes = 20,
-    this.rating = 4.8,
-    this.reviewCount = 142,
-    this.walletBalance = 148500,
+    this.rating = 0,
+    this.reviewCount = 0,
+    this.walletBalance = 0,
   });
 
   BusinessProfileState copyWith({
@@ -66,6 +68,7 @@ class BusinessProfileState {
     String? logoUrl,
     String? photoUrl,
     String? quarter,
+    String? cityName,
     String? description,
     String? openHoursText,
     String? ownerName,
@@ -89,6 +92,7 @@ class BusinessProfileState {
       logoUrl: logoUrl ?? this.logoUrl,
       photoUrl: photoUrl ?? this.photoUrl,
       quarter: quarter ?? this.quarter,
+      cityName: cityName ?? this.cityName,
       description: description ?? this.description,
       openHoursText: openHoursText ?? this.openHoursText,
       ownerName: ownerName ?? this.ownerName,
@@ -111,16 +115,29 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
 
   BusinessProfileNotifier([this._api]) : super(const BusinessProfileState());
 
+  void reinitialiser() {
+    state = const BusinessProfileState();
+  }
+
+  void setWalletBalance(double balance) {
+    state = state.copyWith(walletBalance: balance);
+  }
+
   void _appliquerDonneesProfil(Map<String, dynamic> d) {
     state = state.copyWith(
       id: (d['merchant_id'] ?? d['id']) as int? ?? state.id,
       name: (d['business_name'] ?? d['name']) as String? ?? state.name,
       categorySlug: d['category'] as String? ?? state.categorySlug,
-      category: d['category_name'] as String? ?? d['category'] as String? ?? state.category,
+      category: d['category_name'] as String? ??
+          d['category'] as String? ??
+          state.category,
       emoji: d['emoji'] as String? ?? state.emoji,
       logoUrl: GoLivreurEnv.resolveMediaUrl(d['logo_url'] as String?),
-      photoUrl: GoLivreurEnv.resolveMediaUrl((d['merchant_photo_url'] ?? d['photo_url']) as String?),
+      photoUrl: GoLivreurEnv.resolveMediaUrl(
+        (d['merchant_photo_url'] ?? d['photo_url']) as String?,
+      ),
       quarter: d['address'] as String? ?? state.quarter,
+      cityName: d['city_name'] as String? ?? state.cityName,
       description: d['description'] as String?,
       openHoursText: (d['open_hours_text'] as String?) ?? state.openHoursText,
       ownerName: d['name'] as String? ?? state.ownerName,
@@ -128,19 +145,27 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
       ownerEmail: d['email'] as String?,
       ownerPhotoUrl: GoLivreurEnv.resolveMediaUrl(d['photo_url'] as String?),
       language: d['language'] as String? ?? state.language,
-      notificationsEnabled: d['notifications_enabled'] as bool? ?? state.notificationsEnabled,
+      notificationsEnabled:
+          d['notifications_enabled'] as bool? ?? state.notificationsEnabled,
       isOpen: d['is_open'] == true,
-      prepTimeMinutes: d['prep_time_minutes'] as int? ?? state.prepTimeMinutes,
+      prepTimeMinutes:
+          (d['prep_time_minutes'] as num?)?.toInt() ?? state.prepTimeMinutes,
       rating: (d['average_rating'] as num?)?.toDouble() ?? state.rating,
-      reviewCount: d['total_ratings'] as int? ?? state.reviewCount,
+      reviewCount: (d['total_ratings'] as num?)?.toInt() ?? state.reviewCount,
     );
   }
 
   Future<void> chargerProfil() async {
+    if (_api == null) return;
     try {
-      final res = await _api!.get('/merchant/profile');
-      if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
-        _appliquerDonneesProfil(res.data['donnees'] as Map<String, dynamic>);
+      final res = await _api.get('/merchant/profile');
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map) {
+        _appliquerDonneesProfil(
+          Map<String, dynamic>.from(res.data['donnees'] as Map),
+        );
       }
     } catch (_) {}
   }
@@ -161,6 +186,9 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
     XFile? merchantPhotoFile,
     XFile? ownerPhotoFile,
   }) async {
+    if (_api == null) {
+      return (false, 'Client API non initialisé.');
+    }
     try {
       final files = <String, XFile>{
         if (logoFile != null) 'logo': logoFile,
@@ -168,7 +196,7 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
         if (ownerPhotoFile != null) 'photo': ownerPhotoFile,
       };
 
-      final res = await _api!.uploadMultipart(
+      final res = await _api.uploadMultipart(
         '/merchant/profile',
         fields: {
           'name': ownerName,
@@ -186,8 +214,13 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
         files: files.isNotEmpty ? files : null,
       );
 
-      if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
-        _appliquerDonneesProfil(res.data['donnees'] as Map<String, dynamic>);
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map) {
+        _appliquerDonneesProfil(
+          Map<String, dynamic>.from(res.data['donnees'] as Map),
+        );
         return (true, null);
       }
       return (false, 'Réponse inattendue du serveur.');
@@ -206,12 +239,9 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
 
   void updatePrepTime(int minutes) {
     state = state.copyWith(prepTimeMinutes: minutes);
-  }
-
-  void withdrawFunds(double amount) {
-    if (amount <= state.walletBalance) {
-      state = state.copyWith(walletBalance: state.walletBalance - amount);
-    }
+    _safeIgnore(
+      _api?.put('/merchant/profile', data: {'prep_time_minutes': minutes}),
+    );
   }
 }
 
@@ -260,65 +290,36 @@ class BusinessProductItem {
 class BusinessCatalogNotifier extends StateNotifier<List<BusinessProductItem>> {
   final ApiClient? _api;
 
-  BusinessCatalogNotifier([this._api])
-      : super([
-          const BusinessProductItem(
-            id: 1,
-            name: 'Poulet braisé (quart)',
-            price: 1500,
-            category: 'Plats',
-            description: 'Poulet fermier braisé au feu de bois avec alloco.',
-            isAvailable: true,
-          ),
-          const BusinessProductItem(
-            id: 2,
-            name: 'Attiéké + Poisson braisé',
-            price: 1000,
-            category: 'Plats',
-            description: 'Attiéké frais de Daloa avec poisson braisé assaisonné.',
-            isAvailable: true,
-          ),
-          const BusinessProductItem(
-            id: 3,
-            name: 'Alloco + Œuf',
-            price: 500,
-            category: 'Accompagnements',
-            description: 'Bananes plantains frites bien dorées avec œuf.',
-            isAvailable: true,
-          ),
-          const BusinessProductItem(
-            id: 4,
-            name: 'Garba thon rouge (Épuisé)',
-            price: 800,
-            category: 'Plats',
-            description: 'Garba classique avec pavé de thon.',
-            isAvailable: false,
-          ),
-          const BusinessProductItem(
-            id: 5,
-            name: 'Jus de bissap (500ml)',
-            price: 300,
-            category: 'Boissons',
-            description: 'Jus naturel d\'hibiscus parfumé à la menthe.',
-            isAvailable: true,
-          ),
-        ]);
+  BusinessCatalogNotifier([this._api]) : super(const []);
+
+  void reinitialiser() {
+    state = const [];
+  }
 
   Future<void> chargerCatalogue() async {
+    if (_api == null) return;
     try {
-      final res = await _api!.get('/merchant/products');
-      if (res.statusCode == 200 && res.data['succes'] == true) {
-        final List list = res.data['donnees'] as List;
-        if (list.isNotEmpty) {
-          state = list.map((json) => BusinessProductItem(
-            id: json['id'] as int,
-            name: json['name'] as String,
-            price: (num.tryParse(json['price'].toString()) ?? 0).toDouble(),
-            category: json['category'] ?? 'Plats',
-            description: json['description'],
-            isAvailable: json['is_available'] == true || json['is_available'] == 1,
-          )).toList();
-        }
+      final res = await _api.get('/merchant/products');
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is List) {
+        final list = res.data['donnees'] as List;
+        state = list
+            .whereType<Map>()
+            .map((raw) {
+              final json = Map<String, dynamic>.from(raw);
+              return BusinessProductItem(
+                id: (json['id'] as num).toInt(),
+                name: (json['name'] ?? '').toString(),
+                price: num.tryParse('${json['price'] ?? 0}')?.toDouble() ?? 0,
+                category: (json['category'] ?? 'Catalogue').toString(),
+                description: json['description']?.toString(),
+                isAvailable:
+                    json['is_available'] == true || json['is_available'] == 1,
+              );
+            })
+            .toList();
       }
     } catch (_) {}
   }
@@ -327,52 +328,78 @@ class BusinessCatalogNotifier extends StateNotifier<List<BusinessProductItem>> {
     state = state.map((p) {
       if (p.id == productId) {
         final nextAvail = !p.isAvailable;
-        _safeIgnore(_api?.put('/merchant/products/$productId', data: {
-          'is_available': nextAvail,
-        }));
+        _safeIgnore(
+          _api?.put('/merchant/products/$productId', data: {
+            'is_available': nextAvail,
+          }),
+        );
         return p.copyWith(isAvailable: nextAvail);
       }
       return p;
     }).toList();
   }
 
-  void addProduct({
+  Future<void> addProduct({
+    required String name,
+    required double price,
+    required String category,
+    String? description,
+  }) async {
+    if (_api == null) return;
+    try {
+      final res = await _api.post('/merchant/products', data: {
+        'name': name,
+        'price': price,
+        'category': category,
+        'description': description,
+        'is_available': true,
+      });
+      if ((res.statusCode == 201 || res.statusCode == 200) &&
+          res.data is Map &&
+          res.data['donnees'] is Map) {
+        final json = Map<String, dynamic>.from(res.data['donnees'] as Map);
+        final created = BusinessProductItem(
+          id: (json['id'] as num).toInt(),
+          name: (json['name'] ?? name).toString(),
+          price: num.tryParse('${json['price'] ?? price}')?.toDouble() ?? price,
+          category: (json['category'] ?? category).toString(),
+          description: json['description']?.toString() ?? description,
+          isAvailable:
+              json['is_available'] == true || json['is_available'] == 1,
+        );
+        state = [...state, created];
+        return;
+      }
+    } catch (_) {}
+    await chargerCatalogue();
+  }
+
+  void updateProduct(
+    int id, {
     required String name,
     required double price,
     required String category,
     String? description,
   }) {
-    final nextId = state.isEmpty ? 1 : state.map((p) => p.id).reduce((a, b) => a > b ? a : b) + 1;
-    final newItem = BusinessProductItem(
-      id: nextId,
-      name: name,
-      price: price,
-      category: category,
-      description: description,
-      isAvailable: true,
-    );
-    state = [...state, newItem];
-    _safeIgnore(_api?.post('/merchant/products', data: {
-      'name': name,
-      'price': price,
-      'category': category,
-      'description': description,
-    }));
-  }
-
-  void updateProduct(int id, {required String name, required double price, required String category, String? description}) {
     state = state.map((p) {
       if (p.id == id) {
-        return p.copyWith(name: name, price: price, category: category, description: description);
+        return p.copyWith(
+          name: name,
+          price: price,
+          category: category,
+          description: description,
+        );
       }
       return p;
     }).toList();
-    _safeIgnore(_api?.put('/merchant/products/$id', data: {
-      'name': name,
-      'price': price,
-      'category': category,
-      'description': description,
-    }));
+    _safeIgnore(
+      _api?.put('/merchant/products/$id', data: {
+        'name': name,
+        'price': price,
+        'category': category,
+        'description': description,
+      }),
+    );
   }
 
   void deleteProduct(int id) {
@@ -382,19 +409,20 @@ class BusinessCatalogNotifier extends StateNotifier<List<BusinessProductItem>> {
 }
 
 final businessCatalogProvider =
-    StateNotifierProvider<BusinessCatalogNotifier, List<BusinessProductItem>>((ref) {
+    StateNotifierProvider<BusinessCatalogNotifier, List<BusinessProductItem>>(
+        (ref) {
   final api = ref.watch(apiClientProvider);
   return BusinessCatalogNotifier(api);
 });
 
 // ─── Commandes Business ───────────────────────────────────────────────────────
 enum BusinessOrderStatus {
-  pending,    // Nouvelle commande reçue (45s chrono)
-  accepted,   // En préparation en cuisine
-  ready,      // Commande prête pour le coursier
-  pickedUp,   // Récupérée par le livreur
-  delivered,  // Livrée
-  refused,    // Refusée
+  pending,
+  accepted,
+  ready,
+  pickedUp,
+  delivered,
+  refused,
 }
 
 class BusinessOrder {
@@ -444,64 +472,26 @@ class BusinessOrder {
 class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
   final ApiClient? _api;
 
-  BusinessOrdersNotifier([this._api])
-      : super([
-          BusinessOrder(
-            id: 108,
-            clientName: 'Ama Kouassi',
-            clientPhone: '0701000001',
-            deliveryAddress: 'Daloa, Quartier Résidentiel (Face Maquis Le Baoulé)',
-            items: const [
-              OrderItemModel(
-                id: 1,
-                productId: 1,
-                productNameSnapshot: 'Poulet braisé (quart)',
-                quantity: 2,
-                unitPrice: 1500,
-              ),
-              OrderItemModel(
-                id: 2,
-                productId: 3,
-                productNameSnapshot: 'Alloco + Œuf',
-                quantity: 1,
-                unitPrice: 500,
-              ),
-            ],
-            totalAmount: 3500,
-            paymentMethod: 'wave',
-            status: BusinessOrderStatus.pending,
-            createdAt: DateTime.now(),
-            secondsRemaining: 42,
-          ),
-          BusinessOrder(
-            id: 107,
-            clientName: 'Diallo Ibrahim',
-            clientPhone: '0701000004',
-            deliveryAddress: 'Carrefour Total, Quartier Lobia',
-            items: const [
-              OrderItemModel(
-                id: 3,
-                productId: 2,
-                productNameSnapshot: 'Attiéké + Poisson braisé',
-                quantity: 1,
-                unitPrice: 3000,
-              ),
-            ],
-            totalAmount: 3000,
-            paymentMethod: 'orange_money',
-            status: BusinessOrderStatus.accepted,
-            createdAt: DateTime.now().subtract(const Duration(minutes: 8)),
-          ),
-        ]);
+  BusinessOrdersNotifier([this._api]) : super(const []);
+
+  void reinitialiser() {
+    state = const [];
+  }
 
   Future<void> chargerCommandes() async {
+    if (_api == null) return;
     try {
-      final res = await _api!.get('/merchant/orders');
-      if (res.statusCode == 200 && res.data['succes'] == true) {
-        final List list = res.data['donnees'] as List;
-        if (list.isNotEmpty) {
-          state = list.map((json) => _mapJsonToBusinessOrder(json as Map<String, dynamic>)).toList();
-        }
+      final res = await _api.get('/merchant/orders');
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is List) {
+        final list = res.data['donnees'] as List;
+        state = list
+            .whereType<Map>()
+            .map((json) =>
+                _mapJsonToBusinessOrder(Map<String, dynamic>.from(json)))
+            .toList();
       }
     } catch (_) {}
   }
@@ -517,25 +507,38 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
       _ => BusinessOrderStatus.refused,
     };
 
-    final rawItems = json['items'] as List? ?? [];
-    final items = rawItems.map((item) => OrderItemModel(
-      id: item['id'] as int? ?? 1,
-      productId: item['product_id'] as int? ?? 1,
-      productNameSnapshot: item['product_name_snapshot'] ?? item['product']?['name'] ?? 'Article',
-      quantity: item['quantity'] as int? ?? 1,
-      unitPrice: (num.tryParse(item['unit_price']?.toString() ?? '') ?? 1000).toDouble(),
-    )).toList();
+    final rawItems = json['items'] is List ? json['items'] as List : const [];
+    final items = rawItems.whereType<Map>().map((raw) {
+      final item = Map<String, dynamic>.from(raw);
+      return OrderItemModel(
+        id: (item['id'] as num?)?.toInt() ?? 0,
+        productId: (item['product_id'] as num?)?.toInt() ?? 0,
+        productNameSnapshot: (item['product_name_snapshot'] ??
+                (item['product'] is Map ? item['product']['name'] : null) ??
+                'Article')
+            .toString(),
+        quantity: (item['quantity'] as num?)?.toInt() ?? 1,
+        unitPrice: num.tryParse('${item['unit_price'] ?? 0}')?.toDouble() ?? 0,
+      );
+    }).toList();
+
+    final client = json['client'] is Map
+        ? Map<String, dynamic>.from(json['client'] as Map)
+        : <String, dynamic>{};
 
     return BusinessOrder(
-      id: json['id'] as int,
-      clientName: json['client']?['name'] ?? 'Client Daloa',
-      clientPhone: json['client']?['phone'] ?? '0701000000',
-      deliveryAddress: json['delivery_address'] ?? 'Daloa',
+      id: (json['id'] as num).toInt(),
+      clientName: (client['name'] ?? 'Client').toString(),
+      clientPhone: (client['phone'] ?? '').toString(),
+      deliveryAddress: (json['delivery_address'] ?? '').toString(),
       items: items,
-      totalAmount: (num.tryParse(json['products_total']?.toString() ?? '') ?? 2000).toDouble(),
-      paymentMethod: json['payment_method'] ?? 'cash',
+      totalAmount:
+          num.tryParse('${json['products_total'] ?? 0}')?.toDouble() ?? 0,
+      paymentMethod: (json['payment_method'] ?? 'cash').toString(),
       status: status,
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) ?? DateTime.now() : DateTime.now(),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse('${json['created_at']}') ?? DateTime.now()
+          : DateTime.now(),
       secondsRemaining: 45,
     );
   }
@@ -557,7 +560,12 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
       }
       return o;
     }).toList();
-    _safeIgnore(_api?.post('/merchant/orders/$orderId/refuse', data: {'raison': 'Rupture de stock'}));
+    _safeIgnore(
+      _api?.post(
+        '/merchant/orders/$orderId/refuse',
+        data: {'raison': 'Rupture de stock'},
+      ),
+    );
   }
 
   void markOrderReady(int orderId) {
@@ -578,41 +586,6 @@ final businessOrdersProvider =
 });
 
 // ─── Données Statistiques Revenus ─────────────────────────────────────────────
-class RevenueStats {
-  final double caAujourdhui;
-  final int commandesAujourdhui;
-  final double caSemaine;
-  final int commandesSemaine;
-  final double caMois;
-  final int commandesMois;
-  final List<DisbursementItem> versementsRecents;
-
-  const RevenueStats({
-    this.caAujourdhui = 42500,
-    this.commandesAujourdhui = 12,
-    this.caSemaine = 285000,
-    this.commandesSemaine = 84,
-    this.caMois = 950000,
-    this.commandesMois = 310,
-    this.versementsRecents = const [
-      DisbursementItem(
-        id: 'VER-091',
-        amount: 85000,
-        provider: 'Wave Côte d\'Ivoire',
-        date: '06 Nov 2026, 18:30',
-        status: 'Succès',
-      ),
-      DisbursementItem(
-        id: 'VER-090',
-        amount: 110000,
-        provider: 'Orange Money Daloa',
-        date: '03 Nov 2026, 17:15',
-        status: 'Succès',
-      ),
-    ],
-  });
-}
-
 class DisbursementItem {
   final String id;
   final double amount;
@@ -627,9 +600,98 @@ class DisbursementItem {
     required this.date,
     required this.status,
   });
+
+  factory DisbursementItem.fromJson(Map<String, dynamic> json) {
+    return DisbursementItem(
+      id: (json['id'] ?? '').toString(),
+      amount: num.tryParse('${json['montant'] ?? json['amount'] ?? 0}')
+              ?.toDouble() ??
+          0,
+      provider: (json['description'] ?? json['provider'] ?? 'Versement')
+          .toString(),
+      date: (json['date'] ?? '').toString(),
+      status: (json['statut'] ?? json['status'] ?? 'Effectué').toString(),
+    );
+  }
 }
 
-final revenueStatsProvider = Provider<RevenueStats>((ref) {
-  return const RevenueStats();
-});
+class RevenueStats {
+  final double caAujourdhui;
+  final int commandesAujourdhui;
+  final double caSemaine;
+  final int commandesSemaine;
+  final double caMois;
+  final int commandesMois;
+  final List<DisbursementItem> versementsRecents;
 
+  const RevenueStats({
+    this.caAujourdhui = 0,
+    this.commandesAujourdhui = 0,
+    this.caSemaine = 0,
+    this.commandesSemaine = 0,
+    this.caMois = 0,
+    this.commandesMois = 0,
+    this.versementsRecents = const [],
+  });
+}
+
+class RevenueStatsNotifier extends StateNotifier<RevenueStats> {
+  final ApiClient? _api;
+  final Ref _ref;
+
+  RevenueStatsNotifier(this._api, this._ref) : super(const RevenueStats());
+
+  void reinitialiser() {
+    state = const RevenueStats();
+  }
+
+  Future<void> chargerRevenus() async {
+    if (_api == null) return;
+    try {
+      final res = await _api.get('/merchant/wallet');
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map) {
+        final donnees = Map<String, dynamic>.from(res.data['donnees'] as Map);
+        final wallet = donnees['wallet'] is Map
+            ? Map<String, dynamic>.from(donnees['wallet'] as Map)
+            : <String, dynamic>{};
+        final stats = donnees['stats'] is Map
+            ? Map<String, dynamic>.from(donnees['stats'] as Map)
+            : <String, dynamic>{};
+
+        final balance =
+            num.tryParse('${wallet['balance'] ?? 0}')?.toDouble() ?? 0;
+        _ref.read(businessProfileProvider.notifier).setWalletBalance(balance);
+
+        final rawVersements = donnees['versements_recents'] is List
+            ? donnees['versements_recents'] as List
+            : const [];
+        final versements = rawVersements
+            .whereType<Map>()
+            .map((e) => DisbursementItem.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+
+        state = RevenueStats(
+          caAujourdhui:
+              num.tryParse('${stats['ca_aujourdhui'] ?? 0}')?.toDouble() ?? 0,
+          commandesAujourdhui:
+              (stats['commandes_aujourdhui'] as num?)?.toInt() ?? 0,
+          caSemaine:
+              num.tryParse('${stats['ca_semaine'] ?? 0}')?.toDouble() ?? 0,
+          commandesSemaine: (stats['commandes_semaine'] as num?)?.toInt() ?? 0,
+          caMois: num.tryParse('${stats['ca_mois'] ?? 0}')?.toDouble() ?? 0,
+          commandesMois: (stats['commandes_mois'] as num?)?.toInt() ?? 0,
+          versementsRecents: versements,
+        );
+      }
+    } catch (_) {}
+  }
+}
+
+final revenueStatsProvider =
+    StateNotifierProvider<RevenueStatsNotifier, RevenueStats>((ref) {
+  final api = ref.watch(apiClientProvider);
+  return RevenueStatsNotifier(api, ref);
+});

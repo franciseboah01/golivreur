@@ -89,9 +89,20 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
         'password': pwd,
       });
 
-      if (res.statusCode == 200 && res.data['donnees'] != null) {
-        final token = res.data['donnees']['access_token'] as String?;
-        final refresh = res.data['donnees']['refresh_token'] as String?;
+      if (res.statusCode == 200 && res.data is Map && res.data['donnees'] != null) {
+        final donnees = res.data['donnees'] as Map;
+        final userRole = (donnees['user'] is Map ? donnees['user']['role'] : null)?.toString();
+        if (userRole != null && userRole != 'merchant') {
+          if (mounted) {
+            setState(() {
+              _chargement = false;
+              _erreur = 'Ce compte n\'est pas un compte commerçant.';
+            });
+          }
+          return;
+        }
+        final token = donnees['access_token'] as String?;
+        final refresh = donnees['refresh_token'] as String?;
         if (token != null) {
           await storage.write(key: 'access_token', value: token);
         }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/config/env_config.dart';
 import '../../business/providers/business_provider.dart';
@@ -38,9 +39,15 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
   Widget build(BuildContext context) {
     final profile = ref.watch(businessProfileProvider);
     final orders = ref.watch(businessOrdersProvider);
+    final catalog = ref.watch(businessCatalogProvider);
     final pendingCount = orders.where((o) => o.status == BusinessOrderStatus.pending).length;
-    final totalRevenue = orders.fold<double>(0, (sum, o) => sum + o.totalAmount);
     final logoUrl = GoLivreurEnv.resolveMediaUrl(profile.logoUrl);
+    final citySuffix = (profile.cityName != null && profile.cityName!.isNotEmpty)
+        ? ' à ${profile.cityName}'
+        : '';
+    final cityLabel = (profile.cityName != null && profile.cityName!.isNotEmpty)
+        ? ' (${profile.cityName})'
+        : '';
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -59,7 +66,7 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
             tooltip: 'Support Partenaires',
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Support Commerces Daloa : +225 07 00 00 00 02')),
+                SnackBar(content: Text('Contactez votre agence Support Partenaires GoLivreur$cityLabel.')),
               );
             },
           ),
@@ -67,7 +74,13 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
       ),
       body: RefreshIndicator(
         color: const Color(0xFF2E75B6),
-        onRefresh: () => ref.read(businessProfileProvider.notifier).chargerProfil(),
+        onRefresh: () async {
+          await Future.wait([
+            ref.read(businessProfileProvider.notifier).chargerProfil(),
+            ref.read(businessCatalogProvider.notifier).chargerCatalogue(),
+            ref.read(revenueStatsProvider.notifier).chargerRevenus(),
+          ]);
+        },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -189,7 +202,7 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                             ),
                           ),
                           Text(
-                            profile.isOpen ? 'Visible par les clients à Daloa' : 'Commandes suspendues temporairement',
+                            profile.isOpen ? 'Visible par les clients$citySuffix' : 'Commandes suspendues temporairement',
                             style: TextStyle(
                               fontSize: 12,
                               color: profile.isOpen ? Colors.green.shade700 : Colors.red.shade700,
@@ -251,7 +264,7 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                 icon: Icons.restaurant_menu,
                 color: Colors.purple,
                 title: 'Mon Catalogue',
-                badge: '5 produits',
+                badge: '${catalog.length} produit${catalog.length > 1 ? "s" : ""}',
                 badgeColor: Colors.purple,
                 onTap: () {
                   widget.onSwitchTab?.call(1);
@@ -261,7 +274,7 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                 icon: Icons.account_balance_wallet,
                 color: Colors.blue,
                 title: 'Recettes',
-                badge: '${totalRevenue.toInt()} F CFA',
+                badge: '${profile.walletBalance.toInt()} F CFA',
                 badgeColor: Colors.blue,
                 onTap: () {
                   widget.onSwitchTab?.call(2);
@@ -270,12 +283,12 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
               _buildQuickCard(
                 icon: Icons.notifications_active,
                 color: Colors.teal,
-                title: 'Alertes Daloa',
-                badge: 'Actif',
+                title: 'Notifications',
+                badge: profile.notificationsEnabled ? 'Actif' : 'Pause',
                 badgeColor: Colors.teal,
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Notifications sonores de nouvelles commandes activées')),
+                    const SnackBar(content: Text('Alertes de nouvelles commandes actives.')),
                   );
                 },
               ),
@@ -301,7 +314,11 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                 ListTile(
                   leading: const Icon(Icons.schedule, color: GoLivreurTheme.texteSecondaire),
                   title: const Text('Horaires de livraison'),
-                  subtitle: Text(profile.openHoursText),
+                  subtitle: Text(
+                    profile.openHoursText.isNotEmpty
+                        ? profile.openHoursText
+                        : 'Non renseignés',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _openEditProfile,
                 ),
@@ -309,11 +326,11 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                 ListTile(
                   leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.texteSecondaire),
                   title: const Text('Assistance Partenaires'),
-                  subtitle: const Text('Équipe GoLivreur Daloa'),
+                  subtitle: Text('Agence GoLivreur$cityLabel'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Centre d\'assistance GoLivreur Daloa joignable au 0700000002')),
+                      SnackBar(content: Text('Contactez votre agence GoLivreur$cityLabel.')),
                     );
                   },
                 ),
@@ -324,11 +341,19 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                     'Déconnexion boutique',
                     style: TextStyle(color: GoLivreurTheme.erreur, fontWeight: FontWeight.bold),
                   ),
-                  onTap: () {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const BusinessLoginScreen()),
-                      (route) => false,
-                    );
+                  onTap: () async {
+                    const storage = FlutterSecureStorage();
+                    await storage.deleteAll();
+                    ref.read(businessProfileProvider.notifier).reinitialiser();
+                    ref.read(businessCatalogProvider.notifier).reinitialiser();
+                    ref.read(businessOrdersProvider.notifier).reinitialiser();
+                    ref.read(revenueStatsProvider.notifier).reinitialiser();
+                    if (context.mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const BusinessLoginScreen()),
+                        (route) => false,
+                      );
+                    }
                   },
                 ),
               ],

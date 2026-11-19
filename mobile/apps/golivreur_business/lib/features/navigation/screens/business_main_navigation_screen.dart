@@ -13,10 +13,12 @@ class BusinessMainNavigationScreen extends ConsumerStatefulWidget {
   const BusinessMainNavigationScreen({super.key, this.initialIndex = 0});
 
   @override
-  ConsumerState<BusinessMainNavigationScreen> createState() => _BusinessMainNavigationScreenState();
+  ConsumerState<BusinessMainNavigationScreen> createState() =>
+      _BusinessMainNavigationScreenState();
 }
 
-class _BusinessMainNavigationScreenState extends ConsumerState<BusinessMainNavigationScreen> {
+class _BusinessMainNavigationScreenState
+    extends ConsumerState<BusinessMainNavigationScreen> {
   late int _currentIndex;
   late final List<Widget> _pages;
 
@@ -25,19 +27,48 @@ class _BusinessMainNavigationScreenState extends ConsumerState<BusinessMainNavig
     super.initState();
     _currentIndex = widget.initialIndex;
     _pages = [
-      const BusinessOrdersScreen(),
+      BusinessOrdersScreen(onSwitchTab: _switchToTab),
       const BusinessCatalogScreen(),
       const BusinessRevenueScreen(),
-      BusinessProfileScreen(onSwitchTab: (tabIndex) {
-        setState(() => _currentIndex = tabIndex);
-      }),
+      BusinessProfileScreen(onSwitchTab: _switchToTab),
     ];
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _synchroniserDonneesServeur();
+    });
+  }
+
+  void _switchToTab(int tabIndex) {
+    setState(() => _currentIndex = tabIndex);
+    _rafraichirOnglet(tabIndex);
+  }
+
+  Future<void> _synchroniserDonneesServeur() async {
+    await Future.wait([
+      ref.read(businessProfileProvider.notifier).chargerProfil(),
+      ref.read(businessCatalogProvider.notifier).chargerCatalogue(),
+      ref.read(businessOrdersProvider.notifier).chargerCommandes(),
+      ref.read(revenueStatsProvider.notifier).chargerRevenus(),
+    ]);
+  }
+
+  void _rafraichirOnglet(int index) {
+    if (index == 0) {
+      ref.read(businessOrdersProvider.notifier).chargerCommandes();
+    } else if (index == 1) {
+      ref.read(businessCatalogProvider.notifier).chargerCatalogue();
+    } else if (index == 2) {
+      ref.read(revenueStatsProvider.notifier).chargerRevenus();
+    } else if (index == 3) {
+      ref.read(businessProfileProvider.notifier).chargerProfil();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final orders = ref.watch(businessOrdersProvider);
-    final pendingCount = orders.where((o) => o.status == BusinessOrderStatus.pending).length;
+    final pendingCount =
+        orders.where((o) => o.status == BusinessOrderStatus.pending).length;
 
     return Scaffold(
       body: IndexedStack(
@@ -57,12 +88,10 @@ class _BusinessMainNavigationScreenState extends ConsumerState<BusinessMainNavig
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() => _currentIndex = index);
-          },
+          onTap: _switchToTab,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
-          selectedItemColor: const Color(0xFF2E75B6), // Accent d'identification Business Stitch
+          selectedItemColor: const Color(0xFF2E75B6),
           unselectedItemColor: GoLivreurTheme.texteSecondaire,
           selectedFontSize: 12,
           unselectedFontSize: 12,
@@ -85,7 +114,11 @@ class _BusinessMainNavigationScreenState extends ConsumerState<BusinessMainNavig
                         ),
                         child: Text(
                           '$pendingCount',
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -105,8 +138,8 @@ class _BusinessMainNavigationScreenState extends ConsumerState<BusinessMainNavig
               label: 'Revenus',
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
+              icon: Icon(Icons.storefront_outlined),
+              activeIcon: Icon(Icons.storefront),
               label: 'Profil',
             ),
           ],
@@ -115,4 +148,3 @@ class _BusinessMainNavigationScreenState extends ConsumerState<BusinessMainNavig
     );
   }
 }
-

@@ -31,10 +31,8 @@ class _BusinessRegisterScreenState extends State<BusinessRegisterScreen> {
   String? _erreur;
   String? _succesMessage;
 
-  List<Map<String, dynamic>> _cities = [
-    {'id': 1, 'name': 'Daloa'},
-  ];
-  int _selectedCityId = 1;
+  List<Map<String, dynamic>> _cities = [];
+  int? _selectedCityId;
 
   List<Map<String, String>> _categories = [
     {'slug': 'maquis', 'name': 'Maquis & Grillades'},
@@ -108,7 +106,7 @@ class _BusinessRegisterScreenState extends State<BusinessRegisterScreen> {
         }
       }
     } catch (_) {
-      // Conserve les options par défaut (Daloa + catégories standard)
+      // Conserve les catégories standard si hors-ligne
     } finally {
       if (mounted) {
         setState(() => _chargementOptions = false);
@@ -136,6 +134,12 @@ class _BusinessRegisterScreenState extends State<BusinessRegisterScreen> {
     if (password.length < 6) {
       setState(
         () => _erreur = 'Le mot de passe doit contenir au moins 6 caractères.',
+      );
+      return;
+    }
+    if (_selectedCityId == null) {
+      setState(
+        () => _erreur = 'Veuillez sélectionner votre ville d\'implantation.',
       );
       return;
     }
@@ -375,11 +379,13 @@ class _BusinessRegisterScreenState extends State<BusinessRegisterScreen> {
         ),
         const SizedBox(height: 14),
         DropdownButtonFormField<int>(
+          key: ValueKey('city_$_selectedCityId'),
           initialValue: _selectedCityId,
           decoration: const InputDecoration(
             labelText: 'Ville d\'implantation',
             prefixIcon: Icon(Icons.location_city_outlined),
           ),
+          hint: const Text('Sélectionner une ville'),
           items: _cities
               .map(
                 (city) => DropdownMenuItem<int>(
@@ -423,7 +429,7 @@ class _BusinessRegisterScreenState extends State<BusinessRegisterScreen> {
         TextFormField(
           controller: _addressController,
           decoration: const InputDecoration(
-            labelText: 'Adresse / Quartier (ex: Quartier Commerce, Daloa)',
+            labelText: 'Adresse / Quartier (ex: Quartier Commerce)',
             prefixIcon: Icon(Icons.place_outlined),
           ),
         ),

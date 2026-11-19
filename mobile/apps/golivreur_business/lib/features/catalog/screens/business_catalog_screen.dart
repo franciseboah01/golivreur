@@ -23,19 +23,52 @@ class BusinessCatalogScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: products.isEmpty
-          ? const Center(
-              child: Text('Aucun produit dans votre catalogue.', style: TextStyle(color: GoLivreurTheme.texteSecondaire)),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: products.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final item = products[index];
-                return _buildProductRow(context, ref, item);
-              },
-            ),
+      body: RefreshIndicator(
+        color: const Color(0xFF2E75B6),
+        onRefresh: () =>
+            ref.read(businessCatalogProvider.notifier).chargerCatalogue(),
+        child: products.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
+                children: const [
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: 48,
+                    color: GoLivreurTheme.texteSecondaire,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Aucun produit dans votre catalogue.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: GoLivreurTheme.textePrincipal,
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Appuyez sur « Ajouter un plat / article » pour publier votre premier article sur GoShop.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: GoLivreurTheme.texteSecondaire,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              )
+            : ListView.separated(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                itemCount: products.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final item = products[index];
+                  return _buildProductRow(context, ref, item);
+                },
+              ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: GoLivreurTheme.primaire,
         foregroundColor: Colors.white,
