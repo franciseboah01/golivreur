@@ -1,5 +1,6 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golivreur_core/services/gps_location_service.dart';
 import 'package:golivreur_core/services/pin_lock_service.dart';
 import 'package:golivreur_core/services/secure_token_storage.dart';
 import 'package:golivreur_core/services/sso_switch_service.dart';
@@ -143,6 +144,16 @@ void main() {
         SsoSwitchService.computeCodeChallenge(rfcVerifier),
         rfcExpectedChallenge,
       );
+    });
+  });
+
+  group('GpsLocationService Haversine', () {
+    test('calcule la distance reelle entre deux points GPS en Cote d Ivoire', () {
+      // Abidjan Plateau (5.3204, -4.0161) -> Yamoussoukro (6.8276, -5.2893) ~ 218 km
+      final km = GpsLocationService.distanceKm(5.3204, -4.0161, 6.8276, -5.2893);
+      expect(km, greaterThan(200));
+      expect(km, lessThan(235));
+      expect(GpsLocationService.distanceKm(6.8770, -6.4502, 6.8770, -6.4502), closeTo(0, 0.001));
     });
   });
 }

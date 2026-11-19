@@ -277,6 +277,10 @@ class ParcelModel {
   final String recipientName;
   final String recipientPhone;
   final String deliveryAddress;
+  final double? pickupLat;
+  final double? pickupLng;
+  final double? deliveryLat;
+  final double? deliveryLng;
   final double shippingFee;
   final String paymentMethod;
   final bool senderCodeLocked;
@@ -297,6 +301,10 @@ class ParcelModel {
     required this.recipientName,
     required this.recipientPhone,
     required this.deliveryAddress,
+    this.pickupLat,
+    this.pickupLng,
+    this.deliveryLat,
+    this.deliveryLng,
     required this.shippingFee,
     required this.paymentMethod,
     required this.senderCodeLocked,
@@ -318,6 +326,10 @@ class ParcelModel {
         recipientName: json['recipient_name'] as String,
         recipientPhone: json['recipient_phone'] as String,
         deliveryAddress: json['delivery_address'] as String,
+        pickupLat: (json['pickup_lat'] as num?)?.toDouble(),
+        pickupLng: (json['pickup_lng'] as num?)?.toDouble(),
+        deliveryLat: (json['delivery_lat'] as num?)?.toDouble(),
+        deliveryLng: (json['delivery_lng'] as num?)?.toDouble(),
         shippingFee: (json['shipping_fee'] as num).toDouble(),
         paymentMethod: json['payment_method'] as String,
         senderCodeLocked: json['sender_code_locked'] as bool? ?? false,

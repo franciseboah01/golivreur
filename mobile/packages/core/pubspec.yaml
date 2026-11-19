@@ -28,8 +28,12 @@ dependencies:
   # Stockage sécurisé (tokens JWT)
   flutter_secure_storage: 9.0.0
 
-  # Cartographie
+  # Cartographie & GPS (100 % gratuit : OpenStreetMap + puce GPS native)
   google_maps_flutter: 2.6.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  geolocator: 11.0.0
+  geocoding: 3.0.0
 
   # Firebase (FCM + Crashlytics)
   firebase_core: 2.30.1
