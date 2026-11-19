@@ -1,11 +1,11 @@
 {
-    "name": "golivreur_client",
-    "short_name": "golivreur_client",
+    "name": "GL Client",
+    "short_name": "GL Client",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1A1A2E",
+    "theme_color": "#F4A623",
+    "description": "GL Client — Commandez vos repas, courses et colis GoLivreur.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

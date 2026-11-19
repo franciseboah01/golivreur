@@ -1,11 +1,11 @@
 {
-    "name": "golivreur_business",
-    "short_name": "golivreur_business",
+    "name": "GL Business",
+    "short_name": "GL Business",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1A1A2E",
+    "theme_color": "#1B5E20",
+    "description": "GL Business — Espace commerçants partenaires GoLivreur.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

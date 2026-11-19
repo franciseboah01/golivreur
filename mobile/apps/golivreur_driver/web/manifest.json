@@ -1,11 +1,11 @@
 {
-    "name": "golivreur_driver",
-    "short_name": "golivreur_driver",
+    "name": "GL Driver",
+    "short_name": "GL Driver",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1A1A2E",
+    "theme_color": "#1565C0",
+    "description": "GL Driver — Espace livreurs partenaires GoLivreur.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
