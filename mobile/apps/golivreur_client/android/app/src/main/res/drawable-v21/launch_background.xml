@@ -1,10 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Écran de démarrage natif GoLivreur — Fond sombre #121212 avec icône moto orange -->
+<!-- Transition transparente vers l'écran Flutter sans écran de splash natif intermédiaire -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_background" />
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/splash_logo" />
-    </item>
 </layer-list>
