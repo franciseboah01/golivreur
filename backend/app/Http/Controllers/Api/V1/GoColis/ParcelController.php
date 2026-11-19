@@ -21,6 +21,20 @@ class ParcelController extends Controller
 {
     use NormalizesIvorianPhone;
 
+    public function indexClient(): JsonResponse
+    {
+        $parcels = Parcel::where('sender_id', auth()->id())
+            ->with(['courier.user', 'photos'])
+            ->latest()
+            ->limit(30)
+            ->get();
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $parcels,
+        ]);
+    }
+
     public function store(Request $request, ParcelService $service): JsonResponse
     {
         $cityId = auth()->user()?->city_id;

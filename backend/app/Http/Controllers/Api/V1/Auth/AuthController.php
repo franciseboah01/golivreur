@@ -419,7 +419,13 @@ class AuthController extends Controller
 
         $password = $validated['password'];
 
-        $user = User::where('phone', $phone)
+        $candidatePhones = array_values(array_unique(array_filter([
+            $phone,
+            $rawPhone,
+            $phone !== '' ? "+225{$phone}" : '',
+        ])));
+
+        $user = User::whereIn('phone', $candidatePhones)
             ->whereNull('deleted_at')
             ->first();
 

@@ -144,6 +144,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::get('orders/{order}/confirmation-code', [ClientController::class, 'orderConfirmationCode']);
         Route::get('orders/{order}/courier-location', [ClientController::class, 'orderCourierLocation'])
             ->middleware('throttle:client-courier-location');
+        Route::get('parcels', [ParcelController::class, 'indexClient']);
         Route::post('parcels', [ParcelController::class, 'store']);
         Route::get('parcels/{parcel}', [ParcelController::class, 'showClient']);
         Route::get('parcels/{parcel}/sender-code', [ParcelController::class, 'senderCode']);
@@ -177,6 +178,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
             Route::post('products', [MerchantController::class, 'storeProduct']);
             Route::put('products/{product}', [MerchantController::class, 'updateProduct']);
             Route::delete('products/{product}', [MerchantController::class, 'deleteProduct']);
+            Route::get('wallet', [MerchantController::class, 'wallet']);
         });
     });
 

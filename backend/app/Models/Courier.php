@@ -12,6 +12,17 @@ class Courier extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected static function booted(): void
+    {
+        static::saved(function (Courier $courier): void {
+            if ($courier->wasChanged('is_active') && $courier->user_id !== null) {
+                User::whereKey($courier->user_id)->update([
+                    'is_active' => (bool) $courier->is_active,
+                ]);
+            }
+        });
+    }
+
     protected $fillable = [
         'user_id',
         'city_id',

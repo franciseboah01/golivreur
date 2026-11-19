@@ -18,6 +18,17 @@ class Merchant extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected static function booted(): void
+    {
+        static::saved(function (Merchant $merchant): void {
+            if ($merchant->wasChanged('is_active') && $merchant->user_id !== null) {
+                User::whereKey($merchant->user_id)->update([
+                    'is_active' => (bool) $merchant->is_active,
+                ]);
+            }
+        });
+    }
+
     protected $fillable = [
         'user_id',
         'city_id',

@@ -17,7 +17,14 @@ class EditCourier extends EditRecord
         /** @var Courier $record */
         $record = $this->getRecord();
 
-        return FilamentCityScope::enforceCityOnSave($data, $record);
+        $data = FilamentCityScope::enforceCityOnSave($data, $record);
+
+        if (! empty($data['is_active']) && $record->activated_at === null) {
+            $data['activated_at'] = now();
+            $data['activated_by'] = auth()->id();
+        }
+
+        return $data;
     }
 
     protected function getHeaderActions(): array

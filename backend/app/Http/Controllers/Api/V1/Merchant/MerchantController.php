@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Wallet;
+use App\Models\WalletTransaction;
 use App\Modules\GoShop\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -207,6 +209,64 @@ class MerchantController extends Controller
         return response()->json([
             'succes' => true,
             'message' => 'Produit retiré du catalogue.',
+        ]);
+    }
+
+    public function wallet(): JsonResponse
+    {
+        $merchant = $this->getMerchant();
+
+        $wallet = Wallet::firstOrCreate(
+            ['owner_type' => 'merchant', 'owner_id' => $merchant->id],
+            ['balance' => 0, 'total_earned' => 0, 'total_withdrawn' => 0]
+        );
+
+        $transactions = WalletTransaction::where('wallet_id', $wallet->id)
+            ->latest()
+            ->paginate(20);
+
+        $todayStart = now()->startOfDay();
+        $weekStart = now()->startOfWeek();
+        $monthStart = now()->startOfMonth();
+
+        $baseQuery = Order::where('merchant_id', $merchant->id)
+            ->where('status', Order::STATUS_DELIVERED);
+
+        $todayQuery = (clone $baseQuery)->where('delivered_at', '>=', $todayStart);
+        $weekQuery = (clone $baseQuery)->where('delivered_at', '>=', $weekStart);
+        $monthQuery = (clone $baseQuery)->where('delivered_at', '>=', $monthStart);
+
+        $versements = WalletTransaction::where('wallet_id', $wallet->id)
+            ->whereIn('type', ['withdrawal', 'payout', 'debit'])
+            ->latest()
+            ->limit(20)
+            ->get()
+            ->map(function (WalletTransaction $tx): array {
+                return [
+                    'id' => $tx->reference ?: 'VER-'.$tx->id,
+                    'montant' => (int) round(abs((float) $tx->amount)),
+                    'date' => $tx->created_at?->format('d/m/Y') ?? '',
+                    'statut' => (string) ($tx->status ?? 'completed'),
+                    'description' => (string) ($tx->description ?? ''),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'wallet' => $wallet,
+                'transactions' => $transactions,
+                'stats' => [
+                    'ca_aujourdhui' => (int) round((float) (clone $todayQuery)->sum('merchant_amount')),
+                    'commandes_aujourdhui' => (clone $todayQuery)->count(),
+                    'ca_semaine' => (int) round((float) (clone $weekQuery)->sum('merchant_amount')),
+                    'commandes_semaine' => (clone $weekQuery)->count(),
+                    'ca_mois' => (int) round((float) (clone $monthQuery)->sum('merchant_amount')),
+                    'commandes_mois' => (clone $monthQuery)->count(),
+                ],
+                'versements_recents' => $versements,
+            ],
         ]);
     }
 }

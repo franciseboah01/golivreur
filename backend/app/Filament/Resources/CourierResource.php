@@ -103,19 +103,29 @@ class CourierResource extends Resource
                                     ->label('Mot de passe')
                                     ->password()
                                     ->required()
-                                    ->minLength(8)
-                                    ->dehydrateStateUsing(fn ($state) => Hash::make($state)),
+                                    ->minLength(8),
                             ])
                             ->createOptionUsing(function (array $data): int {
                                 if (! FilamentCityScope::hasValidLocalCity()) {
                                     abort(403, 'Aucune ville rattachée à votre compte administrateur.');
                                 }
 
+                                $rawPhone = preg_replace('/[\s\.\-\(\)]+/', '', trim((string) $data['phone'])) ?? '';
+                                if (str_starts_with($rawPhone, '+225')) {
+                                    $normalizedPhone = substr($rawPhone, 4);
+                                } elseif (str_starts_with($rawPhone, '00225')) {
+                                    $normalizedPhone = substr($rawPhone, 5);
+                                } elseif (strlen($rawPhone) === 13 && str_starts_with($rawPhone, '225')) {
+                                    $normalizedPhone = substr($rawPhone, 3);
+                                } else {
+                                    $normalizedPhone = $rawPhone;
+                                }
+
                                 $user = User::create([
                                     'name' => $data['name'],
-                                    'phone' => $data['phone'],
+                                    'phone' => $normalizedPhone,
                                     'email' => $data['email'],
-                                    'password' => Hash::make($data['password']),
+                                    'password' => Hash::make((string) $data['password']),
                                     'role' => 'driver',
                                     'city_id' => FilamentCityScope::localCityId(),
                                     'is_active' => true,

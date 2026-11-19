@@ -29,6 +29,9 @@ class ClientAddress extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @return BelongsTo<City, $this>
+     */
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
@@ -39,13 +42,16 @@ class ClientAddress extends Model
      */
     public function formattedFullAddress(): string
     {
-        $cityName = $this->city->name ?? 'Daloa';
+        $cityName = trim((string) ($this->city->name ?? ''));
+        $neighborhood = trim((string) $this->neighborhood);
         $details = trim((string) $this->address_line);
 
+        $prefix = $cityName !== '' ? "{$cityName}, {$neighborhood}" : $neighborhood;
+
         if ($details === '') {
-            return "{$cityName}, {$this->neighborhood}";
+            return $prefix;
         }
 
-        return "{$cityName}, {$this->neighborhood} — {$details}";
+        return "{$prefix} — {$details}";
     }
 }

@@ -580,11 +580,92 @@ class DriverController extends Controller
             ->latest()
             ->paginate(20);
 
+        $todayStart = now()->startOfDay();
+        $weekStart = now()->startOfWeek();
+
+        $ordersToday = Order::where('courier_id', $courier->id)
+            ->where('status', Order::STATUS_DELIVERED)
+            ->where('delivered_at', '>=', $todayStart);
+        $parcelsToday = Parcel::where('courier_id', $courier->id)
+            ->where('status', Parcel::STATUS_DELIVERED)
+            ->where('delivered_at', '>=', $todayStart);
+
+        $ordersWeek = Order::where('courier_id', $courier->id)
+            ->where('status', Order::STATUS_DELIVERED)
+            ->where('delivered_at', '>=', $weekStart);
+        $parcelsWeek = Parcel::where('courier_id', $courier->id)
+            ->where('status', Parcel::STATUS_DELIVERED)
+            ->where('delivered_at', '>=', $weekStart);
+
+        $coursesToday = (clone $ordersToday)->count() + (clone $parcelsToday)->count();
+        $earningsToday = (int) round((float) (clone $ordersToday)->sum('courier_amount'))
+            + (int) (clone $parcelsToday)->sum('courier_amount');
+
+        $coursesWeek = (clone $ordersWeek)->count() + (clone $parcelsWeek)->count();
+        $earningsWeek = (int) round((float) (clone $ordersWeek)->sum('courier_amount'))
+            + (int) (clone $parcelsWeek)->sum('courier_amount');
+
+        $totalCourses = Order::where('courier_id', $courier->id)
+            ->where('status', Order::STATUS_DELIVERED)
+            ->count()
+            + Parcel::where('courier_id', $courier->id)
+                ->where('status', Parcel::STATUS_DELIVERED)
+                ->count();
+
+        $recentOrders = Order::where('courier_id', $courier->id)
+            ->where('status', Order::STATUS_DELIVERED)
+            ->with('merchant:id,name')
+            ->latest('delivered_at')
+            ->limit(10)
+            ->get()
+            ->map(function (Order $o): array {
+                return [
+                    'id' => 'order-'.$o->id,
+                    'type' => 'goshop',
+                    'title' => $o->merchant->name ?? "Commande #{$o->id}",
+                    'route' => (string) ($o->delivery_address ?? ''),
+                    'amount' => (int) round((float) ($o->courier_amount ?? 0)),
+                    'time' => $o->delivered_at?->format('d/m H:i') ?? '',
+                    'delivered_at' => $o->delivered_at?->toIso8601String(),
+                ];
+            });
+
+        $recentParcels = Parcel::where('courier_id', $courier->id)
+            ->where('status', Parcel::STATUS_DELIVERED)
+            ->latest('delivered_at')
+            ->limit(10)
+            ->get()
+            ->map(function (Parcel $p): array {
+                return [
+                    'id' => 'parcel-'.$p->id,
+                    'type' => 'gocolis',
+                    'title' => "Colis #{$p->id}",
+                    'route' => trim(($p->pickup_address ?? '').' -> '.($p->delivery_address ?? '')),
+                    'amount' => (int) ($p->courier_amount ?? 0),
+                    'time' => $p->delivered_at?->format('d/m H:i') ?? '',
+                    'delivered_at' => $p->delivered_at?->toIso8601String(),
+                ];
+            });
+
+        $recentCourses = $recentOrders
+            ->concat($recentParcels)
+            ->sortByDesc('delivered_at')
+            ->take(15)
+            ->values();
+
         return response()->json([
             'succes' => true,
             'donnees' => [
                 'wallet' => $wallet,
                 'transactions' => $transactions,
+                'stats' => [
+                    'courses_today' => $coursesToday,
+                    'courses_week' => $coursesWeek,
+                    'earnings_today' => $earningsToday,
+                    'earnings_week' => $earningsWeek,
+                    'total_courses' => $totalCourses,
+                ],
+                'recent_courses' => $recentCourses,
             ],
         ]);
     }

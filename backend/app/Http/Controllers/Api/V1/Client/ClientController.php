@@ -46,10 +46,10 @@ class ClientController extends Controller
      */
     public function merchants(Request $request): JsonResponse
     {
-        $cityId = $request->input('city_id', auth()->user()->city_id ?? 1);
+        $cityId = $request->input('city_id', auth('api')->user()?->city_id);
 
         $merchants = Merchant::query()
-            ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
+            ->when($cityId !== null && $cityId !== '', fn ($q) => $q->where('city_id', (int) $cityId))
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->input('category')))
             ->where('is_active', true)
             ->with([
@@ -576,7 +576,7 @@ class ClientController extends Controller
         return [
             'id' => $address->id,
             'city_id' => $address->city_id,
-            'city_name' => $address->city->name ?? 'Daloa',
+            'city_name' => $address->city->name ?? '',
             'label' => $address->label,
             'neighborhood' => $address->neighborhood,
             'address_line' => $address->address_line,
