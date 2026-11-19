@@ -502,9 +502,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<(bool, String?)> mettreAJourProfil({
-    required String name,
-    required String phone,
-    String? email,
     String? defaultAddress,
     String language = 'fr',
     bool notificationsEnabled = true,
@@ -514,9 +511,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiClient.uploadMultipart(
         '/client/profile',
         fields: {
-          'name': name.trim(),
-          'phone': normalizePhone(phone),
-          'email': email?.trim() ?? '',
           'default_address': defaultAddress?.trim() ?? '',
           'language': language,
           'notifications_enabled': notificationsEnabled ? '1' : '0',
@@ -539,6 +533,136 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return (false, ApiClient.messageErreur(e));
     } catch (_) {
       return (false, 'Impossible de mettre à jour le profil.');
+    }
+  }
+
+  Future<(bool, String)> demanderOtpChangementTelephone(String newPhone) async {
+    try {
+      final res = await _apiClient.post(
+        '/client/profile/phone/request-otp',
+        data: {'phone': normalizePhone(newPhone)},
+      );
+      if (res.statusCode == 200 && res.data['succes'] == true) {
+        return (
+          true,
+          res.data['message']?.toString() ??
+              'Code OTP envoyé sur votre nouveau numéro.',
+        );
+      }
+      return (
+        false,
+        res.data['message']?.toString() ?? 'Impossible d\'envoyer le code OTP.',
+      );
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Impossible d\'envoyer le code OTP.');
+    }
+  }
+
+  Future<(bool, String)> confirmerChangementTelephone({
+    required String newPhone,
+    required String code,
+  }) async {
+    try {
+      final res = await _apiClient.post(
+        '/client/profile/phone/confirm',
+        data: {
+          'phone': normalizePhone(newPhone),
+          'code': code.trim(),
+        },
+      );
+      if (res.statusCode == 200 &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map<String, dynamic>) {
+        final user =
+            UserModel.fromJson(res.data['donnees'] as Map<String, dynamic>);
+        state = state.copyWith(
+          status: AuthStatus.authenticated,
+          user: user,
+          phoneNumber: user.phone,
+          errorMessage: null,
+        );
+        return (
+          true,
+          res.data['message']?.toString() ??
+              'Numéro de téléphone mis à jour avec succès.',
+        );
+      }
+      return (
+        false,
+        res.data['message']?.toString() ?? 'Code OTP invalide ou expiré.',
+      );
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Impossible de confirmer le nouveau numéro.');
+    }
+  }
+
+  Future<(bool, String)> demanderOtpChangementEmail(String newEmail) async {
+    try {
+      final res = await _apiClient.post(
+        '/client/profile/email/request-otp',
+        data: {'email': newEmail.trim().toLowerCase()},
+      );
+      if (res.statusCode == 200 && res.data['succes'] == true) {
+        return (
+          true,
+          res.data['message']?.toString() ??
+              'Code de confirmation envoyé par email.',
+        );
+      }
+      return (
+        false,
+        res.data['message']?.toString() ??
+            'Impossible d\'envoyer le code par email.',
+      );
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Impossible d\'envoyer le code par email.');
+    }
+  }
+
+  Future<(bool, String)> confirmerChangementEmail({
+    required String newEmail,
+    required String code,
+  }) async {
+    try {
+      final res = await _apiClient.post(
+        '/client/profile/email/confirm',
+        data: {
+          'email': newEmail.trim().toLowerCase(),
+          'code': code.trim(),
+        },
+      );
+      if (res.statusCode == 200 &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map<String, dynamic>) {
+        final user =
+            UserModel.fromJson(res.data['donnees'] as Map<String, dynamic>);
+        state = state.copyWith(
+          status: AuthStatus.authenticated,
+          user: user,
+          phoneNumber: user.phone,
+          errorMessage: null,
+        );
+        return (
+          true,
+          res.data['message']?.toString() ??
+              'Adresse email confirmée et enregistrée.',
+        );
+      }
+      return (
+        false,
+        res.data['message']?.toString() ??
+            'Code de confirmation invalide ou expiré.',
+      );
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Impossible de confirmer l\'adresse email.');
     }
   }
 

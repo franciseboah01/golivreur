@@ -1,20 +1,27 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../auth/providers/auth_provider.dart';
 
-/// Écran « Modifier mon profil » — GoLivreur Client.
+/// Écran « Modifier mon profil » — GL Client.
+///
+/// Règles d'intégrité :
+///  - Le nom est verrouillé après inscription (lecture seule).
+///  - Le numéro de téléphone ne peut être modifié qu'avec un OTP envoyé au NOUVEAU numéro.
+///  - L'ajout ou modification d'un email nécessite un code de confirmation envoyé par email.
 class EditClientProfileScreen extends ConsumerStatefulWidget {
   const EditClientProfileScreen({super.key});
 
   @override
-  ConsumerState<EditClientProfileScreen> createState() => _EditClientProfileScreenState();
+  ConsumerState<EditClientProfileScreen> createState() =>
+      _EditClientProfileScreenState();
 }
 
-class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScreen> {
+class _EditClientProfileScreenState
+    extends ConsumerState<EditClientProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _nameCtrl;
@@ -90,15 +97,15 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
       _errorMsg = null;
     });
 
-    final (success, error) = await ref.read(authProvider.notifier).mettreAJourProfil(
-          name: _nameCtrl.text.trim(),
-          phone: _phoneCtrl.text.trim(),
-          email: _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : null,
-          defaultAddress: _addressCtrl.text.trim().isNotEmpty ? _addressCtrl.text.trim() : null,
-          language: _language,
-          notificationsEnabled: _notificationsEnabled,
-          photo: _pickedPhoto,
-        );
+    final (success, error) =
+        await ref.read(authProvider.notifier).mettreAJourProfil(
+              defaultAddress: _addressCtrl.text.trim().isNotEmpty
+                  ? _addressCtrl.text.trim()
+                  : null,
+              language: _language,
+              notificationsEnabled: _notificationsEnabled,
+              photo: _pickedPhoto,
+            );
 
     if (!mounted) return;
 
@@ -113,13 +120,489 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
       );
       Navigator.of(context).pop(true);
     } else {
-      setState(() => _errorMsg = error ?? 'Impossible de sauvegarder vos modifications.');
+      setState(() =>
+          _errorMsg = error ?? 'Impossible de sauvegarder vos modifications.');
+    }
+  }
+
+  Future<void> _openPhoneChangeSheet() async {
+    final newPhoneCtrl = TextEditingController();
+    final otpCtrl = TextEditingController();
+    var step = 1; // 1 = saisir nouveau numéro, 2 = saisir OTP 6 chiffres
+    var busy = false;
+    String? sheetError;
+    String? infoMessage;
+
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
+          return Padding(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 24 + bottomInset),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.phonelink_lock,
+                        color: GoLivreurTheme.primaire),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        step == 1
+                            ? 'Modifier mon numéro'
+                            : 'Confirmer le nouveau numéro',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  step == 1
+                      ? 'Un code OTP de confirmation à 6 chiffres sera envoyé par SMS sur votre nouveau numéro.'
+                      : 'Saisissez le code OTP à 6 chiffres reçu sur le +225 ${AuthNotifier.normalizePhone(newPhoneCtrl.text)}.',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: GoLivreurTheme.texteSecondaire,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (step == 1)
+                  TextField(
+                    controller: newPhoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Nouveau numéro ivoirien (10 chiffres)',
+                      hintText: '0701000099',
+                      prefixText: '+225 ',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                  )
+                else
+                  TextField(
+                    controller: otpCtrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 6,
+                    ),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: 'Code OTP (6 chiffres)',
+                      border: OutlineInputBorder(),
+                      counterText: '',
+                    ),
+                  ),
+                if (infoMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    infoMessage!,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: GoLivreurTheme.secondaire,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                if (sheetError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    sheetError!,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: GoLivreurTheme.erreur,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                if (step == 1)
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: GoLivreurTheme.primaire,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            final validationErr =
+                                ProfileFormHelpers.validateIvorianPhone(
+                                    newPhoneCtrl.text);
+                            if (validationErr != null) {
+                              setSheetState(() => sheetError = validationErr);
+                              return;
+                            }
+                            setSheetState(() {
+                              busy = true;
+                              sheetError = null;
+                              infoMessage = null;
+                            });
+                            final (ok, msg) = await ref
+                                .read(authProvider.notifier)
+                                .demanderOtpChangementTelephone(
+                                    newPhoneCtrl.text);
+                            if (!ctx.mounted) return;
+                            setSheetState(() {
+                              busy = false;
+                              if (ok) {
+                                step = 2;
+                                infoMessage = msg;
+                              } else {
+                                sheetError = msg;
+                              }
+                            });
+                          },
+                    child: busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Envoyer le code OTP'),
+                  )
+                else ...[
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: GoLivreurTheme.secondaire,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            if (!RegExp(r'^\d{6}$')
+                                .hasMatch(otpCtrl.text.trim())) {
+                              setSheetState(() => sheetError =
+                                  'Saisissez le code OTP à 6 chiffres.');
+                              return;
+                            }
+                            setSheetState(() {
+                              busy = true;
+                              sheetError = null;
+                            });
+                            final (ok, msg) = await ref
+                                .read(authProvider.notifier)
+                                .confirmerChangementTelephone(
+                                  newPhone: newPhoneCtrl.text,
+                                  code: otpCtrl.text,
+                                );
+                            if (!ctx.mounted) return;
+                            if (ok) {
+                              Navigator.of(ctx).pop(true);
+                            } else {
+                              setSheetState(() {
+                                busy = false;
+                                sheetError = msg;
+                              });
+                            }
+                          },
+                    child: busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Confirmer le nouveau numéro'),
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton(
+                    onPressed: busy
+                        ? null
+                        : () => setSheetState(() {
+                              step = 1;
+                              otpCtrl.clear();
+                              sheetError = null;
+                              infoMessage = null;
+                            }),
+                    child: const Text('Modifier le numéro saisi'),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    newPhoneCtrl.dispose();
+    otpCtrl.dispose();
+
+    if (updated == true && mounted) {
+      final refreshed = ref.read(authProvider).user;
+      if (refreshed != null) {
+        setState(() => _phoneCtrl.text = refreshed.phone);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Numéro de téléphone confirmé et mis à jour !'),
+          backgroundColor: GoLivreurTheme.succes,
+        ),
+      );
+    }
+  }
+
+  Future<void> _openEmailChangeSheet() async {
+    final newEmailCtrl = TextEditingController();
+    final otpCtrl = TextEditingController();
+    var step = 1;
+    var busy = false;
+    String? sheetError;
+    String? infoMessage;
+
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
+          return Padding(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 24 + bottomInset),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.mark_email_read_outlined,
+                        color: GoLivreurTheme.primaire),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        step == 1
+                            ? 'Confirmer une adresse email'
+                            : 'Saisir le code reçu par email',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  step == 1
+                      ? 'Un code de confirmation à 6 chiffres sera envoyé à cette adresse email avant son enregistrement.'
+                      : 'Saisissez le code à 6 chiffres envoyé à ${newEmailCtrl.text.trim().toLowerCase()}.',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: GoLivreurTheme.texteSecondaire,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (step == 1)
+                  TextField(
+                    controller: newEmailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Adresse email',
+                      hintText: 'exemple@domaine.ci',
+                      prefixIcon: Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                  )
+                else
+                  TextField(
+                    controller: otpCtrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 6,
+                    ),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: 'Code de confirmation (6 chiffres)',
+                      border: OutlineInputBorder(),
+                      counterText: '',
+                    ),
+                  ),
+                if (infoMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    infoMessage!,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: GoLivreurTheme.secondaire,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                if (sheetError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    sheetError!,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: GoLivreurTheme.erreur,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                if (step == 1)
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: GoLivreurTheme.primaire,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            final emailText = newEmailCtrl.text.trim();
+                            if (emailText.isEmpty) {
+                              setSheetState(() =>
+                                  sheetError = 'Veuillez saisir une adresse email.');
+                              return;
+                            }
+                            final validationErr =
+                                ProfileFormHelpers.validateOptionalEmail(
+                                    emailText);
+                            if (validationErr != null) {
+                              setSheetState(() => sheetError = validationErr);
+                              return;
+                            }
+                            setSheetState(() {
+                              busy = true;
+                              sheetError = null;
+                              infoMessage = null;
+                            });
+                            final (ok, msg) = await ref
+                                .read(authProvider.notifier)
+                                .demanderOtpChangementEmail(emailText);
+                            if (!ctx.mounted) return;
+                            setSheetState(() {
+                              busy = false;
+                              if (ok) {
+                                step = 2;
+                                infoMessage = msg;
+                              } else {
+                                sheetError = msg;
+                              }
+                            });
+                          },
+                    child: busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Envoyer le code de confirmation'),
+                  )
+                else ...[
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: GoLivreurTheme.secondaire,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            if (!RegExp(r'^\d{6}$')
+                                .hasMatch(otpCtrl.text.trim())) {
+                              setSheetState(() => sheetError =
+                                  'Saisissez le code à 6 chiffres reçu par email.');
+                              return;
+                            }
+                            setSheetState(() {
+                              busy = true;
+                              sheetError = null;
+                            });
+                            final (ok, msg) = await ref
+                                .read(authProvider.notifier)
+                                .confirmerChangementEmail(
+                                  newEmail: newEmailCtrl.text,
+                                  code: otpCtrl.text,
+                                );
+                            if (!ctx.mounted) return;
+                            if (ok) {
+                              Navigator.of(ctx).pop(true);
+                            } else {
+                              setSheetState(() {
+                                busy = false;
+                                sheetError = msg;
+                              });
+                            }
+                          },
+                    child: busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Confirmer l\'adresse email'),
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton(
+                    onPressed: busy
+                        ? null
+                        : () => setSheetState(() {
+                              step = 1;
+                              otpCtrl.clear();
+                              sheetError = null;
+                              infoMessage = null;
+                            }),
+                    child: const Text('Modifier l\'email saisi'),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    newEmailCtrl.dispose();
+    otpCtrl.dispose();
+
+    if (updated == true && mounted) {
+      final refreshed = ref.read(authProvider).user;
+      if (refreshed != null) {
+        setState(() => _emailCtrl.text = refreshed.email ?? '');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Adresse email confirmée et enregistrée !'),
+          backgroundColor: GoLivreurTheme.succes,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
+    final hasEmail = _emailCtrl.text.trim().isNotEmpty;
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -129,7 +612,8 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
         elevation: 0.5,
       ),
       body: _isInitialLoading
-          ? const Center(child: CircularProgressIndicator(color: GoLivreurTheme.primaire))
+          ? const Center(
+              child: CircularProgressIndicator(color: GoLivreurTheme.primaire))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Form(
@@ -169,20 +653,26 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
                         decoration: BoxDecoration(
                           color: GoLivreurTheme.erreur.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: GoLivreurTheme.erreur.withValues(alpha: 0.4)),
+                          border: Border.all(
+                              color:
+                                  GoLivreurTheme.erreur.withValues(alpha: 0.4)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline, color: GoLivreurTheme.erreur),
+                            const Icon(Icons.error_outline,
+                                color: GoLivreurTheme.erreur),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 _errorMsg!,
-                                style: const TextStyle(color: GoLivreurTheme.erreur, fontSize: 13),
+                                style: const TextStyle(
+                                    color: GoLivreurTheme.erreur, fontSize: 13),
                               ),
                             ),
                             TextButton(
-                              onPressed: _isSaving ? null : (_loadFailed ? _loadFromApi : _save),
+                              onPressed: _isSaving
+                                  ? null
+                                  : (_loadFailed ? _loadFromApi : _save),
                               child: const Text('Réessayer'),
                             ),
                           ],
@@ -204,42 +694,82 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
                         children: [
                           const Text(
                             'Informations personnelles',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 14),
+
+                          // Nom verrouillé après inscription
                           TextFormField(
                             controller: _nameCtrl,
+                            readOnly: true,
+                            enabled: false,
                             decoration: const InputDecoration(
-                              labelText: 'Nom et prénom *',
+                              labelText: 'Nom et prénom (verrouillé)',
+                              helperText:
+                                  'Non modifiable après inscription — contactez le support en cas d\'erreur.',
+                              helperMaxLines: 2,
                               prefixIcon: Icon(Icons.person_outline),
+                              suffixIcon: Icon(Icons.lock_outline,
+                                  size: 18,
+                                  color: GoLivreurTheme.texteSecondaire),
+                              filled: true,
+                              fillColor: GoLivreurTheme.fond,
                               border: OutlineInputBorder(),
                             ),
-                            validator: ProfileFormHelpers.validateRequiredName,
                           ),
                           const SizedBox(height: 14),
+
+                          // Numéro de téléphone modifiable uniquement via OTP sur le nouveau numéro
                           TextFormField(
                             controller: _phoneCtrl,
-                            keyboardType: TextInputType.phone,
-                            decoration: const InputDecoration(
-                              labelText: 'Téléphone ivoirien *',
-                              hintText: '0701000001',
-                              prefixIcon: Icon(Icons.phone_outlined),
-                              border: OutlineInputBorder(),
+                            readOnly: true,
+                            decoration: InputDecoration(
+                              labelText: 'Téléphone ivoirien',
+                              helperText:
+                                  'Confirmation par code OTP sur le nouveau numéro requise.',
+                              prefixIcon: const Icon(Icons.phone_outlined),
+                              prefixText: '+225 ',
+                              suffixIcon: TextButton(
+                                onPressed: _openPhoneChangeSheet,
+                                child: const Text(
+                                  'Modifier',
+                                  style: TextStyle(
+                                    color: GoLivreurTheme.primaire,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              border: const OutlineInputBorder(),
                             ),
-                            validator: ProfileFormHelpers.validateIvorianPhone,
                           ),
                           const SizedBox(height: 14),
+
+                          // Email modifiable / ajoutable uniquement via code de confirmation par email
                           TextFormField(
                             controller: _emailCtrl,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: const InputDecoration(
+                            readOnly: true,
+                            decoration: InputDecoration(
                               labelText: 'Adresse email (optionnelle)',
-                              prefixIcon: Icon(Icons.email_outlined),
-                              border: OutlineInputBorder(),
+                              hintText: 'Aucune adresse email enregistrée',
+                              helperText:
+                                  'Un code de confirmation envoyé par email est requis.',
+                              prefixIcon: const Icon(Icons.email_outlined),
+                              suffixIcon: TextButton(
+                                onPressed: _openEmailChangeSheet,
+                                child: Text(
+                                  hasEmail ? 'Modifier' : 'Ajouter',
+                                  style: const TextStyle(
+                                    color: GoLivreurTheme.primaire,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              border: const OutlineInputBorder(),
                             ),
-                            validator: ProfileFormHelpers.validateOptionalEmail,
                           ),
                           const SizedBox(height: 14),
+
                           TextFormField(
                             controller: _addressCtrl,
                             maxLines: 2,
@@ -268,7 +798,8 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
                         children: [
                           const Text(
                             'Préférences & Sécurité',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
@@ -279,27 +810,38 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
                               border: OutlineInputBorder(),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'fr', child: Text('Français')),
-                              DropdownMenuItem(value: 'en', child: Text('English')),
+                              DropdownMenuItem(
+                                  value: 'fr', child: Text('Français')),
+                              DropdownMenuItem(
+                                  value: 'en', child: Text('English')),
                             ],
-                            onChanged: (val) => setState(() => _language = val ?? 'fr'),
+                            onChanged: (val) =>
+                                setState(() => _language = val ?? 'fr'),
                           ),
                           const SizedBox(height: 8),
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
-                            title: const Text('Notifications de commande', style: TextStyle(fontSize: 14)),
-                            subtitle: const Text('Alertes de livraison et mode pluie', style: TextStyle(fontSize: 12)),
+                            title: const Text('Notifications de commande',
+                                style: TextStyle(fontSize: 14)),
+                            subtitle: const Text(
+                                'Alertes de livraison et mode pluie',
+                                style: TextStyle(fontSize: 12)),
                             value: _notificationsEnabled,
                             activeThumbColor: GoLivreurTheme.primaire,
-                            onChanged: (val) => setState(() => _notificationsEnabled = val),
+                            onChanged: (val) =>
+                                setState(() => _notificationsEnabled = val),
                           ),
                           const Divider(),
                           ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.lock_outline, color: GoLivreurTheme.primaire),
-                            title: const Text('Changer mon mot de passe', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            leading: const Icon(Icons.lock_outline,
+                                color: GoLivreurTheme.primaire),
+                            title: const Text('Changer mon mot de passe',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 14)),
                             trailing: const Icon(Icons.chevron_right),
-                            onTap: () => ProfileFormHelpers.showChangePasswordDialog(
+                            onTap: () =>
+                                ProfileFormHelpers.showChangePasswordDialog(
                               context,
                               apiClient: ref.read(apiClientProvider),
                               accentColor: GoLivreurTheme.primaire,
@@ -316,19 +858,24 @@ class _EditClientProfileScreenState extends ConsumerState<EditClientProfileScree
                         style: ElevatedButton.styleFrom(
                           backgroundColor: GoLivreurTheme.primaire,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
                         ),
                         onPressed: _isSaving ? null : _save,
                         icon: _isSaving
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
                               )
                             : const Icon(Icons.check_circle_outline),
                         label: Text(
-                          _isSaving ? 'Enregistrement en cours...' : 'Enregistrer les modifications',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          _isSaving
+                              ? 'Enregistrement en cours...'
+                              : 'Enregistrer les modifications',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15),
                         ),
                       ),
                     ),

@@ -4,21 +4,25 @@ use App\Models\City;
 use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\MerchantCategory;
+use App\Models\OtpCode;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 // ─── TESTS PROFIL CLIENT ──────────────────────────────────────────────────────
 
-it('client : peut lire, mettre à jour son profil, uploader une photo et remplacer l\'ancienne', function () {
+it('client : verrouille le nom, exige un OTP pour changer téléphone ou email, et permet photo/adresse/préférences', function () {
     Storage::fake('public');
+    Mail::fake();
 
     $city = City::factory()->create(['name' => 'Daloa']);
     $client = User::factory()->create([
         'name' => 'Client Initial',
         'phone' => '0701000010',
+        'email' => null,
         'role' => 'client',
         'city_id' => $city->id,
     ]);
@@ -32,15 +36,84 @@ it('client : peut lire, mettre à jour son profil, uploader une photo et remplac
         ->assertJsonPath('donnees.name', 'Client Initial')
         ->assertJsonPath('donnees.phone', '0701000010');
 
-    // 2. Mise à jour + upload première photo
+    // 2. Tentative de modification directe du nom -> 422 NAME_LOCKED
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->putJson('/api/v1/client/profile', ['name' => 'Nom Piraté'])
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'NAME_LOCKED');
+
+    // 3. Tentative de modification directe du téléphone sans OTP -> 422 PHONE_OTP_REQUIRED
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->putJson('/api/v1/client/profile', ['phone' => '+225 07 01 00 00 99'])
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'PHONE_OTP_REQUIRED');
+
+    // 4. Tentative d'ajout direct d'email sans code de confirmation -> 422 EMAIL_OTP_REQUIRED
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->putJson('/api/v1/client/profile', ['email' => 'client.modifie@golivreur.ci'])
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'EMAIL_OTP_REQUIRED');
+
+    // 5. Changement de numéro sécurisé via OTP envoyé au NOUVEAU numéro
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson('/api/v1/client/profile/phone/request-otp', [
+            'phone' => '+225 07 01 00 00 99',
+        ])
+        ->assertOk()
+        ->assertJsonPath('succes', true);
+
+    $phoneOtp = OtpCode::where('phone', '0701000099')
+        ->where('purpose', "phone_chg_{$client->id}")
+        ->where('is_used', false)
+        ->latest('id')
+        ->firstOrFail();
+
+    // Mauvais code -> 422
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson('/api/v1/client/profile/phone/confirm', [
+            'phone' => '0701000099',
+            'code' => '000000',
+        ])
+        ->assertStatus(422);
+
+    // Code valide -> téléphone mis à jour
+    $phoneOtp->update(['code_hash' => Hash::make('482910'), 'attempts' => 0]);
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson('/api/v1/client/profile/phone/confirm', [
+            'phone' => '+225 07 01 00 00 99',
+            'code' => '482910',
+        ])
+        ->assertOk()
+        ->assertJsonPath('donnees.phone', '0701000099');
+
+    // 6. Ajout d'email sécurisé via code de confirmation envoyé par email
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson('/api/v1/client/profile/email/request-otp', [
+            'email' => 'client.modifie@golivreur.ci',
+        ])
+        ->assertOk()
+        ->assertJsonPath('succes', true);
+
+    $emailOtp = OtpCode::where('purpose', "email_chg_{$client->id}")
+        ->where('is_used', false)
+        ->latest('id')
+        ->firstOrFail();
+    $emailOtp->update(['code_hash' => Hash::make('739104'), 'attempts' => 0]);
+
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson('/api/v1/client/profile/email/confirm', [
+            'email' => 'client.modifie@golivreur.ci',
+            'code' => '739104',
+        ])
+        ->assertOk()
+        ->assertJsonPath('donnees.email', 'client.modifie@golivreur.ci');
+
+    // 7. Mise à jour adresse + préférences + upload photo (sans changer nom/téléphone/email)
     $photo1 = UploadedFile::fake()->image('avatar1.jpg', 300, 300);
 
     $res1 = $this->withHeader('Authorization', "Bearer {$token}")
         ->post('/api/v1/client/profile', [
             '_method' => 'PUT',
-            'name' => 'Client Modifié',
-            'phone' => '+225 07 01 00 00 99',
-            'email' => 'client.modifie@golivreur.ci',
             'default_address' => 'Quartier Lobia, Rue 4',
             'language' => 'en',
             'notifications_enabled' => '0',
@@ -49,7 +122,7 @@ it('client : peut lire, mettre à jour son profil, uploader une photo et remplac
 
     $res1->assertOk()
         ->assertJsonPath('succes', true)
-        ->assertJsonPath('donnees.name', 'Client Modifié')
+        ->assertJsonPath('donnees.name', 'Client Initial')
         ->assertJsonPath('donnees.phone', '0701000099')
         ->assertJsonPath('donnees.email', 'client.modifie@golivreur.ci')
         ->assertJsonPath('donnees.default_address', 'Quartier Lobia, Rue 4')
@@ -61,7 +134,7 @@ it('client : peut lire, mettre à jour son profil, uploader une photo et remplac
     expect($oldPath)->not->toBeNull();
     Storage::disk('public')->assertExists($oldPath);
 
-    // 3. Remplacement photo -> l'ancien fichier doit être supprimé
+    // 8. Remplacement photo -> l'ancien fichier doit être supprimé
     $photo2 = UploadedFile::fake()->image('avatar2.png', 300, 300);
     $this->withHeader('Authorization', "Bearer {$token}")
         ->post('/api/v1/client/profile', [
@@ -75,7 +148,7 @@ it('client : peut lire, mettre à jour son profil, uploader une photo et remplac
     Storage::disk('public')->assertMissing($oldPath);
     Storage::disk('public')->assertExists($client->photo_path);
 
-    // 4. Cohérence Admin -> Mobile : modification côté DB/Admin reflétée sur GET
+    // 9. Cohérence Admin -> Mobile : modification côté DB/Admin reflétée sur GET
     $client->update(['default_address' => 'Quartier Soleil (Modifié Admin)']);
     $this->withHeader('Authorization', "Bearer {$token}")
         ->getJson('/api/v1/client/profile')

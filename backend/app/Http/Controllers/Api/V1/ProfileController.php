@@ -11,14 +11,19 @@ use App\Http\Resources\BusinessProfileResource;
 use App\Http\Resources\ClientProfileResource;
 use App\Http\Resources\DriverProfileResource;
 use App\Models\ActivityLog;
+use App\Models\OtpCode;
 use App\Models\User;
+use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 /**
  * Contrôleur API gérant la consultation et la mise à jour du profil
@@ -89,11 +94,64 @@ class ProfileController extends Controller
         $user = $request->user();
         $validated = $request->validated();
 
-        DB::transaction(function () use ($user, $validated, $request) {
-            $userData = $this->extractCommonUserData($validated);
+        // 1. Le nom est verrouillé après l'inscription pour le client
+        if (
+            array_key_exists('name', $validated)
+            && trim((string) $user->name) !== ''
+            && trim((string) $validated['name']) !== trim((string) $user->name)
+        ) {
+            return response()->json([
+                'succes' => false,
+                'code' => 'NAME_LOCKED',
+                'message' => 'Le nom ne peut plus être modifié après inscription. Contactez le service client en cas d\'erreur.',
+                'errors' => [
+                    'name' => ['Le nom ne peut plus être modifié après inscription.'],
+                ],
+            ], 422);
+        }
 
-            if (array_key_exists('default_address', $validated)) {
-                $userData['default_address'] = $validated['default_address'];
+        // 2. Le numéro de téléphone exige un OTP confirmé sur le nouveau numéro
+        if (
+            array_key_exists('phone', $validated)
+            && (string) $validated['phone'] !== (string) $user->phone
+        ) {
+            return response()->json([
+                'succes' => false,
+                'code' => 'PHONE_OTP_REQUIRED',
+                'message' => 'La modification du numéro nécessite un code OTP envoyé sur votre nouveau numéro.',
+                'errors' => [
+                    'phone' => ['Confirmez le nouveau numéro avec le code OTP dédié.'],
+                ],
+            ], 422);
+        }
+
+        // 3. L'ajout ou modification d'email exige un code de confirmation envoyé à l'adresse email
+        if (array_key_exists('email', $validated)) {
+            $incomingEmail = $validated['email'] !== null ? strtolower(trim((string) $validated['email'])) : null;
+            $currentEmail = $user->email !== null ? strtolower(trim((string) $user->email)) : null;
+
+            if ($incomingEmail !== null && $incomingEmail !== '' && $incomingEmail !== $currentEmail) {
+                return response()->json([
+                    'succes' => false,
+                    'code' => 'EMAIL_OTP_REQUIRED',
+                    'message' => 'L\'ajout ou la modification d\'une adresse email nécessite un code de confirmation envoyé par email.',
+                    'errors' => [
+                        'email' => ['Confirmez votre adresse email avec le code reçu par mail.'],
+                    ],
+                ], 422);
+            }
+        }
+
+        DB::transaction(function () use ($user, $validated, $request) {
+            $userData = [];
+            foreach (['language', 'notifications_enabled', 'default_address'] as $field) {
+                if (array_key_exists($field, $validated)) {
+                    $userData[$field] = $validated[$field];
+                }
+            }
+
+            if (array_key_exists('email', $validated) && ($validated['email'] === null || $validated['email'] === '')) {
+                $userData['email'] = null;
             }
 
             if ($request->hasFile('photo')) {
@@ -114,6 +172,340 @@ class ProfileController extends Controller
         return response()->json([
             'succes' => true,
             'message' => 'Profil client mis à jour avec succès.',
+            'donnees' => new ClientProfileResource($user->fresh()->load('city')),
+        ]);
+    }
+
+    /**
+     * Étape 1 : Envoie un code OTP à 6 chiffres sur le NOUVEAU numéro de téléphone du client.
+     */
+    public function requestClientPhoneChangeOtp(Request $request, SmsService $smsService): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $normalized = $this->normalizeIvorianPhone((string) $request->input('phone', ''));
+        $request->merge(['phone' => $normalized]);
+
+        $validated = $request->validate([
+            'phone' => [
+                'required',
+                'string',
+                'regex:/^(01|05|07|21|25|27)[0-9]{8}$/',
+                Rule::unique('users', 'phone')->ignore($user->id),
+            ],
+        ], [
+            'phone.required' => 'Veuillez saisir votre nouveau numéro de téléphone.',
+            'phone.regex' => 'Format ivoirien invalide : 10 chiffres attendus (ex: 0701000001).',
+            'phone.unique' => 'Ce numéro de téléphone est déjà utilisé par un autre compte.',
+        ]);
+
+        $newPhone = (string) $validated['phone'];
+        if ($newPhone === (string) $user->phone) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Ce numéro est déjà celui associé à votre compte.',
+                'errors' => ['phone' => ['Saisissez un nouveau numéro différent de l\'actuel.']],
+            ], 422);
+        }
+
+        $rateKey = "client_phone_otp:{$user->id}";
+        if (RateLimiter::tooManyAttempts($rateKey, 5)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Trop de demandes de code. Patientez quelques minutes.',
+            ], 429);
+        }
+        RateLimiter::hit($rateKey, 600);
+
+        $purpose = "phone_chg_{$user->id}";
+        OtpCode::where('purpose', $purpose)
+            ->where('is_used', false)
+            ->update(['is_used' => true]);
+
+        $plainCode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        OtpCode::create([
+            'phone' => $newPhone,
+            'code_hash' => Hash::make($plainCode),
+            'purpose' => $purpose,
+            'expires_at' => now()->addMinutes(5),
+        ]);
+
+        $smsService->envoyerOtp($newPhone, $plainCode, 'phone_change');
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'action' => 'client_phone_change_otp_sent',
+            'entity_type' => 'user',
+            'entity_id' => $user->id,
+            'properties' => ['new_phone_masked' => substr($newPhone, 0, 2).'****'.substr($newPhone, -3)],
+            'ip_address' => $request->ip(),
+            'severity' => 'info',
+        ]);
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Un code OTP de confirmation à 6 chiffres a été envoyé sur votre nouveau numéro.',
+        ]);
+    }
+
+    /**
+     * Étape 2 : Vérifie le code OTP reçu sur le nouveau numéro et met à jour `users.phone`.
+     */
+    public function confirmClientPhoneChange(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $normalized = $this->normalizeIvorianPhone((string) $request->input('phone', ''));
+        $request->merge(['phone' => $normalized]);
+
+        $validated = $request->validate([
+            'phone' => [
+                'required',
+                'string',
+                'regex:/^(01|05|07|21|25|27)[0-9]{8}$/',
+                Rule::unique('users', 'phone')->ignore($user->id),
+            ],
+            'code' => ['required', 'string', 'regex:/^[0-9]{6}$/'],
+        ], [
+            'phone.unique' => 'Ce numéro de téléphone est déjà utilisé par un autre compte.',
+            'code.regex' => 'Veuillez saisir le code OTP à 6 chiffres.',
+        ]);
+
+        $newPhone = (string) $validated['phone'];
+        $code = (string) $validated['code'];
+        $purpose = "phone_chg_{$user->id}";
+
+        $otp = OtpCode::where('phone', $newPhone)
+            ->where('purpose', $purpose)
+            ->where('is_used', false)
+            ->where('expires_at', '>', now())
+            ->latest('id')
+            ->first();
+
+        if (! $otp) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Code OTP expiré ou introuvable. Demandez un nouveau code.',
+            ], 422);
+        }
+
+        if ($otp->attempts >= 3) {
+            $otp->update(['is_used' => true]);
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Trop de tentatives incorrectes. Veuillez demander un nouveau code OTP.',
+            ], 422);
+        }
+
+        if (! Hash::check($code, $otp->code_hash)) {
+            $otp->increment('attempts');
+            if ($otp->attempts >= 3) {
+                $otp->update(['is_used' => true]);
+            }
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Code OTP incorrect.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($otp, $user, $newPhone, $request): void {
+            $otp->update(['is_used' => true]);
+            $user->update([
+                'phone' => $newPhone,
+                'phone_verified_at' => now(),
+            ]);
+
+            ActivityLog::create([
+                'user_id' => $user->id,
+                'action' => 'client_phone_changed',
+                'entity_type' => 'user',
+                'entity_id' => $user->id,
+                'properties' => ['new_phone_masked' => substr($newPhone, 0, 2).'****'.substr($newPhone, -3)],
+                'ip_address' => $request->ip(),
+                'severity' => 'warning',
+            ]);
+        });
+
+        RateLimiter::clear("client_phone_otp:{$user->id}");
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Votre numéro de téléphone a été confirmé et mis à jour avec succès.',
+            'donnees' => new ClientProfileResource($user->fresh()->load('city')),
+        ]);
+    }
+
+    /**
+     * Étape 1 : Envoie un code de confirmation à 6 chiffres à la nouvelle adresse email du client.
+     */
+    public function requestClientEmailChangeOtp(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $normalizedEmail = strtolower(trim((string) $request->input('email', '')));
+        $request->merge(['email' => $normalizedEmail]);
+
+        $validated = $request->validate([
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
+        ], [
+            'email.required' => 'Veuillez saisir une adresse email.',
+            'email.email' => 'Veuillez saisir une adresse email valide.',
+            'email.unique' => 'Cette adresse email est déjà utilisée par un autre compte.',
+        ]);
+
+        $newEmail = (string) $validated['email'];
+        if ($user->email !== null && strtolower(trim((string) $user->email)) === $newEmail) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Cette adresse email est déjà associée à votre compte.',
+                'errors' => ['email' => ['Saisissez une adresse email différente de l\'actuelle.']],
+            ], 422);
+        }
+
+        $rateKey = "client_email_otp:{$user->id}";
+        if (RateLimiter::tooManyAttempts($rateKey, 5)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Trop de demandes de code. Patientez quelques minutes.',
+            ], 429);
+        }
+        RateLimiter::hit($rateKey, 600);
+
+        $purpose = "email_chg_{$user->id}";
+        $emailKey = $this->emailOtpKey($newEmail);
+
+        OtpCode::where('purpose', $purpose)
+            ->where('is_used', false)
+            ->update(['is_used' => true]);
+
+        $plainCode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        OtpCode::create([
+            'phone' => $emailKey,
+            'code_hash' => Hash::make($plainCode),
+            'purpose' => $purpose,
+            'expires_at' => now()->addMinutes(10),
+        ]);
+
+        Mail::raw(
+            "GoLivreur : Votre code de confirmation d'adresse email est {$plainCode}. Ce code est valable 10 minutes.",
+            static function ($message) use ($newEmail): void {
+                $message->to($newEmail)->subject('GoLivreur — Code de confirmation email');
+            },
+        );
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'action' => 'client_email_change_otp_sent',
+            'entity_type' => 'user',
+            'entity_id' => $user->id,
+            'properties' => ['email_domain' => substr(strrchr($newEmail, '@') ?: '', 1)],
+            'ip_address' => $request->ip(),
+            'severity' => 'info',
+        ]);
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Un code de confirmation à 6 chiffres a été envoyé à votre adresse email.',
+        ]);
+    }
+
+    /**
+     * Étape 2 : Vérifie le code de confirmation email et met à jour `users.email`.
+     */
+    public function confirmClientEmailChange(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $normalizedEmail = strtolower(trim((string) $request->input('email', '')));
+        $request->merge(['email' => $normalizedEmail]);
+
+        $validated = $request->validate([
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
+            'code' => ['required', 'string', 'regex:/^[0-9]{6}$/'],
+        ], [
+            'email.email' => 'Veuillez saisir une adresse email valide.',
+            'email.unique' => 'Cette adresse email est déjà utilisée par un autre compte.',
+            'code.regex' => 'Veuillez saisir le code de confirmation à 6 chiffres.',
+        ]);
+
+        $newEmail = (string) $validated['email'];
+        $code = (string) $validated['code'];
+        $purpose = "email_chg_{$user->id}";
+        $emailKey = $this->emailOtpKey($newEmail);
+
+        $otp = OtpCode::where('phone', $emailKey)
+            ->where('purpose', $purpose)
+            ->where('is_used', false)
+            ->where('expires_at', '>', now())
+            ->latest('id')
+            ->first();
+
+        if (! $otp) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Code de confirmation expiré ou introuvable. Demandez un nouveau code.',
+            ], 422);
+        }
+
+        if ($otp->attempts >= 3) {
+            $otp->update(['is_used' => true]);
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Trop de tentatives incorrectes. Veuillez demander un nouveau code.',
+            ], 422);
+        }
+
+        if (! Hash::check($code, $otp->code_hash)) {
+            $otp->increment('attempts');
+            if ($otp->attempts >= 3) {
+                $otp->update(['is_used' => true]);
+            }
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Code de confirmation email incorrect.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($otp, $user, $newEmail, $request): void {
+            $otp->update(['is_used' => true]);
+            $user->update(['email' => $newEmail]);
+
+            ActivityLog::create([
+                'user_id' => $user->id,
+                'action' => 'client_email_changed',
+                'entity_type' => 'user',
+                'entity_id' => $user->id,
+                'properties' => ['email_domain' => substr(strrchr($newEmail, '@') ?: '', 1)],
+                'ip_address' => $request->ip(),
+                'severity' => 'info',
+            ]);
+        });
+
+        RateLimiter::clear("client_email_otp:{$user->id}");
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Votre adresse email a été confirmée et enregistrée avec succès.',
             'donnees' => new ClientProfileResource($user->fresh()->load('city')),
         ]);
     }
@@ -348,6 +740,31 @@ class ProfileController extends Controller
         }
 
         return $newPath;
+    }
+
+    private function normalizeIvorianPhone(string $raw): string
+    {
+        $cleaned = preg_replace('/[\s\.\-\(\)]+/', '', trim($raw)) ?? '';
+        if (str_starts_with($cleaned, '+225')) {
+            return substr($cleaned, 4);
+        }
+        if (str_starts_with($cleaned, '00225')) {
+            return substr($cleaned, 5);
+        }
+        if (strlen($cleaned) === 13 && str_starts_with($cleaned, '225')) {
+            return substr($cleaned, 3);
+        }
+
+        return $cleaned;
+    }
+
+    /**
+     * Clé déterministe de 20 caractères (compatible `otp_codes.phone VARCHAR(20)`)
+     * pour rattacher un code de confirmation email sans aucune modification de schéma SQL.
+     */
+    private function emailOtpKey(string $normalizedEmail): string
+    {
+        return 'e:'.substr(hash('sha256', $normalizedEmail), 0, 18);
     }
 
     private function logProfileUpdate(User $user, string $action, ?string $ipAddress): void

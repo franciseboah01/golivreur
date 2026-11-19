@@ -136,6 +136,10 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
     Route::prefix('client')->middleware('role:client')->group(function () {
         Route::get('profile', [ProfileController::class, 'showClient']);
         Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateClient']);
+        Route::post('profile/phone/request-otp', [ProfileController::class, 'requestClientPhoneChangeOtp']);
+        Route::post('profile/phone/confirm', [ProfileController::class, 'confirmClientPhoneChange']);
+        Route::post('profile/email/request-otp', [ProfileController::class, 'requestClientEmailChangeOtp']);
+        Route::post('profile/email/confirm', [ProfileController::class, 'confirmClientEmailChange']);
         Route::get('addresses', [ClientController::class, 'addresses']);
         Route::post('addresses', [ClientController::class, 'storeAddress']);
         Route::put('addresses/{address}', [ClientController::class, 'updateAddress']);

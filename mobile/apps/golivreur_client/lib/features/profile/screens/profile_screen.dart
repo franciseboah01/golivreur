@@ -201,7 +201,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   _buildTile(
                     icon: Icons.manage_accounts_outlined,
                     title: 'Modifier mon profil',
-                    subtitle: 'Nom, téléphone, email, photo et adresse par défaut',
+                    subtitle: 'Téléphone (OTP), email (confirmé), photo et adresse',
                     onTap: _openEditProfile,
                   ),
                   const Divider(height: 1),
