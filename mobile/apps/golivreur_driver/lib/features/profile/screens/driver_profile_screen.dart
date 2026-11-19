@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/config/env_config.dart';
+import 'package:golivreur_core/services/api_client.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../driver/providers/driver_provider.dart';
 import '../../auth/screens/driver_login_screen.dart';
 import 'edit_driver_profile_screen.dart';
@@ -333,6 +334,32 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
+                  leading: const Icon(Icons.pin_outlined, color: GoLivreurTheme.primaire),
+                  title: const Text('Verrouillage rapide (Code PIN 4 chiffres)'),
+                  subtitle: const Text('Chiffre le Refresh Token local (3 essais max)'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    final changed = await PinSetupSheet.show(
+                      context,
+                      pinService: PinLockService(
+                        storage: SecureTokenStorage.createStorage(),
+                      ),
+                    );
+                    if (changed != null && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            changed
+                                ? 'Code PIN rapide activé.'
+                                : 'Code PIN rapide désactivé.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
                   leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.texteSecondaire),
                   title: Text(
                     (profile.cityName != null && profile.cityName!.isNotEmpty)
@@ -358,8 +385,9 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                     style: TextStyle(color: GoLivreurTheme.erreur, fontWeight: FontWeight.bold),
                   ),
                   onTap: () async {
-                    const storage = FlutterSecureStorage();
-                    await storage.deleteAll();
+                    await PinLockService(
+                      storage: SecureTokenStorage.createStorage(),
+                    ).wipeAllAuthAndPinData();
                     ref.read(driverProfileProvider.notifier).reinitialiser();
                     ref.read(driverActiveJobProvider.notifier).reinitialiser();
                     if (context.mounted) {
@@ -372,6 +400,12 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 16),
+          InterAppSwitcherSection(
+            currentApp: GoLivreurAppTarget.driver,
+            userRoles: profile.roles,
+            apiClient: ref.read(apiClientProvider),
           ),
           const SizedBox(height: 24),
         ],

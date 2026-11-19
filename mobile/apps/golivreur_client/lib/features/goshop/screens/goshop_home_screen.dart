@@ -5,6 +5,7 @@ import 'package:golivreur_core/config/env_config.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../providers/goshop_provider.dart';
+import '../widgets/promo_banners_carousel.dart';
 import 'merchant_detail_screen.dart';
 import 'cart_screen.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -500,89 +501,8 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                     ),
                   ),
 
-                  // ─── Bannière Promotionnelle Daloa ───────────────────────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFF4A623), Color(0xFFE28E10)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: GoLivreurTheme.primaire.withValues(alpha: 0.25),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.25),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Text(
-                                    '🎉 OFFRE DE BIENVENUE',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Livraison offerte sur votre 1ère commande',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  destination.cityName.isNotEmpty
-                                      ? 'Ce week-end pour fêter nos commerces à ${destination.cityName} !'
-                                      : 'Ce week-end pour fêter nos commerces partenaires !',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.delivery_dining,
-                              color: Colors.white,
-                              size: 34,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  // ─── Carrousel Bannières Dynamiques (auto-expirables) ────
+                  const PromoBannersCarousel(),
 
                   // ─── Rayons & Services (Catégories) ──────────────────────
                   const Padding(

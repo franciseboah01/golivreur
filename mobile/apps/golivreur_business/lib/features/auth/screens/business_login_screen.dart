@@ -1,11 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/config/env_config.dart';
 import 'package:golivreur_core/services/api_client.dart';
-import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
-import 'package:golivreur_core/widgets/golivreur_logo.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../navigation/screens/business_main_navigation_screen.dart';
 import 'business_register_screen.dart';
 
@@ -76,7 +74,7 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
     });
 
     try {
-      const storage = FlutterSecureStorage();
+      final storage = SecureTokenStorage.createStorage();
       final api = widget.apiClientOverride ??
           ApiClient(
             baseUrl: GoLivreurEnv.apiBaseUrl,
@@ -87,36 +85,69 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
       final res = await api.post('/auth/login-password', data: {
         'phone': phone,
         'password': pwd,
+        'app_type': 'business',
       });
 
-      if (res.statusCode == 200 && res.data is Map && res.data['donnees'] != null) {
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['donnees'] != null) {
         final donnees = res.data['donnees'] as Map;
-        final userRole = (donnees['user'] is Map ? donnees['user']['role'] : null)?.toString();
-        if (userRole != null && userRole != 'merchant') {
+        final userMap = donnees['user'] is Map
+            ? Map<String, dynamic>.from(donnees['user'] as Map)
+            : <String, dynamic>{};
+        final userRole = userMap['role']?.toString();
+        final roles = userMap['roles'] is List
+            ? (userMap['roles'] as List).map((e) => e.toString()).toList()
+            : <String>[if (userRole != null) userRole];
+
+        if (!roles.contains('merchant')) {
           if (mounted) {
             setState(() {
               _chargement = false;
-              _erreur = 'Ce compte n\'est pas un compte commerçant.';
+              _erreur = 'Ce compte ne dispose pas encore du rôle commerçant.';
             });
           }
           return;
         }
+
         final token = donnees['access_token'] as String?;
         final refresh = donnees['refresh_token'] as String?;
+        await PinLockService(storage: storage).wipeAllAuthAndPinData();
         if (token != null) {
-          await storage.write(key: 'access_token', value: token);
+          await SecureTokenStorage.saveTokens(
+            storage,
+            accessToken: token,
+            refreshToken: refresh,
+          );
         }
-        if (refresh != null) {
-          await storage.write(key: 'refresh_token', value: refresh);
-        }
+
+        final mustChangePassword = userMap['must_change_password'] == true;
 
         if (mounted) {
           setState(() => _chargement = false);
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const BusinessMainNavigationScreen(),
-            ),
-          );
+          if (mustChangePassword) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => ForcePasswordChangeScreen(
+                  apiClient: api,
+                  initialTemporaryPassword: pwd,
+                  onPasswordChanged: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => const BusinessMainNavigationScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => const BusinessMainNavigationScreen(),
+              ),
+            );
+          }
         }
         return;
       }
@@ -128,17 +159,27 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
         });
       }
     } on DioException catch (e) {
+      final roleMissing = RoleMissingInfo.tryParse(e);
       if (mounted) {
         setState(() {
           _chargement = false;
-          _erreur = ApiClient.messageErreur(e);
+          _erreur = roleMissing?.message ?? ApiClient.messageErreur(e);
         });
+        if (roleMissing != null) {
+          await showRoleMissingDialog(
+            context,
+            info: roleMissing,
+            registerButtonLabel: 'Devenir commerçant partenaire',
+            onRegisterRole: _ouvrirPreInscription,
+          );
+        }
       }
     } catch (_) {
       if (mounted) {
         setState(() {
           _chargement = false;
-          _erreur = 'Impossible de se connecter au serveur. Vérifiez votre réseau.';
+          _erreur =
+              'Impossible de se connecter au serveur. Vérifiez votre réseau.';
         });
       }
     }
@@ -180,7 +221,6 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-
               if (_erreur != null) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -196,7 +236,6 @@ class _BusinessLoginScreenState extends State<BusinessLoginScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,

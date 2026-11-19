@@ -237,13 +237,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Par défaut : emoji 🛵 affiché dans le badge ambre
-    expect(find.text('🛵'), findsOneWidget);
+    // Spec 1.2 : aucun emoji de repli ('🛵') n'est affiché hors ligne ; le monogramme vectoriel "GL" prend le relais
+    expect(find.text('🛵'), findsNothing);
+    expect(find.text('GL'), findsOneWidget);
 
     // Quand l'admin met à jour le logo dans les paramètres, toutes les vues réagissent automatiquement
     container
         .read(appBrandingProvider.notifier)
-        .updateFromValues('http://localhost:8080/storage/branding/logo.png', '🛵');
+        .updateFromValues('http://localhost:8080/storage/branding/logo.png', '');
     await tester.pump();
 
     expect(find.byType(Image), findsOneWidget);

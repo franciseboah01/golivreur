@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
 import 'package:golivreur_core/widgets/golivreur_logo.dart';
+import 'package:golivreur_core/widgets/role_missing_dialog.dart';
 import '../../gocolis/providers/gocolis_provider.dart';
 import '../../goshop/providers/goshop_provider.dart';
 import '../../goshop/providers/order_provider.dart';
@@ -46,9 +47,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ref.invalidate(clientNotificationsProvider);
       ref.invalidate(ordersHistoryProvider);
       ref.invalidate(parcelsHistoryProvider);
+      ref.invalidate(promoBannersProvider);
       ref.read(weatherProvider.notifier).chargerStatutVille();
       ref.read(clientAddressesProvider.notifier).chargerAdresses();
       ref.read(favoritesProvider.notifier).chargerFavoris();
+    } else if (mounted) {
+      final roleMissing = ref.read(authProvider).roleMissingInfo;
+      if (roleMissing != null) {
+        await showRoleMissingDialog(
+          context,
+          info: roleMissing,
+          registerButtonLabel: 'Créer un compte client',
+          onRegisterRole: () {
+            ref.read(authProvider.notifier).clearError();
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const RegisterScreen()),
+            );
+          },
+        );
+      }
     }
   }
 

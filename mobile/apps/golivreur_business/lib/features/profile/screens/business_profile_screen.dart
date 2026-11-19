@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/config/env_config.dart';
+import 'package:golivreur_core/services/api_client.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../business/providers/business_provider.dart';
 import '../../auth/screens/business_login_screen.dart';
 import 'edit_business_profile_screen.dart';
@@ -23,7 +24,155 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(businessProfileProvider.notifier).chargerProfil();
+      ref.read(priorityCourierProvider.notifier).charger();
     });
+  }
+
+  Future<void> _openPriorityCourierPicker() async {
+    await ref.read(priorityCourierProvider.notifier).charger();
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => Consumer(
+        builder: (ctx, sheetRef, _) {
+          final state = sheetRef.watch(priorityCourierProvider);
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Livreur prioritaire de la boutique',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Ce livreur recevra vos commandes en priorité avant le dispatch standard (auto-assignation bloquée).',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: GoLivreurTheme.texteSecondaire,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (state.loading)
+                    const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else ...[
+                    if (state.current != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: OutlinedButton.icon(
+                          onPressed: state.saving
+                              ? null
+                              : () async {
+                                  final (_, msg) = await sheetRef
+                                      .read(priorityCourierProvider.notifier)
+                                      .assigner(null);
+                                  if (ctx.mounted) {
+                                    Navigator.of(ctx).pop();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(msg)),
+                                    );
+                                  }
+                                },
+                          icon: const Icon(Icons.person_remove_outlined,
+                              color: GoLivreurTheme.erreur),
+                          label: const Text(
+                            'Retirer le livreur prioritaire',
+                            style: TextStyle(color: GoLivreurTheme.erreur),
+                          ),
+                        ),
+                      ),
+                    if (state.available.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Text(
+                          'Aucun livreur actif disponible dans votre ville pour le moment.',
+                          style: TextStyle(color: GoLivreurTheme.texteSecondaire),
+                        ),
+                      )
+                    else
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 320),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: state.available.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, index) {
+                            final c = state.available[index];
+                            final selected = state.current?.id == c.id;
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: CircleAvatar(
+                                backgroundColor: c.isOnline
+                                    ? Colors.green.withValues(alpha: 0.15)
+                                    : Colors.grey.shade200,
+                                child: Icon(
+                                  Icons.delivery_dining,
+                                  color: c.isOnline
+                                      ? GoLivreurTheme.secondaire
+                                      : Colors.grey,
+                                ),
+                              ),
+                              title: Text(
+                                c.name,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Text(
+                                '${c.phone}${c.vehiclePlate != null ? " • ${c.vehiclePlate}" : ""} • ${c.isOnline ? "En ligne" : "Hors ligne"}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              trailing: selected
+                                  ? const Chip(
+                                      label: Text('Prioritaire',
+                                          style: TextStyle(
+                                              fontSize: 11, color: Colors.white)),
+                                      backgroundColor: GoLivreurTheme.secondaire,
+                                    )
+                                  : TextButton(
+                                      onPressed: state.saving
+                                          ? null
+                                          : () async {
+                                              final (ok, msg) = await sheetRef
+                                                  .read(priorityCourierProvider
+                                                      .notifier)
+                                                  .assigner(c.id);
+                                              if (ctx.mounted) {
+                                                Navigator.of(ctx).pop();
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(msg),
+                                                    backgroundColor: ok
+                                                        ? GoLivreurTheme.secondaire
+                                                        : GoLivreurTheme.erreur,
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                      child: const Text('Assigner'),
+                                    ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _openEditProfile() async {
@@ -38,6 +187,7 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(businessProfileProvider);
+    final priorityState = ref.watch(priorityCourierProvider);
     final orders = ref.watch(businessOrdersProvider);
     final catalog = ref.watch(businessCatalogProvider);
     final pendingCount = orders.where((o) => o.status == BusinessOrderStatus.pending).length;
@@ -312,6 +462,44 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
+                  leading: const Icon(Icons.star_outline_rounded, color: GoLivreurTheme.primaire),
+                  title: const Text('Livreur prioritaire de la boutique'),
+                  subtitle: Text(
+                    priorityState.current != null
+                        ? '${priorityState.current!.name} (${priorityState.current!.phone})'
+                        : 'Aucun livreur prioritaire — dispatch automatique',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _openPriorityCourierPicker,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.pin_outlined, color: GoLivreurTheme.primaire),
+                  title: const Text('Verrouillage rapide (Code PIN 4 chiffres)'),
+                  subtitle: const Text('Chiffre le Refresh Token local (3 essais max)'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    final changed = await PinSetupSheet.show(
+                      context,
+                      pinService: PinLockService(
+                        storage: SecureTokenStorage.createStorage(),
+                      ),
+                    );
+                    if (changed != null && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            changed
+                                ? 'Code PIN rapide activé.'
+                                : 'Code PIN rapide désactivé.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
                   leading: const Icon(Icons.schedule, color: GoLivreurTheme.texteSecondaire),
                   title: const Text('Horaires de livraison'),
                   subtitle: Text(
@@ -342,12 +530,14 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                     style: TextStyle(color: GoLivreurTheme.erreur, fontWeight: FontWeight.bold),
                   ),
                   onTap: () async {
-                    const storage = FlutterSecureStorage();
-                    await storage.deleteAll();
+                    await PinLockService(
+                      storage: SecureTokenStorage.createStorage(),
+                    ).wipeAllAuthAndPinData();
                     ref.read(businessProfileProvider.notifier).reinitialiser();
                     ref.read(businessCatalogProvider.notifier).reinitialiser();
                     ref.read(businessOrdersProvider.notifier).reinitialiser();
                     ref.read(revenueStatsProvider.notifier).reinitialiser();
+                    ref.read(priorityCourierProvider.notifier).reinitialiser();
                     if (context.mounted) {
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(builder: (_) => const BusinessLoginScreen()),
@@ -358,6 +548,12 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 16),
+          InterAppSwitcherSection(
+            currentApp: GoLivreurAppTarget.business,
+            userRoles: profile.roles,
+            apiClient: ref.read(apiClientProvider),
           ),
           const SizedBox(height: 24),
         ],

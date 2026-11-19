@@ -109,6 +109,9 @@ class DriverProfileState {
   final double earningsWeek;
   final List<DriverTransaction> transactions;
   final List<DriverCompletedCourse> recentCourses;
+  final List<String> roles;
+  final bool mustChangePassword;
+  final String? pinResetRequiredAt;
 
   const DriverProfileState({
     this.id = 0,
@@ -134,6 +137,9 @@ class DriverProfileState {
     this.earningsWeek = 0,
     this.transactions = const [],
     this.recentCourses = const [],
+    this.roles = const ['driver'],
+    this.mustChangePassword = false,
+    this.pinResetRequiredAt,
   });
 
   DriverProfileState copyWith({
@@ -160,6 +166,9 @@ class DriverProfileState {
     double? earningsWeek,
     List<DriverTransaction>? transactions,
     List<DriverCompletedCourse>? recentCourses,
+    List<String>? roles,
+    bool? mustChangePassword,
+    String? pinResetRequiredAt,
   }) {
     return DriverProfileState(
       id: id ?? this.id,
@@ -185,6 +194,9 @@ class DriverProfileState {
       earningsWeek: earningsWeek ?? this.earningsWeek,
       transactions: transactions ?? this.transactions,
       recentCourses: recentCourses ?? this.recentCourses,
+      roles: roles ?? this.roles,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+      pinResetRequiredAt: pinResetRequiredAt ?? this.pinResetRequiredAt,
     );
   }
 }
@@ -219,6 +231,11 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
       averageRating:
           (d['average_rating'] as num?)?.toDouble() ?? state.averageRating,
       totalRatings: (d['total_ratings'] as num?)?.toInt() ?? state.totalRatings,
+      roles: d['roles'] is List
+          ? (d['roles'] as List).map((e) => e.toString()).toList()
+          : state.roles,
+      mustChangePassword: d['must_change_password'] == true,
+      pinResetRequiredAt: d['pin_reset_required_at']?.toString(),
     );
   }
 

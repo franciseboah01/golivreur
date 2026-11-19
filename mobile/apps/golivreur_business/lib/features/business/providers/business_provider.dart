@@ -33,6 +33,9 @@ class BusinessProfileState {
   final double rating;
   final int reviewCount;
   final double walletBalance;
+  final List<String> roles;
+  final bool mustChangePassword;
+  final String? pinResetRequiredAt;
 
   const BusinessProfileState({
     this.id = 0,
@@ -57,6 +60,9 @@ class BusinessProfileState {
     this.rating = 0,
     this.reviewCount = 0,
     this.walletBalance = 0,
+    this.roles = const ['merchant'],
+    this.mustChangePassword = false,
+    this.pinResetRequiredAt,
   });
 
   BusinessProfileState copyWith({
@@ -82,6 +88,9 @@ class BusinessProfileState {
     double? rating,
     int? reviewCount,
     double? walletBalance,
+    List<String>? roles,
+    bool? mustChangePassword,
+    String? pinResetRequiredAt,
   }) {
     return BusinessProfileState(
       id: id ?? this.id,
@@ -106,6 +115,9 @@ class BusinessProfileState {
       rating: rating ?? this.rating,
       reviewCount: reviewCount ?? this.reviewCount,
       walletBalance: walletBalance ?? this.walletBalance,
+      roles: roles ?? this.roles,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+      pinResetRequiredAt: pinResetRequiredAt ?? this.pinResetRequiredAt,
     );
   }
 }
@@ -152,6 +164,11 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
           (d['prep_time_minutes'] as num?)?.toInt() ?? state.prepTimeMinutes,
       rating: (d['average_rating'] as num?)?.toDouble() ?? state.rating,
       reviewCount: (d['total_ratings'] as num?)?.toInt() ?? state.reviewCount,
+      roles: d['roles'] is List
+          ? (d['roles'] as List).map((e) => e.toString()).toList()
+          : state.roles,
+      mustChangePassword: d['must_change_password'] == true,
+      pinResetRequiredAt: d['pin_reset_required_at']?.toString(),
     );
   }
 
@@ -694,4 +711,143 @@ final revenueStatsProvider =
     StateNotifierProvider<RevenueStatsNotifier, RevenueStats>((ref) {
   final api = ref.watch(apiClientProvider);
   return RevenueStatsNotifier(api, ref);
+});
+
+// ─── Livreur Prioritaire de la Boutique (Pillar 2.3) ─────────────────────────
+class PriorityCourierOption {
+  final int id;
+  final String name;
+  final String phone;
+  final String? vehicleType;
+  final String? vehiclePlate;
+  final bool isOnline;
+  final double averageRating;
+
+  const PriorityCourierOption({
+    required this.id,
+    required this.name,
+    required this.phone,
+    this.vehicleType,
+    this.vehiclePlate,
+    this.isOnline = false,
+    this.averageRating = 0,
+  });
+
+  factory PriorityCourierOption.fromJson(Map<String, dynamic> json) =>
+      PriorityCourierOption(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        name: json['name']?.toString() ?? '',
+        phone: json['phone']?.toString() ?? '',
+        vehicleType: json['vehicle_type']?.toString(),
+        vehiclePlate: json['vehicle_plate']?.toString(),
+        isOnline: json['is_online'] == true,
+        averageRating: (json['average_rating'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+class PriorityCourierState {
+  final bool loading;
+  final bool saving;
+  final PriorityCourierOption? current;
+  final List<PriorityCourierOption> available;
+  final String? errorMessage;
+
+  const PriorityCourierState({
+    this.loading = false,
+    this.saving = false,
+    this.current,
+    this.available = const [],
+    this.errorMessage,
+  });
+
+  PriorityCourierState copyWith({
+    bool? loading,
+    bool? saving,
+    PriorityCourierOption? current,
+    bool clearCurrent = false,
+    List<PriorityCourierOption>? available,
+    String? errorMessage,
+  }) {
+    return PriorityCourierState(
+      loading: loading ?? this.loading,
+      saving: saving ?? this.saving,
+      current: clearCurrent ? null : (current ?? this.current),
+      available: available ?? this.available,
+      errorMessage: errorMessage,
+    );
+  }
+}
+
+class PriorityCourierNotifier extends StateNotifier<PriorityCourierState> {
+  final ApiClient? _api;
+
+  PriorityCourierNotifier([this._api]) : super(const PriorityCourierState());
+
+  void reinitialiser() {
+    state = const PriorityCourierState();
+  }
+
+  Future<void> charger() async {
+    if (_api == null) return;
+    state = state.copyWith(loading: true, errorMessage: null);
+    try {
+      final res = await _api.get('/merchant/priority-courier');
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map) {
+        final d = Map<String, dynamic>.from(res.data['donnees'] as Map);
+        final rawCurrent = d['priority_courier'];
+        final rawAvail = d['available_couriers'] is List
+            ? d['available_couriers'] as List
+            : const [];
+        state = PriorityCourierState(
+          loading: false,
+          current: rawCurrent is Map
+              ? PriorityCourierOption.fromJson(
+                  Map<String, dynamic>.from(rawCurrent),
+                )
+              : null,
+          available: rawAvail
+              .whereType<Map>()
+              .map((e) =>
+                  PriorityCourierOption.fromJson(Map<String, dynamic>.from(e)))
+              .toList(),
+        );
+        return;
+      }
+      state = state.copyWith(loading: false);
+    } catch (_) {
+      state = state.copyWith(loading: false);
+    }
+  }
+
+  Future<(bool, String)> assigner(int? courierId) async {
+    if (_api == null) return (false, 'Client API indisponible.');
+    state = state.copyWith(saving: true, errorMessage: null);
+    try {
+      final res = await _api.put(
+        '/merchant/priority-courier',
+        data: {'courier_id': courierId},
+      );
+      final msg = (res.data is Map ? res.data['message']?.toString() : null) ??
+          'Configuration mise à jour.';
+      await charger();
+      state = state.copyWith(saving: false);
+      return (true, msg);
+    } on DioException catch (e) {
+      final msg = ApiClient.messageErreur(e);
+      state = state.copyWith(saving: false, errorMessage: msg);
+      return (false, msg);
+    } catch (_) {
+      state = state.copyWith(saving: false);
+      return (false, 'Impossible de modifier le livreur prioritaire.');
+    }
+  }
+}
+
+final priorityCourierProvider =
+    StateNotifierProvider<PriorityCourierNotifier, PriorityCourierState>((ref) {
+  final api = ref.watch(apiClientProvider);
+  return PriorityCourierNotifier(api);
 });

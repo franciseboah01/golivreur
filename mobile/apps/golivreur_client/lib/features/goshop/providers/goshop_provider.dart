@@ -902,3 +902,59 @@ final clientNotificationsProvider = FutureProvider<List<ClientNotificationItem>>
   return items;
 });
 
+// ─── Bannières Promotionnelles Dynamiques (auto-expirables côté API) ──────────
+class PromoBannerModel {
+  final String id;
+  final String title;
+  final String subtitle;
+  final String? imageUrl;
+  final String? deepLink;
+  final String? startsAt;
+  final String? endsAt;
+
+  const PromoBannerModel({
+    required this.id,
+    required this.title,
+    this.subtitle = '',
+    this.imageUrl,
+    this.deepLink,
+    this.startsAt,
+    this.endsAt,
+  });
+
+  factory PromoBannerModel.fromJson(Map<String, dynamic> json) =>
+      PromoBannerModel(
+        id: json['id']?.toString() ?? '',
+        title: json['title']?.toString() ?? '',
+        subtitle: json['subtitle']?.toString() ?? '',
+        imageUrl: json['image_url']?.toString(),
+        deepLink: json['deep_link']?.toString(),
+        startsAt: json['starts_at']?.toString(),
+        endsAt: json['ends_at']?.toString(),
+      );
+}
+
+final promoBannersProvider = FutureProvider<List<PromoBannerModel>>((ref) async {
+  final api = ref.watch(apiClientProvider);
+  final auth = ref.watch(authProvider);
+  final weather = ref.watch(weatherProvider);
+  final cityId = auth.user?.cityId ?? weather.cityId;
+
+  try {
+    final res = await api.get(
+      '/client/banners',
+      queryParameters: cityId != null ? {'city_id': cityId} : null,
+    );
+    if (res.statusCode == 200 && res.data['succes'] == true) {
+      final raw = res.data['donnees'] as List<dynamic>? ?? const [];
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(PromoBannerModel.fromJson)
+          .where((b) => b.title.isNotEmpty)
+          .toList();
+    }
+  } catch (_) {}
+  return const [];
+});
+
+

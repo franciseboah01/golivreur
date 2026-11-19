@@ -3,13 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/services/api_client.dart';
+import 'package:golivreur_core/services/pin_lock_service.dart';
+import 'package:golivreur_core/services/secure_token_storage.dart';
+import 'package:golivreur_core/services/sso_switch_service.dart';
+import 'package:golivreur_core/widgets/role_missing_dialog.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../config/env.dart';
 
 void Function()? _forcedLogoutHandler;
 
 final Provider<FlutterSecureStorage> secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
-  return const FlutterSecureStorage();
+  return SecureTokenStorage.createStorage();
 });
 
 final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
@@ -37,6 +41,8 @@ class AuthState {
   final int? pendingCityId;
   final String? pendingPassword;
   final String? errorMessage;
+  final RoleMissingInfo? roleMissingInfo;
+  final String? lastTemporaryPassword;
 
   const AuthState({
     this.status = AuthStatus.initial,
@@ -46,6 +52,8 @@ class AuthState {
     this.pendingCityId,
     this.pendingPassword,
     this.errorMessage,
+    this.roleMissingInfo,
+    this.lastTemporaryPassword,
   });
 
   AuthState copyWith({
@@ -58,6 +66,10 @@ class AuthState {
     String? pendingPassword,
     bool clearPendingRegistration = false,
     String? errorMessage,
+    RoleMissingInfo? roleMissingInfo,
+    bool clearRoleMissing = true,
+    String? lastTemporaryPassword,
+    bool clearTempPassword = false,
   }) {
     return AuthState(
       status: status ?? this.status,
@@ -67,6 +79,10 @@ class AuthState {
       pendingCityId: clearPendingRegistration ? null : (pendingCityId ?? this.pendingCityId),
       pendingPassword: clearPendingRegistration ? null : (pendingPassword ?? this.pendingPassword),
       errorMessage: errorMessage,
+      roleMissingInfo: roleMissingInfo ?? (clearRoleMissing ? null : this.roleMissingInfo),
+      lastTemporaryPassword: clearTempPassword
+          ? null
+          : (lastTemporaryPassword ?? this.lastTemporaryPassword),
     );
   }
 }
@@ -233,15 +249,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<bool> connexionParMotDePasse(String phone, String password) async {
     final cleanPhone = normalizePhone(phone);
+    final trimmedPassword = password.trim();
     state = state.copyWith(
       status: AuthStatus.loading,
       clearPendingRegistration: true,
       errorMessage: null,
+      clearRoleMissing: true,
     );
     try {
       final res = await _apiClient.post('/auth/login-password', data: {
         'phone': cleanPhone,
-        'password': password.trim(),
+        'password': trimmedPassword,
+        'app_type': 'client',
       });
 
       if (res.statusCode == 200 && res.data['succes'] == true) {
@@ -258,11 +277,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
           return false;
         }
 
-        await _storage.deleteAll();
-        await _storage.write(key: 'access_token', value: accessToken);
-        if (refreshToken != null) {
-          await _storage.write(key: 'refresh_token', value: refreshToken);
-        }
+        await PinLockService(storage: _storage).wipeAllAuthAndPinData();
+        await SecureTokenStorage.saveTokens(
+          _storage,
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        );
 
         final user = UserModel.fromJson(userJson);
         state = state.copyWith(
@@ -270,6 +290,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           user: user,
           phoneNumber: user.phone,
           errorMessage: null,
+          lastTemporaryPassword: user.mustChangePassword ? trimmedPassword : null,
+          clearTempPassword: !user.mustChangePassword,
         );
         await chargerProfil();
         return true;
@@ -280,6 +302,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
         errorMessage: 'Identifiants incorrects.',
       );
     } on DioException catch (e) {
+      final roleMissing = RoleMissingInfo.tryParse(e);
+      if (roleMissing != null) {
+        state = state.copyWith(
+          status: AuthStatus.error,
+          errorMessage: roleMissing.message,
+          roleMissingInfo: roleMissing,
+          clearRoleMissing: false,
+        );
+        return false;
+      }
+
       final msg = e.response?.statusCode == 404
           ? 'Aucun compte trouvé avec ce numéro. Veuillez vous inscrire.'
           : ApiClient.messageErreur(e);
@@ -404,11 +437,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiClient.get('/client/profile');
       if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
         final user = UserModel.fromJson(res.data['donnees'] as Map<String, dynamic>);
+        await PinLockService(storage: _storage)
+            .applyServerPinResetIfNeeded(user.pinResetRequiredAt);
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
           phoneNumber: user.phone,
           errorMessage: null,
+          clearTempPassword: !user.mustChangePassword,
         );
         return null;
       }
@@ -418,6 +454,54 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {
       return 'Impossible de charger votre profil.';
     }
+  }
+
+  /// Restaure une session après déverrouillage PIN local (ou si un jeton actif est déjà présent).
+  Future<bool> restaurerSessionLocale() async {
+    final accessToken = await SecureTokenStorage.readAccessToken(_storage);
+    final hasRefresh = PinLockService.unlockedRefreshToken != null ||
+        (await SecureTokenStorage.readRefreshToken(_storage)) != null;
+    if ((accessToken == null || accessToken.isEmpty) && !hasRefresh) {
+      return false;
+    }
+
+    final err = await chargerProfil();
+    return err == null && state.status == AuthStatus.authenticated;
+  }
+
+  /// Échange un Deep Link SSO PKCE (`golivreur-client://sso?code=...&verifier=...`).
+  Future<bool> finaliserBasculeSso(Uri uri) async {
+    try {
+      final result = await SsoSwitchService.exchangeIncomingDeepLink(
+        apiClient: _apiClient,
+        storage: _storage,
+        uri: uri,
+        currentApp: GoLivreurAppTarget.client,
+      );
+      if (result == null) return false;
+      final user = UserModel.fromJson(result.userJson);
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        user: user,
+        phoneNumber: user.phone,
+        errorMessage: null,
+      );
+      await chargerProfil();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> marquerMotDePasseChange() async {
+    final current = state.user;
+    if (current != null) {
+      state = state.copyWith(
+        user: current.copyWith(mustChangePassword: false),
+        clearTempPassword: true,
+      );
+    }
+    await chargerProfil();
   }
 
   Future<(bool, String?)> mettreAJourProfil({
@@ -471,7 +555,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> forcerDeconnexionLocale() async {
-    await _storage.deleteAll();
+    await PinLockService(storage: _storage).wipeAllAuthAndPinData();
     state = const AuthState(status: AuthStatus.initial);
   }
 

@@ -1,11 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/config/env_config.dart';
 import 'package:golivreur_core/services/api_client.dart';
-import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
-import 'package:golivreur_core/widgets/golivreur_logo.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../navigation/screens/driver_main_navigation_screen.dart';
 import 'driver_register_screen.dart';
 
@@ -64,7 +62,8 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
     final password = _passwordController.text;
 
     if (phone.isEmpty || password.isEmpty) {
-      setState(() => _erreur = 'Veuillez saisir votre numéro et votre mot de passe.');
+      setState(() =>
+          _erreur = 'Veuillez saisir votre numéro et votre mot de passe.');
       return;
     }
 
@@ -74,7 +73,7 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
     });
 
     try {
-      const storage = FlutterSecureStorage();
+      final storage = SecureTokenStorage.createStorage();
       final api = widget.apiClientOverride ??
           ApiClient(
             baseUrl: GoLivreurEnv.apiBaseUrl,
@@ -85,32 +84,69 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
       final res = await api.post('/auth/login-password', data: {
         'phone': phone,
         'password': password,
+        'app_type': 'driver',
       });
 
-      if (res.statusCode == 200 && res.data is Map && res.data['donnees'] != null) {
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['donnees'] != null) {
         final donnees = res.data['donnees'] as Map;
-        final userRole = (donnees['user'] is Map ? donnees['user']['role'] : null)?.toString();
-        if (userRole != null && userRole != 'driver' && userRole != 'courier') {
+        final userMap = donnees['user'] is Map
+            ? Map<String, dynamic>.from(donnees['user'] as Map)
+            : <String, dynamic>{};
+        final userRole = userMap['role']?.toString();
+        final roles = userMap['roles'] is List
+            ? (userMap['roles'] as List).map((e) => e.toString()).toList()
+            : <String>[if (userRole != null) userRole];
+
+        if (!roles.contains('driver') && !roles.contains('courier')) {
           if (mounted) {
             setState(() {
               _chargement = false;
-              _erreur = 'Ce compte n\'est pas un compte livreur.';
+              _erreur = 'Ce compte ne dispose pas encore du rôle livreur.';
             });
           }
           return;
         }
+
         final token = donnees['access_token'] as String?;
         final refresh = donnees['refresh_token'] as String?;
-        if (token != null) await storage.write(key: 'access_token', value: token);
-        if (refresh != null) await storage.write(key: 'refresh_token', value: refresh);
+        await PinLockService(storage: storage).wipeAllAuthAndPinData();
+        if (token != null) {
+          await SecureTokenStorage.saveTokens(
+            storage,
+            accessToken: token,
+            refreshToken: refresh,
+          );
+        }
+
+        final mustChangePassword = userMap['must_change_password'] == true;
 
         if (mounted) {
           setState(() => _chargement = false);
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const DriverMainNavigationScreen(),
-            ),
-          );
+          if (mustChangePassword) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => ForcePasswordChangeScreen(
+                  apiClient: api,
+                  initialTemporaryPassword: password,
+                  onPasswordChanged: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => const DriverMainNavigationScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => const DriverMainNavigationScreen(),
+              ),
+            );
+          }
         }
         return;
       }
@@ -122,16 +158,20 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
         });
       }
     } on DioException catch (e) {
-      String message = 'Numéro ou mot de passe incorrect.';
-      final data = e.response?.data;
-      if (data is Map && data['message'] is String) {
-        message = data['message'] as String;
-      }
+      final roleMissing = RoleMissingInfo.tryParse(e);
       if (mounted) {
         setState(() {
           _chargement = false;
-          _erreur = message;
+          _erreur = roleMissing?.message ?? ApiClient.messageErreur(e);
         });
+        if (roleMissing != null) {
+          await showRoleMissingDialog(
+            context,
+            info: roleMissing,
+            registerButtonLabel: 'Devenir livreur',
+            onRegisterRole: _ouvrirPreInscription,
+          );
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -179,7 +219,6 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-
               if (_erreur != null) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -195,7 +234,6 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
