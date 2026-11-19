@@ -225,7 +225,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Ajoutez des bons plats ou articles de Daloa !',
+                'Ajoutez des plats ou articles de vos commerces locaux !',
                 style: TextStyle(color: GoLivreurTheme.texteSecondaire),
               ),
               const SizedBox(height: 24),
@@ -389,9 +389,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             ),
             const SizedBox(height: 20),
 
-            // ─── Repères & Instructions de livraison à Daloa ────────────────
+            // ─── Repères & Instructions de livraison ────────────────────────
             const Text(
-              'Instructions de livraison (Repères à Daloa)',
+              'Instructions de livraison (Repères)',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

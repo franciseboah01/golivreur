@@ -25,7 +25,7 @@ class OrdersTrackingHistoryScreen extends ConsumerWidget {
           if (orders.isEmpty) {
             return const EtatVide(
               icone: Icons.receipt_long_outlined,
-              message: 'Aucune commande enregistrée pour l\'instant.\nCommandez chez vos commerces partenaires à Daloa !',
+              message: 'Aucune commande enregistrée pour l\'instant.\nCommandez chez vos commerces partenaires !',
             );
           }
 

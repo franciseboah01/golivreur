@@ -386,7 +386,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Daloa bouge, on livre !',
+                        'Votre ville bouge, on livre !',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 13,

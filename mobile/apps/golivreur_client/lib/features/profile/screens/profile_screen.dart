@@ -238,11 +238,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const Divider(height: 1),
                 _buildTile(
                   icon: Icons.support_agent,
-                  title: 'Support client & Urgence Daloa',
-                  subtitle: 'Appel direct vers notre bureau local Daloa',
+                  title: registeredCity.isNotEmpty
+                      ? 'Support client & Urgence ($registeredCity)'
+                      : 'Support client & Urgence',
+                  subtitle: registeredCity.isNotEmpty
+                      ? 'Assistance agence locale $registeredCity'
+                      : 'Assistance agence locale GoLivreur',
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Ligne directe Support Daloa : +225 07 00 00 00 02')),
+                      SnackBar(
+                        content: Text(
+                          registeredCity.isNotEmpty
+                              ? 'Contactez votre agence Support GoLivreur ($registeredCity).'
+                              : 'Contactez votre agence Support GoLivreur.',
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -285,9 +295,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                const Text(
-                  'GoLivreur v5.0 • Fait avec passion pour Daloa',
-                  style: TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 12),
+                Text(
+                  registeredCity.isNotEmpty
+                      ? 'GoLivreur v5.0 • $registeredCity'
+                      : 'GoLivreur v5.0',
+                  style: const TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 12),
                 ),
               ],
             ),
@@ -360,7 +372,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Aucune alerte en cours. Service standard actif à Daloa.',
+                                    'Aucune alerte en cours. Service standard actif.',
                                     style: TextStyle(color: GoLivreurTheme.texteSecondaire),
                                   ),
                                 ),

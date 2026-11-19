@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
+import '../providers/goshop_provider.dart';
 import '../providers/order_provider.dart';
 import '../providers/gps_tracking_provider.dart';
 
@@ -119,6 +120,7 @@ class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
     // Écoute les mises à jour en temps réel (statut + position GPS via Reverb)
     ref.watch(gpsTrackingProvider(widget.orderId));
     final orderAsync = ref.watch(orderDetailProvider(widget.orderId));
+    final weather = ref.watch(weatherProvider);
 
     // Quand une nouvelle position GPS arrive, animer le déplacement
     ref.listen<AsyncValue<LatLng?>>(
@@ -156,7 +158,10 @@ class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
               initialCameraPosition: CameraPosition(
                 target: order.deliveryLat != null && order.deliveryLng != null
                     ? LatLng(order.deliveryLat!, order.deliveryLng!)
-                    : const LatLng(6.8770, -6.4502), // Centre Daloa par défaut
+                    : LatLng(
+                        weather.centerLat ?? 7.5399,
+                        weather.centerLng ?? -5.5471,
+                      ),
                 zoom: 15,
               ),
               markers: _marqueurs,

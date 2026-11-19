@@ -236,7 +236,7 @@ class _MerchantDetailScreenState extends ConsumerState<MerchantDetailScreen> {
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Délais de préparation et livraison adaptés (+15 min) en raison de la pluie à Daloa.',
+                              'Délais de préparation et livraison adaptés (+15 min) en raison de la pluie.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF1B4D7E),

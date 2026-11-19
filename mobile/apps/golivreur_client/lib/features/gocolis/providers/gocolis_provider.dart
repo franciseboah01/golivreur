@@ -4,99 +4,39 @@ import '../../auth/providers/auth_provider.dart';
 
 final parcelsHistoryProvider = FutureProvider<List<ParcelModel>>((ref) async {
   final api = ref.watch(apiClientProvider);
+  final userId = ref.watch(authProvider.select((s) => s.user?.id));
+  if (userId == null) return const [];
 
   try {
     final response = await api.get('/client/parcels');
-    if (response.statusCode == 200 && response.data['succes'] == true) {
+    if (response.statusCode == 200 &&
+        response.data is Map &&
+        response.data['succes'] == true &&
+        response.data['donnees'] is List) {
       final List list = response.data['donnees'] as List;
-      return list.map((json) => ParcelModel.fromJson(json)).toList();
+      return list
+          .whereType<Map>()
+          .map((json) => ParcelModel.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
     }
-  } catch (_) {
-    // Mode démo ou hors-ligne
-  }
+  } catch (_) {}
 
-  // Fallback réaliste Daloa
-  return [
-    ParcelModel(
-      id: 501,
-      status: 'in_transit',
-      size: 'moyen',
-      sizeLabel: 'Moyen (Boîte à chaussures / Vêtements)',
-      declaredValue: 15000,
-      hasInsurance: true,
-      insuranceAmount: 300,
-      recipientName: 'Kouassi Yves',
-      recipientPhone: '0701000008',
-      deliveryAddress: 'Quartier Lobia, face pharmacie de garde',
-      shippingFee: 1000,
-      paymentMethod: 'wave',
-      senderCodeLocked: false,
-      recipientCodeLocked: false,
-      courier: const CourierModel(
-        id: 12,
-        name: 'Bakary Soro',
-        photoUrl: null,
-        currentLat: 6.8780,
-        currentLng: -6.4490,
-        averageRating: 4.8,
-        isOnline: true,
-      ),
-      photos: const [
-        ParcelPhotoModel(
-          id: 1,
-          type: 'pickup',
-          photoUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=300',
-        ),
-      ],
-      createdAt: DateTime.now().subtract(const Duration(minutes: 25)),
-    ),
-  ];
+  return const [];
 });
 
-final singleParcelProvider = FutureProvider.family<ParcelModel, int>((ref, parcelId) async {
+final singleParcelProvider =
+    FutureProvider.family<ParcelModel, int>((ref, parcelId) async {
   final api = ref.watch(apiClientProvider);
 
-  try {
-    final response = await api.get('/client/parcels/$parcelId');
-    if (response.statusCode == 200 && response.data['succes'] == true) {
-      return ParcelModel.fromJson(response.data['donnees'] as Map<String, dynamic>);
-    }
-  } catch (_) {
-    // Fallback
+  final response = await api.get('/client/parcels/$parcelId');
+  if (response.statusCode == 200 &&
+      response.data is Map &&
+      response.data['succes'] == true &&
+      response.data['donnees'] is Map) {
+    return ParcelModel.fromJson(
+      Map<String, dynamic>.from(response.data['donnees'] as Map),
+    );
   }
 
-  return ParcelModel(
-    id: parcelId,
-    status: 'in_transit',
-    size: 'moyen',
-    sizeLabel: 'Moyen (Colis scellé)',
-    declaredValue: 15000,
-    hasInsurance: true,
-    insuranceAmount: 300,
-    recipientName: 'Kouassi Yves',
-    recipientPhone: '0701000008',
-    deliveryAddress: 'Quartier Lobia, face pharmacie de garde',
-    shippingFee: 1000,
-    paymentMethod: 'wave',
-    senderCodeLocked: false,
-    recipientCodeLocked: false,
-    courier: const CourierModel(
-      id: 12,
-      name: 'Bakary Soro',
-      photoUrl: null,
-      currentLat: 6.8780,
-      currentLng: -6.4490,
-      averageRating: 4.8,
-      isOnline: true,
-    ),
-    photos: const [
-      ParcelPhotoModel(
-        id: 1,
-        type: 'pickup',
-        photoUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=300',
-      ),
-    ],
-    createdAt: DateTime.now().subtract(const Duration(minutes: 25)),
-  );
+  throw Exception('Colis #$parcelId introuvable.');
 });
-

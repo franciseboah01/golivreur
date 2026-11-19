@@ -111,7 +111,7 @@ class GoLivreurErrorView extends StatelessWidget {
     if (customMessage != null) return customMessage!;
     switch (type) {
       case GoLivreurErrorType.networkLoss:
-        return 'Vérifiez votre connexion Wi-Fi ou vos données mobiles pour reprendre votre session à Daloa.';
+        return 'Vérifiez votre connexion Wi-Fi ou vos données mobiles pour reprendre votre session GoLivreur.';
       case GoLivreurErrorType.timeout:
         return 'La connexion est un peu lente en ce moment. Touchez Réessayer pour recharger les informations.';
       case GoLivreurErrorType.serverError:

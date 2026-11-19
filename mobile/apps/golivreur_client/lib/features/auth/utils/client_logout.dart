@@ -15,6 +15,8 @@ Future<void> deconnecterEtReinitialiserClient(
   ref.read(searchQueryProvider.notifier).state = '';
   ref.read(selectedNeighborhoodProvider.notifier).state = '';
   await ref.read(authProvider.notifier).deconnecter();
+  ref.invalidate(weatherProvider);
+  ref.invalidate(merchantsListProvider);
   ref.invalidate(clientAddressesProvider);
   ref.invalidate(favoritesProvider);
   ref.invalidate(clientNotificationsProvider);

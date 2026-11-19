@@ -553,9 +553,11 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                const Text(
-                                  'Ce week-end pour fêter nos commerces de Daloa !',
-                                  style: TextStyle(
+                                Text(
+                                  destination.cityName.isNotEmpty
+                                      ? 'Ce week-end pour fêter nos commerces à ${destination.cityName} !'
+                                      : 'Ce week-end pour fêter nos commerces partenaires !',
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
                                   ),
@@ -661,19 +663,21 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                     ),
                   ),
 
-                  // ─── Populaire à Daloa ────────────────────────────────────
+                  // ─── Populaire dans la ville active ──────────────────────
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.local_fire_department, color: GoLivreurTheme.primaire, size: 22),
-                            SizedBox(width: 6),
+                            const Icon(Icons.local_fire_department, color: GoLivreurTheme.primaire, size: 22),
+                            const SizedBox(width: 6),
                             Text(
-                              'Populaire à Daloa',
-                              style: TextStyle(
+                              destination.cityName.isNotEmpty
+                                  ? 'Populaire à ${destination.cityName}'
+                                  : 'Commerces populaires',
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: GoLivreurTheme.textePrincipal,
@@ -759,7 +763,7 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                     ),
                   ),
 
-                  // ─── Bouton Achat Spécifique à Daloa ─────────────────────
+                  // ─── Bouton Achat Spécifique ─────────────────────────────
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: InkWell(
@@ -778,14 +782,16 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: GoLivreurTheme.primaire.withValues(alpha: 0.4)),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_shopping_cart, color: Color(0xFFC47B00), size: 22),
-                            SizedBox(width: 8),
+                            const Icon(Icons.add_shopping_cart, color: Color(0xFFC47B00), size: 22),
+                            const SizedBox(width: 8),
                             Text(
-                              'Besoin d\'un achat spécifique à Daloa ?',
-                              style: TextStyle(
+                              destination.cityName.isNotEmpty
+                                  ? 'Besoin d\'un achat spécifique à ${destination.cityName} ?'
+                                  : 'Besoin d\'un achat spécifique ?',
+                              style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
                                 color: Color(0xFF835500),
@@ -1677,14 +1683,22 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.storefront, color: GoLivreurTheme.primaire),
-                    title: const Text('GoShop - Commerces Daloa'),
+                    title: Text(
+                      cityName.isNotEmpty
+                          ? 'GoShop - Commerces $cityName'
+                          : 'GoShop - Commerces locaux',
+                    ),
                     subtitle: const Text('Restaurants, Maquis & Boutiques'),
                     onTap: () => Navigator.pop(context),
                   ),
                   ListTile(
                     leading: const Icon(Icons.all_inbox, color: Colors.blue),
                     title: const Text('GoColis - Envoi de colis'),
-                    subtitle: const Text('Expéditions express moto à Daloa'),
+                    subtitle: Text(
+                      cityName.isNotEmpty
+                          ? 'Expéditions express moto à $cityName'
+                          : 'Expéditions express moto dans votre ville',
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.of(context).push(
@@ -1717,12 +1731,22 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                   const Divider(),
                   ListTile(
                     leading: const Icon(Icons.support_agent, color: Colors.teal),
-                    title: const Text('Support Client Daloa'),
-                    subtitle: const Text('+225 07 00 00 00 02'),
+                    title: Text(
+                      cityName.isNotEmpty
+                          ? 'Support Client $cityName'
+                          : 'Support Client GoLivreur',
+                    ),
+                    subtitle: const Text('Assistance & suivi'),
                     onTap: () {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Support GoLivreur Daloa joignable au 0700000002')),
+                        SnackBar(
+                          content: Text(
+                            cityName.isNotEmpty
+                                ? 'Contactez votre agence Support GoLivreur ($cityName).'
+                                : 'Contactez votre agence Support GoLivreur.',
+                          ),
+                        ),
                       );
                     },
                   ),

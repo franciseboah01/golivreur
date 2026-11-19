@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
+import '../../goshop/providers/goshop_provider.dart';
 import '../providers/gocolis_provider.dart';
 import 'new_parcel_screen.dart';
 import 'parcel_tracking_screen.dart';
@@ -12,19 +13,21 @@ class GoColisHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final parcelsAsync = ref.watch(parcelsHistoryProvider);
+    final destination = ref.watch(activeDeliveryDestinationProvider);
+    final cityName = destination.cityName;
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.inventory_2, color: GoLivreurTheme.primaire),
-            SizedBox(width: 8),
+            const Icon(Icons.inventory_2, color: GoLivreurTheme.primaire),
+            const SizedBox(width: 8),
             Text(
-              'GoColis Daloa',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              cityName.isNotEmpty ? 'GoColis $cityName' : 'GoColis',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
           ],
         ),
@@ -62,9 +65,11 @@ class GoColisHomeScreen extends ConsumerWidget {
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text(
-                      '📦 COURSIER EXPRESS DALOA',
-                      style: TextStyle(
+                    child: Text(
+                      cityName.isNotEmpty
+                          ? '📦 COURSIER EXPRESS ${cityName.toUpperCase()}'
+                          : '📦 COURSIER EXPRESS',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 11,
@@ -72,9 +77,11 @@ class GoColisHomeScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Expédiez un colis partout à Daloa en 30 minutes',
-                    style: TextStyle(
+                  Text(
+                    cityName.isNotEmpty
+                        ? 'Expédiez un colis partout à $cityName en 30 minutes'
+                        : 'Expédiez un colis dans votre ville en 30 minutes',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

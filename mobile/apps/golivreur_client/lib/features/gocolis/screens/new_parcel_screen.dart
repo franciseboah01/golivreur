@@ -60,7 +60,6 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
 
     setState(() => _isSubmitting = true);
     final api = ref.read(apiClientProvider);
-    int parcelId = 501;
 
     try {
       final payload = {
@@ -75,20 +74,39 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
       };
 
       final response = await api.post('/client/parcels', data: payload);
-      if (response.statusCode == 201 && response.data['donnees'] != null) {
-        parcelId = response.data['donnees']['id'] as int;
+      final rawId = response.data is Map && response.data['donnees'] is Map
+          ? response.data['donnees']['id']
+          : null;
+
+      if ((response.statusCode == 201 || response.statusCode == 200) && rawId != null) {
+        final parcelId = rawId is int ? rawId : int.parse('$rawId');
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+          ref.invalidate(parcelsHistoryProvider);
+
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => ParcelTrackingScreen(parcelId: parcelId),
+            ),
+          );
+        }
+        return;
       }
-    } catch (_) {
-      // Fallback démo
-      parcelId = 501;
-    } finally {
+
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ref.invalidate(parcelsHistoryProvider);
-
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => ParcelTrackingScreen(parcelId: parcelId),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossible d\'enregistrer l\'expédition. Vérifiez les informations saisies.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de l\'envoi du colis. Vérifiez votre connexion.'),
           ),
         );
       }
@@ -147,9 +165,9 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
                     TextFormField(
                       controller: _addressController,
                       decoration: const InputDecoration(
-                        labelText: 'Adresse de livraison & Repère à Daloa *',
+                        labelText: 'Adresse de livraison & Repère *',
                         prefixIcon: Icon(Icons.location_on_outlined),
-                        hintText: 'Ex: Lobia, face pharmacie de garde',
+                        hintText: 'Ex: Quartier, face pharmacie ou carrefour',
                       ),
                       validator: (val) => val == null || val.isEmpty ? 'Champ obligatoire' : null,
                     ),

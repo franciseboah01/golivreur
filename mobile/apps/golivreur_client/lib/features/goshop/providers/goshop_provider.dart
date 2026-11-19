@@ -64,6 +64,8 @@ const List<DeliveryTariffTier> defaultGoShopBareme = [
 class WeatherState {
   final int? cityId;
   final String cityName;
+  final double? centerLat;
+  final double? centerLng;
   final bool isRainMode;
   final bool emergencyModeActive;
   final String? emergencyMessage;
@@ -77,6 +79,8 @@ class WeatherState {
   const WeatherState({
     this.cityId,
     this.cityName = '',
+    this.centerLat,
+    this.centerLng,
     this.isRainMode = false,
     this.emergencyModeActive = false,
     this.emergencyMessage,
@@ -91,6 +95,8 @@ class WeatherState {
   WeatherState copyWith({
     int? cityId,
     String? cityName,
+    double? centerLat,
+    double? centerLng,
     bool? isRainMode,
     bool? emergencyModeActive,
     String? emergencyMessage,
@@ -104,6 +110,8 @@ class WeatherState {
     return WeatherState(
       cityId: cityId ?? this.cityId,
       cityName: cityName ?? this.cityName,
+      centerLat: centerLat ?? this.centerLat,
+      centerLng: centerLng ?? this.centerLng,
       isRainMode: isRainMode ?? this.isRainMode,
       emergencyModeActive: emergencyModeActive ?? this.emergencyModeActive,
       emergencyMessage: emergencyMessage ?? this.emergencyMessage,
@@ -171,19 +179,25 @@ class WeatherState {
 
 class WeatherNotifier extends StateNotifier<WeatherState> {
   final ApiClient _apiClient;
+  final int? _initialCityId;
   final void Function(String? logoUrl, String? defaultEmoji)? _onBranding;
 
-  WeatherNotifier(this._apiClient, {void Function(String?, String?)? onBranding})
-      : _onBranding = onBranding,
+  WeatherNotifier(
+    this._apiClient, {
+    int? initialCityId,
+    void Function(String?, String?)? onBranding,
+  })  : _initialCityId = initialCityId,
+        _onBranding = onBranding,
         super(const WeatherState()) {
-    chargerStatutVille();
+    chargerStatutVille(cityId: _initialCityId);
   }
 
   Future<void> chargerStatutVille({int? cityId}) async {
+    final targetCityId = cityId ?? state.cityId ?? _initialCityId;
     try {
       final res = await _apiClient.get(
         '/client/city-status',
-        queryParameters: cityId != null ? {'city_id': cityId} : null,
+        queryParameters: targetCityId != null ? {'city_id': targetCityId} : null,
       );
       if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
         final d = res.data['donnees'] as Map<String, dynamic>;
@@ -200,6 +214,8 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
         state = state.copyWith(
           cityId: d['city_id'] as int?,
           cityName: cName,
+          centerLat: (d['center_lat'] as num?)?.toDouble(),
+          centerLng: (d['center_lng'] as num?)?.toDouble(),
           isRainMode: rainActive,
           rainDelayMinutes: d['rain_delay_minutes'] as int? ?? (rainActive ? 15 : 0),
           emergencyModeActive: d['emergency_mode_active'] as bool? ?? false,
@@ -231,12 +247,25 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
 
 final weatherProvider = StateNotifierProvider<WeatherNotifier, WeatherState>((ref) {
   final api = ref.watch(apiClientProvider);
-  return WeatherNotifier(
+  final initialCityId = ref.read(authProvider).user?.cityId;
+  final notifier = WeatherNotifier(
     api,
+    initialCityId: initialCityId,
     onBranding: (logoUrl, emoji) {
       ref.read(appBrandingProvider.notifier).updateFromValues(logoUrl, emoji);
     },
   );
+
+  ref.listen<int?>(
+    authProvider.select((s) => s.user?.cityId),
+    (prev, next) {
+      if (next != null && next != prev) {
+        notifier.chargerStatutVille(cityId: next);
+      }
+    },
+  );
+
+  return notifier;
 });
 
 // ─── Quartiers (chargés depuis l'API, aucune liste codée en dur) & Adresses ──
@@ -645,183 +674,29 @@ final categoriesProvider = FutureProvider<List<CategoryItem>>((ref) async {
 
 final selectedCategoryProvider = StateProvider<String>((ref) => 'all');
 
-// ─── Provider Commerces de Daloa ──────────────────────────────────────────────
+// ─── Provider Commerces de la ville active du client ──────────────────────────
 final merchantsListProvider = FutureProvider<List<MerchantModel>>((ref) async {
   final api = ref.watch(apiClientProvider);
+  final userCityId = ref.watch(authProvider.select((s) => s.user?.cityId));
 
   try {
-    final response = await api.get('/client/merchants');
-    if (response.statusCode == 200 && response.data['succes'] == true) {
+    final response = await api.get(
+      '/client/merchants',
+      queryParameters: userCityId != null ? {'city_id': userCityId} : null,
+    );
+    if (response.statusCode == 200 &&
+        response.data is Map &&
+        response.data['succes'] == true &&
+        response.data['donnees'] is List) {
       final List data = response.data['donnees'] as List;
-      return data.map((json) => MerchantModel.fromJson(json)).toList();
+      return data
+          .whereType<Map>()
+          .map((json) => MerchantModel.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
     }
-  } catch (_) {
-    // Si l'API renvoie une erreur ou en mode hors-ligne, fallback sur les données locales réalistes de Daloa
-  }
+  } catch (_) {}
 
-  // Fallback données réalistes Daloa validées
-  return [
-    const MerchantModel(
-      id: 1,
-      name: 'Maquis Chez Tantie Adjoua',
-      category: 'maquis',
-      categoryName: 'Maquis & Grillades',
-      emoji: '🍖',
-      address: 'Quartier Commerce, Daloa',
-      lat: 6.8821,
-      lng: -6.4478,
-      prepTimeMinutes: 20,
-      isOpen: true,
-      averageRating: 4.8,
-      photoUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500',
-      products: [
-        ProductModel(
-          id: 101,
-          name: 'Garba Royal (Attiéké + Poisson Thon)',
-          price: 1500,
-          description: 'Attiéké frais de Daloa avec pavé de thon frit assaisonné, piment et tomates.',
-          isAvailable: true,
-          category: 'Plats du jour',
-        ),
-        ProductModel(
-          id: 102,
-          name: 'Poulet Braisé Maison (Demi)',
-          price: 3000,
-          description: 'Poulet fermier braisé au feu de bois avec oignons caramélisés et alloco.',
-          isAvailable: true,
-          category: 'Grillades',
-        ),
-        ProductModel(
-          id: 103,
-          name: 'Alloco Croustillant',
-          price: 500,
-          description: 'Bananes plantains mûres frites dans de l\'huile végétale propre.',
-          isAvailable: true,
-          category: 'Accompagnements',
-        ),
-        ProductModel(
-          id: 104,
-          name: 'Jus de Bissap Maison Glacé',
-          price: 500,
-          description: 'Jus naturel d\'hibiscus parfumé à la menthe et vanille (500ml).',
-          isAvailable: true,
-          category: 'Boissons',
-        ),
-      ],
-    ),
-    const MerchantModel(
-      id: 2,
-      name: 'Pharmacie Centrale Daloa',
-      category: 'pharmacie',
-      categoryName: 'Pharmacies',
-      emoji: '💊',
-      address: 'Place de la Mairie, Daloa',
-      lat: 6.8770,
-      lng: -6.4502,
-      prepTimeMinutes: 10,
-      isOpen: true,
-      averageRating: 4.9,
-      photoUrl: 'https://images.unsplash.com/photo-1586015555751-63bb77f4322a?w=500',
-      products: [
-        ProductModel(
-          id: 201,
-          name: 'Paracétamol 1000mg (Boîte de 16)',
-          price: 1200,
-          description: 'Antalgique et antipyrétique de première intention.',
-          isAvailable: true,
-          category: 'Médicaments',
-        ),
-        ProductModel(
-          id: 202,
-          name: 'Thermomètre Digital Précision',
-          price: 2500,
-          description: 'Mesure rapide en 10 secondes avec alerte sonore de fièvre.',
-          isAvailable: true,
-          category: 'Matériel médical',
-        ),
-        ProductModel(
-          id: 203,
-          name: 'Sérum Physiologique (Pack de 10)',
-          price: 1500,
-          description: 'Pour lavage nasal et oculaire nourrissons et adultes.',
-          isAvailable: true,
-          category: 'Soins',
-        ),
-      ],
-    ),
-    const MerchantModel(
-      id: 3,
-      name: 'Fast Food Speed Burger Daloa',
-      category: 'fast_food',
-      categoryName: 'Fast-Foods',
-      emoji: '🍔',
-      address: 'Rue du Commerce, Daloa',
-      lat: 6.8795,
-      lng: -6.4521,
-      prepTimeMinutes: 15,
-      isOpen: true,
-      averageRating: 4.5,
-      photoUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500',
-      products: [
-        ProductModel(
-          id: 301,
-          name: 'Burger Double Cheese Bacon',
-          price: 2500,
-          description: 'Double steak haché pur bœuf, cheddar fondant, sauce maison et frites.',
-          isAvailable: true,
-          category: 'Burgers',
-        ),
-        ProductModel(
-          id: 302,
-          name: 'Sandwich Chawarma Poulet',
-          price: 1500,
-          description: 'Pain pita frais garni de poulet mariné, crudités et sauce blanche.',
-          isAvailable: true,
-          category: 'Chawarma',
-        ),
-        ProductModel(
-          id: 303,
-          name: 'Canette Coca-Cola 33cl',
-          price: 500,
-          description: 'Boisson rafraîchissante servie très fraîche.',
-          isAvailable: true,
-          category: 'Boissons',
-        ),
-      ],
-    ),
-    const MerchantModel(
-      id: 4,
-      name: 'Boulangerie La Centrale Daloa',
-      category: 'boulangerie',
-      categoryName: 'Boulangeries & Pâtisseries',
-      emoji: '🥐',
-      address: 'Avenue Houphouët-Boigny, face Gare UTB, Daloa',
-      lat: 6.8745,
-      lng: -6.4580,
-      prepTimeMinutes: 10,
-      isOpen: true,
-      averageRating: 4.7,
-      photoUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=500',
-      products: [
-        ProductModel(
-          id: 401,
-          name: 'Croissant Pur Beurre Doré',
-          price: 400,
-          description: 'Feuilletage croustillant au beurre fin, cuit du matin.',
-          isAvailable: true,
-          category: 'Viennoiseries',
-        ),
-        ProductModel(
-          id: 402,
-          name: 'Baguette Traditionnelle',
-          price: 200,
-          description: 'Baguette croustillante à la mie aérée.',
-          isAvailable: true,
-          category: 'Pains',
-        ),
-      ],
-    ),
-  ];
+  return const [];
 });
 
 // ─── Gestion du Panier (Mono-commerce comme spécifié dans Stitch) ──────────────

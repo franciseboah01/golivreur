@@ -6,155 +6,39 @@ final orderDetailProvider =
     FutureProvider.family<OrderModel, int>((ref, orderId) async {
   final api = ref.watch(apiClientProvider);
 
-  try {
-    final response = await api.get('/client/orders/$orderId');
-    if (response.statusCode == 200 && response.data['succes'] == true) {
-      return OrderModel.fromJson(response.data['donnees'] as Map<String, dynamic>);
-    }
-  } catch (_) {
-    // Mode déconnecté ou fallback démo Daloa
+  final response = await api.get('/client/orders/$orderId');
+  if (response.statusCode == 200 &&
+      response.data is Map &&
+      response.data['succes'] == true &&
+      response.data['donnees'] is Map) {
+    return OrderModel.fromJson(
+      Map<String, dynamic>.from(response.data['donnees'] as Map),
+    );
   }
 
-  // Fallback réaliste pour Daloa validé avec le code de confirmation 4829
-  return OrderModel(
-    id: orderId,
-    status: 'in_transit',
-    productsTotal: 4500,
-    deliveryFee: 800,
-    paymentMethod: 'wave',
-    paymentStatus: 'paid',
-    confirmationCode: '4829',
-    confirmationLocked: false,
-    deliveryAddress: 'Daloa, Quartier Résidentiel (Face Maquis Le Baoulé)',
-    deliveryLat: 6.8821,
-    deliveryLng: -6.4478,
-    specialInstructions: 'Portail bleu, m\'appeler dès arrivée.',
-    merchant: const MerchantModel(
-      id: 1,
-      name: 'Chez Tantie Adjoua',
-      category: 'maquis',
-      address: 'Quartier Résidentiel, Daloa',
-      lat: 6.8821,
-      lng: -6.4478,
-      prepTimeMinutes: 20,
-      isOpen: true,
-      averageRating: 4.8,
-      products: [],
-    ),
-    courier: const CourierModel(
-      id: 10,
-      name: 'Mamadou Touré',
-      photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-      currentLat: 6.8790,
-      currentLng: -6.4510,
-      averageRating: 4.9,
-      isOnline: true,
-    ),
-    items: const [
-      OrderItemModel(
-        id: 1,
-        productId: 101,
-        productNameSnapshot: 'Garba Royal (Attiéké + Thon)',
-        quantity: 2,
-        unitPrice: 1500,
-      ),
-      OrderItemModel(
-        id: 2,
-        productId: 102,
-        productNameSnapshot: 'Poulet Braisé Maison (Demi)',
-        quantity: 1,
-        unitPrice: 3000,
-      ),
-    ],
-    createdAt: DateTime.now().subtract(const Duration(minutes: 15)),
-  );
+  throw Exception('Commande #$orderId introuvable.');
 });
 
 final ordersHistoryProvider = FutureProvider<List<OrderModel>>((ref) async {
   final api = ref.watch(apiClientProvider);
+  final userId = ref.watch(authProvider.select((s) => s.user?.id));
+  if (userId == null) return const [];
 
   try {
     final response = await api.get('/client/orders');
-    if (response.statusCode == 200 && response.data['succes'] == true) {
+    if (response.statusCode == 200 &&
+        response.data is Map &&
+        response.data['succes'] == true) {
       final raw = response.data['donnees'];
-      final List list = (raw is Map && raw['data'] != null)
+      final List list = (raw is Map && raw['data'] is List)
           ? (raw['data'] as List)
-          : (raw is List ? raw : []);
-      if (list.isNotEmpty) {
-        return list.map((json) => OrderModel.fromJson(json as Map<String, dynamic>)).toList();
-      }
+          : (raw is List ? raw : const []);
+      return list
+          .whereType<Map>()
+          .map((json) => OrderModel.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
     }
-  } catch (_) {
-    // Mode démo ou fallback
-  }
+  } catch (_) {}
 
-  return [
-    OrderModel(
-      id: 104,
-      status: 'in_transit',
-      productsTotal: 4500,
-      deliveryFee: 800,
-      paymentMethod: 'wave',
-      paymentStatus: 'paid',
-      confirmationCode: '4829',
-      confirmationLocked: false,
-      deliveryAddress: 'Daloa, Quartier Résidentiel',
-      merchant: const MerchantModel(
-        id: 1,
-        name: 'Chez Tantie Adjoua',
-        category: 'maquis',
-        address: 'Quartier Résidentiel, Daloa',
-        lat: 6.8821,
-        lng: -6.4478,
-        prepTimeMinutes: 20,
-        isOpen: true,
-        averageRating: 4.8,
-        products: [],
-      ),
-      items: const [
-        OrderItemModel(
-          id: 1,
-          productId: 101,
-          productNameSnapshot: 'Garba Royal',
-          quantity: 2,
-          unitPrice: 1500,
-        ),
-      ],
-      createdAt: DateTime.now().subtract(const Duration(minutes: 18)),
-    ),
-    OrderModel(
-      id: 98,
-      status: 'delivered',
-      productsTotal: 2500,
-      deliveryFee: 500,
-      paymentMethod: 'orange_money',
-      paymentStatus: 'paid',
-      confirmationCode: null,
-      confirmationLocked: false,
-      deliveryAddress: 'Centre-ville, Boulevard Principal',
-      merchant: const MerchantModel(
-        id: 2,
-        name: 'Pharmacie Centrale',
-        category: 'pharmacie',
-        address: 'Centre-ville, Daloa',
-        lat: 6.8770,
-        lng: -6.4502,
-        prepTimeMinutes: 10,
-        isOpen: true,
-        averageRating: 4.9,
-        products: [],
-      ),
-      items: const [
-        OrderItemModel(
-          id: 2,
-          productId: 201,
-          productNameSnapshot: 'Paracétamol + Soins',
-          quantity: 1,
-          unitPrice: 2500,
-        ),
-      ],
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      deliveredAt: DateTime.now().subtract(const Duration(days: 2, hours: -1)),
-    ),
-  ];
+  return const [];
 });
