@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/services/api_client.dart';
-import 'package:golivreur_core/services/pin_lock_service.dart';
 import 'package:golivreur_core/services/secure_token_storage.dart';
 import 'package:golivreur_core/services/sso_switch_service.dart';
 import 'package:golivreur_core/widgets/role_missing_dialog.dart';
@@ -277,7 +276,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           return false;
         }
 
-        await PinLockService(storage: _storage).wipeAllAuthAndPinData();
+        await SecureTokenStorage.clearSessionTokens(_storage);
         await SecureTokenStorage.saveTokens(
           _storage,
           accessToken: accessToken,
@@ -437,8 +436,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiClient.get('/client/profile');
       if (res.statusCode == 200 && res.data['succes'] == true && res.data['donnees'] != null) {
         final user = UserModel.fromJson(res.data['donnees'] as Map<String, dynamic>);
-        await PinLockService(storage: _storage)
-            .applyServerPinResetIfNeeded(user.pinResetRequiredAt);
         state = state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -456,12 +453,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Restaure une session après déverrouillage PIN local (ou si un jeton actif est déjà présent).
+  /// Restaure la session client si un jeton actif est déjà présent.
   Future<bool> restaurerSessionLocale() async {
     final accessToken = await SecureTokenStorage.readAccessToken(_storage);
-    final hasRefresh = PinLockService.unlockedRefreshToken != null ||
-        (await SecureTokenStorage.readRefreshToken(_storage)) != null;
-    if ((accessToken == null || accessToken.isEmpty) && !hasRefresh) {
+    final refreshToken = await SecureTokenStorage.readRefreshToken(_storage);
+    if ((accessToken == null || accessToken.isEmpty) &&
+        (refreshToken == null || refreshToken.isEmpty)) {
       return false;
     }
 
@@ -555,7 +552,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> forcerDeconnexionLocale() async {
-    await PinLockService(storage: _storage).wipeAllAuthAndPinData();
+    await SecureTokenStorage.clearSessionTokens(_storage);
     state = const AuthState(status: AuthStatus.initial);
   }
 

@@ -79,51 +79,24 @@ class ClientAuthGate extends ConsumerStatefulWidget {
 }
 
 class _ClientAuthGateState extends ConsumerState<ClientAuthGate> {
-  bool _checkingBoot = true;
-  bool _pinLocked = false;
-
   @override
   void initState() {
     super.initState();
     DeepLinkBridge.listen(_handleIncomingUri);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapSecurity());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapSession());
   }
 
-  Future<void> _bootstrapSecurity() async {
-    final storage = ref.read(secureStorageProvider);
-    final pinService = PinLockService(storage: storage);
-
+  Future<void> _bootstrapSession() async {
     final initialUri = await DeepLinkBridge.getInitialUri();
     if (initialUri != null && initialUri.host == 'sso') {
       await _handleIncomingUri(initialUri);
-      if (mounted) {
-        setState(() {
-          _checkingBoot = false;
-          _pinLocked = false;
-        });
-      }
       return;
     }
 
-    final needsPin = await pinService.requiresUnlock();
-    if (needsPin) {
-      if (mounted) {
-        setState(() {
-          _checkingBoot = false;
-          _pinLocked = true;
-        });
-      }
-      return;
-    }
-
-    // Si un token existe déjà (et pas de PIN configuré), restaurer la session silencieusement
+    final storage = ref.read(secureStorageProvider);
     final existingToken = await SecureTokenStorage.readAccessToken(storage);
     if (existingToken != null && existingToken.isNotEmpty) {
       await ref.read(authProvider.notifier).restaurerSessionLocale();
-    }
-
-    if (mounted) {
-      setState(() => _checkingBoot = false);
     }
   }
 
@@ -133,7 +106,6 @@ class _ClientAuthGateState extends ConsumerState<ClientAuthGate> {
     }
     final ok = await ref.read(authProvider.notifier).finaliserBasculeSso(uri);
     if (ok && mounted) {
-      setState(() => _pinLocked = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Session transférée avec succès vers GL Client.'),
@@ -146,34 +118,6 @@ class _ClientAuthGateState extends ConsumerState<ClientAuthGate> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-
-    if (_pinLocked) {
-      final storage = ref.read(secureStorageProvider);
-      return PinLockScreen(
-        appName: 'GL Client',
-        pinService: PinLockService(storage: storage),
-        onUnlocked: (_) async {
-          final restored =
-              await ref.read(authProvider.notifier).restaurerSessionLocale();
-          if (mounted) {
-            setState(() => _pinLocked = false);
-            if (!restored) {
-              await ref.read(authProvider.notifier).forcerDeconnexionLocale();
-            }
-          }
-        },
-        onWipedForceLogin: () async {
-          await ref.read(authProvider.notifier).forcerDeconnexionLocale();
-          if (mounted) {
-            setState(() => _pinLocked = false);
-          }
-        },
-      );
-    }
-
-    if (_checkingBoot && authState.status == AuthStatus.initial) {
-      return const LoginScreen();
-    }
 
     if (authState.status == AuthStatus.authenticated) {
       if (authState.user?.mustChangePassword == true) {

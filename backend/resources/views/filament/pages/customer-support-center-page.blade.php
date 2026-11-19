@@ -121,14 +121,16 @@
                                 Réinitialiser le mot de passe (envoi direct)
                             </x-filament::button>
 
-                            <x-filament::button
-                                wire:click="declencherResetPin"
-                                wire:confirm="Confirmer la réinitialisation du code PIN rapide et la révocation des sessions actives ?"
-                                color="warning"
-                                class="w-full"
-                            >
-                                Réinitialiser le code PIN rapide
-                            </x-filament::button>
+                            @if (! empty(array_intersect(['merchant', 'driver', 'courier'], $callerData['user']['roles'] ?? [])))
+                                <x-filament::button
+                                    wire:click="declencherResetPin"
+                                    wire:confirm="Confirmer la réinitialisation du code PIN rapide (Business / Driver) et la révocation des sessions actives ?"
+                                    color="warning"
+                                    class="w-full"
+                                >
+                                    Réinitialiser le code PIN rapide (Business / Driver)
+                                </x-filament::button>
+                            @endif
                         </div>
                     @endif
                 </div>

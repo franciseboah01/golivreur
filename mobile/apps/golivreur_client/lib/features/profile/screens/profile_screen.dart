@@ -224,30 +224,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const Divider(height: 1),
                 _buildTile(
-                  icon: Icons.pin_outlined,
-                  title: 'Verrouillage rapide (Code PIN 4 chiffres)',
-                  subtitle: 'Chiffre votre session locale (3 essais max)',
-                  onTap: () async {
-                    final storage = ref.read(secureStorageProvider);
-                    final changed = await PinSetupSheet.show(
-                      context,
-                      pinService: PinLockService(storage: storage),
-                    );
-                    if (changed != null && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            changed
-                                ? 'Code PIN rapide activé. Votre Refresh Token est désormais chiffré.'
-                                : 'Code PIN rapide désactivé.',
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                const Divider(height: 1),
-                _buildTile(
                   icon: Icons.shield_outlined,
                   title: 'Sécurité & Codes de livraison',
                   subtitle: 'Codes 4 chiffres pour GoShop & GoColis',
