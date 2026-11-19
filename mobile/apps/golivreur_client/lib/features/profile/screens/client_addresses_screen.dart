@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../goshop/providers/goshop_provider.dart';
 
 /// Écran de gestion complète des adresses de livraison du Client :
@@ -23,6 +24,7 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
 
   Future<void> _openAddressForm({ClientAddressModel? existing}) async {
     final quarters = ref.read(daloaNeighborhoodsProvider);
+    final weather = ref.read(weatherProvider);
     final currentQuarter = ref.read(selectedNeighborhoodProvider);
     String? selectedQuarter = existing != null && quarters.contains(existing.neighborhood)
         ? existing.neighborhood
@@ -32,7 +34,11 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
 
     final formKey = GlobalKey<FormState>();
     final labelCtrl = TextEditingController(text: existing?.label ?? '');
+    final customQuarterCtrl = TextEditingController(text: existing?.neighborhood ?? '');
     final lineCtrl = TextEditingController(text: existing?.addressLine ?? '');
+    double? pickedLat = existing?.lat;
+    double? pickedLng = existing?.lng;
+    bool isLocatingGps = false;
     bool isDefault = existing?.isDefault ?? ref.read(clientAddressesProvider).addresses.isEmpty;
     bool isSaving = false;
     String? errorText;
@@ -46,6 +52,63 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
       ),
       builder: (sheetCtx) => StatefulBuilder(
         builder: (ctx, setModalState) {
+          Future<void> detectGps() async {
+            setModalState(() {
+              isLocatingGps = true;
+              errorText = null;
+            });
+            final res = await GpsLocationService.obtenirPositionActuelle(
+              withAddressLookup: true,
+            );
+            if (!ctx.mounted) return;
+            setModalState(() {
+              isLocatingGps = false;
+              if (res.isSuccess) {
+                pickedLat = res.lat;
+                pickedLng = res.lng;
+                if (lineCtrl.text.trim().isEmpty &&
+                    res.formattedAddress != null &&
+                    res.formattedAddress!.isNotEmpty) {
+                  lineCtrl.text = res.formattedAddress!;
+                }
+                if (quarters.isEmpty &&
+                    customQuarterCtrl.text.trim().isEmpty &&
+                    res.neighborhoodHint != null) {
+                  customQuarterCtrl.text = res.neighborhoodHint!;
+                }
+              } else {
+                errorText = res.errorMessage;
+              }
+            });
+          }
+
+          Future<void> openOsmPicker() async {
+            final initLat = pickedLat ?? weather.centerLat ?? 6.8770;
+            final initLng = pickedLng ?? weather.centerLng ?? -6.4502;
+            final picked = await OsmLocationPickerScreen.pick(
+              ctx,
+              initialLat: initLat,
+              initialLng: initLng,
+              title: 'Point de livraison sur la carte',
+            );
+            if (picked != null && ctx.mounted) {
+              setModalState(() {
+                pickedLat = picked.lat;
+                pickedLng = picked.lng;
+                if (lineCtrl.text.trim().isEmpty &&
+                    picked.addressLabel != null &&
+                    picked.addressLabel!.isNotEmpty) {
+                  lineCtrl.text = picked.addressLabel!;
+                }
+                if (quarters.isEmpty &&
+                    customQuarterCtrl.text.trim().isEmpty &&
+                    picked.neighborhoodHint != null) {
+                  customQuarterCtrl.text = picked.neighborhoodHint!;
+                }
+              });
+            }
+          }
+
           return Padding(
             padding: EdgeInsets.fromLTRB(
               20,
@@ -73,6 +136,73 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 10),
+
+                    // ─── Localisation GPS & Carte OpenStreetMap (100 % gratuit) ──
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: (isSaving || isLocatingGps) ? null : detectGps,
+                            icon: isLocatingGps
+                                ? const SizedBox(
+                                    width: 15,
+                                    height: 15,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.my_location, size: 17),
+                            label: const Text('Ma position GPS',
+                                style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: GoLivreurTheme.secondaire,
+                              side: const BorderSide(color: GoLivreurTheme.secondaire),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: isSaving ? null : openOsmPicker,
+                            icon: const Icon(Icons.map_outlined, size: 17),
+                            label: const Text('Pointer sur carte',
+                                style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: GoLivreurTheme.primaire,
+                              side: const BorderSide(color: GoLivreurTheme.primaire),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (pickedLat != null && pickedLng != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: GoLivreurTheme.secondaire.withValues(alpha: 0.09),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.gps_fixed,
+                                size: 15, color: GoLivreurTheme.secondaire),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Position GPS enregistrée (${pickedLat!.toStringAsFixed(4)}, ${pickedLng!.toStringAsFixed(4)})',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: GoLivreurTheme.secondaire,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     if (errorText != null) ...[
                       Container(
@@ -100,17 +230,16 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
                     ),
                     const SizedBox(height: 12),
                     if (quarters.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: GoLivreurTheme.bordure),
+                      TextFormField(
+                        controller: customQuarterCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Quartier de livraison *',
+                          hintText: 'Ex: Cocody, Centre-ville, Commerce...',
+                          prefixIcon: Icon(Icons.location_city_outlined),
+                          border: OutlineInputBorder(),
                         ),
-                        child: const Text(
-                          'Aucun quartier disponible pour votre ville.',
-                          style: TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 13),
-                        ),
+                        validator: (v) =>
+                            (v == null || v.trim().length < 2) ? 'Quartier obligatoire' : null,
                       )
                     else
                       DropdownButtonFormField<String>(
@@ -162,11 +291,15 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: (isSaving || selectedQuarter == null)
+                        onPressed: isSaving
                             ? null
                             : () async {
                                 if (!formKey.currentState!.validate()) return;
-                                final chosenQuarter = selectedQuarter!;
+                                final chosenQuarter = quarters.isEmpty
+                                    ? customQuarterCtrl.text.trim()
+                                    : (selectedQuarter ?? '');
+                                if (chosenQuarter.isEmpty) return;
+
                                 setModalState(() {
                                   isSaving = true;
                                   errorText = null;
@@ -178,6 +311,8 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
                                         label: labelCtrl.text,
                                         neighborhood: chosenQuarter,
                                         addressLine: lineCtrl.text,
+                                        lat: pickedLat,
+                                        lng: pickedLng,
                                         isDefault: isDefault,
                                       )
                                     : await notifier.modifierAdresse(
@@ -185,6 +320,8 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
                                         label: labelCtrl.text,
                                         neighborhood: chosenQuarter,
                                         addressLine: lineCtrl.text,
+                                        lat: pickedLat,
+                                        lng: pickedLng,
                                         isDefault: isDefault,
                                       );
 

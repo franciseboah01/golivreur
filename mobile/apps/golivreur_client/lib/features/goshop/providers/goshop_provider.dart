@@ -481,18 +481,22 @@ class ClientAddressesNotifier extends StateNotifier<ClientAddressesState> {
     required String label,
     required String neighborhood,
     required String addressLine,
+    double? lat,
+    double? lng,
     bool isDefault = false,
   }) async {
     try {
       final weather = _ref.read(weatherProvider);
       final q = weather.findNeighborhood(neighborhood);
+      final effectiveLat = lat ?? (q.lat != 0 ? q.lat : weather.centerLat);
+      final effectiveLng = lng ?? (q.lng != 0 ? q.lng : weather.centerLng);
       final res = await _apiClient.post('/client/addresses', data: {
         'label': label.trim(),
         'neighborhood': neighborhood.trim(),
         'address_line': addressLine.trim(),
         'city_id': weather.cityId,
-        'lat': q.lat,
-        'lng': q.lng,
+        if (effectiveLat != null) 'lat': effectiveLat,
+        if (effectiveLng != null) 'lng': effectiveLng,
         'is_default': isDefault,
       });
 
@@ -514,17 +518,21 @@ class ClientAddressesNotifier extends StateNotifier<ClientAddressesState> {
     required String label,
     required String neighborhood,
     required String addressLine,
+    double? lat,
+    double? lng,
     bool isDefault = false,
   }) async {
     try {
       final weather = _ref.read(weatherProvider);
       final q = weather.findNeighborhood(neighborhood);
+      final effectiveLat = lat ?? (q.lat != 0 ? q.lat : weather.centerLat);
+      final effectiveLng = lng ?? (q.lng != 0 ? q.lng : weather.centerLng);
       final res = await _apiClient.put('/client/addresses/$id', data: {
         'label': label.trim(),
         'neighborhood': neighborhood.trim(),
         'address_line': addressLine.trim(),
-        'lat': q.lat,
-        'lng': q.lng,
+        if (effectiveLat != null) 'lat': effectiveLat,
+        if (effectiveLng != null) 'lng': effectiveLng,
         'is_default': isDefault,
       });
 

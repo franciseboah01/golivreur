@@ -1,24 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/models/modeles.dart';
-import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../providers/goshop_provider.dart';
 import '../providers/order_provider.dart';
 import '../providers/gps_tracking_provider.dart';
 
-/// Écran de suivi GPS en temps réel — GoShop.
+/// Écran de suivi GPS en temps réel — GL Client (100 % gratuit via OpenStreetMap).
 ///
 /// Affiche :
-///   - Carte Google Maps avec marqueur du livreur qui se déplace
-///   - Statut de la commande en temps réel (WebSocket Reverb)
-///   - Nom et photo du livreur
+///   - Carte OpenStreetMap interactive avec marqueur du livreur en mouvement,
+///     destination et tracé en direct
+///   - Statut de la commande + infos livreur
 ///   - Code de confirmation à 4 chiffres (à donner au livreur)
-///   - Temps estimé d'arrivée
-///
-/// Le marqueur de la moto se déplace en douceur à chaque mise à jour GPS.
 class SuiviGPSScreen extends ConsumerStatefulWidget {
   final int orderId;
 
@@ -28,42 +24,22 @@ class SuiviGPSScreen extends ConsumerStatefulWidget {
   ConsumerState<SuiviGPSScreen> createState() => _SuiviGPSScreenState();
 }
 
-class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
-    with TickerProviderStateMixin {
-  // Contrôleur de la carte Google Maps
-  GoogleMapController? _mapController;
-
-  // Ensemble des marqueurs affichés sur la carte
-  final Set<Marker> _marqueurs = {};
-
-  // Position actuelle du livreur
-  LatLng? _positionLivreur;
-
-  // Animation de déplacement fluide du marqueur
-  late AnimationController _animController;
-  late Animation<double> _animLat;
-  late Animation<double> _animLng;
-
-  // Timer de timeout 8 secondes
+class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen> {
   Timer? _timerTimeout;
   bool _afficherBanniereTimeout = false;
 
   @override
   void initState() {
     super.initState();
-
-    // Animation pour déplacement fluide du marqueur (500ms)
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-
-    // Démarrer le timeout de 8 secondes pour le chargement initial
     _timerTimeout = Timer(
       const Duration(seconds: 8),
       () {
-        if (mounted && _positionLivreur == null) {
-          setState(() => _afficherBanniereTimeout = true);
+        if (mounted) {
+          final currentLoc =
+              ref.read(gpsTrackingProvider(widget.orderId)).valueOrNull;
+          if (currentLoc == null) {
+            setState(() => _afficherBanniereTimeout = true);
+          }
         }
       },
     );
@@ -71,76 +47,23 @@ class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
 
   @override
   void dispose() {
-    _mapController?.dispose();
-    _animController.dispose();
     _timerTimeout?.cancel();
     super.dispose();
   }
 
-  /// Déplace le marqueur du livreur en douceur vers la nouvelle position.
-  /// Appelé à chaque mise à jour GPS reçue via WebSocket Reverb.
-  void _deplacerMarqueur(LatLng ancienne, LatLng nouvelle) {
-    _animLat = Tween<double>(begin: ancienne.latitude, end: nouvelle.latitude)
-        .animate(CurvedAnimation(parent: _animController, curve: Curves.easeInOut));
-    _animLng = Tween<double>(begin: ancienne.longitude, end: nouvelle.longitude)
-        .animate(CurvedAnimation(parent: _animController, curve: Curves.easeInOut));
-
-    _animController.forward(from: 0).then((_) {
-      if (mounted) {
-        setState(() {
-          _positionLivreur = nouvelle;
-          _majMarqueurs(nouvelle);
-        });
-      }
-    });
-
-    _animLat.addListener(() {
-      if (mounted && _mapController != null) {
-        final positionInterp = LatLng(_animLat.value, _animLng.value);
-        setState(() => _majMarqueurs(positionInterp));
-      }
-    });
-  }
-
-  void _majMarqueurs(LatLng position) {
-    _marqueurs
-      ..removeWhere((m) => m.markerId.value == 'livreur')
-      ..add(
-        Marker(
-          markerId: const MarkerId('livreur'),
-          position: position,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          infoWindow: const InfoWindow(title: 'Votre livreur'),
-        ),
-      );
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Écoute les mises à jour en temps réel (statut + position GPS via Reverb)
-    ref.watch(gpsTrackingProvider(widget.orderId));
+    final gpsAsync = ref.watch(gpsTrackingProvider(widget.orderId));
     final orderAsync = ref.watch(orderDetailProvider(widget.orderId));
     final weather = ref.watch(weatherProvider);
+    final courierLoc = gpsAsync.valueOrNull;
 
-    // Quand une nouvelle position GPS arrive, animer le déplacement
-    ref.listen<AsyncValue<LatLng?>>(
+    ref.listen<AsyncValue<CourierLocationPoint?>>(
       gpsTrackingProvider(widget.orderId),
-      (previous, next) {
-        next.whenData((nouvellePosition) {
-          if (nouvellePosition != null) {
-            // Cacher la bannière timeout si visible
-            if (_afficherBanniereTimeout) {
-              setState(() => _afficherBanniereTimeout = false);
-            }
-            final ancienne = _positionLivreur ?? nouvellePosition;
-            _deplacerMarqueur(ancienne, nouvellePosition);
-
-            // Centrer la carte sur le livreur
-            _mapController?.animateCamera(
-              CameraUpdate.newLatLng(nouvellePosition),
-            );
-          }
-        });
+      (_, next) {
+        if (next.valueOrNull != null && _afficherBanniereTimeout && mounted) {
+          setState(() => _afficherBanniereTimeout = false);
+        }
       },
     );
 
@@ -153,38 +76,17 @@ class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
         ),
         data: (order) => Stack(
           children: [
-            // ── Carte Google Maps ────────────────────────────────────────────
-            GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: order.deliveryLat != null && order.deliveryLng != null
-                    ? LatLng(order.deliveryLat!, order.deliveryLng!)
-                    : LatLng(
-                        weather.centerLat ?? 7.5399,
-                        weather.centerLng ?? -5.5471,
-                      ),
-                zoom: 15,
+            // ── Carte OpenStreetMap gratuite en direct ───────────────────────
+            Positioned.fill(
+              bottom: 220,
+              child: OsmLiveTrackingMap(
+                courierLat: courierLoc?.lat,
+                courierLng: courierLoc?.lng,
+                destinationLat: order.deliveryLat,
+                destinationLng: order.deliveryLng,
+                fallbackLat: weather.centerLat ?? 6.8770,
+                fallbackLng: weather.centerLng ?? -6.4502,
               ),
-              markers: _marqueurs,
-              myLocationEnabled: true,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              onMapCreated: (controller) {
-                _mapController = controller;
-                // Ajouter le marqueur de destination (adresse de livraison)
-                if (order.deliveryLat != null && order.deliveryLng != null) {
-                  setState(() {
-                    _marqueurs.add(
-                      Marker(
-                        markerId: const MarkerId('destination'),
-                        position: LatLng(order.deliveryLat!, order.deliveryLng!),
-                        icon: BitmapDescriptor.defaultMarkerWithHue(
-                            BitmapDescriptor.hueGreen),
-                        infoWindow: const InfoWindow(title: 'Votre adresse'),
-                      ),
-                    );
-                  });
-                }
-              },
             ),
 
             // ── AppBar superposée ────────────────────────────────────────────
@@ -196,7 +98,8 @@ class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
                     CircleAvatar(
                       backgroundColor: Colors.white,
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: GoLivreurTheme.textePrincipal),
+                        icon: const Icon(Icons.arrow_back,
+                            color: GoLivreurTheme.textePrincipal),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                     ),
@@ -209,16 +112,65 @@ class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
                         ),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(GoLivreurTheme.rayonL),
+                          borderRadius:
+                              BorderRadius.circular(GoLivreurTheme.rayonL),
+                          boxShadow: const [
+                            BoxShadow(blurRadius: 8, color: Colors.black12),
+                          ],
                         ),
-                        child: Text(
-                          order.labelStatut,
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                order.labelStatut,
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            if (courierLoc != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: GoLivreurTheme.secondaire
+                                      .withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.gps_fixed,
+                                        size: 12,
+                                        color: GoLivreurTheme.secondaire),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'En direct',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: GoLivreurTheme.secondaire,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    CircleAvatar(
+                      backgroundColor: Colors.white,
+                      child: IconButton(
+                        icon: const Icon(Icons.refresh,
+                            color: GoLivreurTheme.textePrincipal),
+                        onPressed: () {
+                          ref.invalidate(orderDetailProvider(widget.orderId));
+                          ref.invalidate(gpsTrackingProvider(widget.orderId));
+                        },
                       ),
                     ),
                   ],
@@ -226,14 +178,38 @@ class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
               ),
             ),
 
-            // ── Bannière connexion lente (timeout 8s) ────────────────────────
-            if (_afficherBanniereTimeout)
+            // ── Bannière attente signal GPS ──────────────────────────────────
+            if (_afficherBanniereTimeout && courierLoc == null)
               Positioned(
-                top: MediaQuery.of(context).padding.top + 80,
-                left: 0,
-                right: 0,
-                child: BanniereConnexionLente(
-                  onAnnuler: () => setState(() => _afficherBanniereTimeout = false),
+                top: MediaQuery.of(context).padding.top + 76,
+                left: 16,
+                right: 16,
+                child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  elevation: 3,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.gps_not_fixed,
+                            color: GoLivreurTheme.primaire, size: 18),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'En attente du signal GPS du livreur...',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 16),
+                          onPressed: () =>
+                              setState(() => _afficherBanniereTimeout = false),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
 
@@ -242,7 +218,10 @@ class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
               bottom: 0,
               left: 0,
               right: 0,
-              child: _PanneauInfosLivraison(order: order),
+              child: _PanneauInfosLivraison(
+                order: order,
+                isRainMode: weather.isRainMode,
+              ),
             ),
           ],
         ),
@@ -251,11 +230,14 @@ class _SuiviGPSScreenState extends ConsumerState<SuiviGPSScreen>
   }
 }
 
-/// Panneau d'informations de livraison affiché en bas de l'écran.
 class _PanneauInfosLivraison extends StatelessWidget {
   final OrderModel order;
+  final bool isRainMode;
 
-  const _PanneauInfosLivraison({required this.order});
+  const _PanneauInfosLivraison({
+    required this.order,
+    required this.isRainMode,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -271,21 +253,18 @@ class _PanneauInfosLivraison extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Indicateur de glissement
           Container(
-            width: 40, height: 4,
+            width: 40,
+            height: 4,
             decoration: BoxDecoration(
               color: GoLivreurTheme.bordure,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           const SizedBox(height: GoLivreurTheme.espacementM),
-
-          // Infos livreur
           if (order.courier != null) ...[
             Row(
               children: [
-                // Photo du livreur
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: GoLivreurTheme.primaire.withValues(alpha: 0.1),
@@ -293,7 +272,8 @@ class _PanneauInfosLivraison extends StatelessWidget {
                       ? NetworkImage(order.courier!.photoUrl!)
                       : null,
                   child: order.courier!.photoUrl == null
-                      ? const Icon(Icons.person, color: GoLivreurTheme.primaire, size: 28)
+                      ? const Icon(Icons.person,
+                          color: GoLivreurTheme.primaire, size: 28)
                       : null,
                 ),
                 const SizedBox(width: GoLivreurTheme.espacementM),
@@ -311,12 +291,14 @@ class _PanneauInfosLivraison extends StatelessWidget {
                       ),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: GoLivreurTheme.primaire, size: 14),
+                          const Icon(Icons.star,
+                              color: GoLivreurTheme.primaire, size: 14),
                           const SizedBox(width: 4),
                           Text(
                             order.courier!.averageRating.toStringAsFixed(1),
                             style: const TextStyle(
-                              fontFamily: 'Inter', fontSize: 13,
+                              fontFamily: 'Inter',
+                              fontSize: 13,
                               color: GoLivreurTheme.texteSecondaire,
                             ),
                           ),
@@ -325,44 +307,43 @@ class _PanneauInfosLivraison extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Bouton appel (placeholder — numéro masqué)
                 CircleAvatar(
-                  backgroundColor: GoLivreurTheme.secondaire.withValues(alpha: 0.1),
+                  backgroundColor:
+                      GoLivreurTheme.secondaire.withValues(alpha: 0.1),
                   child: const Icon(Icons.phone, color: GoLivreurTheme.secondaire),
                 ),
               ],
             ),
             const Divider(height: GoLivreurTheme.espacementXL),
           ],
-
-          // Encadré rassurant Mode Pluie Daloa
-          Container(
-            margin: const EdgeInsets.only(bottom: GoLivreurTheme.espacementM),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F1F8),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF2E75B6).withValues(alpha: 0.3)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.shield_outlined, color: Color(0xFF2E75B6), size: 18),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '🌧️ Mode Pluie actif : Vitesse réduite pour la sécurité du livreur. Votre commande est protégée au sec !',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF1B4D7E),
-                      fontWeight: FontWeight.w600,
+          if (isRainMode)
+            Container(
+              margin: const EdgeInsets.only(bottom: GoLivreurTheme.espacementM),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F1F8),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: const Color(0xFF2E75B6).withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.shield_outlined,
+                      color: Color(0xFF2E75B6), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '🌧️ Mode Pluie actif : Vitesse réduite pour la sécurité du livreur. Votre commande est protégée au sec !',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF1B4D7E),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-
-          // Code de confirmation
           if (order.confirmationCode != null && !order.confirmationLocked) ...[
             const Text(
               'Code à donner au livreur',
@@ -382,7 +363,8 @@ class _PanneauInfosLivraison extends StatelessWidget {
                   height: 64,
                   decoration: BoxDecoration(
                     color: GoLivreurTheme.primaire.withValues(alpha: 0.08),
-                    border: Border.all(color: GoLivreurTheme.primaire, width: 2),
+                    border:
+                        Border.all(color: GoLivreurTheme.primaire, width: 2),
                     borderRadius: BorderRadius.circular(GoLivreurTheme.rayonM),
                   ),
                   child: Center(
@@ -410,8 +392,6 @@ class _PanneauInfosLivraison extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ],
-
-          // Code bloqué
           if (order.confirmationLocked) ...[
             Container(
               padding: const EdgeInsets.all(GoLivreurTheme.espacementM),
@@ -437,7 +417,6 @@ class _PanneauInfosLivraison extends StatelessWidget {
               ),
             ),
           ],
-
           const SizedBox(height: GoLivreurTheme.espacementM),
         ],
       ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
+import '../../goshop/providers/gps_tracking_provider.dart';
+import '../../goshop/providers/goshop_provider.dart';
 import '../providers/gocolis_provider.dart';
 
 class ParcelTrackingScreen extends ConsumerWidget {
@@ -12,6 +14,8 @@ class ParcelTrackingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final parcelAsync = ref.watch(singleParcelProvider(parcelId));
+    final courierLoc = ref.watch(parcelGpsTrackingProvider(parcelId)).valueOrNull;
+    final weather = ref.watch(weatherProvider);
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -85,6 +89,73 @@ class ParcelTrackingScreen extends ConsumerWidget {
                             ),
                           ),
                       ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ─── Carte GPS temps réel (OpenStreetMap 100 % gratuit) ──────
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: GoLivreurTheme.bordure),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.map_outlined,
+                              color: GoLivreurTheme.primaire, size: 18),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Suivi GPS en direct',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          if (courierLoc != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: GoLivreurTheme.secondaire
+                                    .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'Signal actif',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: GoLivreurTheme.secondaire,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: 210,
+                      child: OsmLiveTrackingMap(
+                        courierLat: courierLoc?.lat,
+                        courierLng: courierLoc?.lng,
+                        pickupLat: parcel.pickupLat,
+                        pickupLng: parcel.pickupLng,
+                        destinationLat: parcel.deliveryLat,
+                        destinationLng: parcel.deliveryLng,
+                        fallbackLat: weather.centerLat ?? 6.8770,
+                        fallbackLng: weather.centerLng ?? -6.4502,
+                      ),
                     ),
                   ],
                 ),
