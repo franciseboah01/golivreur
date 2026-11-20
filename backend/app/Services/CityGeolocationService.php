@@ -23,14 +23,15 @@ class CityGeolocationService
     public const COURIER_REID_SETTING_PREFIX = 'courier_city_reid:';
 
     /**
-     * Trouve la ville active la plus proche des coordonnées GPS dans un rayon maximal.
+     * Trouve la ville active la plus proche des coordonnées GPS en respectant
+     * le rayon configuré propre à chaque ville (ex: 3 km pour une petite commune, 45 km pour Abidjan).
      *
      * @return array{city: City, distance_km: float}|null
      */
     public function findNearestActiveCity(
         float $lat,
         float $lng,
-        float $maxRadiusKm = self::CLIENT_DETECT_MAX_RADIUS_KM,
+        ?float $maxRadiusKm = null,
     ): ?array {
         $cities = City::query()
             ->where('is_active', true)
@@ -53,13 +54,17 @@ class CityGeolocationService
                 $lng,
             );
 
-            if ($distance < $minDistance) {
+            $effectiveRadius = $maxRadiusKm !== null
+                ? min($maxRadiusKm, $city->radius_km)
+                : $city->radius_km;
+
+            if ($distance <= $effectiveRadius && $distance < $minDistance) {
                 $minDistance = $distance;
                 $nearestCity = $city;
             }
         }
 
-        if ($nearestCity === null || $minDistance > $maxRadiusKm) {
+        if ($nearestCity === null) {
             return null;
         }
 
@@ -80,7 +85,7 @@ class CityGeolocationService
      *     distance_to_detected_km: float|null
      * }|null
      */
-    public function detectCityChange(?City $registeredCity, float $lat, float $lng, float $outsideThresholdKm = self::DRIVER_OUTSIDE_CITY_RADIUS_KM): ?array
+    public function detectCityChange(?City $registeredCity, float $lat, float $lng, ?float $outsideThresholdKm = null): ?array
     {
         if (
             $registeredCity === null
@@ -98,8 +103,10 @@ class CityGeolocationService
             $lng,
         );
 
-        // Position toujours dans le périmètre légal de la ville d'affectation
-        if ($distanceFromRegistered <= City::RAYON_MAX_VILLE_KM) {
+        $registeredRadius = $registeredCity->radius_km;
+
+        // Position toujours dans le périmètre configuré de la ville d'affectation
+        if ($distanceFromRegistered <= $registeredRadius) {
             return null;
         }
 
@@ -117,7 +124,8 @@ class CityGeolocationService
             ];
         }
 
-        if ($distanceFromRegistered > $outsideThresholdKm) {
+        $effectiveOutsideThreshold = $outsideThresholdKm ?? $registeredRadius;
+        if ($distanceFromRegistered > $effectiveOutsideThreshold) {
             return [
                 'outside_registered_city' => true,
                 'detected_city' => null,

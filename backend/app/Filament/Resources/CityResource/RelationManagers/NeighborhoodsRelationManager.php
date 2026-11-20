@@ -82,6 +82,7 @@ class NeighborhoodsRelationManager extends RelationManager
                                     cityName: (string) $city->name,
                                     cityCenterLat: $cityLat,
                                     cityCenterLng: $cityLng,
+                                    maxRadiusKm: $city->radius_km,
                                 );
 
                                 if ($found === null) {
@@ -142,6 +143,11 @@ class NeighborhoodsRelationManager extends RelationManager
                         $lngPath = $prefix !== '' ? "{$prefix}.lng" : 'lng';
                         $distancePath = $prefix !== '' ? "{$prefix}.distance_km" : 'distance_km';
 
+                        $cityRadiusKm = $city->radius_km;
+                        $smartZoom = ! $hasCityCenter
+                            ? 6
+                            : ($cityRadiusKm <= 6.0 ? 15 : ($cityRadiusKm <= 15.0 ? 14 : 13));
+
                         return [
                             'mode' => 'neighborhood',
                             'latPath' => $latPath,
@@ -149,10 +155,10 @@ class NeighborhoodsRelationManager extends RelationManager
                             'distancePath' => $distancePath,
                             'defaultLat' => $hasCityCenter ? (float) $city->center_lat : 7.539989,
                             'defaultLng' => $hasCityCenter ? (float) $city->center_lng : -5.547080,
-                            'defaultZoom' => $hasCityCenter ? 14 : 6,
+                            'defaultZoom' => $smartZoom,
                             'cityCenterLat' => $hasCityCenter ? (float) $city->center_lat : null,
                             'cityCenterLng' => $hasCityCenter ? (float) $city->center_lng : null,
-                            'radiusMeters' => (int) (City::RAYON_MAX_VILLE_KM * 1000),
+                            'radiusMeters' => (int) round($cityRadiusKm * 1000),
                             'defaultLayer' => 'satellite',
                         ];
                     })

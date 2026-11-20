@@ -11,7 +11,11 @@ class City extends Model
 {
     use HasFactory;
 
+    public const RAYON_MIN_VILLE_KM = 1.0;
+
     public const RAYON_MAX_VILLE_KM = 45.0;
+
+    public const RAYON_MAX_CONFIG_VILLE_KM = 60.0;
 
     public const RAYON_QUARTIER_VILLE_KM = 25.0;
 
@@ -38,6 +42,8 @@ class City extends Model
             return true;
         }
 
+        $rayonVilleKm = $this->radius_km;
+
         $distance = self::distanceHaversine(
             (float) $this->center_lat,
             (float) $this->center_lng,
@@ -45,11 +51,14 @@ class City extends Model
             $lng
         );
 
-        if ($distance <= self::RAYON_MAX_VILLE_KM) {
+        if ($distance <= $rayonVilleKm) {
             return true;
         }
 
-        // Tolérance par proximité directe d'un quartier actif géolocalisé de cette ville
+        // Tolérance proportionnelle au rayon configuré autour d'un quartier actif géolocalisé :
+        // une petite commune de 3 km garde une marge locale (~1.5 km) et ne déborde jamais sur la ville voisine.
+        $rayonQuartierKm = min(self::RAYON_QUARTIER_VILLE_KM, max(1.5, $rayonVilleKm * 0.5));
+
         $neighborhoods = $this->relationLoaded('neighborhoods')
             ? $this->neighborhoods
             : $this->neighborhoods()
@@ -76,7 +85,7 @@ class City extends Model
                 $lng
             );
 
-            if ($distanceQuartier <= self::RAYON_QUARTIER_VILLE_KM) {
+            if ($distanceQuartier <= $rayonQuartierKm) {
                 return true;
             }
         }
@@ -142,5 +151,13 @@ class City extends Model
     public function getSupportPhoneAttribute(): string
     {
         return app(SettingsService::class)->getCitySupportPhone((int) $this->id);
+    }
+
+    /**
+     * Rayon de couverture GPS personnalisé de cette ville en km (via SettingsService, sans migration).
+     */
+    public function getRadiusKmAttribute(): float
+    {
+        return app(SettingsService::class)->getCityRadiusKm($this->id !== null ? (int) $this->id : null);
     }
 }

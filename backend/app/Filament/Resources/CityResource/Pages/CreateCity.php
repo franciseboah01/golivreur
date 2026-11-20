@@ -15,6 +15,8 @@ class CreateCity extends CreateRecord
 
     private ?string $pendingSupportPhone = null;
 
+    private ?float $pendingRadiusKm = null;
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         if (FilamentCityScope::isLocal()) {
@@ -25,6 +27,11 @@ class CreateCity extends CreateRecord
             ? trim($data['support_phone'])
             : null;
         unset($data['support_phone']);
+
+        $this->pendingRadiusKm = isset($data['radius_km']) && is_numeric($data['radius_km'])
+            ? (float) $data['radius_km']
+            : null;
+        unset($data['radius_km']);
 
         // Si l'admin n'a pas saisi ni pointé de GPS, tente un géocodage officiel automatique en Côte d'Ivoire.
         // En cas d'échec ou hors-ligne, laisse null (aucun utilisateur ne sera bloqué).
@@ -45,12 +52,21 @@ class CreateCity extends CreateRecord
     {
         /** @var City $city */
         $city = $this->getRecord();
+        $userId = auth()->id() ? (int) auth()->id() : null;
 
         if ($this->pendingSupportPhone !== null && $this->pendingSupportPhone !== '') {
             app(SettingsService::class)->setCitySupportPhone(
                 cityId: (int) $city->id,
                 rawPhone: $this->pendingSupportPhone,
-                userId: auth()->id() ? (int) auth()->id() : null,
+                userId: $userId,
+            );
+        }
+
+        if ($this->pendingRadiusKm !== null) {
+            app(SettingsService::class)->setCityRadiusKm(
+                cityId: (int) $city->id,
+                radiusKm: $this->pendingRadiusKm,
+                userId: $userId,
             );
         }
     }

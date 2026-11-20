@@ -79,6 +79,7 @@ class IvoryCoastGeocodingService
             && $city->center_lng !== null
             && ! (abs((float) $city->center_lat) < 0.0001 && abs((float) $city->center_lng) < 0.0001)
         ) {
+            $maxRadiusKm = $city->radius_km;
             $distanceKm = City::distanceHaversine(
                 (float) $city->center_lat,
                 (float) $city->center_lng,
@@ -86,10 +87,10 @@ class IvoryCoastGeocodingService
                 $lng,
             );
 
-            if ($distanceKm > City::RAYON_MAX_VILLE_KM) {
+            if ($distanceKm > $maxRadiusKm) {
                 $rounded = round($distanceKm, 1);
 
-                return "Ce point est à {$rounded} km du centre de {$city->name} (maximum ".City::RAYON_MAX_VILLE_KM.' km). Placez le repère dans la zone de la ville ou laissez vide.';
+                return "Ce point est à {$rounded} km du centre de {$city->name} (rayon configuré : {$maxRadiusKm} km). Placez le repère dans le périmètre ou ajustez le rayon de la ville.";
             }
         }
 
@@ -168,6 +169,7 @@ class IvoryCoastGeocodingService
         string $cityName,
         ?float $cityCenterLat = null,
         ?float $cityCenterLng = null,
+        float $maxRadiusKm = City::RAYON_MAX_VILLE_KM,
     ): ?array {
         $cleanNb = trim($neighborhoodName);
         $cleanCity = trim($cityName);
@@ -179,7 +181,7 @@ class IvoryCoastGeocodingService
             && $cityCenterLng !== null
             && ! (abs($cityCenterLat) < 0.0001 && abs($cityCenterLng) < 0.0001);
 
-        $cacheKey = 'ci_geocode:nb:'.md5(mb_strtolower("{$cleanNb}|{$cleanCity}|".($hasCityCenter ? "{$cityCenterLat},{$cityCenterLng}" : '')));
+        $cacheKey = 'ci_geocode:nb:'.md5(mb_strtolower("{$cleanNb}|{$cleanCity}|{$maxRadiusKm}|".($hasCityCenter ? "{$cityCenterLat},{$cityCenterLng}" : '')));
 
         /** @var array{lat: float, lng: float, display_name: string}|null $cached */
         $cached = Cache::get($cacheKey);
@@ -196,8 +198,8 @@ class IvoryCoastGeocodingService
         ];
 
         if ($hasCityCenter) {
-            // Biais géographique (~35 km autour du centre de la ville)
-            $delta = 0.35;
+            // Biais géographique adapté au rayon configuré de la ville
+            $delta = max(0.05, ($maxRadiusKm / 111.0) * 1.3);
             $params['viewbox'] = sprintf(
                 '%.5f,%.5f,%.5f,%.5f',
                 $cityCenterLng - $delta,
@@ -219,7 +221,7 @@ class IvoryCoastGeocodingService
 
             if ($hasCityCenter) {
                 $distanceKm = City::distanceHaversine($cityCenterLat, $cityCenterLng, $lat, $lng);
-                if ($distanceKm > City::RAYON_MAX_VILLE_KM) {
+                if ($distanceKm > $maxRadiusKm) {
                     continue;
                 }
             }

@@ -2,13 +2,14 @@
     $mode = $mode ?? 'city';
     $latPath = $latPath ?? 'data.center_lat';
     $lngPath = $lngPath ?? 'data.center_lng';
+    $radiusPath = $radiusPath ?? null;
     $distancePath = $distancePath ?? null;
     $defaultLat = (float) ($defaultLat ?? 7.539989);
     $defaultLng = (float) ($defaultLng ?? -5.547080);
     $defaultZoom = (int) ($defaultZoom ?? ($mode === 'neighborhood' ? 14 : 6));
     $cityCenterLat = isset($cityCenterLat) && $cityCenterLat !== null ? (float) $cityCenterLat : null;
     $cityCenterLng = isset($cityCenterLng) && $cityCenterLng !== null ? (float) $cityCenterLng : null;
-    $radiusMeters = (int) ($radiusMeters ?? 45000);
+    $radiusMeters = (int) ($radiusMeters ?? 15000);
     $defaultLayer = $defaultLayer ?? ($mode === 'neighborhood' ? 'satellite' : 'plan');
     $mapId = 'gl-map-' . uniqid();
 @endphp
@@ -18,16 +19,18 @@
     x-data="{
         lat: $wire.$entangle(@js($latPath)),
         lng: $wire.$entangle(@js($lngPath)),
+        radiusKm: @if ($radiusPath) $wire.$entangle(@js($radiusPath)) @else {{ round($radiusMeters / 1000, 1) }} @endif,
         mode: @js($mode),
         latPath: @js($latPath),
         lngPath: @js($lngPath),
+        radiusPath: @js($radiusPath),
         distancePath: @js($distancePath),
         defaultLat: @js($defaultLat),
         defaultLng: @js($defaultLng),
         defaultZoom: @js($defaultZoom),
         cityCenterLat: @js($cityCenterLat),
         cityCenterLng: @js($cityCenterLng),
-        radiusMeters: @js($radiusMeters),
+        fallbackRadiusMeters: @js($radiusMeters),
         layerMode: @js($defaultLayer),
         map: null,
         marker: null,
@@ -52,6 +55,29 @@
 
             this.$watch('lat', () => this.syncFromForm(true));
             this.$watch('lng', () => this.syncFromForm(true));
+            if (this.radiusPath) {
+                this.$watch('radiusKm', () => this.syncRadius(true));
+            }
+        },
+
+        effectiveRadiusMeters() {
+            const parsed = this.parseCoord(this.radiusKm);
+            if (parsed !== null && parsed >= 1 && parsed <= 60) {
+                return Math.round(parsed * 1000);
+            }
+            return this.fallbackRadiusMeters;
+        },
+
+        effectiveRadiusKmLabel() {
+            const km = this.effectiveRadiusMeters() / 1000;
+            return Number.isInteger(km) ? String(km) : km.toFixed(1);
+        },
+
+        applyPresetRadius(km) {
+            if (!this.radiusPath) return;
+            this.radiusKm = km;
+            this.$wire.set(this.radiusPath, km);
+            this.syncRadius(true);
         },
 
         ensureLeaflet() {
@@ -107,7 +133,7 @@
 
             const startLat = hasCurrent ? curLat : this.defaultLat;
             const startLng = hasCurrent ? curLng : this.defaultLng;
-            const startZoom = hasCurrent ? (this.mode === 'city' ? 11 : 15) : this.defaultZoom;
+            const startZoom = hasCurrent ? (this.mode === 'city' ? 12 : 15) : this.defaultZoom;
 
             this.map = L.map(el, { zoomControl: true }).setView([startLat, startLng], startZoom);
 
@@ -129,21 +155,21 @@
 
             this.applyBaseLayer();
 
-            // En mode quartier, affiche le périmètre de la ville parente en pointillés verts
+            // En mode quartier, affiche le périmètre exact de la ville parente en pointillés verts
             if (this.mode === 'neighborhood' && this.cityCenterLat !== null && this.cityCenterLng !== null) {
                 this.parentCircle = L.circle([this.cityCenterLat, this.cityCenterLng], {
-                    radius: this.radiusMeters,
+                    radius: this.effectiveRadiusMeters(),
                     color: '#1B5E20',
                     weight: 1.5,
                     dashArray: '6 6',
                     fillColor: '#1B5E20',
-                    fillOpacity: 0.04,
+                    fillOpacity: 0.05,
                     interactive: false,
                 }).addTo(this.map);
             }
 
             if (hasCurrent) {
-                this.placeVisualMarker(curLat, curLng, false);
+                this.placeVisualMarker(curLat, curLng, this.mode === 'city');
             } else {
                 this.updateStatus(null, null);
             }
@@ -190,9 +216,10 @@
             }
 
             if (this.mode === 'neighborhood' && this.cityCenterLat !== null && this.cityCenterLng !== null) {
+                const maxKm = this.effectiveRadiusMeters() / 1000;
                 const km = this.haversineKm(this.cityCenterLat, this.cityCenterLng, lat, lng);
-                if (km > (this.radiusMeters / 1000)) {
-                    this.warningText = `Ce point est à ${km.toFixed(1)} km du centre de la ville (hors du périmètre de ${(this.radiusMeters / 1000).toFixed(0)} km).`;
+                if (km > maxKm) {
+                    this.warningText = `Ce point est à ${km.toFixed(1)} km du centre de la ville (hors du rayon configuré de ${this.effectiveRadiusKmLabel()} km).`;
                     return;
                 }
                 if (this.distancePath) {
@@ -211,7 +238,7 @@
             this.placeVisualMarker(lat, lng, false);
         },
 
-        placeVisualMarker(lat, lng, fly) {
+        placeVisualMarker(lat, lng, fitCircle) {
             if (!this.map || !window.L) return;
 
             if (this.marker) {
@@ -225,11 +252,13 @@
             }
 
             if (this.mode === 'city') {
+                const radiusM = this.effectiveRadiusMeters();
                 if (this.cityCircle) {
                     this.cityCircle.setLatLng([lat, lng]);
+                    this.cityCircle.setRadius(radiusM);
                 } else {
                     this.cityCircle = L.circle([lat, lng], {
-                        radius: this.radiusMeters,
+                        radius: radiusM,
                         color: '#F4A623',
                         weight: 2,
                         fillColor: '#F4A623',
@@ -237,17 +266,32 @@
                         interactive: false,
                     }).addTo(this.map);
                 }
-            }
-
-            if (fly) {
-                const targetZoom = this.mode === 'city' ? 11 : 15;
-                this.map.flyTo([lat, lng], Math.max(this.map.getZoom(), targetZoom), { duration: 0.6 });
+                if (fitCircle) {
+                    this.map.fitBounds(this.cityCircle.getBounds(), { padding: [24, 24], maxZoom: 15 });
+                }
+            } else if (fitCircle) {
+                this.map.flyTo([lat, lng], Math.max(this.map.getZoom(), 15), { duration: 0.6 });
             }
 
             this.updateStatus(lat, lng);
         },
 
-        syncFromForm(fly) {
+        syncRadius(fitCircle) {
+            if (!this.map || this.mode !== 'city') return;
+            const curLat = this.parseCoord(this.lat);
+            const curLng = this.parseCoord(this.lng);
+            if (this.cityCircle) {
+                this.cityCircle.setRadius(this.effectiveRadiusMeters());
+                if (fitCircle) {
+                    this.map.fitBounds(this.cityCircle.getBounds(), { padding: [24, 24], maxZoom: 15 });
+                }
+            }
+            if (curLat !== null && curLng !== null) {
+                this.updateStatus(curLat, curLng);
+            }
+        },
+
+        syncFromForm(fitCircle) {
             if (!this.map) return;
             const curLat = this.parseCoord(this.lat);
             const curLng = this.parseCoord(this.lng);
@@ -265,7 +309,7 @@
             }
             if (this.isInsideIvoryCoast(curLat, curLng)) {
                 this.warningText = '';
-                this.placeVisualMarker(curLat, curLng, fly);
+                this.placeVisualMarker(curLat, curLng, fitCircle);
             }
         },
 
@@ -305,12 +349,12 @@
         updateStatus(lat, lng) {
             if (lat === null || lng === null) {
                 this.statusText = this.mode === 'city'
-                    ? 'Aucun centre défini : cliquez sur le centre-ville ou utilisez le bouton « Localiser la ville » ci-dessus (laisser vide ne bloque aucun client).'
+                    ? 'Aucun centre défini : cliquez sur le centre-ville ou utilisez la loupe « Localiser » ci-dessus (laisser vide ne bloque aucun client).'
                     : 'Aucun GPS défini (autorisé) : cliquez sur la vue Satellite pour pointer le quartier, ou laissez vide (tarif calculé via la distance estimée).';
                 return;
             }
             if (this.mode === 'city') {
-                this.statusText = `Centre-ville positionné (${lat.toFixed(4)}, ${lng.toFixed(4)}) — cercle orange = périmètre actif de ${(this.radiusMeters / 1000).toFixed(0)} km.`;
+                this.statusText = `Centre-ville (${lat.toFixed(4)}, ${lng.toFixed(4)}) — cercle orange = périmètre actif de ${this.effectiveRadiusKmLabel()} km. Ajustez le rayon pour coller exactement aux limites de la ville.`;
             } else {
                 this.statusText = `Quartier positionné (${lat.toFixed(4)}, ${lng.toFixed(4)}) — glissez le marqueur pour ajuster.`;
             }
@@ -343,6 +387,24 @@
             </button>
         </div>
 
+        @if ($mode === 'city' && $radiusPath)
+            <div class="flex flex-wrap items-center gap-1">
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 mr-1">Rayon rapide :</span>
+                @foreach ([3, 5, 10, 20, 45] as $preset)
+                    <button
+                        type="button"
+                        @click="applyPresetRadius({{ $preset }})"
+                        :class="parseCoord(radiusKm) === {{ $preset }}
+                            ? 'bg-amber-500 text-white border-amber-500'
+                            : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-50'"
+                        class="rounded-md border px-2 py-1 text-xs font-semibold transition"
+                    >
+                        {{ $preset }} km
+                    </button>
+                @endforeach
+            </div>
+        @endif
+
         <div class="flex flex-wrap items-center gap-2">
             @if ($mode === 'neighborhood')
                 <button
@@ -369,7 +431,7 @@
     <div
         id="{{ $mapId }}"
         x-ref="mapContainer"
-        style="height: {{ $mode === 'city' ? '310px' : '270px' }}; width: 100%; z-index: 1;"
+        style="height: {{ $mode === 'city' ? '330px' : '270px' }}; width: 100%; z-index: 1;"
         class="rounded-xl border border-gray-300 dark:border-gray-700 overflow-hidden bg-gray-100 dark:bg-gray-900"
     ></div>
 

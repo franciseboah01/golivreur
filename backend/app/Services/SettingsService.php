@@ -303,6 +303,53 @@ class SettingsService
     }
 
     /**
+     * Retourne le rayon de couverture GPS (en km) configuré pour une ville
+     * (entre 1 km pour une petite commune et 60 km pour une grande métropole ; défaut 45 km).
+     */
+    public function getCityRadiusKm(?int $cityId = null): float
+    {
+        if ($cityId === null || $cityId <= 0) {
+            return City::RAYON_MAX_VILLE_KM;
+        }
+
+        $raw = $this->get('ville_rayon_km', $cityId);
+        $value = is_array($raw) ? ($raw['km'] ?? null) : (is_numeric($raw) ? $raw : null);
+
+        if (! is_numeric($value)) {
+            return City::RAYON_MAX_VILLE_KM;
+        }
+
+        $km = (float) $value;
+
+        return round(
+            max(City::RAYON_MIN_VILLE_KM, min(City::RAYON_MAX_CONFIG_VILLE_KM, $km)),
+            1,
+        );
+    }
+
+    /**
+     * Enregistre le rayon de couverture GPS personnalisé d'une ville sans modification de schéma SQL
+     * (stocké dans `settings` avec `key = 'ville_rayon_km'` et `city_id = $cityId`).
+     */
+    public function setCityRadiusKm(int $cityId, float $radiusKm, ?int $userId = null): float
+    {
+        $clamped = round(
+            max(City::RAYON_MIN_VILLE_KM, min(City::RAYON_MAX_CONFIG_VILLE_KM, $radiusKm)),
+            1,
+        );
+
+        $this->set(
+            'ville_rayon_km',
+            ['km' => $clamped],
+            $cityId,
+            $userId,
+            "Rayon de couverture GPS ville #{$cityId} ({$clamped} km)",
+        );
+
+        return $clamped;
+    }
+
+    /**
      * Retourne l'identité visuelle GoLivreur (logo personnalisé si existant, sinon emoji par défaut).
      *
      * @return array{logo_path: ?string, logo_url: ?string, default_emoji: string}

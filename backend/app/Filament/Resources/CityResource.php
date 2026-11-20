@@ -125,20 +125,35 @@ class CityResource extends Resource
                             ->label('Ville ouverte au service GoLivreur')
                             ->default(true),
 
+                        Forms\Components\TextInput::make('radius_km')
+                            ->label('Rayon de couverture de la ville (km)')
+                            ->helperText('Ajustez selon la taille réelle : ex. 3 à 5 km (petite commune / Sirasso), 10 à 15 km (Daloa, Korhogo), 30 à 45 km (Grand Abidjan). Le cercle orange sur la carte s\'adapte en direct.')
+                            ->numeric()
+                            ->minValue(City::RAYON_MIN_VILLE_KM)
+                            ->maxValue(City::RAYON_MAX_CONFIG_VILLE_KM)
+                            ->step(0.5)
+                            ->default(10.0)
+                            ->suffix('km')
+                            ->required()
+                            ->live()
+                            ->columnSpanFull(),
+
                         Forms\Components\View::make('filament.components.gps-map-picker')
                             ->viewData(function (Forms\Components\View $component): array {
                                 $prefix = $component->getContainer()->getStatePath();
                                 $latPath = $prefix !== '' ? "{$prefix}.center_lat" : 'center_lat';
                                 $lngPath = $prefix !== '' ? "{$prefix}.center_lng" : 'center_lng';
+                                $radiusPath = $prefix !== '' ? "{$prefix}.radius_km" : 'radius_km';
 
                                 return [
                                     'mode' => 'city',
                                     'latPath' => $latPath,
                                     'lngPath' => $lngPath,
+                                    'radiusPath' => $radiusPath,
                                     'defaultLat' => 7.539989,
                                     'defaultLng' => -5.547080,
                                     'defaultZoom' => 6,
-                                    'radiusMeters' => (int) (City::RAYON_MAX_VILLE_KM * 1000),
+                                    'radiusMeters' => 10000,
                                     'defaultLayer' => 'plan',
                                 ];
                             })
@@ -234,6 +249,12 @@ class CityResource extends Resource
                         : 'Non défini (OK)')
                     ->color(fn (City $record): string => ($record->center_lng !== null && (float) $record->center_lng > 0) ? 'danger' : 'gray')
                     ->toggleable(),
+
+                Tables\Columns\TextColumn::make('radius_km_display')
+                    ->label('Rayon')
+                    ->badge()
+                    ->state(fn (City $record): string => rtrim(rtrim(number_format($record->radius_km, 1, '.', ''), '0'), '.').' km')
+                    ->color('warning'),
 
                 Tables\Columns\TextColumn::make('support_phone')
                     ->label('N° Service Client')

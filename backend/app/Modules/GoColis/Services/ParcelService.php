@@ -480,17 +480,18 @@ class ParcelService
         $distanceKm = ($city->center_lat !== null && $city->center_lng !== null)
             ? round(City::distanceHaversine((float) $city->center_lat, (float) $city->center_lng, $lat, $lng), 1)
             : null;
+        $rayonKm = $city->radius_km;
 
         $nearest = app(CityGeolocationService::class)->findNearestActiveCity($lat, $lng);
         if ($nearest !== null && (int) $nearest['city']->id !== (int) $city->id) {
             $detectedName = $nearest['city']->name;
-            $distText = $distanceKm !== null ? " ({$distanceKm} km du centre)" : '';
+            $distText = $distanceKm !== null ? " ({$distanceKm} km du centre, rayon {$rayonKm} km)" : '';
 
             return "Les coordonnées de {$typeLabel} sont en dehors du périmètre de {$city->name}{$distText} : position détectée proche de {$detectedName}.";
         }
 
         if ($distanceKm !== null) {
-            return "Les coordonnées de {$typeLabel} sont en dehors du périmètre de {$city->name} ({$distanceKm} km du centre GPS configuré). Vérifiez les coordonnées GPS de la ville dans l'administration.";
+            return "Les coordonnées de {$typeLabel} sont en dehors du périmètre de {$city->name} ({$distanceKm} km du centre, rayon configuré : {$rayonKm} km). Vérifiez les coordonnées ou le rayon de la ville dans l'administration.";
         }
 
         return "Les coordonnées de {$typeLabel} sont situées en dehors du périmètre de {$city->name}.";

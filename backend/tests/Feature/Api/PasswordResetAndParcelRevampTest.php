@@ -10,6 +10,7 @@ use App\Models\Parcel;
 use App\Models\ParcelPhoto;
 use App\Models\User;
 use App\Services\Auth\PasswordResetService;
+use App\Services\CityGeolocationService;
 use App\Services\FirebasePhoneAuthService;
 use App\Services\IvoryCoastGeocodingService;
 use App\Services\SettingsService;
@@ -478,4 +479,47 @@ it('calcule un tarif fiable via distance_km pour un quartier non référencé sa
     $parcel = Parcel::findOrFail($res->json('donnees.id'));
     // Distance facturée = 4.0 km (forfait du quartier) et NON 11.1 km vers le centre-ville !
     expect((float) $parcel->distance_km)->toBe(4.0);
+});
+
+it('permet de réduire le rayon d\'une petite commune à 3 km sans déborder sur les villes voisines', function () {
+    $sirasso = City::factory()->create([
+        'name' => 'Sirasso',
+        'is_active' => true,
+        'center_lat' => 9.4580,
+        'center_lng' => -6.2080,
+    ]);
+    $villeVoisine = City::factory()->create([
+        'name' => 'Nafoun',
+        'is_active' => true,
+        'center_lat' => 9.5480, // ~10 km au nord de Sirasso
+        'center_lng' => -6.2080,
+    ]);
+
+    $settings = app(SettingsService::class);
+    $settings->setCityRadiusKm($sirasso->id, 3.0);
+    $settings->setCityRadiusKm($villeVoisine->id, 3.0);
+
+    expect($sirasso->fresh()->radius_km)->toBe(3.0)
+        ->and($villeVoisine->fresh()->radius_km)->toBe(3.0);
+
+    // 1. Point à ~2 km du centre de Sirasso -> DANS Sirasso
+    expect($sirasso->estDansLaVille(9.4760, -6.2080))->toBeTrue();
+
+    // 2. Point dans la commune voisine (~10 km) -> HORS Sirasso, DANS Nafoun !
+    expect($sirasso->estDansLaVille(9.5480, -6.2080))->toBeFalse()
+        ->and($villeVoisine->estDansLaVille(9.5480, -6.2080))->toBeTrue();
+
+    // 3. Détection GPS automatique au milieu entre les deux (5 km de chaque) -> aucune capture abusive
+    $geoCity = app(CityGeolocationService::class);
+    expect($geoCity->findNearestActiveCity(9.5030, -6.2080))->toBeNull();
+    // Mais à 1 km de Nafoun -> détecte bien Nafoun (jamais Sirasso)
+    $detected = $geoCity->findNearestActiveCity(9.5550, -6.2080);
+    expect($detected)->not->toBeNull()
+        ->and($detected['city']->id)->toBe($villeVoisine->id);
+
+    // 4. Validation quartier Admin : un quartier placé à 6 km de Sirasso (rayon 3 km) est refusé
+    $geo = app(IvoryCoastGeocodingService::class);
+    expect($geo->validateNeighborhoodWithinCity($sirasso, 9.5120, -6.2080))
+        ->not->toBeNull()
+        ->toContain('3 km');
 });

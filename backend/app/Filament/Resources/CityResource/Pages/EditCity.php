@@ -15,6 +15,8 @@ class EditCity extends EditRecord
 
     private ?string $pendingSupportPhone = null;
 
+    private ?float $pendingRadiusKm = null;
+
     protected function getHeaderActions(): array
     {
         return [
@@ -27,8 +29,10 @@ class EditCity extends EditRecord
     {
         /** @var City $record */
         $record = $this->getRecord();
-        $data['support_phone'] = app(SettingsService::class)->getOwnCitySupportPhone((int) $record->id)
-            ?? app(SettingsService::class)->getCitySupportPhone((int) $record->id);
+        $settings = app(SettingsService::class);
+        $data['support_phone'] = $settings->getOwnCitySupportPhone((int) $record->id)
+            ?? $settings->getCitySupportPhone((int) $record->id);
+        $data['radius_km'] = $settings->getCityRadiusKm((int) $record->id);
 
         return $data;
     }
@@ -47,6 +51,11 @@ class EditCity extends EditRecord
             : '';
         unset($data['support_phone']);
 
+        $this->pendingRadiusKm = isset($data['radius_km']) && is_numeric($data['radius_km'])
+            ? (float) $data['radius_km']
+            : null;
+        unset($data['radius_km']);
+
         return $data;
     }
 
@@ -54,12 +63,21 @@ class EditCity extends EditRecord
     {
         /** @var City $city */
         $city = $this->getRecord();
+        $userId = auth()->id() ? (int) auth()->id() : null;
 
         if ($this->pendingSupportPhone !== null) {
             app(SettingsService::class)->setCitySupportPhone(
                 cityId: (int) $city->id,
                 rawPhone: $this->pendingSupportPhone,
-                userId: auth()->id() ? (int) auth()->id() : null,
+                userId: $userId,
+            );
+        }
+
+        if ($this->pendingRadiusKm !== null) {
+            app(SettingsService::class)->setCityRadiusKm(
+                cityId: (int) $city->id,
+                radiusKm: $this->pendingRadiusKm,
+                userId: $userId,
             );
         }
     }
