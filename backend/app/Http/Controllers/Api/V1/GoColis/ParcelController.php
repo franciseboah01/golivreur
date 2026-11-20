@@ -471,7 +471,7 @@ class ParcelController extends Controller
             return response()->json(['succes' => false, 'message' => 'Accès refusé pour cette zone.'], 403);
         }
 
-        $parcel->load(['photos']);
+        $parcel->load(['courier.user', 'photos']);
 
         return response()->json([
             'succes' => true,

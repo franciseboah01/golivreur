@@ -14,6 +14,7 @@ class ParcelTrackingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final parcelAsync = ref.watch(singleParcelProvider(parcelId));
+    final senderCodeAsync = ref.watch(parcelSenderCodeProvider(parcelId));
     final courierLoc = ref.watch(parcelGpsTrackingProvider(parcelId)).valueOrNull;
     final weather = ref.watch(weatherProvider);
 
@@ -195,36 +196,45 @@ class ParcelTrackingScreen extends ConsumerWidget {
                       style: TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: ['7', '3', '9', '1'].map((c) {
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 6),
-                          width: 48,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: GoLivreurTheme.primaire, width: 2),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            c,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: GoLivreurTheme.textePrincipal,
-                            ),
-                          ),
+                    Builder(
+                      builder: (_) {
+                        final rawCode = senderCodeAsync.valueOrNull;
+                        final digits = (rawCode != null && rawCode.length == 4)
+                            ? rawCode.split('')
+                            : const ['•', '•', '•', '•'];
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: digits.map((c) {
+                            return Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 6),
+                              width: 48,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color: GoLivreurTheme.primaire, width: 2),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                c,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: GoLivreurTheme.textePrincipal,
+                                ),
+                              ),
+                            );
+                          }).toList(),
                         );
-                      }).toList(),
+                      },
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
 
-              // ─── Photo de ramassage du colis scellé ───────────────────────
+              // ─── Photo du colis (expéditeur ou preuve de ramassage) ───────
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -236,22 +246,28 @@ class ParcelTrackingScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.photo_camera, color: GoLivreurTheme.secondaire, size: 20),
-                        SizedBox(width: 8),
+                        const Icon(Icons.photo_camera,
+                            color: GoLivreurTheme.secondaire, size: 20),
+                        const SizedBox(width: 8),
                         Text(
-                          'Preuve de ramassage (Colis scellé)',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          parcel.photoRamassage != null
+                              ? 'Preuve de ramassage (Colis scellé)'
+                              : (parcel.photoColis != null
+                                  ? 'Photo du colis jointe'
+                                  : 'Preuve de ramassage (Colis scellé)'),
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    if (parcel.photoRamassage != null)
+                    if ((parcel.photoRamassage ?? parcel.photoColis) != null)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: Image.network(
-                          parcel.photoRamassage!.photoUrl,
+                          (parcel.photoRamassage ?? parcel.photoColis)!.photoUrl,
                           height: 160,
                           width: double.infinity,
                           fit: BoxFit.cover,

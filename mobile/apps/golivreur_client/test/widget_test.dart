@@ -14,8 +14,10 @@ import 'package:golivreur_client/features/gocolis/providers/parcel_draft_recover
 import 'package:golivreur_client/features/gocolis/screens/new_parcel_screen.dart';
 import 'package:golivreur_client/features/goshop/providers/goshop_provider.dart';
 import 'package:golivreur_client/features/goshop/providers/order_provider.dart';
+import 'package:golivreur_client/features/goshop/screens/goshop_home_screen.dart';
 import 'package:golivreur_client/features/navigation/screens/main_navigation_screen.dart';
 import 'package:golivreur_client/main.dart';
+import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/services/api_client.dart' as core_api;
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 
@@ -286,11 +288,103 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Vérifie la présence des 4 onglets de navigation client
-    expect(find.text('Accueil'), findsOneWidget);
-    expect(find.text('Colis'), findsOneWidget);
-    expect(find.text('Commandes'), findsOneWidget);
-    expect(find.text('Profil'), findsOneWidget);
+    // Vérifie la présence des 4 onglets de navigation client dans la BottomNavigationBar
+    final navBar = find.byType(BottomNavigationBar);
+    expect(find.descendant(of: navBar, matching: find.text('Accueil')), findsOneWidget);
+    expect(find.descendant(of: navBar, matching: find.text('Colis')), findsOneWidget);
+    expect(find.descendant(of: navBar, matching: find.text('Commandes')), findsOneWidget);
+    expect(find.descendant(of: navBar, matching: find.text('Profil')), findsOneWidget);
+  });
+
+  testWidgets(
+      'GoShopHomeScreen - affiche les produits en grille sous Catégories par défaut et permet de visiter les boutiques',
+      (WidgetTester tester) async {
+    final sampleMerchants = [
+      const MerchantModel(
+        id: 101,
+        name: 'Maquis Le Baobab',
+        category: 'restaurant',
+        categoryName: 'Repas',
+        address: 'Quartier Commerce, Daloa',
+        lat: 6.877,
+        lng: -6.450,
+        isOpen: true,
+        prepTimeMinutes: 20,
+        averageRating: 4.8,
+        products: [
+          ProductModel(
+            id: 1,
+            name: 'Attiéké Poisson Braisé',
+            description: 'Servi chaud avec alloco et piment maison',
+            price: 2500,
+            category: 'Repas',
+            isAvailable: true,
+          ),
+        ],
+      ),
+      const MerchantModel(
+        id: 102,
+        name: 'Maison Karité Daloa',
+        category: 'cosmetique',
+        categoryName: 'Cosmétiques',
+        address: 'Quartier Lobia, Daloa',
+        lat: 6.872,
+        lng: -6.458,
+        isOpen: true,
+        prepTimeMinutes: 25,
+        averageRating: 4.9,
+        products: [
+          ProductModel(
+            id: 2,
+            name: 'Soin Karité Éclat',
+            description: 'Huile hydratante naturelle 250 ml',
+            price: 6500,
+            category: 'Cosmétiques',
+            isAvailable: true,
+          ),
+        ],
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ..._fakeClientOverrides(),
+          merchantsListProvider.overrideWith((ref) => Future.value(sampleMerchants)),
+          promoBannersProvider.overrideWith((ref) => Future.value(const [])),
+        ],
+        child: const MaterialApp(
+          home: GoShopHomeScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Section Catégories + grille de produits par défaut
+    expect(find.text('Catégories'), findsOneWidget);
+    expect(find.text('Populaires à Daloa'), findsOneWidget);
+    expect(find.text('Attiéké Poisson Braisé'), findsOneWidget);
+    expect(find.text('2 500 FCFA'), findsOneWidget);
+    expect(find.text('Soin Karité Éclat'), findsOneWidget);
+    expect(find.text('6 500 FCFA'), findsOneWidget);
+
+    // Accès rapide aux boutiques en dessous des produits + bascule Boutiques
+    expect(find.text('Visiter les boutiques'), findsOneWidget);
+    expect(find.text('Boutiques'), findsOneWidget);
+
+    // Clic sur un produit -> fiche aperçu avec bouton "Visiter la boutique"
+    await tester.tap(find.text('Attiéké Poisson Braisé'));
+    await tester.pumpAndSettle();
+    expect(find.text('Visiter la boutique « Maquis Le Baobab »'), findsOneWidget);
+
+    // Fermer la fiche puis basculer sur l'onglet "Boutiques"
+    Navigator.of(tester.element(find.text('Visiter la boutique « Maquis Le Baobab »'))).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Boutiques'));
+    await tester.pumpAndSettle();
+    expect(find.text('Boutiques à Daloa'), findsOneWidget);
+    expect(find.text('Quartier Commerce, Daloa'), findsOneWidget);
   });
 
   testWidgets(

@@ -15,6 +15,16 @@ import '../../orders/screens/orders_tracking_history_screen.dart';
 import '../../profile/screens/client_addresses_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 
+class _HomeProductEntry {
+  final ProductModel product;
+  final MerchantModel merchant;
+
+  const _HomeProductEntry({
+    required this.product,
+    required this.merchant,
+  });
+}
+
 class GoShopHomeScreen extends ConsumerStatefulWidget {
   const GoShopHomeScreen({super.key});
 
@@ -27,6 +37,7 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
   bool _detectingCity = false;
+  bool _showShopsView = false; // Par défaut : affiche les Produits sous Catégories (bascule vers Boutiques à la demande)
 
   @override
   void initState() {
@@ -521,7 +532,7 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                                 filled: false,
                                 isDense: true,
                                 contentPadding: EdgeInsets.zero,
-                                hintText: 'Rechercher un maquis, garba, pharmacie...',
+                                hintText: 'Rechercher un produit, plat, boutique...',
                                 hintStyle: TextStyle(
                                   color: GoLivreurTheme.texteSecondaire,
                                   fontSize: 14,
@@ -562,173 +573,374 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
                   // ─── Carrousel Bannières Dynamiques (auto-expirables) ────
                   const PromoBannersCarousel(),
 
-                  // ─── Rayons & Services (Catégories) ──────────────────────
+                  // ─── Catégories (cartes pastel arrondies fidèles à la maquette) ──
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 16, 16, 10),
                     child: Text(
-                      'Rayons & Services',
+                      'Catégories',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: GoLivreurTheme.textePrincipal,
+                        color: Color(0xFF1F2937),
                       ),
                     ),
                   ),
                   SizedBox(
-                    height: 92,
+                    height: 88,
                     child: ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       scrollDirection: Axis.horizontal,
-                      itemCount: categories.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemCount: categories.length + 1,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
                       itemBuilder: (context, index) {
+                        // Dernière tuile : accès rapide Colis (comme sur la maquette)
+                        if (index == categories.length) {
+                          return InkWell(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const GoColisHomeScreen(),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              width: 82,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCE6EE),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFFC6D5E2),
+                                ),
+                              ),
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.inventory_2_outlined,
+                                    color: Color(0xFF47607A),
+                                    size: 30,
+                                  ),
+                                  SizedBox(height: 6),
+                                  Text(
+                                    'Colis',
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1F2937),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+
                         final cat = categories[index];
                         final isSelected = cat.id == selectedCat;
+                        final pastelBg = _categoryPastelColor(cat.id, index);
 
                         return InkWell(
                           onTap: () {
-                            ref.read(selectedCategoryProvider.notifier).state = cat.id;
+                            ref.read(selectedCategoryProvider.notifier).state =
+                                cat.id;
                           },
-                          borderRadius: BorderRadius.circular(14),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 58,
-                                height: 58,
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? GoLivreurTheme.primaire
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? GoLivreurTheme.primaire
-                                        : GoLivreurTheme.bordure,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.04),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                clipBehavior: Clip.antiAlias,
-                                child: _buildCategoryVisual(cat, isSelected),
+                          borderRadius: BorderRadius.circular(16),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            width: 84,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? GoLivreurTheme.primaire
+                                      .withValues(alpha: 0.18)
+                                  : pastelBg,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isSelected
+                                    ? GoLivreurTheme.primaire
+                                    : pastelBg,
+                                width: isSelected ? 2 : 1,
                               ),
-                              const SizedBox(height: 6),
-                              SizedBox(
-                                width: 70,
-                                child: Text(
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 36,
+                                  height: 36,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: _buildCategoryVisual(cat, isSelected),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
                                   cat.name,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                    fontSize: 11.5,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w600,
                                     color: isSelected
-                                        ? GoLivreurTheme.primaire
-                                        : GoLivreurTheme.textePrincipal,
+                                        ? const Color(0xFF835500)
+                                        : const Color(0xFF1F2937),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         );
                       },
                     ),
                   ),
 
-                  // ─── Populaire dans la ville active ──────────────────────
+                  // ─── Populaires à {Ville} : Produits par défaut + bascule Boutiques ─
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.local_fire_department, color: GoLivreurTheme.primaire, size: 22),
-                            const SizedBox(width: 6),
-                            Text(
-                              destination.cityName.isNotEmpty
-                                  ? 'Populaire à ${destination.cityName}'
-                                  : 'Commerces populaires',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: GoLivreurTheme.textePrincipal,
-                              ),
+                        Expanded(
+                          child: Text(
+                            _showShopsView
+                                ? (destination.cityName.isNotEmpty
+                                    ? 'Boutiques à ${destination.cityName}'
+                                    : 'Nos boutiques')
+                                : (destination.cityName.isNotEmpty
+                                    ? 'Populaires à ${destination.cityName}'
+                                    : 'Produits populaires'),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F2937),
                             ),
-                          ],
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        Text(
-                          'Sélection locale',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: GoLivreurTheme.texteSecondaire.withValues(alpha: 0.8),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: GoLivreurTheme.bordure),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildViewTogglePill(
+                                label: 'Produits',
+                                active: !_showShopsView,
+                                onTap: () =>
+                                    setState(() => _showShopsView = false),
+                              ),
+                              _buildViewTogglePill(
+                                label: 'Boutiques',
+                                active: _showShopsView,
+                                onTap: () =>
+                                    setState(() => _showShopsView = true),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
 
-                  // ─── Liste des Commerces ─────────────────────────────────
+                  // ─── Grille Produits (par défaut) OU Liste complète Boutiques ───
                   merchantsAsync.when(
                     data: (merchants) {
                       final normalizedQuery = searchQuery.trim().toLowerCase();
-                      final filtered = merchants.where((m) {
+                      final filteredMerchants = merchants.where((m) {
                         final matchesCategory =
                             selectedCat == 'all' || m.category == selectedCat;
                         if (!matchesCategory) return false;
                         if (normalizedQuery.isEmpty) return true;
-                        final inMerchant = m.name.toLowerCase().contains(normalizedQuery) ||
-                            m.address.toLowerCase().contains(normalizedQuery) ||
-                            (m.categoryName ?? m.category).toLowerCase().contains(normalizedQuery);
+                        final inMerchant =
+                            m.name.toLowerCase().contains(normalizedQuery) ||
+                                m.address.toLowerCase().contains(normalizedQuery) ||
+                                (m.categoryName ?? m.category)
+                                    .toLowerCase()
+                                    .contains(normalizedQuery);
                         final inProducts = m.products.any(
-                          (p) => p.name.toLowerCase().contains(normalizedQuery),
+                          (p) =>
+                              p.name.toLowerCase().contains(normalizedQuery) ||
+                              (p.description ?? '')
+                                  .toLowerCase()
+                                  .contains(normalizedQuery),
                         );
                         return inMerchant || inProducts;
                       }).toList();
 
-                      if (filtered.isEmpty) {
-                        return Container(
-                          padding: const EdgeInsets.all(32),
-                          alignment: Alignment.center,
-                          child: Column(
-                            children: [
-                              const Icon(Icons.storefront_outlined, size: 48, color: GoLivreurTheme.texteSecondaire),
-                              const SizedBox(height: 12),
-                              Text(
-                                normalizedQuery.isNotEmpty
-                                    ? 'Aucun résultat pour « ${searchQuery.trim()} ».'
-                                    : 'Aucun commerce disponible dans cette catégorie pour le moment.',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: GoLivreurTheme.texteSecondaire),
-                              ),
-                            ],
-                          ),
+                      // Extraire tous les produits disponibles des boutiques filtrées
+                      final productEntries = <_HomeProductEntry>[];
+                      for (final m in filteredMerchants) {
+                        for (final p in m.products) {
+                          if (!p.isAvailable) continue;
+                          if (normalizedQuery.isNotEmpty) {
+                            final matchesProduct =
+                                p.name.toLowerCase().contains(normalizedQuery) ||
+                                    (p.description ?? '')
+                                        .toLowerCase()
+                                        .contains(normalizedQuery) ||
+                                    (p.category ?? '')
+                                        .toLowerCase()
+                                        .contains(normalizedQuery) ||
+                                    m.name
+                                        .toLowerCase()
+                                        .contains(normalizedQuery);
+                            if (!matchesProduct) continue;
+                          }
+                          productEntries.add(
+                            _HomeProductEntry(product: p, merchant: m),
+                          );
+                        }
+                      }
+
+                      // Mode 1 : Vue complète des Boutiques (sur clic "Boutiques")
+                      if (_showShopsView) {
+                        if (filteredMerchants.isEmpty) {
+                          return _buildEmptyCatalogState(
+                            icon: Icons.storefront_outlined,
+                            message: normalizedQuery.isNotEmpty
+                                ? 'Aucune boutique trouvée pour « ${searchQuery.trim()} ».'
+                                : 'Aucune boutique disponible dans cette catégorie pour le moment.',
+                          );
+                        }
+
+                        return ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: filteredMerchants.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 16),
+                          itemBuilder: (context, index) {
+                            final merchant = filteredMerchants[index];
+                            return _buildMerchantCard(
+                              context,
+                              ref,
+                              merchant,
+                              weather,
+                              selectedQuarter,
+                              favoriteIds.contains(merchant.id),
+                            );
+                          },
                         );
                       }
 
-                      return ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 16),
-                        itemBuilder: (context, index) {
-                          final merchant = filtered[index];
-                          return _buildMerchantCard(
-                            context,
-                            ref,
-                            merchant,
-                            weather,
-                            selectedQuarter,
-                            favoriteIds.contains(merchant.id),
-                          );
-                        },
+                      // Mode 2 (Par défaut) : Grille 2 colonnes de Produits + bande « Boutiques à visiter »
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (productEntries.isEmpty)
+                            _buildEmptyCatalogState(
+                              icon: Icons.shopping_bag_outlined,
+                              message: normalizedQuery.isNotEmpty
+                                  ? 'Aucun produit trouvé pour « ${searchQuery.trim()} ».'
+                                  : 'Aucun produit publié dans cette catégorie pour le moment.',
+                              actionLabel: filteredMerchants.isNotEmpty
+                                  ? 'Visiter les ${filteredMerchants.length} boutique(s)'
+                                  : null,
+                              onAction: filteredMerchants.isNotEmpty
+                                  ? () => setState(() => _showShopsView = true)
+                                  : null,
+                            )
+                          else
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                mainAxisExtent: 238,
+                              ),
+                              itemCount: productEntries.length,
+                              itemBuilder: (context, index) {
+                                final entry = productEntries[index];
+                                return _buildProductGridCard(
+                                  context,
+                                  ref,
+                                  entry,
+                                  weather.isRainMode,
+                                );
+                              },
+                            ),
+
+                          // Bandeau horizontal « Boutiques à visiter » juste en dessous des produits
+                          if (filteredMerchants.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 22, 16, 10),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(
+                                        Icons.storefront_outlined,
+                                        color: GoLivreurTheme.primaire,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Visiter les boutiques',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1F2937),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        setState(() => _showShopsView = true),
+                                    child: const Text(
+                                      'Voir tout ›',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: GoLivreurTheme.primaire,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(
+                              height: 118,
+                              child: ListView.separated(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                scrollDirection: Axis.horizontal,
+                                itemCount: filteredMerchants.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 12),
+                                itemBuilder: (context, index) {
+                                  final m = filteredMerchants[index];
+                                  return _buildCompactShopCard(context, m);
+                                },
+                              ),
+                            ),
+                          ],
+                        ],
                       );
                     },
                     loading: () => const GoLivreurListSkeleton(
@@ -855,6 +1067,659 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  static String _formatFcfa(double price) {
+    final digits = price.round().toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      final posFromEnd = digits.length - i;
+      buf.write(digits[i]);
+      if (posFromEnd > 1 && posFromEnd % 3 == 1) {
+        buf.write(' ');
+      }
+    }
+    return '${buf.toString()} FCFA';
+  }
+
+  Color _categoryPastelColor(String catId, int index) {
+    return switch (catId) {
+      'all' => const Color(0xFFFFF1DB),
+      'restaurant' || 'maquis' || 'fast_food' => const Color(0xFFFCE6D4),
+      'cosmetique' || 'pharmacie' || 'beaute' => const Color(0xFFD4EFE3),
+      'supermarche' || 'epicerie' || 'boulangerie' => const Color(0xFFFCECC9),
+      'boutique' || 'mode' => const Color(0xFFEAE1F9),
+      'hightech' || 'high_tech' => const Color(0xFFDCE6EE),
+      _ => const [
+          Color(0xFFFCE6D4),
+          Color(0xFFD4EFE3),
+          Color(0xFFFCECC9),
+          Color(0xFFDCE6EE),
+          Color(0xFFEAE1F9),
+        ][index % 5],
+    };
+  }
+
+  Widget _buildViewTogglePill({
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: active ? GoLivreurTheme.primaire : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: active ? Colors.white : GoLivreurTheme.texteSecondaire,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyCatalogState({
+    required IconData icon,
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      alignment: Alignment.center,
+      child: Column(
+        children: [
+          Icon(icon, size: 46, color: GoLivreurTheme.texteSecondaire),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: GoLivreurTheme.texteSecondaire),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onAction,
+              icon: const Icon(Icons.storefront_outlined, size: 18),
+              label: Text(actionLabel),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Carte Produit en grille 2 colonnes (fidèle à la maquette : photo, nom, prix FCFA en vert, délai, lien boutique).
+  Widget _buildProductGridCard(
+    BuildContext context,
+    WidgetRef ref,
+    _HomeProductEntry entry,
+    bool isRainMode,
+  ) {
+    final product = entry.product;
+    final merchant = entry.merchant;
+    final prepMin = merchant.prepTimeMinutes + (isRainMode ? 15 : 0);
+
+    return InkWell(
+      onTap: () => _showProductDetailSheet(context, ref, entry, prepMin),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: GoLivreurTheme.bordure),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Photo produit arrondie + bouton rapide "+"
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      height: 112,
+                      width: double.infinity,
+                      child: product.photoUrl != null &&
+                              product.photoUrl!.isNotEmpty
+                          ? Image.network(
+                              product.photoUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _buildProductPlaceholder(merchant),
+                            )
+                          : _buildProductPlaceholder(merchant),
+                    ),
+                  ),
+                  Positioned(
+                    right: 6,
+                    bottom: 6,
+                    child: Material(
+                      color: GoLivreurTheme.primaire,
+                      shape: const CircleBorder(),
+                      elevation: 2,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () {
+                          ref
+                              .read(cartProvider.notifier)
+                              .addProduct(merchant, product);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content:
+                                  Text('${product.name} ajouté au panier !'),
+                              backgroundColor: GoLivreurTheme.secondaire,
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.all(5),
+                          child:
+                              Icon(Icons.add, color: Colors.white, size: 18),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Nom du produit + Prix en vert + Badge délai
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1F2937),
+                        height: 1.2,
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _formatFcfa(product.price),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: GoLivreurTheme.secondaire,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$prepMin min',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF4B5563),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Lien discret cliquable pour visiter directement la boutique
+            InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => MerchantDetailScreen(merchant: merchant),
+                  ),
+                );
+              },
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(16),
+              ),
+              child: Container(
+                margin: const EdgeInsets.only(top: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFAFAFA),
+                  borderRadius: BorderRadius.vertical(
+                    bottom: Radius.circular(15),
+                  ),
+                  border: Border(
+                    top: BorderSide(color: Color(0xFFEEEEEE)),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.storefront_outlined,
+                      size: 13,
+                      color: GoLivreurTheme.texteSecondaire,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        merchant.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: GoLivreurTheme.texteSecondaire,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 14,
+                      color: GoLivreurTheme.primaire,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductPlaceholder(MerchantModel merchant) {
+    final emoji = merchant.emoji?.trim();
+    return Container(
+      color: const Color(0xFFF3F0EA),
+      alignment: Alignment.center,
+      child: emoji != null && emoji.isNotEmpty
+          ? Text(emoji, style: const TextStyle(fontSize: 38))
+          : Icon(
+              _getCategoryIcon(merchant.category),
+              size: 38,
+              color: GoLivreurTheme.primaire.withValues(alpha: 0.6),
+            ),
+    );
+  }
+
+  /// Carte boutique compacte horizontale sous les produits pour visiter chaque boutique en 1 clic.
+  Widget _buildCompactShopCard(BuildContext context, MerchantModel merchant) {
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MerchantDetailScreen(merchant: merchant),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 224,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: GoLivreurTheme.bordure),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                _buildMerchantLogoBadge(merchant),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        merchant.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: GoLivreurTheme.textePrincipal,
+                        ),
+                      ),
+                      Text(
+                        merchant.categoryName ?? merchant.category,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: GoLivreurTheme.texteSecondaire,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.star, color: Color(0xFFF9A825), size: 14),
+                      const SizedBox(width: 3),
+                      Text(
+                        merchant.averageRating.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          '${merchant.products.length} art.',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: GoLivreurTheme.texteSecondaire,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: GoLivreurTheme.primaire.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Visiter ›',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF835500),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showProductDetailSheet(
+    BuildContext context,
+    WidgetRef ref,
+    _HomeProductEntry entry,
+    int prepMin,
+  ) {
+    final product = entry.product;
+    final merchant = entry.merchant;
+    var qty = 1;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setModalState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: GoLivreurTheme.bordure,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: SizedBox(
+                      height: 180,
+                      width: double.infinity,
+                      child: product.photoUrl != null &&
+                              product.photoUrl!.isNotEmpty
+                          ? Image.network(
+                              product.photoUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _buildProductPlaceholder(merchant),
+                            )
+                          : _buildProductPlaceholder(merchant),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.name,
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$prepMin min',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4B5563),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _formatFcfa(product.price),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: GoLivreurTheme.secondaire,
+                    ),
+                  ),
+                  if (product.description != null &&
+                      product.description!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      product.description!.trim(),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        color: GoLivreurTheme.texteSecondaire,
+                      ),
+                    ),
+                  ],
+                  if (product.attributes.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: product.attributes.entries
+                          .where((e) =>
+                              e.value != null && '${e.value}'.trim().isNotEmpty)
+                          .map((e) {
+                        final valStr = e.value is bool
+                            ? (e.value == true ? 'Oui' : 'Non')
+                            : '${e.value}';
+                        return Chip(
+                          visualDensity: VisualDensity.compact,
+                          backgroundColor: GoLivreurTheme.fond,
+                          label: Text(
+                            '${e.key} : $valStr',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: GoLivreurTheme.bordure),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              onPressed: qty > 1
+                                  ? () => setModalState(() => qty--)
+                                  : null,
+                              icon: const Icon(Icons.remove, size: 18),
+                            ),
+                            Text(
+                              '$qty',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => setModalState(() => qty++),
+                              icon: const Icon(Icons.add, size: 18),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: GoLivreurTheme.secondaire,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () {
+                              ref.read(cartProvider.notifier).addProduct(
+                                    merchant,
+                                    product,
+                                    quantity: qty,
+                                  );
+                              Navigator.of(ctx).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '$qty × ${product.name} ajouté au panier !',
+                                  ),
+                                  backgroundColor: GoLivreurTheme.secondaire,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.add_shopping_cart, size: 18),
+                            label: Text(
+                              'Ajouter • ${_formatFcfa(product.price * qty)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: GoLivreurTheme.textePrincipal,
+                      side: const BorderSide(color: GoLivreurTheme.bordure),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              MerchantDetailScreen(merchant: merchant),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.storefront_outlined, size: 18),
+                    label: Text(
+                      'Visiter la boutique « ${merchant.name} »',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1144,15 +2009,15 @@ class _GoShopHomeScreenState extends ConsumerState<GoShopHomeScreen> {
       return Center(
         child: Text(
           cat.emoji!,
-          style: const TextStyle(fontSize: 26),
+          style: const TextStyle(fontSize: 24),
         ),
       );
     }
 
     return Icon(
       _getCategoryIcon(cat.id),
-      color: isSelected ? Colors.white : GoLivreurTheme.primaire,
-      size: 28,
+      color: isSelected ? GoLivreurTheme.primaire : const Color(0xFF374151),
+      size: 26,
     );
   }
 

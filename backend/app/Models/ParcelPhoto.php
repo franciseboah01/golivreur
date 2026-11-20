@@ -47,7 +47,11 @@ class ParcelPhoto extends Model
         $storagePath = $this->attributes['storage_path'] ?? null;
 
         if (is_string($storagePath) && $storagePath !== '') {
-            return Storage::disk(self::storageDisk())->temporaryUrl($storagePath, now()->addMinutes(15));
+            try {
+                return Storage::disk(self::storageDisk())->temporaryUrl($storagePath, now()->addMinutes(15));
+            } catch (\Throwable) {
+                // Repli sûr si le disque ne supporte pas les URLs signées temporaires
+            }
         }
 
         $legacyUrl = $this->attributes['photo_url'] ?? null;

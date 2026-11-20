@@ -262,6 +262,44 @@ class _PanneauInfosLivraison extends StatelessWidget {
             ),
           ),
           const SizedBox(height: GoLivreurTheme.espacementM),
+          if (order.courier == null) ...[
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: GoLivreurTheme.primaire.withValues(alpha: 0.14),
+                  child: const Icon(Icons.storefront,
+                      color: GoLivreurTheme.primaire, size: 24),
+                ),
+                const SizedBox(width: GoLivreurTheme.espacementM),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.merchant?.name ?? 'Commande #${order.id}',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${order.items.length} article(s) • ${order.totalClient.toInt()} F CFA',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: GoLivreurTheme.texteSecondaire,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: GoLivreurTheme.espacementM),
+          ],
           if (order.courier != null) ...[
             Row(
               children: [

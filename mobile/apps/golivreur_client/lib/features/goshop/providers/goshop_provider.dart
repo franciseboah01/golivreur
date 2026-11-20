@@ -26,11 +26,12 @@ class DeliveryNeighborhood {
 
   factory DeliveryNeighborhood.fromJson(Map<String, dynamic> json) =>
       DeliveryNeighborhood(
-        id: (json['id'] as num?)?.toInt(),
-        name: json['name'] as String? ?? '',
-        lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
-        lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
-        defaultDistanceKm: (json['distance_km'] as num?)?.toDouble() ?? 2.0,
+        id: int.tryParse('${json['id'] ?? ''}'),
+        name: json['name']?.toString() ?? '',
+        lat: double.tryParse('${json['lat'] ?? ''}') ?? 0.0,
+        lng: double.tryParse('${json['lng'] ?? ''}') ?? 0.0,
+        defaultDistanceKm:
+            double.tryParse('${json['distance_km'] ?? ''}') ?? 2.0,
       );
 }
 
@@ -49,10 +50,10 @@ class DeliveryTariffTier {
 
   factory DeliveryTariffTier.fromJson(Map<String, dynamic> json) =>
       DeliveryTariffTier(
-        maxKm: (json['max_km'] as num?)?.toDouble() ?? 99,
-        normal: (json['normal'] as num?)?.toDouble() ?? 800,
-        pointe: (json['pointe'] as num?)?.toDouble() ?? 1000,
-        pluie: (json['pluie'] as num?)?.toDouble() ?? 1300,
+        maxKm: double.tryParse('${json['max_km'] ?? ''}') ?? 99,
+        normal: double.tryParse('${json['normal'] ?? ''}') ?? 800,
+        pointe: double.tryParse('${json['pointe'] ?? ''}') ?? 1000,
+        pluie: double.tryParse('${json['pluie'] ?? ''}') ?? 1300,
       );
 }
 
@@ -311,12 +312,14 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
         );
 
         state = state.copyWith(
-          cityId: d['city_id'] as int?,
+          cityId: int.tryParse('${d['city_id'] ?? ''}'),
           cityName: cName,
-          centerLat: (d['center_lat'] as num?)?.toDouble(),
-          centerLng: (d['center_lng'] as num?)?.toDouble(),
+          centerLat: double.tryParse('${d['center_lat'] ?? ''}'),
+          centerLng: double.tryParse('${d['center_lng'] ?? ''}'),
           isRainMode: rainActive,
-          rainDelayMinutes: d['rain_delay_minutes'] as int? ?? (rainActive ? 15 : 0),
+          rainDelayMinutes:
+              int.tryParse('${d['rain_delay_minutes'] ?? ''}') ??
+                  (rainActive ? 15 : 0),
           emergencyModeActive: d['emergency_mode_active'] as bool? ?? false,
           emergencyMessage: d['emergency_mode_message'] as String?,
           bannerDismissed: false,
@@ -410,16 +413,16 @@ class ClientAddressModel {
 
   factory ClientAddressModel.fromJson(Map<String, dynamic> json) =>
       ClientAddressModel(
-        id: json['id'] as int,
-        cityId: json['city_id'] as int?,
-        cityName: json['city_name'] as String? ?? '',
-        label: json['label'] as String? ?? '',
-        neighborhood: json['neighborhood'] as String? ?? '',
-        addressLine: json['address_line'] as String? ?? '',
-        formattedAddress: json['formatted_address'] as String? ?? '',
-        lat: (json['lat'] as num?)?.toDouble(),
-        lng: (json['lng'] as num?)?.toDouble(),
-        isDefault: json['is_default'] as bool? ?? false,
+        id: int.tryParse('${json['id'] ?? 0}') ?? 0,
+        cityId: int.tryParse('${json['city_id'] ?? ''}'),
+        cityName: json['city_name']?.toString() ?? '',
+        label: json['label']?.toString() ?? '',
+        neighborhood: json['neighborhood']?.toString() ?? '',
+        addressLine: json['address_line']?.toString() ?? '',
+        formattedAddress: json['formatted_address']?.toString() ?? '',
+        lat: double.tryParse('${json['lat'] ?? ''}'),
+        lng: double.tryParse('${json['lng'] ?? ''}'),
+        isDefault: json['is_default'] == true || json['is_default'] == 1,
       );
 }
 

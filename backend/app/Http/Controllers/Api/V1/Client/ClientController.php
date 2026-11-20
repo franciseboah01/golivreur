@@ -302,7 +302,7 @@ class ClientController extends Controller
             return response()->json(['succes' => false, 'message' => 'Accès refusé pour cette zone.'], 403);
         }
 
-        $order->load(['merchant', 'courier.user', 'items.product']);
+        $order->load(['merchant.categoryModel', 'courier.user', 'items.product']);
 
         return response()->json([
             'succes' => true,

@@ -1,6 +1,87 @@
 /// Modèles de données partagés entre les 3 applications GoLivreur.
-/// Correspondent exactement aux réponses JSON de l'API Laravel.
+/// Correspondent exactement aux réponses JSON de l'API Laravel (tolérants aux DECIMAL MySQL/PostgreSQL).
 import '../config/env_config.dart';
+
+// ─── Helpers de parsing résilients (évitent tout crash sur String DECIMAL / 0-1 bool) ──
+
+double _toDouble(dynamic value, [double fallback = 0.0]) {
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final parsed = double.tryParse(value.trim().replaceAll(',', '.'));
+    if (parsed != null) return parsed;
+  }
+  return fallback;
+}
+
+double? _toNullableDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return double.tryParse(trimmed.replaceAll(',', '.'));
+  }
+  return null;
+}
+
+int _toInt(dynamic value, [int fallback = 0]) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final trimmed = value.trim();
+    final asInt = int.tryParse(trimmed);
+    if (asInt != null) return asInt;
+    final asDouble = double.tryParse(trimmed.replaceAll(',', '.'));
+    if (asDouble != null) return asDouble.toInt();
+  }
+  return fallback;
+}
+
+int? _toNullableInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return int.tryParse(trimmed) ?? double.tryParse(trimmed)?.toInt();
+  }
+  return null;
+}
+
+bool _toBool(dynamic value, [bool fallback = false]) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.trim().toLowerCase();
+    if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+    if (lower == 'false' || lower == '0' || lower == 'no') return false;
+  }
+  return fallback;
+}
+
+DateTime _toDateTime(dynamic value) {
+  if (value is DateTime) return value;
+  if (value is String && value.trim().isNotEmpty) {
+    return DateTime.tryParse(value.trim()) ?? DateTime.now();
+  }
+  return DateTime.now();
+}
+
+DateTime? _toNullableDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is String && value.trim().isNotEmpty) {
+    return DateTime.tryParse(value.trim());
+  }
+  return null;
+}
+
+Map<String, dynamic>? _toMap(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return Map<String, dynamic>.from(value);
+  return null;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // USER
@@ -61,7 +142,7 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     final resolvedPhoto = GoLivreurEnv.resolveMediaUrl(
-      (json['photo_url'] as String?) ?? (json['avatar_url'] as String?),
+      (json['photo_url']?.toString()) ?? (json['avatar_url']?.toString()),
     );
     final rawRoles = json['roles'];
     final parsedRoles = rawRoles is List
@@ -69,23 +150,23 @@ class UserModel {
         : <String>[if (json['role'] != null) json['role'].toString()];
 
     return UserModel(
-      id: json['id'] as int,
-      name: json['name'] as String? ?? '',
-      phone: json['phone'] as String? ?? '',
-      email: json['email'] as String?,
-      role: json['role'] as String? ?? 'client',
+      id: _toInt(json['id']),
+      name: json['name']?.toString() ?? '',
+      phone: json['phone']?.toString() ?? '',
+      email: json['email']?.toString(),
+      role: json['role']?.toString() ?? 'client',
       roles: parsedRoles,
-      cityId: json['city_id'] as int?,
-      cityName: json['city_name'] as String?,
-      supportPhone: json['support_phone'] as String?,
-      defaultAddress: json['default_address'] as String?,
-      language: json['language'] as String? ?? 'fr',
-      notificationsEnabled: json['notifications_enabled'] as bool? ?? true,
+      cityId: _toNullableInt(json['city_id']),
+      cityName: json['city_name']?.toString(),
+      supportPhone: json['support_phone']?.toString(),
+      defaultAddress: json['default_address']?.toString(),
+      language: json['language']?.toString() ?? 'fr',
+      notificationsEnabled: _toBool(json['notifications_enabled'], true),
       avatarUrl: resolvedPhoto,
       photoUrl: resolvedPhoto,
-      isActive: json['is_active'] as bool? ?? true,
-      mustChangePassword: json['must_change_password'] == true,
-      pinResetRequiredAt: json['pin_reset_required_at'] as String?,
+      isActive: _toBool(json['is_active'], true),
+      mustChangePassword: _toBool(json['must_change_password'], false),
+      pinResetRequiredAt: json['pin_reset_required_at']?.toString(),
     );
   }
 
@@ -195,43 +276,45 @@ class OrderModel {
     this.deliveredAt,
   });
 
-  factory OrderModel.fromJson(Map<String, dynamic> json) => OrderModel(
-        id: json['id'] as int,
-        status: json['status'] as String,
-        productsTotal: (json['products_total'] as num).toDouble(),
-        deliveryFee: (json['delivery_fee'] as num).toDouble(),
-        paymentMethod: json['payment_method'] as String,
-        paymentStatus: json['payment_status'] as String,
-        confirmationCode: json['confirmation_code'] as String?,
-        confirmationLocked: json['confirmation_locked'] as bool? ?? false,
-        deliveryAddress: json['delivery_address'] as String,
-        deliveryLat: (json['delivery_lat'] as num?)?.toDouble(),
-        deliveryLng: (json['delivery_lng'] as num?)?.toDouble(),
-        specialInstructions: json['special_instructions'] as String?,
-        merchant: json['merchant'] != null
-            ? MerchantModel.fromJson(json['merchant'] as Map<String, dynamic>)
-            : null,
-        courier: json['courier'] != null
-            ? CourierModel.fromJson(json['courier'] as Map<String, dynamic>)
-            : null,
-        items: (json['items'] as List<dynamic>? ?? [])
-            .map((e) => OrderItemModel.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        createdAt: DateTime.parse(json['created_at'] as String),
-        deliveredAt: json['delivered_at'] != null
-            ? DateTime.parse(json['delivered_at'] as String)
-            : null,
-      );
+  factory OrderModel.fromJson(Map<String, dynamic> json) {
+    final merchantMap = _toMap(json['merchant']);
+    final courierMap = _toMap(json['courier']);
+    final rawItems = json['items'] is List ? json['items'] as List : const [];
+
+    return OrderModel(
+      id: _toInt(json['id']),
+      status: json['status']?.toString() ?? 'pending',
+      productsTotal: _toDouble(json['products_total']),
+      deliveryFee: _toDouble(json['delivery_fee']),
+      paymentMethod: json['payment_method']?.toString() ?? 'cash',
+      paymentStatus: json['payment_status']?.toString() ?? 'pending',
+      confirmationCode: json['confirmation_code']?.toString(),
+      confirmationLocked: _toBool(json['confirmation_locked'], false),
+      deliveryAddress: json['delivery_address']?.toString() ?? '',
+      deliveryLat: _toNullableDouble(json['delivery_lat']),
+      deliveryLng: _toNullableDouble(json['delivery_lng']),
+      specialInstructions: json['special_instructions']?.toString(),
+      merchant: merchantMap != null ? MerchantModel.fromJson(merchantMap) : null,
+      courier: courierMap != null ? CourierModel.fromJson(courierMap) : null,
+      items: rawItems
+          .whereType<Map>()
+          .map((e) => OrderItemModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      createdAt: _toDateTime(json['created_at']),
+      deliveredAt: _toNullableDateTime(json['delivered_at']),
+    );
+  }
 
   double get totalClient => productsTotal + deliveryFee;
 
   bool get estActif => [
-        'pending', 'accepted', 'ready', 'picked_up', 'in_transit'
+        'pending', 'accepted', 'waiting', 'ready', 'picked_up', 'in_transit'
       ].contains(status);
 
   String get labelStatut => switch (status) {
         'pending'    => 'En attente du commerce',
         'accepted'   => 'Commande acceptée',
+        'waiting'    => 'Recherche d\'un livreur',
         'refused'    => 'Commande refusée',
         'ready'      => 'Commande prête',
         'picked_up'  => 'Livreur en route',
@@ -257,13 +340,18 @@ class OrderItemModel {
     required this.unitPrice,
   });
 
-  factory OrderItemModel.fromJson(Map<String, dynamic> json) => OrderItemModel(
-        id: json['id'] as int,
-        productId: json['product_id'] as int,
-        productNameSnapshot: json['product_name_snapshot'] as String,
-        quantity: json['quantity'] as int,
-        unitPrice: (json['unit_price'] as num).toDouble(),
-      );
+  factory OrderItemModel.fromJson(Map<String, dynamic> json) {
+    final prodMap = _toMap(json['product']);
+    return OrderItemModel(
+      id: _toInt(json['id']),
+      productId: _toInt(json['product_id']),
+      productNameSnapshot: json['product_name_snapshot']?.toString() ??
+          prodMap?['name']?.toString() ??
+          'Article',
+      quantity: _toInt(json['quantity'], 1),
+      unitPrice: _toDouble(json['unit_price']),
+    );
+  }
 
   double get sousTotal => unitPrice * quantity;
 }
@@ -321,36 +409,45 @@ class ParcelModel {
     this.deliveredAt,
   });
 
-  factory ParcelModel.fromJson(Map<String, dynamic> json) => ParcelModel(
-        id: json['id'] as int,
-        status: json['status'] as String,
-        size: json['size'] as String,
-        sizeLabel: json['size_label'] as String? ?? json['size'] as String,
-        declaredValue: (json['declared_value'] as num).toDouble(),
-        hasInsurance: json['has_insurance'] as bool? ?? false,
-        insuranceAmount: (json['insurance_amount'] as num? ?? 0).toDouble(),
-        recipientName: json['recipient_name'] as String,
-        recipientPhone: json['recipient_phone'] as String,
-        deliveryAddress: json['delivery_address'] as String,
-        pickupLat: (json['pickup_lat'] as num?)?.toDouble(),
-        pickupLng: (json['pickup_lng'] as num?)?.toDouble(),
-        deliveryLat: (json['delivery_lat'] as num?)?.toDouble(),
-        deliveryLng: (json['delivery_lng'] as num?)?.toDouble(),
-        shippingFee: (json['shipping_fee'] as num).toDouble(),
-        paymentMethod: json['payment_method'] as String,
-        senderCodeLocked: json['sender_code_locked'] as bool? ?? false,
-        recipientCodeLocked: json['recipient_code_locked'] as bool? ?? false,
-        courier: json['courier'] != null
-            ? CourierModel.fromJson(json['courier'] as Map<String, dynamic>)
-            : null,
-        photos: (json['photos'] as List<dynamic>? ?? [])
-            .map((e) => ParcelPhotoModel.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        createdAt: DateTime.parse(json['created_at'] as String),
-        deliveredAt: json['delivered_at'] != null
-            ? DateTime.parse(json['delivered_at'] as String)
-            : null,
-      );
+  factory ParcelModel.fromJson(Map<String, dynamic> json) {
+    final courierMap = _toMap(json['courier']);
+    final rawPhotos = json['photos'] is List ? json['photos'] as List : const [];
+    final rawSize = json['size']?.toString() ?? 'moyen';
+    final defaultSizeLabel = switch (rawSize) {
+      'petit' => 'Petit (max 1 kg)',
+      'moyen' => 'Moyen (max 5 kg)',
+      'grand' => 'Grand (max 15 kg)',
+      _ => rawSize,
+    };
+
+    return ParcelModel(
+      id: _toInt(json['id']),
+      status: json['status']?.toString() ?? 'pending',
+      size: rawSize,
+      sizeLabel: json['size_label']?.toString() ?? defaultSizeLabel,
+      declaredValue: _toDouble(json['declared_value']),
+      hasInsurance: _toBool(json['has_insurance'], false),
+      insuranceAmount: _toDouble(json['insurance_amount']),
+      recipientName: json['recipient_name']?.toString() ?? '',
+      recipientPhone: json['recipient_phone']?.toString() ?? '',
+      deliveryAddress: json['delivery_address']?.toString() ?? '',
+      pickupLat: _toNullableDouble(json['pickup_lat']),
+      pickupLng: _toNullableDouble(json['pickup_lng']),
+      deliveryLat: _toNullableDouble(json['delivery_lat']),
+      deliveryLng: _toNullableDouble(json['delivery_lng']),
+      shippingFee: _toDouble(json['shipping_fee']),
+      paymentMethod: json['payment_method']?.toString() ?? 'cash',
+      senderCodeLocked: _toBool(json['sender_code_locked'], false),
+      recipientCodeLocked: _toBool(json['recipient_code_locked'], false),
+      courier: courierMap != null ? CourierModel.fromJson(courierMap) : null,
+      photos: rawPhotos
+          .whereType<Map>()
+          .map((e) => ParcelPhotoModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      createdAt: _toDateTime(json['created_at']),
+      deliveredAt: _toNullableDateTime(json['delivered_at']),
+    );
+  }
 
   String get labelStatut => switch (status) {
         'pending'      => 'Recherche livreur',
@@ -366,16 +463,19 @@ class ParcelModel {
         _              => status,
       };
 
+  ParcelPhotoModel? get photoColis =>
+      photos.where((p) => p.type == 'parcel' && p.photoUrl.isNotEmpty).firstOrNull;
+
   ParcelPhotoModel? get photoRamassage =>
-      photos.where((p) => p.type == 'pickup').firstOrNull;
+      photos.where((p) => p.type == 'pickup' && p.photoUrl.isNotEmpty).firstOrNull;
 
   ParcelPhotoModel? get photoLivraison =>
-      photos.where((p) => p.type == 'delivery').firstOrNull;
+      photos.where((p) => p.type == 'delivery' && p.photoUrl.isNotEmpty).firstOrNull;
 }
 
 class ParcelPhotoModel {
   final int id;
-  final String type; // pickup | delivery
+  final String type; // parcel | pickup | delivery
   final String photoUrl;
 
   const ParcelPhotoModel({
@@ -384,12 +484,18 @@ class ParcelPhotoModel {
     required this.photoUrl,
   });
 
-  factory ParcelPhotoModel.fromJson(Map<String, dynamic> json) =>
-      ParcelPhotoModel(
-        id: json['id'] as int,
-        type: json['type'] as String,
-        photoUrl: json['photo_url'] as String,
-      );
+  factory ParcelPhotoModel.fromJson(Map<String, dynamic> json) {
+    final signed = json['signed_url']?.toString().trim() ?? '';
+    final legacy = json['photo_url']?.toString().trim() ?? '';
+    final chosen = signed.isNotEmpty ? signed : legacy;
+    final resolved = GoLivreurEnv.resolveMediaUrl(chosen) ?? chosen;
+
+    return ParcelPhotoModel(
+      id: _toInt(json['id']),
+      type: json['type']?.toString() ?? 'parcel',
+      photoUrl: resolved,
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -418,14 +524,14 @@ class CategoryModel {
   });
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) => CategoryModel(
-        id: json['id'] as int? ?? 0,
-        name: json['name'] as String? ?? '',
-        slug: json['slug'] as String? ?? '',
-        description: json['description'] as String?,
-        icon: json['icon'] as String?,
-        emoji: json['emoji'] as String?,
-        logoUrl: GoLivreurEnv.resolveMediaUrl(json['logo_url'] as String?),
-        isActive: json['is_active'] as bool? ?? true,
+        id: _toInt(json['id']),
+        name: json['name']?.toString() ?? '',
+        slug: json['slug']?.toString() ?? '',
+        description: json['description']?.toString(),
+        icon: json['icon']?.toString(),
+        emoji: json['emoji']?.toString(),
+        logoUrl: GoLivreurEnv.resolveMediaUrl(json['logo_url']?.toString()),
+        isActive: _toBool(json['is_active'], true),
       );
 }
 
@@ -462,24 +568,30 @@ class MerchantModel {
     required this.products,
   });
 
-  factory MerchantModel.fromJson(Map<String, dynamic> json) => MerchantModel(
-        id: json['id'] as int,
-        name: json['name'] as String,
-        category: json['category'] as String,
-        categoryName: json['category_name'] as String?,
-        emoji: json['emoji'] as String?,
-        logoUrl: GoLivreurEnv.resolveMediaUrl(json['logo_url'] as String?),
-        address: json['address'] as String,
-        lat: (json['lat'] as num).toDouble(),
-        lng: (json['lng'] as num).toDouble(),
-        prepTimeMinutes: json['prep_time_minutes'] as int? ?? 15,
-        isOpen: json['is_open'] as bool? ?? false,
-        averageRating: (json['average_rating'] as num? ?? 0).toDouble(),
-        photoUrl: GoLivreurEnv.resolveMediaUrl(json['photo_url'] as String?),
-        products: (json['products'] as List<dynamic>? ?? [])
-            .map((e) => ProductModel.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+  factory MerchantModel.fromJson(Map<String, dynamic> json) {
+    final rawProducts = json['products'] is List ? json['products'] as List : const [];
+    final catModel = _toMap(json['category_model']);
+
+    return MerchantModel(
+      id: _toInt(json['id']),
+      name: json['name']?.toString() ?? '',
+      category: json['category']?.toString() ?? 'autre',
+      categoryName: json['category_name']?.toString() ?? catModel?['name']?.toString(),
+      emoji: json['emoji']?.toString() ?? catModel?['emoji']?.toString(),
+      logoUrl: GoLivreurEnv.resolveMediaUrl(json['logo_url']?.toString()),
+      address: json['address']?.toString() ?? '',
+      lat: _toDouble(json['lat']),
+      lng: _toDouble(json['lng']),
+      prepTimeMinutes: _toInt(json['prep_time_minutes'], 15),
+      isOpen: _toBool(json['is_open'], false),
+      averageRating: _toDouble(json['average_rating']),
+      photoUrl: GoLivreurEnv.resolveMediaUrl(json['photo_url']?.toString()),
+      products: rawProducts
+          .whereType<Map>()
+          .map((e) => ProductModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
 }
 
 class ProductModel {
@@ -489,7 +601,9 @@ class ProductModel {
   final String? description;
   final String? photoUrl;
   final bool isAvailable;
+  final int? quantity;
   final String? category;
+  final Map<String, dynamic> attributes;
 
   const ProductModel({
     required this.id,
@@ -498,18 +612,28 @@ class ProductModel {
     this.description,
     this.photoUrl,
     required this.isAvailable,
+    this.quantity,
     this.category,
+    this.attributes = const {},
   });
 
-  factory ProductModel.fromJson(Map<String, dynamic> json) => ProductModel(
-        id: json['id'] as int,
-        name: json['name'] as String,
-        price: (json['price'] as num).toDouble(),
-        description: json['description'] as String?,
-        photoUrl: json['photo_url'] as String?,
-        isAvailable: json['is_available'] as bool? ?? true,
-        category: json['category'] as String?,
-      );
+  factory ProductModel.fromJson(Map<String, dynamic> json) {
+    final rawAttrs = _toMap(json['attributes']) ??
+        _toMap(json['custom_attributes']) ??
+        const <String, dynamic>{};
+
+    return ProductModel(
+      id: _toInt(json['id']),
+      name: json['name']?.toString() ?? '',
+      price: _toDouble(json['price']),
+      description: json['description']?.toString(),
+      photoUrl: GoLivreurEnv.resolveMediaUrl(json['photo_url']?.toString()),
+      isAvailable: _toBool(json['is_available'], true),
+      quantity: _toNullableInt(json['quantity']),
+      category: json['category']?.toString(),
+      attributes: rawAttrs,
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -535,15 +659,18 @@ class CourierModel {
     required this.isOnline,
   });
 
-  factory CourierModel.fromJson(Map<String, dynamic> json) => CourierModel(
-        id: json['id'] as int,
-        name: json['name'] as String? ?? json['user']?['name'] as String? ?? '',
-        photoUrl: json['photo_url'] as String?,
-        currentLat: (json['current_lat'] as num?)?.toDouble(),
-        currentLng: (json['current_lng'] as num?)?.toDouble(),
-        averageRating: (json['average_rating'] as num? ?? 0).toDouble(),
-        isOnline: json['is_online'] as bool? ?? false,
-      );
+  factory CourierModel.fromJson(Map<String, dynamic> json) {
+    final userMap = _toMap(json['user']);
+    return CourierModel(
+      id: _toInt(json['id']),
+      name: json['name']?.toString() ?? userMap?['name']?.toString() ?? '',
+      photoUrl: GoLivreurEnv.resolveMediaUrl(json['photo_url']?.toString()),
+      currentLat: _toNullableDouble(json['current_lat']),
+      currentLng: _toNullableDouble(json['current_lng']),
+      averageRating: _toDouble(json['average_rating']),
+      isOnline: _toBool(json['is_online'], false),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -571,12 +698,12 @@ class NotificationModel {
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) =>
       NotificationModel(
-        id: json['id'] as int,
-        type: json['type'] as String,
-        title: json['title'] as String,
-        body: json['body'] as String,
-        isRead: json['is_read'] as bool? ?? false,
-        data: json['data'] as Map<String, dynamic>?,
-        createdAt: DateTime.parse(json['created_at'] as String),
+        id: _toInt(json['id']),
+        type: json['type']?.toString() ?? 'system',
+        title: json['title']?.toString() ?? '',
+        body: json['body']?.toString() ?? '',
+        isRead: _toBool(json['is_read'], false),
+        data: _toMap(json['data']),
+        createdAt: _toDateTime(json['created_at']),
       );
 }

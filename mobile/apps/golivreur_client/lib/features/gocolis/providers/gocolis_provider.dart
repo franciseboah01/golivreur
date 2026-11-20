@@ -40,3 +40,20 @@ final singleParcelProvider =
 
   throw Exception('Colis #$parcelId introuvable.');
 });
+
+/// Récupère le véritable code expéditeur à 4 chiffres (D-CODE-1).
+final parcelSenderCodeProvider =
+    FutureProvider.family<String?, int>((ref, parcelId) async {
+  final api = ref.watch(apiClientProvider);
+  try {
+    final res = await api.get('/client/parcels/$parcelId/sender-code');
+    if (res.statusCode == 200 &&
+        res.data is Map &&
+        res.data['succes'] == true &&
+        res.data['donnees'] is Map) {
+      final code = res.data['donnees']['sender_code']?.toString().trim();
+      if (code != null && code.isNotEmpty) return code;
+    }
+  } catch (_) {}
+  return null;
+});

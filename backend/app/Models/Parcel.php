@@ -35,13 +35,22 @@ class Parcel extends Model
         'sender_code', 'sender_code_enc', 'recipient_code',
     ];
 
+    protected $appends = [
+        'size_label',
+    ];
+
     protected $casts = [
         'has_insurance' => 'boolean',
+        'weight_kg' => 'float',
         'insurance_amount' => 'integer',
         'declared_value' => 'integer',
         'shipping_fee' => 'integer',
         'platform_commission' => 'integer',
         'courier_amount' => 'integer',
+        'pickup_lat' => 'float',
+        'pickup_lng' => 'float',
+        'delivery_lat' => 'float',
+        'delivery_lng' => 'float',
         'distance_km' => 'float',
         'sender_code_locked' => 'boolean',
         'recipient_code_locked' => 'boolean',
