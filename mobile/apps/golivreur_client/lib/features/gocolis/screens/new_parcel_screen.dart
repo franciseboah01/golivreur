@@ -745,10 +745,13 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
 
     final effectivePickupLat = _pickupLat ?? weather.centerLat;
     final effectivePickupLng = _pickupLng ?? weather.centerLng;
-    final effectiveDeliveryLat =
-        neighborhood.lat != 0.0 ? neighborhood.lat : weather.centerLat;
-    final effectiveDeliveryLng =
-        neighborhood.lng != 0.0 ? neighborhood.lng : weather.centerLng;
+    // N'envoyer delivery_lat/delivery_lng que si le quartier sélectionné possède un vrai GPS :
+    // pour un quartier sans GPS (non référencé), le serveur utilise sa distance estimée (distance_km)
+    // sans fausser le tarif vers un centre-ville ou un bureau excentré.
+    final hasRealNeighborhoodGps =
+        neighborhood.lat != 0.0 && neighborhood.lng != 0.0;
+    final effectiveDeliveryLat = hasRealNeighborhoodGps ? neighborhood.lat : null;
+    final effectiveDeliveryLng = hasRealNeighborhoodGps ? neighborhood.lng : null;
 
     try {
       final fields = <String, dynamic>{

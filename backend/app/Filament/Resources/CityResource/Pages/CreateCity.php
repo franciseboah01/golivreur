@@ -5,6 +5,7 @@ namespace App\Filament\Resources\CityResource\Pages;
 use App\Filament\Resources\CityResource;
 use App\Filament\Support\FilamentCityScope;
 use App\Models\City;
+use App\Services\IvoryCoastGeocodingService;
 use App\Services\SettingsService;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -24,6 +25,18 @@ class CreateCity extends CreateRecord
             ? trim($data['support_phone'])
             : null;
         unset($data['support_phone']);
+
+        // Si l'admin n'a pas saisi ni pointé de GPS, tente un géocodage officiel automatique en Côte d'Ivoire.
+        // En cas d'échec ou hors-ligne, laisse null (aucun utilisateur ne sera bloqué).
+        $hasLat = isset($data['center_lat']) && $data['center_lat'] !== '';
+        $hasLng = isset($data['center_lng']) && $data['center_lng'] !== '';
+        if (! $hasLat && ! $hasLng && ! empty($data['name']) && is_string($data['name'])) {
+            $found = app(IvoryCoastGeocodingService::class)->geocodeCity($data['name']);
+            if ($found !== null) {
+                $data['center_lat'] = $found['lat'];
+                $data['center_lng'] = $found['lng'];
+            }
+        }
 
         return $data;
     }

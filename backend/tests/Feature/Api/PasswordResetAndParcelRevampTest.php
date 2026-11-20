@@ -11,10 +11,12 @@ use App\Models\ParcelPhoto;
 use App\Models\User;
 use App\Services\Auth\PasswordResetService;
 use App\Services\FirebasePhoneAuthService;
+use App\Services\IvoryCoastGeocodingService;
 use App\Services\SettingsService;
 use App\Services\SmsService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -371,4 +373,109 @@ it('accepte les coordonnées dans un rayon élargi de 45 km ou proche d\'un quar
 
     $errorMsg = (string) ($res->json('errors.pickup_lat.0') ?? '');
     expect($errorMsg)->toContain('Abidjan')->toContain('Daloa');
+});
+
+// ─── GÉOCODAGE CÔTE D'IVOIRE + QUARTIERS NON RÉFÉRENCÉS SANS GPS ─────────────
+
+it('valide les bornes Côte d\'Ivoire, détecte l\'oubli du signe moins et filtre les homonymes hors ville', function () {
+    $geo = app(IvoryCoastGeocodingService::class);
+
+    // 1. Laisser vide est toujours valide
+    expect($geo->validateCoordinates(null, null))->toBeNull();
+
+    // 2. Coordonnées valides de Sirasso
+    expect($geo->validateCoordinates(9.4580, -6.2080))->toBeNull();
+
+    // 3. Oubli du signe « - » sur la longitude -> message explicite avec correction suggérée
+    $signError = $geo->validateCoordinates(9.4580, 6.2080);
+    expect($signError)->not->toBeNull()->toContain('-6.208000');
+
+    // 4. Hors Côte d'Ivoire (Paris) -> rejeté
+    expect($geo->validateCoordinates(48.8566, 2.3522))->not->toBeNull();
+
+    // 5. Quartier trop loin de sa ville parente -> rejeté
+    $sirasso = City::factory()->create([
+        'name' => 'Sirasso',
+        'center_lat' => 9.4580,
+        'center_lng' => -6.2080,
+    ]);
+    expect($geo->validateNeighborhoodWithinCity($sirasso, 5.3600, -4.0083))
+        ->not->toBeNull()
+        ->toContain('Sirasso');
+
+    // 6. Géocodage Nominatim ville + filtrage d'homonyme hors ville pour un quartier
+    Http::fake([
+        'nominatim.openstreetmap.org/*' => Http::sequence()
+            ->push([
+                [
+                    'lat' => '9.4581',
+                    'lon' => '-6.2086',
+                    'type' => 'town',
+                    'category' => 'place',
+                    'display_name' => 'Sirasso, Savanes, Côte d\'Ivoire',
+                ],
+            ], 200)
+            ->push([
+                // Homonyme à Abidjan (~460 km de Sirasso) -> doit être ignoré !
+                [
+                    'lat' => '5.3600',
+                    'lon' => '-4.0083',
+                    'type' => 'suburb',
+                    'display_name' => 'Commerce, Abidjan, Côte d\'Ivoire',
+                ],
+            ], 200),
+    ]);
+
+    $cityResult = $geo->geocodeCity('Sirasso');
+    expect($cityResult)->not->toBeNull()
+        ->and($cityResult['lat'])->toBe(9.4581)
+        ->and($cityResult['lng'])->toBe(-6.2086);
+
+    $homonymResult = $geo->geocodeNeighborhood('Commerce', 'Sirasso', 9.4581, -6.2086);
+    expect($homonymResult)->toBeNull();
+});
+
+it('calcule un tarif fiable via distance_km pour un quartier non référencé sans GPS (sans dérive vers le centre-ville)', function () {
+    $sirasso = City::factory()->create([
+        'name' => 'Sirasso',
+        'is_active' => true,
+        'center_lat' => 9.4580,
+        'center_lng' => -6.2080,
+    ]);
+
+    // Quartier local non présent sur OpenStreetMap (lat/lng null, distance forfaitaire 4.0 km)
+    $unmappedNb = Neighborhood::create([
+        'city_id' => $sirasso->id,
+        'name' => 'Quartier Château',
+        'is_active' => true,
+        'distance_km' => 4.0,
+        'lat' => null,
+        'lng' => null,
+    ]);
+
+    $client = User::factory()->create([
+        'role' => 'client',
+        'city_id' => $sirasso->id,
+        'is_active' => true,
+    ]);
+    $token = JWTAuth::fromUser($client);
+
+    // Le client ramasse à ~11 km au nord du centre-ville, mais choisit un quartier sans GPS (4.0 km)
+    $res = $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson('/api/v1/client/parcels', [
+            'recipient_name' => 'Coulibaly Fatou',
+            'recipient_phone' => '0705060708',
+            'neighborhood_id' => $unmappedNb->id,
+            'pickup_lat' => 9.5580,
+            'pickup_lng' => -6.2080,
+            'size' => 'petit',
+            'payment_method' => 'cash',
+        ]);
+
+    $res->assertCreated()
+        ->assertJsonPath('succes', true);
+
+    $parcel = Parcel::findOrFail($res->json('donnees.id'));
+    // Distance facturée = 4.0 km (forfait du quartier) et NON 11.1 km vers le centre-ville !
+    expect((float) $parcel->distance_km)->toBe(4.0);
 });

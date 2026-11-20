@@ -88,10 +88,15 @@ class ParcelService
             }
 
             // Vérification coordonnées de ramassage et livraison dans la ville
-            $pickupLat = isset($donnees['pickup_lat']) ? (float) $donnees['pickup_lat'] : (float) ($city->center_lat ?? 6.8770);
-            $pickupLng = isset($donnees['pickup_lng']) ? (float) $donnees['pickup_lng'] : (float) ($city->center_lng ?? -6.4502);
-            $deliveryLat = isset($donnees['delivery_lat']) ? (float) $donnees['delivery_lat'] : (float) ($city->center_lat ?? 6.8770);
-            $deliveryLng = isset($donnees['delivery_lng']) ? (float) $donnees['delivery_lng'] : (float) ($city->center_lng ?? -6.4502);
+            $hasRealPickup = isset($donnees['pickup_lat'], $donnees['pickup_lng'])
+                && ! (abs((float) $donnees['pickup_lat']) < 0.0001 && abs((float) $donnees['pickup_lng']) < 0.0001);
+            $hasRealDelivery = isset($donnees['delivery_lat'], $donnees['delivery_lng'])
+                && ! (abs((float) $donnees['delivery_lat']) < 0.0001 && abs((float) $donnees['delivery_lng']) < 0.0001);
+
+            $pickupLat = $hasRealPickup ? (float) $donnees['pickup_lat'] : (float) ($city->center_lat ?? 6.8770);
+            $pickupLng = $hasRealPickup ? (float) $donnees['pickup_lng'] : (float) ($city->center_lng ?? -6.4502);
+            $deliveryLat = $hasRealDelivery ? (float) $donnees['delivery_lat'] : (float) ($city->center_lat ?? 6.8770);
+            $deliveryLng = $hasRealDelivery ? (float) $donnees['delivery_lng'] : (float) ($city->center_lng ?? -6.4502);
 
             if (! $city->estDansLaVille($pickupLat, $pickupLng)) {
                 throw ValidationException::withMessages([
@@ -105,19 +110,25 @@ class ParcelService
                 ]);
             }
 
-            // Calcul distance serveur Haversine entre pickup et delivery (coef routier approché CDC = 1.0)
-            $haversineDistance = City::distanceHaversine(
-                $pickupLat,
-                $pickupLng,
-                $deliveryLat,
-                $deliveryLng
-            );
+            // Calcul distance serveur : GPS-à-GPS uniquement si le point de livraison possède un vrai GPS ;
+            // sinon on utilise la distance estimée du quartier (distance_km) afin de ne jamais fausser le prix vers le centre-ville.
             $fallbackDistance = isset($donnees['distance_km']) && (float) $donnees['distance_km'] > 0
                 ? (float) $donnees['distance_km']
-                : 0.1;
-            $distanceKm = $haversineDistance > 0.05
-                ? max(0.1, round($haversineDistance * 1.0, 2))
-                : max(0.1, round($fallbackDistance, 2));
+                : 2.0;
+
+            if ($hasRealPickup && $hasRealDelivery) {
+                $haversineDistance = City::distanceHaversine(
+                    $pickupLat,
+                    $pickupLng,
+                    $deliveryLat,
+                    $deliveryLng
+                );
+                $distanceKm = $haversineDistance > 0.05
+                    ? max(0.1, round($haversineDistance * 1.0, 2))
+                    : max(0.1, round($fallbackDistance, 2));
+            } else {
+                $distanceKm = max(0.1, round($fallbackDistance, 2));
+            }
 
             // Calculer les frais d'expédition avec la distance réelle et $city (Point 4)
             $fraisExpedition = $this->commissionService->calculerFraisExpedition(

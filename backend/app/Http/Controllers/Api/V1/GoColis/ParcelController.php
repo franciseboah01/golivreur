@@ -107,13 +107,19 @@ class ParcelController extends Controller
             if (empty($validated['delivery_address'])) {
                 $validated['delivery_address'] = $neighborhood->name;
             }
-            if (! isset($validated['delivery_lat']) && $neighborhood->lat !== null) {
-                $validated['delivery_lat'] = (float) $neighborhood->lat;
+            $nbHasGps = $neighborhood->lat !== null
+                && $neighborhood->lng !== null
+                && ! (abs((float) $neighborhood->lat) < 0.0001 && abs((float) $neighborhood->lng) < 0.0001);
+
+            if ($nbHasGps) {
+                if (! isset($validated['delivery_lat'])) {
+                    $validated['delivery_lat'] = (float) $neighborhood->lat;
+                }
+                if (! isset($validated['delivery_lng'])) {
+                    $validated['delivery_lng'] = (float) $neighborhood->lng;
+                }
             }
-            if (! isset($validated['delivery_lng']) && $neighborhood->lng !== null) {
-                $validated['delivery_lng'] = (float) $neighborhood->lng;
-            }
-            if (! isset($validated['distance_km']) && $neighborhood->distance_km !== null) {
+            if ($neighborhood->distance_km !== null && (float) $neighborhood->distance_km > 0 && (! isset($validated['distance_km']) || ! $nbHasGps)) {
                 $validated['distance_km'] = (float) $neighborhood->distance_km;
             }
         } elseif (empty($validated['delivery_address']) && ! empty($validated['delivery_neighborhood'])) {

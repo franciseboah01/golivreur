@@ -7,8 +7,12 @@ use App\Filament\Resources\CityResource\RelationManagers\NeighborhoodsRelationMa
 use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\City;
+use App\Services\IvoryCoastGeocodingService;
+use Closure;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -73,31 +77,111 @@ class CityResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Configuration Géographique')
+                    ->description('Saisissez le nom de la ville puis cliquez sur la loupe pour localiser automatiquement son vrai centre-ville (sans jamais utiliser la position d\'un bureau excentré).')
                     ->schema([
                         Forms\Components\TextInput::make('name')
                             ->label('Nom officiel de la ville')
+                            ->placeholder('Ex: Sirasso, Daloa, Korhogo, Abidjan...')
                             ->required()
-                            ->maxLength(100),
+                            ->maxLength(100)
+                            ->suffixAction(
+                                Forms\Components\Actions\Action::make('locateCity')
+                                    ->label('Localiser')
+                                    ->icon('heroicon-m-magnifying-glass')
+                                    ->tooltip('Trouver automatiquement le centre officiel de la ville en Côte d\'Ivoire (OpenStreetMap)')
+                                    ->action(function (?string $state, Set $set): void {
+                                        $query = trim((string) $state);
+                                        if ($query === '') {
+                                            Notification::make()
+                                                ->title('Saisissez d\'abord le nom de la ville.')
+                                                ->warning()
+                                                ->send();
+
+                                            return;
+                                        }
+
+                                        $found = app(IvoryCoastGeocodingService::class)->geocodeCity($query);
+                                        if ($found === null) {
+                                            Notification::make()
+                                                ->title("Ville « {$query} » introuvable automatiquement")
+                                                ->body('Cliquez directement sur le centre de la ville sur la carte (mode Plan ou Satellite), ou laissez les coordonnées vides (aucun utilisateur ne sera bloqué).')
+                                                ->warning()
+                                                ->send();
+
+                                            return;
+                                        }
+
+                                        $set('center_lat', $found['lat']);
+                                        $set('center_lng', $found['lng']);
+
+                                        Notification::make()
+                                            ->title("Centre-ville trouvé : {$query}")
+                                            ->body("{$found['display_name']} ({$found['lat']}, {$found['lng']}). Vérifiez sur la carte que le cercle orange englobe toute la ville.")
+                                            ->success()
+                                            ->send();
+                                    }),
+                            ),
                         Forms\Components\Toggle::make('is_active')
-                            ->label('Ville ouverte au service GoLivreur'),
+                            ->label('Ville ouverte au service GoLivreur')
+                            ->default(true),
+
+                        Forms\Components\View::make('filament.components.gps-map-picker')
+                            ->viewData(function (Forms\Components\View $component): array {
+                                $prefix = $component->getContainer()->getStatePath();
+                                $latPath = $prefix !== '' ? "{$prefix}.center_lat" : 'center_lat';
+                                $lngPath = $prefix !== '' ? "{$prefix}.center_lng" : 'center_lng';
+
+                                return [
+                                    'mode' => 'city',
+                                    'latPath' => $latPath,
+                                    'lngPath' => $lngPath,
+                                    'defaultLat' => 7.539989,
+                                    'defaultLng' => -5.547080,
+                                    'defaultZoom' => 6,
+                                    'radiusMeters' => (int) (City::RAYON_MAX_VILLE_KM * 1000),
+                                    'defaultLayer' => 'plan',
+                                ];
+                            })
+                            ->columnSpanFull(),
+
                         Forms\Components\TextInput::make('center_lat')
-                            ->label('Latitude GPS du centre')
-                            ->placeholder('Ex: 6.8770 (Daloa) ou 9.4580 (Sirasso)')
-                            ->helperText('En Côte d\'Ivoire, la latitude est positive (entre 4.3 et 10.7).')
+                            ->label('Latitude GPS du centre (rempli automatiquement)')
+                            ->placeholder('Ex: 9.4580 (Sirasso) ou 6.8770 (Daloa)')
+                            ->helperText('Facultatif — Côte d\'Ivoire : entre 4.2 et 10.85. Laisser vide ne bloque aucun client.')
                             ->numeric()
-                            ->minValue(-90.0)
-                            ->maxValue(90.0)
                             ->step(0.000001)
-                            ->nullable(),
+                            ->nullable()
+                            ->live(onBlur: true)
+                            ->rule(function (Get $get): Closure {
+                                return function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                                    $lat = ($value === null || $value === '') ? null : (float) $value;
+                                    $rawLng = $get('center_lng');
+                                    $lng = ($rawLng === null || $rawLng === '') ? null : (float) $rawLng;
+                                    $error = app(IvoryCoastGeocodingService::class)->validateCoordinates($lat, $lng);
+                                    if ($error !== null) {
+                                        $fail($error);
+                                    }
+                                };
+                            }),
                         Forms\Components\TextInput::make('center_lng')
-                            ->label('Longitude GPS du centre')
-                            ->placeholder('Ex: -6.4502 (Daloa) ou -6.2080 (Sirasso)')
-                            ->helperText('ATTENTION : en Côte d\'Ivoire, la longitude est TOUJOURS NÉGATIVE (avec le signe « - », entre -8.6 et -2.5).')
+                            ->label('Longitude GPS du centre (rempli automatiquement)')
+                            ->placeholder('Ex: -6.2080 (Sirasso) ou -6.4502 (Daloa)')
+                            ->helperText('Facultatif — Côte d\'Ivoire : TOUJOURS NÉGATIVE (entre -8.7 et -2.4, avec le signe « - »).')
                             ->numeric()
-                            ->minValue(-180.0)
-                            ->maxValue(180.0)
                             ->step(0.000001)
-                            ->nullable(),
+                            ->nullable()
+                            ->live(onBlur: true)
+                            ->rule(function (Get $get): Closure {
+                                return function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                                    $rawLat = $get('center_lat');
+                                    $lat = ($rawLat === null || $rawLat === '') ? null : (float) $rawLat;
+                                    $lng = ($value === null || $value === '') ? null : (float) $value;
+                                    $error = app(IvoryCoastGeocodingService::class)->validateCoordinates($lat, $lng);
+                                    if ($error !== null) {
+                                        $fail($error);
+                                    }
+                                };
+                            }),
                         Forms\Components\TextInput::make('support_phone')
                             ->label('Numéro de service / Support client de la ville')
                             ->placeholder('Ex: +225 07 01 02 03 04 ou 0701020304')
@@ -143,11 +227,11 @@ class CityResource extends Resource
                     ->badge()
                     ->color('info'),
 
-                Tables\Columns\TextColumn::make('center_lat')
+                Tables\Columns\TextColumn::make('center_gps')
                     ->label('Centre GPS (Lat, Lng)')
-                    ->formatStateUsing(fn (City $record): string => $record->center_lat !== null && $record->center_lng !== null
+                    ->state(fn (City $record): string => $record->center_lat !== null && $record->center_lng !== null
                         ? number_format((float) $record->center_lat, 4, '.', '').', '.number_format((float) $record->center_lng, 4, '.', '')
-                        : 'Non défini')
+                        : 'Non défini (OK)')
                     ->color(fn (City $record): string => ($record->center_lng !== null && (float) $record->center_lng > 0) ? 'danger' : 'gray')
                     ->toggleable(),
 
