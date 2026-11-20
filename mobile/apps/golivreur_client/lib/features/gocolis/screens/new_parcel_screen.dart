@@ -11,10 +11,18 @@ import 'package:image_picker/image_picker.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../goshop/providers/goshop_provider.dart';
 import '../providers/gocolis_provider.dart';
+import '../providers/parcel_draft_recovery.dart';
 import 'parcel_tracking_screen.dart';
 
 class NewParcelScreen extends ConsumerStatefulWidget {
-  const NewParcelScreen({super.key});
+  final ParcelDraftData? recoveredDraft;
+  final XFile? recoveredPhoto;
+
+  const NewParcelScreen({
+    super.key,
+    this.recoveredDraft,
+    this.recoveredPhoto,
+  });
 
   @override
   ConsumerState<NewParcelScreen> createState() => _NewParcelScreenState();
@@ -34,6 +42,8 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
   bool _locatingPickup = false;
 
   DeliveryNeighborhood? _selectedNeighborhood;
+  int? _pendingNeighborhoodId;
+  String? _pendingNeighborhoodName;
   String? _selectedSize; // petit | moyen | grand (obligatoire)
   String _selectedPaymentMethod = 'cash';
 
@@ -45,19 +55,117 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
   @override
   void initState() {
     super.initState();
+
+    final draft = widget.recoveredDraft;
+    if (draft != null) {
+      _recipientNameController.text = draft.recipientName;
+      _recipientPhoneController.text = draft.recipientPhone;
+      _descriptionController.text = draft.description;
+      _declaredValueController.text = draft.declaredValue;
+      _selectedSize = draft.selectedSize;
+      _selectedPaymentMethod = draft.selectedPaymentMethod;
+      _pickupLat = draft.pickupLat;
+      _pickupLng = draft.pickupLng;
+      _pickupAddressText = draft.pickupAddressText;
+      _pendingNeighborhoodId = draft.neighborhoodId;
+      _pendingNeighborhoodName = draft.neighborhoodName;
+    }
+
     _recipientNameController.addListener(_onRequiredFieldChanged);
     _recipientPhoneController.addListener(_onRequiredFieldChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 1. Auto-actualisation GPS de ramassage dès l'entrée sur la page
-      _detectPickupGps(silent: true);
+      // Efface le brouillon de récupération dès qu'il a été restauré en mémoire
+      if (draft != null) {
+        ParcelDraftRecovery.clearDraft(ref.read(secureStorageProvider));
+      }
+
+      if (widget.recoveredPhoto != null) {
+        _loadPhotoFile(widget.recoveredPhoto!, showRestoredNotice: true);
+      } else {
+        _checkLostPhotoInScreen();
+      }
+
+      // 1. Auto-actualisation GPS de ramassage dès l'entrée sur la page (si pas déjà restauré)
+      if (_pickupLat == null || _pickupLng == null) {
+        _detectPickupGps(silent: true);
+      }
 
       // 2. S'assurer que la liste dynamique des quartiers (API Admin) est à jour
       final weather = ref.read(weatherProvider);
       if (weather.neighborhoods.isEmpty) {
         ref.read(weatherProvider.notifier).chargerStatutVille();
+      } else {
+        _applyPendingNeighborhood(weather.neighborhoods);
       }
     });
+  }
+
+  void _applyPendingNeighborhood(List<DeliveryNeighborhood> neighborhoods) {
+    if (_selectedNeighborhood != null) return;
+    if (_pendingNeighborhoodId == null && _pendingNeighborhoodName == null) {
+      return;
+    }
+    for (final n in neighborhoods) {
+      if ((_pendingNeighborhoodId != null && n.id == _pendingNeighborhoodId) ||
+          (_pendingNeighborhoodName != null &&
+              n.name == _pendingNeighborhoodName)) {
+        if (mounted) {
+          setState(() {
+            _selectedNeighborhood = n;
+            _pendingNeighborhoodId = null;
+            _pendingNeighborhoodName = null;
+          });
+        }
+        return;
+      }
+    }
+  }
+
+  Future<void> _checkLostPhotoInScreen() async {
+    final lost = await ParcelDraftRecovery.retrieveLostCameraPhoto();
+    if (lost != null && mounted && _parcelPhotoFile == null) {
+      await _loadPhotoFile(lost, showRestoredNotice: true);
+    }
+  }
+
+  Future<void> _loadPhotoFile(
+    XFile file, {
+    bool showRestoredNotice = false,
+  }) async {
+    try {
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _parcelPhotoFile = file;
+        _parcelPhotoBytes = bytes;
+      });
+      if (showRestoredNotice) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo du colis enregistrée avec succès !'),
+            backgroundColor: GoLivreurTheme.secondaire,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  ParcelDraftData _buildCurrentDraft() {
+    return ParcelDraftData(
+      recipientName: _recipientNameController.text,
+      recipientPhone: _recipientPhoneController.text,
+      neighborhoodId: _selectedNeighborhood?.id ?? _pendingNeighborhoodId,
+      neighborhoodName: _selectedNeighborhood?.name ?? _pendingNeighborhoodName,
+      description: _descriptionController.text,
+      declaredValue: _declaredValueController.text,
+      selectedSize: _selectedSize,
+      selectedPaymentMethod: _selectedPaymentMethod,
+      pickupLat: _pickupLat,
+      pickupLng: _pickupLng,
+      pickupAddressText: _pickupAddressText,
+      savedAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
   }
 
   void _onRequiredFieldChanged() {
@@ -195,21 +303,25 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
   }
 
   Future<void> _pickParcelPhoto(ImageSource source) async {
+    final storage = ref.read(secureStorageProvider);
+    // Persiste le brouillon AVANT d'ouvrir l'appareil photo Android :
+    // si l'OS tue MainActivity par manque de RAM pendant la prise de photo,
+    // tout le formulaire + la photo seront restaurés automatiquement au retour.
+    await ParcelDraftRecovery.saveDraft(storage, _buildCurrentDraft());
+
     try {
       final picked = await _imagePicker.pickImage(
         source: source,
-        maxWidth: 1280,
-        maxHeight: 1280,
-        imageQuality: 82,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 75,
+        requestFullMetadata: false,
       );
+      await ParcelDraftRecovery.clearDraft(storage);
       if (picked == null) return;
-      final bytes = await picked.readAsBytes();
-      if (!mounted) return;
-      setState(() {
-        _parcelPhotoFile = picked;
-        _parcelPhotoBytes = bytes;
-      });
+      await _loadPhotoFile(picked);
     } catch (_) {
+      await ParcelDraftRecovery.clearDraft(storage);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -409,6 +521,7 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
                                 _parcelPhotoBytes!,
                                 width: 64,
                                 height: 64,
+                                cacheWidth: 256,
                                 fit: BoxFit.cover,
                               ),
                             ),
@@ -722,6 +835,19 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
           break;
         }
       }
+    } else if (neighborhoods.isNotEmpty &&
+        (_pendingNeighborhoodId != null || _pendingNeighborhoodName != null)) {
+      for (final n in neighborhoods) {
+        if ((_pendingNeighborhoodId != null && n.id == _pendingNeighborhoodId) ||
+            (_pendingNeighborhoodName != null &&
+                n.name == _pendingNeighborhoodName)) {
+          validDropdownValue = n;
+          break;
+        }
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _applyPendingNeighborhood(neighborhoods);
+      });
     }
 
     return Scaffold(
@@ -845,6 +971,9 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
                     const SizedBox(height: 12),
                     if (neighborhoods.isNotEmpty)
                       DropdownButtonFormField<DeliveryNeighborhood>(
+                        key: ValueKey(
+                          'nb_${validDropdownValue?.id ?? validDropdownValue?.name ?? "none"}',
+                        ),
                         initialValue: validDropdownValue,
                         isExpanded: true,
                         decoration: InputDecoration(
@@ -977,6 +1106,7 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
                                 _parcelPhotoBytes!,
                                 width: 72,
                                 height: 72,
+                                cacheWidth: 256,
                                 fit: BoxFit.cover,
                               ),
                             ),

@@ -10,6 +10,7 @@ import 'package:golivreur_client/features/auth/providers/auth_provider.dart'
     as auth_api;
 import 'package:golivreur_client/features/auth/screens/login_screen.dart';
 import 'package:golivreur_client/features/gocolis/providers/gocolis_provider.dart';
+import 'package:golivreur_client/features/gocolis/providers/parcel_draft_recovery.dart';
 import 'package:golivreur_client/features/gocolis/screens/new_parcel_screen.dart';
 import 'package:golivreur_client/features/goshop/providers/goshop_provider.dart';
 import 'package:golivreur_client/features/goshop/providers/order_provider.dart';
@@ -49,6 +50,19 @@ class _FakeSecureStorage extends Fake implements FlutterSecureStorage {
     } else {
       _data[key] = value;
     }
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    IOSOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    MacOsOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    _data.remove(key);
   }
 
   @override
@@ -211,6 +225,47 @@ void main() {
     await tester.pump();
     final ElevatedButton submitBtn = tester.widget(submitBtnFinder);
     expect(submitBtn.onPressed, isNull);
+  });
+
+  testWidgets(
+      'NewParcelScreen - restaure intégralement le brouillon après recréation d\'activité Android (caméra)',
+      (WidgetTester tester) async {
+    final draft = ParcelDraftData(
+      recipientName: 'Koné Mariam',
+      recipientPhone: '0709000001',
+      neighborhoodId: 10,
+      neighborhoodName: 'Commerce',
+      description: 'Chaussures neuves',
+      declaredValue: '25000',
+      selectedSize: 'moyen',
+      selectedPaymentMethod: 'wave',
+      pickupLat: 6.8780,
+      pickupLng: -6.4500,
+      pickupAddressText: 'Tazibouo, Daloa',
+      savedAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _fakeClientOverrides(),
+        child: MaterialApp(
+          home: NewParcelScreen(recoveredDraft: draft),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Koné Mariam'), findsOneWidget);
+    expect(find.text('0709000001'), findsOneWidget);
+    expect(find.text('Commerce'), findsOneWidget);
+    expect(find.text('Chaussures neuves'), findsOneWidget);
+    // Tous les champs obligatoires étant restaurés, le bouton de validation doit être actif !
+    final submitBtnFinder = find.byType(ElevatedButton);
+    await tester.ensureVisible(submitBtnFinder.last);
+    await tester.pump();
+    final ElevatedButton submitBtn = tester.widget(submitBtnFinder.last);
+    expect(submitBtn.onPressed, isNotNull);
   });
 
   testWidgets('MainNavigationScreen - affiche la barre avec 4 onglets',

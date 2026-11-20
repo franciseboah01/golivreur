@@ -4,6 +4,7 @@ import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/gocolis/providers/parcel_draft_recovery.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 
 Future<void> main() async {
@@ -65,8 +66,23 @@ class _ClientRootGateState extends ConsumerState<ClientRootGate> {
       await ref.read(authProvider.notifier).initialiserSessionAuDemarrage();
     } catch (_) {}
 
+    // Si Android a détruit l'activité pendant la prise de photo colis (faible RAM),
+    // on récupère immédiatement la photo + le brouillon et on saute le Splash Screen.
+    bool recoveredFromCamera = false;
+    try {
+      final recovery = await ParcelDraftRecovery.checkPendingRecovery(
+        ref.read(secureStorageProvider),
+      );
+      recoveredFromCamera = recovery != null;
+    } catch (_) {}
+
     if (mounted) {
-      setState(() => _bootCompleted = true);
+      setState(() {
+        _bootCompleted = true;
+        if (recoveredFromCamera) {
+          _splashFinished = true;
+        }
+      });
     }
 
     // Vérifie un éventuel Deep Link SSO entrant sans jamais bloquer le démarrage

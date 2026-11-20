@@ -6,7 +6,9 @@ import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../goshop/providers/goshop_provider.dart';
 import '../../goshop/screens/goshop_home_screen.dart';
+import '../../gocolis/providers/parcel_draft_recovery.dart';
 import '../../gocolis/screens/gocolis_home_screen.dart';
+import '../../gocolis/screens/new_parcel_screen.dart';
 import '../../orders/screens/orders_tracking_history_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 
@@ -39,6 +41,19 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.syncTokenWithBackend(ref.read(apiClientProvider));
+
+      final recovery = ParcelDraftRecovery.takePendingRecovery();
+      if (recovery != null && mounted) {
+        setState(() => _currentIndex = 1);
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => NewParcelScreen(
+              recoveredDraft: recovery.draft,
+              recoveredPhoto: recovery.photo,
+            ),
+          ),
+        );
+      }
     });
 
     _pushMsgSub = PushNotificationService.onForegroundMessage.listen((_) {

@@ -219,9 +219,10 @@ class ProfileAvatarPicker extends StatelessWidget {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
         source: source,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 85,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 75,
+        requestFullMetadata: false,
       );
 
       if (picked == null) return;
