@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\ConfirmPasswordResetRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterDriverRequest;
 use App\Http\Requests\Auth\RegisterMerchantRequest;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\RequestPasswordResetRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Jobs\SendPushNotification;
 use App\Models\City;
@@ -18,6 +20,7 @@ use App\Models\User;
 use App\Models\VehicleType;
 use App\Models\Wallet;
 use App\Services\ActivityLogService;
+use App\Services\Auth\PasswordResetService;
 use App\Services\FirebasePhoneAuthService;
 use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
@@ -806,6 +809,58 @@ class AuthController extends Controller
                 'user' => $this->formatUserPayload($user),
             ],
         ]);
+    }
+
+    /**
+     * Mot de passe oublié — Étape 1 : demande ou renvoi d'un OTP de réinitialisation.
+     */
+    public function requestPasswordReset(
+        RequestPasswordResetRequest $request,
+        PasswordResetService $passwordResetService,
+    ): JsonResponse {
+        $result = $passwordResetService->requestReset(
+            phone: (string) $request->validated('phone'),
+            useFirebaseOtp: $request->boolean('use_firebase_otp'),
+            ip: $request->ip(),
+        );
+
+        return response()->json($result['payload'], $result['status']);
+    }
+
+    /**
+     * Mot de passe oublié — Étape 2 : vérifie l'OTP (max 2 essais, 5 min) et réinitialise le mot de passe.
+     */
+    public function confirmPasswordReset(
+        ConfirmPasswordResetRequest $request,
+        PasswordResetService $passwordResetService,
+    ): JsonResponse {
+        $validated = $request->validated();
+
+        $result = $passwordResetService->confirmReset(
+            phone: (string) $validated['phone'],
+            newPassword: (string) $validated['password'],
+            code: isset($validated['code']) ? (string) $validated['code'] : null,
+            firebaseIdToken: isset($validated['firebase_id_token']) ? (string) $validated['firebase_id_token'] : null,
+            ip: $request->ip(),
+        );
+
+        return response()->json($result['payload'], $result['status']);
+    }
+
+    /**
+     * Mot de passe oublié — Enregistre côté serveur un échec OTP détecté sur le SDK Firebase mobile
+     * afin de garantir le blocage strict après 2 essais.
+     */
+    public function recordPasswordResetFailure(
+        RequestPasswordResetRequest $request,
+        PasswordResetService $passwordResetService,
+    ): JsonResponse {
+        $result = $passwordResetService->recordFailedAttempt(
+            phone: (string) $request->validated('phone'),
+            ip: $request->ip(),
+        );
+
+        return response()->json($result['payload'], $result['status']);
     }
 
     /**

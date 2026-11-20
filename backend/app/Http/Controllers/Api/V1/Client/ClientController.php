@@ -434,6 +434,10 @@ class ClientController extends Controller
 
         $isRainMode = (bool) ($city->rain_mode_active ?? false);
         $branding = $settingsService->getBranding();
+        $contenus = $settingsService->get('contenus', $city?->id);
+        $supportPhone = is_array($contenus) && is_string($contenus['support_whatsapp'] ?? null) && trim($contenus['support_whatsapp']) !== ''
+            ? trim($contenus['support_whatsapp'])
+            : (string) SettingsService::DEFAULTS['contenus']['support_whatsapp'];
 
         $neighborhoods = $city
             ? Neighborhood::query()
@@ -465,6 +469,7 @@ class ClientController extends Controller
                 'bareme' => $tarifs['bareme'] ?? $defaultBareme,
                 'tarifs_colis' => is_array($tarifsColis) ? $tarifsColis : $defaultTarifsColis,
                 'neighborhoods' => $neighborhoods,
+                'support_phone' => $supportPhone,
                 'app_logo_url' => $branding['logo_url'],
                 'app_default_emoji' => $branding['default_emoji'],
             ],

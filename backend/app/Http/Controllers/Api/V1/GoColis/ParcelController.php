@@ -8,6 +8,7 @@ use App\Http\Requests\Concerns\NormalizesIvorianPhone;
 use App\Models\City;
 use App\Models\Neighborhood;
 use App\Models\Parcel;
+use App\Models\ParcelPhoto;
 use App\Modules\GoColis\Services\ParcelService;
 use App\Services\ConfirmationCodeService;
 use App\Services\CourierLocationPollingService;
@@ -37,25 +38,87 @@ class ParcelController extends Controller
 
     public function store(Request $request, ParcelService $service): JsonResponse
     {
-        $cityId = auth()->user()?->city_id;
-        $activeModes = PaymentMethod::activeValues($cityId !== null ? (int) $cityId : null);
+        $user = auth()->user();
+        $cityId = $user?->city_id;
+        $isSimulatedTestMode = $request->boolean('simulate_payment')
+            && (bool) config('payments.simulate_mobile_money', false);
+
+        if ($isSimulatedTestMode) {
+            $rawMethod = $request->input('payment_method');
+            if (is_string($rawMethod)) {
+                $canonical = PaymentMethod::tryFromInput($rawMethod);
+                if ($canonical !== null) {
+                    $request->merge(['payment_method' => $canonical->value]);
+                }
+            }
+            $allowedModes = array_map(
+                static fn (PaymentMethod $m): string => $m->value,
+                PaymentMethod::clientCases(),
+            );
+        } else {
+            $allowedModes = PaymentMethod::activeValues($cityId !== null ? (int) $cityId : null);
+        }
 
         $validated = $request->validate([
             'recipient_name' => 'required|string|max:150',
             'recipient_phone' => 'required|string',
-            'delivery_address' => 'required|string',
-            'delivery_lat' => 'required|numeric|between:-90,90',
-            'delivery_lng' => 'required|numeric|between:-180,180',
-            'pickup_address' => 'nullable|string',
-            'pickup_lat' => 'required|numeric|between:-90,90',
-            'pickup_lng' => 'required|numeric|between:-180,180',
+            'neighborhood_id' => 'nullable|integer|exists:neighborhoods,id',
+            'delivery_neighborhood' => 'nullable|string|max:120',
+            'delivery_address' => 'required_without_all:neighborhood_id,delivery_neighborhood|nullable|string|max:255',
+            'delivery_lat' => 'nullable|numeric|between:-90,90',
+            'delivery_lng' => 'nullable|numeric|between:-180,180',
+            'pickup_address' => 'nullable|string|max:255',
+            'pickup_lat' => 'nullable|numeric|between:-90,90',
+            'pickup_lng' => 'nullable|numeric|between:-180,180',
             'size' => 'required|in:petit,moyen,grand',
-            'weight_kg' => 'required|numeric|min:0.1',
+            'weight_kg' => 'nullable|numeric|min:0.1',
             'declared_value' => 'nullable|numeric|min:0',
-            'description' => 'nullable|string',
-            'payment_method' => ['required', 'string', Rule::in($activeModes)],
-            'distance_km' => 'nullable|numeric',
+            'description' => 'nullable|string|max:500',
+            'payment_method' => ['required', 'string', Rule::in($allowedModes)],
+            'distance_km' => 'nullable|numeric|min:0',
+            'simulate_payment' => 'nullable|boolean',
+            'photo' => ['nullable', 'file', 'max:5120', 'mimetypes:image/jpeg,image/png,image/webp', 'mimes:jpg,jpeg,png,webp'],
         ]);
+
+        // Résolution du quartier de livraison (Dropdown Admin) et des coordonnées associées
+        $neighborhood = null;
+        if (! empty($validated['neighborhood_id'])) {
+            $neighborhood = Neighborhood::query()
+                ->whereKey((int) $validated['neighborhood_id'])
+                ->where('city_id', (int) $cityId)
+                ->where('is_active', true)
+                ->first();
+
+            if (! $neighborhood) {
+                throw ValidationException::withMessages([
+                    'neighborhood_id' => ['Le quartier sélectionné est indisponible pour votre ville.'],
+                ]);
+            }
+        } elseif (! empty($validated['delivery_neighborhood']) && $cityId !== null) {
+            $neighborhoodName = trim((string) $validated['delivery_neighborhood']);
+            $neighborhood = Neighborhood::query()
+                ->where('city_id', (int) $cityId)
+                ->where('is_active', true)
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($neighborhoodName)])
+                ->first();
+        }
+
+        if ($neighborhood !== null) {
+            if (empty($validated['delivery_address'])) {
+                $validated['delivery_address'] = $neighborhood->name;
+            }
+            if (! isset($validated['delivery_lat']) && $neighborhood->lat !== null) {
+                $validated['delivery_lat'] = (float) $neighborhood->lat;
+            }
+            if (! isset($validated['delivery_lng']) && $neighborhood->lng !== null) {
+                $validated['delivery_lng'] = (float) $neighborhood->lng;
+            }
+            if (! isset($validated['distance_km']) && $neighborhood->distance_km !== null) {
+                $validated['distance_km'] = (float) $neighborhood->distance_km;
+            }
+        } elseif (empty($validated['delivery_address']) && ! empty($validated['delivery_neighborhood'])) {
+            $validated['delivery_address'] = trim((string) $validated['delivery_neighborhood']);
+        }
 
         $phone = $this->normalizePhoneValue((string) $validated['recipient_phone']);
         if (! preg_match('/^(01|05|07|21|25|27)[0-9]{8}$/', $phone)) {
@@ -65,12 +128,21 @@ class ParcelController extends Controller
         }
         $validated['recipient_phone'] = $phone;
 
-        $weight = (float) $validated['weight_kg'];
+        $defaultWeights = [
+            'petit' => 0.5,
+            'moyen' => 2.0,
+            'grand' => 8.0,
+        ];
         $maxWeights = [
             'petit' => 1.0,
             'moyen' => 5.0,
             'grand' => 15.0,
         ];
+        $weight = isset($validated['weight_kg'])
+            ? (float) $validated['weight_kg']
+            : ($defaultWeights[$validated['size']] ?? 2.0);
+        $validated['weight_kg'] = $weight;
+
         $maxWeight = $maxWeights[$validated['size']] ?? 15.0;
         if ($weight > $maxWeight) {
             throw ValidationException::withMessages([
@@ -78,7 +150,15 @@ class ParcelController extends Controller
             ]);
         }
 
-        $parcel = $service->creerExpedition(auth()->user(), $validated);
+        $photoFile = $request->file('photo');
+        $parcel = $service->creerExpedition(
+            $user,
+            $validated,
+            $photoFile instanceof UploadedFile ? $photoFile : null,
+        );
+
+        /** @var ParcelPhoto|null $senderPhoto */
+        $senderPhoto = $parcel->photos->firstWhere('type', 'parcel');
 
         return response()->json([
             'succes' => true,
@@ -86,7 +166,13 @@ class ParcelController extends Controller
                 'id' => $parcel->id,
                 'sender_code_plain' => $parcel->sender_code_plain,
                 'shipping_fee' => (float) $parcel->shipping_fee,
+                'insurance_amount' => (float) $parcel->insurance_amount,
+                'total_amount' => (float) $parcel->shipping_fee + (float) $parcel->insurance_amount,
                 'has_insurance' => (bool) $parcel->has_insurance,
+                'payment_method' => $parcel->payment_method,
+                'payment_status' => $parcel->payment_status,
+                'payment_reference' => $parcel->payment_reference,
+                'photo_url' => $senderPhoto?->signed_url,
             ],
             'message' => 'Expédition créée avec succès.',
         ], 201);

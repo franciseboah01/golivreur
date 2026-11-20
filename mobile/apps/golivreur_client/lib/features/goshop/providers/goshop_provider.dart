@@ -10,12 +10,14 @@ export 'package:golivreur_core/providers/branding_provider.dart';
 
 // ─── Quartiers & Tarification proportionnelle ────────────────────────────────
 class DeliveryNeighborhood {
+  final int? id;
   final String name;
   final double lat;
   final double lng;
   final double defaultDistanceKm;
 
   const DeliveryNeighborhood({
+    this.id,
     required this.name,
     required this.lat,
     required this.lng,
@@ -24,6 +26,7 @@ class DeliveryNeighborhood {
 
   factory DeliveryNeighborhood.fromJson(Map<String, dynamic> json) =>
       DeliveryNeighborhood(
+        id: (json['id'] as num?)?.toInt(),
         name: json['name'] as String? ?? '',
         lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
         lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
@@ -161,6 +164,7 @@ class WeatherState {
   final List<DeliveryTariffTier> bareme;
   final ParcelTariffsConfig tarifsColis;
   final List<DeliveryNeighborhood> neighborhoods;
+  final String supportPhone;
 
   const WeatherState({
     this.cityId,
@@ -177,6 +181,7 @@ class WeatherState {
     this.bareme = defaultGoShopBareme,
     this.tarifsColis = const ParcelTariffsConfig(),
     this.neighborhoods = const [],
+    this.supportPhone = '+2250700000002',
   });
 
   WeatherState copyWith({
@@ -194,6 +199,7 @@ class WeatherState {
     List<DeliveryTariffTier>? bareme,
     ParcelTariffsConfig? tarifsColis,
     List<DeliveryNeighborhood>? neighborhoods,
+    String? supportPhone,
   }) {
     return WeatherState(
       cityId: cityId ?? this.cityId,
@@ -210,6 +216,7 @@ class WeatherState {
       bareme: bareme ?? this.bareme,
       tarifsColis: tarifsColis ?? this.tarifsColis,
       neighborhoods: neighborhoods ?? this.neighborhoods,
+      supportPhone: supportPhone ?? this.supportPhone,
     );
   }
 
@@ -328,6 +335,9 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
           neighborhoods: rawNeighborhoods
               .map((e) => DeliveryNeighborhood.fromJson(e as Map<String, dynamic>))
               .toList(),
+          supportPhone: (d['support_phone'] as String?)?.trim().isNotEmpty == true
+              ? (d['support_phone'] as String).trim()
+              : null,
         );
       }
     } catch (_) {

@@ -970,6 +970,204 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return null;
   }
 
+  /// Mot de passe oublié — Étape 1 : demande ou renvoi du code OTP (Firebase en test, SMS en prod).
+  Future<PasswordResetRequestResult> demanderResetMotDePasse(
+    String phone, {
+    bool isResend = false,
+  }) async {
+    final cleanPhone = normalizePhone(phone);
+    final useFirebaseOtp = FirebasePhoneOtpService.isFirebaseReady;
+
+    try {
+      final res = await _apiClient.post('/auth/password-reset/request', data: {
+        'phone': cleanPhone,
+        'use_firebase_otp': useFirebaseOtp,
+      });
+
+      if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
+        final donnees = res.data['donnees'] is Map
+            ? Map<String, dynamic>.from(res.data['donnees'] as Map)
+            : const <String, dynamic>{};
+        final expiresIn = (donnees['expires_in_seconds'] as num?)?.toInt() ?? 300;
+        final remainingAttempts =
+            (donnees['remaining_attempts'] as num?)?.toInt() ?? 2;
+        final supportPhone = donnees['support_phone']?.toString() ?? '+2250700000002';
+
+        String? autoIdToken;
+        if (useFirebaseOtp) {
+          final fbRes = await FirebasePhoneOtpService.sendOtp(
+            cleanPhone,
+            isResend: isResend,
+          );
+          if (!fbRes.success) {
+            return PasswordResetRequestResult(
+              success: false,
+              message: fbRes.errorMessage ??
+                  'Impossible d\'envoyer le code SMS via Firebase.',
+              supportPhone: supportPhone,
+            );
+          }
+          if (fbRes.isAutoVerified) {
+            autoIdToken = fbRes.autoVerifiedIdToken;
+          }
+        }
+
+        return PasswordResetRequestResult(
+          success: true,
+          message: res.data['message']?.toString() ??
+              'Un code de réinitialisation a été envoyé par SMS.',
+          expiresInSeconds: expiresIn,
+          remainingAttempts: remainingAttempts,
+          supportPhone: supportPhone,
+          autoVerifiedIdToken: autoIdToken,
+        );
+      }
+
+      return const PasswordResetRequestResult(
+        success: false,
+        message: 'Impossible d\'envoyer le code de réinitialisation.',
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final isLocked = e.response?.statusCode == 429 ||
+          (data is Map && data['code'] == 'PASSWORD_RESET_LOCKED');
+      final donnees = data is Map && data['donnees'] is Map
+          ? Map<String, dynamic>.from(data['donnees'] as Map)
+          : const <String, dynamic>{};
+      final supportPhone = donnees['support_phone']?.toString() ?? '+2250700000002';
+      final msg = data is Map && data['message'] is String
+          ? data['message'] as String
+          : ApiClient.messageErreur(e);
+
+      return PasswordResetRequestResult(
+        success: false,
+        locked: isLocked,
+        message: msg,
+        supportPhone: supportPhone,
+      );
+    } catch (_) {
+      return const PasswordResetRequestResult(
+        success: false,
+        message: 'Impossible de contacter le serveur.',
+      );
+    }
+  }
+
+  /// Enregistre côté serveur un échec OTP détecté localement par le SDK Firebase
+  /// afin de faire respecter la limite stricte de 2 tentatives.
+  Future<PasswordResetConfirmResult> signalerEchecOtpReset(String phone) async {
+    final cleanPhone = normalizePhone(phone);
+    try {
+      final res = await _apiClient.post(
+        '/auth/password-reset/fail-attempt',
+        data: {'phone': cleanPhone},
+      );
+      final data = res.data is Map ? res.data as Map : const {};
+      final donnees = data['donnees'] is Map
+          ? Map<String, dynamic>.from(data['donnees'] as Map)
+          : const <String, dynamic>{};
+      return PasswordResetConfirmResult(
+        success: false,
+        locked: donnees['locked'] == true || res.statusCode == 429,
+        remainingAttempts: (donnees['remaining_attempts'] as num?)?.toInt() ?? 0,
+        supportPhone: donnees['support_phone']?.toString() ?? '+2250700000002',
+        message: data['message']?.toString() ?? 'Code de réinitialisation incorrect.',
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final isLocked = e.response?.statusCode == 429 ||
+          (data is Map && data['code'] == 'PASSWORD_RESET_LOCKED');
+      final donnees = data is Map && data['donnees'] is Map
+          ? Map<String, dynamic>.from(data['donnees'] as Map)
+          : const <String, dynamic>{};
+      return PasswordResetConfirmResult(
+        success: false,
+        locked: isLocked,
+        remainingAttempts: (donnees['remaining_attempts'] as num?)?.toInt() ??
+            (isLocked ? 0 : 1),
+        supportPhone: donnees['support_phone']?.toString() ?? '+2250700000002',
+        message: data is Map && data['message'] is String
+            ? data['message'] as String
+            : ApiClient.messageErreur(e),
+      );
+    } catch (_) {
+      return const PasswordResetConfirmResult(
+        success: false,
+        message: 'Code de réinitialisation incorrect.',
+      );
+    }
+  }
+
+  /// Mot de passe oublié — Étape 2 : vérifie l'OTP (max 2 essais, 5 min) et réinitialise le mot de passe.
+  Future<PasswordResetConfirmResult> confirmerResetMotDePasse({
+    required String phone,
+    required String code,
+    required String newPassword,
+    required String passwordConfirmation,
+    String? firebaseIdToken,
+  }) async {
+    final cleanPhone = normalizePhone(phone);
+    try {
+      String? resolvedFirebaseToken = firebaseIdToken;
+      if ((resolvedFirebaseToken == null || resolvedFirebaseToken.isEmpty) &&
+          FirebasePhoneOtpService.hasActiveVerificationFor(cleanPhone)) {
+        final fbVerify = await FirebasePhoneOtpService.verifySmsCode(code);
+        if (!fbVerify.success || fbVerify.idToken == null) {
+          // Décrémenter la tentative côté serveur pour garantir la limite stricte de 2 essais
+          return await signalerEchecOtpReset(cleanPhone);
+        }
+        resolvedFirebaseToken = fbVerify.idToken;
+      }
+
+      final res = await _apiClient.post('/auth/password-reset/confirm', data: {
+        'phone': cleanPhone,
+        if (resolvedFirebaseToken != null && resolvedFirebaseToken.isNotEmpty)
+          'firebase_id_token': resolvedFirebaseToken,
+        if (code.trim().isNotEmpty) 'code': code.trim(),
+        'password': newPassword,
+        'password_confirmation': passwordConfirmation,
+      });
+
+      if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
+        FirebasePhoneOtpService.clearSession();
+        return PasswordResetConfirmResult(
+          success: true,
+          message: res.data['message']?.toString() ??
+              'Votre mot de passe a été réinitialisé avec succès.',
+        );
+      }
+
+      return const PasswordResetConfirmResult(
+        success: false,
+        message: 'Impossible de réinitialiser le mot de passe.',
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final isLocked = e.response?.statusCode == 429 ||
+          (data is Map && data['code'] == 'PASSWORD_RESET_LOCKED');
+      final donnees = data is Map && data['donnees'] is Map
+          ? Map<String, dynamic>.from(data['donnees'] as Map)
+          : const <String, dynamic>{};
+      final supportPhone = donnees['support_phone']?.toString() ?? '+2250700000002';
+      final msg = data is Map && data['message'] is String
+          ? data['message'] as String
+          : ApiClient.messageErreur(e);
+
+      return PasswordResetConfirmResult(
+        success: false,
+        locked: isLocked,
+        remainingAttempts: (donnees['remaining_attempts'] as num?)?.toInt(),
+        supportPhone: supportPhone,
+        message: msg,
+      );
+    } catch (_) {
+      return const PasswordResetConfirmResult(
+        success: false,
+        message: 'Impossible de réinitialiser le mot de passe.',
+      );
+    }
+  }
+
   Future<void> deconnecter() async {
     try {
       await _apiClient.post('/auth/logout').timeout(const Duration(seconds: 3));
@@ -998,6 +1196,42 @@ final StateNotifierProvider<AuthNotifier, AuthState> authProvider =
   final storage = ref.watch(secureStorageProvider);
   return AuthNotifier(apiClient, storage);
 });
+
+class PasswordResetRequestResult {
+  final bool success;
+  final bool locked;
+  final String message;
+  final int expiresInSeconds;
+  final int remainingAttempts;
+  final String supportPhone;
+  final String? autoVerifiedIdToken;
+
+  const PasswordResetRequestResult({
+    required this.success,
+    required this.message,
+    this.locked = false,
+    this.expiresInSeconds = 300,
+    this.remainingAttempts = 2,
+    this.supportPhone = '+2250700000002',
+    this.autoVerifiedIdToken,
+  });
+}
+
+class PasswordResetConfirmResult {
+  final bool success;
+  final bool locked;
+  final String message;
+  final int? remainingAttempts;
+  final String supportPhone;
+
+  const PasswordResetConfirmResult({
+    required this.success,
+    required this.message,
+    this.locked = false,
+    this.remainingAttempts,
+    this.supportPhone = '+2250700000002',
+  });
+}
 
 class CityAutoDetectResult {
   final bool detected;

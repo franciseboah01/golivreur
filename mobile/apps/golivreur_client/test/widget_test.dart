@@ -10,6 +10,7 @@ import 'package:golivreur_client/features/auth/providers/auth_provider.dart'
     as auth_api;
 import 'package:golivreur_client/features/auth/screens/login_screen.dart';
 import 'package:golivreur_client/features/gocolis/providers/gocolis_provider.dart';
+import 'package:golivreur_client/features/gocolis/screens/new_parcel_screen.dart';
 import 'package:golivreur_client/features/goshop/providers/goshop_provider.dart';
 import 'package:golivreur_client/features/goshop/providers/order_provider.dart';
 import 'package:golivreur_client/features/navigation/screens/main_navigation_screen.dart';
@@ -79,7 +80,23 @@ class _FakeHttpClientAdapter implements HttpClientAdapter {
           'rain_delay_minutes': 0,
           'emergency_mode_active': false,
           'bareme': <dynamic>[],
-          'neighborhoods': <dynamic>[],
+          'neighborhoods': <dynamic>[
+            {
+              'id': 10,
+              'name': 'Commerce',
+              'distance_km': 2.5,
+              'lat': 6.8810,
+              'lng': -6.4490,
+            },
+            {
+              'id': 11,
+              'name': 'Lobia',
+              'distance_km': 3.2,
+              'lat': 6.8720,
+              'lng': -6.4580,
+            },
+          ],
+          'support_phone': '+2250700000002',
           'app_logo_url': null,
           'app_default_emoji': '🛵',
         },
@@ -154,7 +171,46 @@ void main() {
     expect(find.text('Se connecter en tant que client'), findsOneWidget);
     expect(find.text('Mot de passe'), findsOneWidget);
     expect(find.text('Se connecter'), findsOneWidget);
+    expect(find.text('Mot de passe oublié ?'), findsOneWidget);
+    expect(find.text('Se connecter par code SMS (OTP)'), findsNothing);
     expect(find.text('Remplir'), findsNothing);
+
+    // Clic sur "Mot de passe oublié ?" ouvre le flux de réinitialisation par SMS
+    await tester.tap(find.text('Mot de passe oublié ?'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mot de passe oublié'), findsOneWidget);
+    expect(find.text('Recevoir le code par SMS'), findsOneWidget);
+  });
+
+  testWidgets(
+      'NewParcelScreen - affiche Dropdown quartiers (sans GPS destinataire), section Informations sur le colis, photo et bouton désactivé par défaut',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _fakeClientOverrides(),
+        child: const MaterialApp(
+          home: NewParcelScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Nouvelle Expédition'), findsOneWidget);
+    expect(find.text('Position GPS de ramassage'), findsOneWidget);
+    expect(find.text('Informations du destinataire'), findsOneWidget);
+    expect(find.text('Pointer sur carte'), findsNothing);
+    expect(find.text('Sélectionnez un quartier'), findsOneWidget);
+    expect(find.text('Informations sur le colis'), findsOneWidget);
+    expect(find.text('Ajouter une photo du colis'), findsOneWidget);
+    expect(find.text('Format du colis *'), findsOneWidget);
+
+    // Bouton "Valider l'expédition" doit être désactivé tant que les champs obligatoires sont vides
+    final submitBtnFinder = find.widgetWithText(ElevatedButton, 'Valider l\'expédition');
+    await tester.ensureVisible(submitBtnFinder);
+    await tester.pump();
+    final ElevatedButton submitBtn = tester.widget(submitBtnFinder);
+    expect(submitBtn.onPressed, isNull);
   });
 
   testWidgets('MainNavigationScreen - affiche la barre avec 4 onglets',

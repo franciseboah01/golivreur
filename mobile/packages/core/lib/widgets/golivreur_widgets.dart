@@ -5,6 +5,7 @@ export '../services/pin_lock_service.dart';
 export '../services/push_notification_service.dart';
 export '../services/secure_token_storage.dart';
 export '../services/sso_switch_service.dart';
+export '../services/support_contact_service.dart';
 export 'animated_splash_screen.dart';
 export 'atoms/widgets_atomiques.dart';
 export 'edit_profile_helpers.dart';

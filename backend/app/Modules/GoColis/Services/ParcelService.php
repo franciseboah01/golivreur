@@ -16,6 +16,7 @@ use App\Services\AsyncJobDispatcher;
 use App\Services\ConfirmationCodeService;
 use App\Services\NotificationService;
 use App\Services\ParcelPhotoStorageService;
+use App\Services\Payment\ParcelPaymentProcessor;
 use App\Services\SettingsService;
 use App\Services\SmsService;
 use App\Services\WalletService;
@@ -49,6 +50,8 @@ class ParcelService
 
     private readonly ParcelPhotoStorageService $photoStorageService;
 
+    private readonly ParcelPaymentProcessor $paymentProcessor;
+
     public function __construct(
         private readonly CommissionService $commissionService,
         private readonly AssignmentService $assignmentService,
@@ -59,18 +62,22 @@ class ParcelService
         ?SettingsService $settingsService = null,
         ?ConfirmationCodeService $confirmationCodeService = null,
         ?ParcelPhotoStorageService $photoStorageService = null,
+        ?ParcelPaymentProcessor $paymentProcessor = null,
     ) {
         $this->settingsService = $settingsService ?? app(SettingsService::class);
         $this->confirmationCodeService = $confirmationCodeService ?? app(ConfirmationCodeService::class);
         $this->photoStorageService = $photoStorageService ?? app(ParcelPhotoStorageService::class);
+        $this->paymentProcessor = $paymentProcessor ?? app(ParcelPaymentProcessor::class);
     }
 
     /**
-     * Crée une expédition GoColis et envoie le code destinataire par SMS.
+     * Crée une expédition GoColis, applique la stratégie de paiement configurée,
+     * enregistre éventuellement la photo du colis fournie par l'expéditeur et envoie
+     * le code destinataire par SMS.
      */
-    public function creerExpedition(User $expediteur, array $donnees): Parcel
+    public function creerExpedition(User $expediteur, array $donnees, ?UploadedFile $senderPhoto = null): Parcel
     {
-        return DB::transaction(function () use ($expediteur, $donnees) {
+        return DB::transaction(function () use ($expediteur, $donnees, $senderPhoto) {
             $city = City::findOrFail($expediteur->city_id);
 
             if ($city->emergency_mode_active) {
@@ -80,10 +87,10 @@ class ParcelService
             }
 
             // Vérification coordonnées de ramassage et livraison dans la ville
-            $pickupLat = (float) $donnees['pickup_lat'];
-            $pickupLng = (float) $donnees['pickup_lng'];
-            $deliveryLat = (float) $donnees['delivery_lat'];
-            $deliveryLng = (float) $donnees['delivery_lng'];
+            $pickupLat = isset($donnees['pickup_lat']) ? (float) $donnees['pickup_lat'] : (float) ($city->center_lat ?? 6.8770);
+            $pickupLng = isset($donnees['pickup_lng']) ? (float) $donnees['pickup_lng'] : (float) ($city->center_lng ?? -6.4502);
+            $deliveryLat = isset($donnees['delivery_lat']) ? (float) $donnees['delivery_lat'] : (float) ($city->center_lat ?? 6.8770);
+            $deliveryLng = isset($donnees['delivery_lng']) ? (float) $donnees['delivery_lng'] : (float) ($city->center_lng ?? -6.4502);
 
             if (! $city->estDansLaVille($pickupLat, $pickupLng)) {
                 throw ValidationException::withMessages([
@@ -104,7 +111,12 @@ class ParcelService
                 $deliveryLat,
                 $deliveryLng
             );
-            $distanceKm = max(0.1, round($haversineDistance * 1.0, 2));
+            $fallbackDistance = isset($donnees['distance_km']) && (float) $donnees['distance_km'] > 0
+                ? (float) $donnees['distance_km']
+                : 0.1;
+            $distanceKm = $haversineDistance > 0.05
+                ? max(0.1, round($haversineDistance * 1.0, 2))
+                : max(0.1, round($fallbackDistance, 2));
 
             // Calculer les frais d'expédition avec la distance réelle et $city (Point 4)
             $fraisExpedition = $this->commissionService->calculerFraisExpedition(
@@ -156,6 +168,14 @@ class ParcelService
                                             ? 'pending_cash' : 'pending',
             ]);
 
+            // Traitement modulaire du paiement (Pattern Strategy : Cash / Simulation Test / futures API)
+            $this->paymentProcessor->process($parcel);
+
+            // Enregistrer la photo du colis fournie par l'expéditeur (si présente)
+            if ($senderPhoto !== null) {
+                $this->sauvegarderPhotoColisExpediteur($parcel, $senderPhoto, $pickupLat, $pickupLng);
+            }
+
             // Envoyer le code destinataire par SMS (jamais loggé)
             $smsEnvoye = $this->smsService->envoyerCodeDestinataire(
                 phone: $donnees['recipient_phone'],
@@ -177,17 +197,46 @@ class ParcelService
                 action: 'parcel_created',
                 entityType: 'parcel',
                 entityId: $parcel->id,
-                properties: ['size' => $donnees['size'], 'fee' => $fraisExpedition],
+                properties: [
+                    'size' => $donnees['size'],
+                    'fee' => $fraisExpedition,
+                    'payment_method' => $parcel->payment_method,
+                    'payment_status' => $parcel->payment_status,
+                    'has_sender_photo' => $senderPhoto !== null,
+                ],
             );
 
             // Chercher un livreur immédiatement
             $this->assignmentService->attribuerLivreurGoColis($parcel, tentative: 1);
 
+            $parcel->load('photos');
             // Retourner avec le code expéditeur en clair (une seule fois)
             $parcel->sender_code_plain = $codeExpediteur;
 
             return $parcel;
         });
+    }
+
+    /**
+     * Enregistre la photo illustrative du colis jointe par l'expéditeur à la création (`type = 'parcel'`).
+     * Distincte des photos de preuve livreur (`pickup` et `delivery`).
+     */
+    public function sauvegarderPhotoColisExpediteur(
+        Parcel $parcel,
+        UploadedFile $photo,
+        ?float $lat = null,
+        ?float $lng = null,
+    ): ParcelPhoto {
+        $storagePath = $this->photoStorageService->reencoderEtStocker($parcel, $photo, 'parcel');
+
+        return ParcelPhoto::create([
+            'parcel_id' => $parcel->id,
+            'type' => 'parcel',
+            'photo_url' => '',
+            'storage_path' => $storagePath,
+            'lat' => $lat,
+            'lng' => $lng,
+        ]);
     }
 
     /**

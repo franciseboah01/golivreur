@@ -106,6 +106,9 @@ Route::prefix('auth')->middleware('throttle:60,1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
     Route::post('login-password', [AuthController::class, 'loginPassword']);
     Route::post('verify-login', [AuthController::class, 'verifierOtpConnexion']);
+    Route::post('password-reset/request', [AuthController::class, 'requestPasswordReset']);
+    Route::post('password-reset/confirm', [AuthController::class, 'confirmPasswordReset']);
+    Route::post('password-reset/fail-attempt', [AuthController::class, 'recordPasswordResetFailure']);
     Route::post('refresh', [AuthController::class, 'refresh']);
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:api');
     Route::post('sso/authorize', [SsoController::class, 'authorizeSwitch'])

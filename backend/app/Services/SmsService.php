@@ -42,6 +42,7 @@ class SmsService
             'inscription' => "GoLivreur : Votre code d'inscription est {$code}. Valable 5 minutes.",
             'connexion' => "GoLivreur : Votre code de connexion est {$code}. Valable 5 minutes.",
             'phone_change' => "GoLivreur : Votre code de confirmation pour modifier votre numéro est {$code}. Valable 5 minutes.",
+            'password_reset' => "GoLivreur : Votre code de réinitialisation de mot de passe est {$code}. Valable 5 minutes.",
             default => "GoLivreur : Votre code est {$code}. Valable 5 minutes.",
         };
 

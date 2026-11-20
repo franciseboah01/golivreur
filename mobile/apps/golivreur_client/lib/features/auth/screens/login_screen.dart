@@ -8,7 +8,7 @@ import '../../gocolis/providers/gocolis_provider.dart';
 import '../../goshop/providers/goshop_provider.dart';
 import '../../goshop/providers/order_provider.dart';
 import '../providers/auth_provider.dart';
-import 'otp_verification_screen.dart';
+import '../widgets/forgot_password_sheet.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -74,34 +74,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<void> _submitOtpLogin() async {
-    final phone = AuthNotifier.normalizePhone(_phoneController.text);
-    if (phone.length != 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Saisissez d\'abord votre numéro ivoirien à 10 chiffres.',
-          ),
-          backgroundColor: GoLivreurTheme.erreur,
-        ),
+  Future<void> _openForgotPassword() async {
+    ref.read(authProvider.notifier).clearError();
+    final supportPhone = ref.read(weatherProvider).supportPhone;
+
+    final outcome = await ForgotPasswordSheet.show(
+      context,
+      initialPhone: _phoneController.text,
+      fallbackSupportPhone: supportPhone,
+    );
+
+    if (!mounted || outcome == null) return;
+
+    if (outcome.locked) {
+      await showPasswordResetLockedDialog(
+        context,
+        message: outcome.message ??
+            'Trop de tentatives ou délai expiré. Veuillez contacter le service client pour réinitialiser votre mot de passe.',
+        supportPhone: outcome.supportPhone,
       );
       return;
     }
 
-    final success =
-        await ref.read(authProvider.notifier).demanderOtpConnexion(phone);
-
-    if (success && mounted) {
-      if (ref.read(authProvider).status == AuthStatus.authenticated) {
-        _onPostLoginSuccess();
-        return;
-      }
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => OtpVerificationScreen(
-            phone: phone,
-            isRegister: false,
+    if (outcome.resetSucceeded) {
+      _passwordController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            outcome.message ??
+                'Mot de passe réinitialisé avec succès ! Vous pouvez maintenant vous connecter.',
           ),
+          backgroundColor: GoLivreurTheme.succes,
         ),
       );
     }
@@ -206,27 +209,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 24),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: authState.status == AuthStatus.loading
+                        ? null
+                        : _openForgotPassword,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 4,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Mot de passe oublié ?',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: GoLivreurTheme.texteSecondaire,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 BoutonPrimaire(
                   label: 'Se connecter',
                   estEnChargement: authState.status == AuthStatus.loading,
                   onPressed: _submit,
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: authState.status == AuthStatus.loading
-                      ? null
-                      : _submitOtpLogin,
-                  icon: const Icon(Icons.sms_outlined, size: 18),
-                  label: const Text('Se connecter par code SMS (OTP)'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: GoLivreurTheme.primaire,
-                    side: const BorderSide(color: GoLivreurTheme.primaire),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
                 ),
                 const SizedBox(height: 16),
                 Row(
