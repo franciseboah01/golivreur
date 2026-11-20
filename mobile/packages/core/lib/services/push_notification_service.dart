@@ -62,6 +62,7 @@ class PushNotificationService {
   PushNotificationService._();
 
   static bool _initialized = false;
+  static Completer<bool>? _initCompleter;
   static ApiClient? _activeApiClient;
   static String? _lastSyncedToken;
   static StreamSubscription<String>? _tokenRefreshSub;
@@ -84,6 +85,10 @@ class PushNotificationService {
   static Future<bool> initialize() async {
     if (_initialized) return true;
     if (kIsWeb) return false;
+    if (_initCompleter != null) return _initCompleter!.future;
+
+    final completer = Completer<bool>();
+    _initCompleter = completer;
 
     try {
       if (Firebase.apps.isEmpty) {
@@ -124,9 +129,13 @@ class PushNotificationService {
       }
 
       _initialized = true;
+      completer.complete(true);
       return true;
     } catch (_) {
+      completer.complete(false);
       return false;
+    } finally {
+      _initCompleter = null;
     }
   }
 

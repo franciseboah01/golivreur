@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
@@ -12,6 +14,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../goshop/providers/goshop_provider.dart';
 import '../providers/gocolis_provider.dart';
 import '../providers/parcel_draft_recovery.dart';
+import 'in_app_camera_screen.dart';
 import 'parcel_tracking_screen.dart';
 
 class NewParcelScreen extends ConsumerStatefulWidget {
@@ -89,6 +92,8 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
       // 1. Auto-actualisation GPS de ramassage dès l'entrée sur la page (si pas déjà restauré)
       if (_pickupLat == null || _pickupLng == null) {
         _detectPickupGps(silent: true);
+      } else {
+        _syncCityFromGpsAndReloadNeighborhoods();
       }
 
       // 2. S'assurer que la liste dynamique des quartiers (API Admin) est à jour
@@ -99,6 +104,27 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
         _applyPendingNeighborhood(weather.neighborhoods);
       }
     });
+  }
+
+  /// Synchronise silencieusement la ville du client avec sa position GPS réelle
+  /// afin d'éviter tout décalage périmètre / liste de quartiers lorsqu'il change de ville.
+  Future<void> _syncCityFromGpsAndReloadNeighborhoods() async {
+    try {
+      final result = await ref
+          .read(authProvider.notifier)
+          .detecterVilleParGps(silent: true);
+      if (!mounted) return;
+      if (result != null && result.changed && result.cityId != null) {
+        setState(() {
+          _selectedNeighborhood = null;
+          _pendingNeighborhoodId = null;
+          _pendingNeighborhoodName = null;
+        });
+        await ref
+            .read(weatherProvider.notifier)
+            .chargerStatutVille(cityId: result.cityId);
+      }
+    } catch (_) {}
   }
 
   void _applyPendingNeighborhood(List<DeliveryNeighborhood> neighborhoods) {
@@ -286,6 +312,11 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
       }
     });
 
+    if (res.isSuccess) {
+      await _syncCityFromGpsAndReloadNeighborhoods();
+      if (!mounted) return;
+    }
+
     if (!silent) {
       if (res.isSuccess) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -302,11 +333,26 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
     }
   }
 
+  Future<void> _captureParcelPhotoInApp() async {
+    final useInAppCamera = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+
+    if (!useInAppCamera) {
+      await _pickParcelPhoto(ImageSource.camera);
+      return;
+    }
+
+    // Caméra intégrée in-app : ne quitte jamais GL Client -> zéro kill MainActivity / zéro redémarrage.
+    final captured = await InAppCameraScreen.capture(context);
+    if (captured == null || !mounted) return;
+    await _loadPhotoFile(captured);
+  }
+
   Future<void> _pickParcelPhoto(ImageSource source) async {
     final storage = ref.read(secureStorageProvider);
-    // Persiste le brouillon AVANT d'ouvrir l'appareil photo Android :
-    // si l'OS tue MainActivity par manque de RAM pendant la prise de photo,
-    // tout le formulaire + la photo seront restaurés automatiquement au retour.
+    // Persiste le brouillon AVANT d'ouvrir la galerie / sélecteur externe :
+    // si l'OS tue MainActivity par manque de RAM, tout le formulaire est restauré.
     await ParcelDraftRecovery.saveDraft(storage, _buildCurrentDraft());
 
     try {
@@ -358,10 +404,10 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
                       color: GoLivreurTheme.primaire),
                 ),
                 title: const Text('Prendre une photo'),
-                subtitle: const Text('Utiliser l\'appareil photo du téléphone'),
+                subtitle: const Text('Caméra intégrée GoLivreur (rapide, sans quitter l\'app)'),
                 onTap: () {
                   Navigator.of(ctx).pop();
-                  _pickParcelPhoto(ImageSource.camera);
+                  _captureParcelPhotoInApp();
                 },
               ),
               ListTile(

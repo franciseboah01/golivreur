@@ -8,6 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Représente un quartier / zone rattaché à une ville.
+ *
+ * @property int $id
+ * @property int $city_id
+ * @property string $name
+ * @property bool $is_active
+ * @property float|null $distance_km
+ * @property float|null $lat
+ * @property float|null $lng
  */
 class Neighborhood extends Model
 {

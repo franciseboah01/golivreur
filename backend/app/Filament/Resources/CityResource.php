@@ -82,6 +82,8 @@ class CityResource extends Resource
                             ->label('Ville ouverte au service GoLivreur'),
                         Forms\Components\TextInput::make('center_lat')
                             ->label('Latitude GPS du centre')
+                            ->placeholder('Ex: 6.8770 (Daloa) ou 9.4580 (Sirasso)')
+                            ->helperText('En Côte d\'Ivoire, la latitude est positive (entre 4.3 et 10.7).')
                             ->numeric()
                             ->minValue(-90.0)
                             ->maxValue(90.0)
@@ -89,6 +91,8 @@ class CityResource extends Resource
                             ->nullable(),
                         Forms\Components\TextInput::make('center_lng')
                             ->label('Longitude GPS du centre')
+                            ->placeholder('Ex: -6.4502 (Daloa) ou -6.2080 (Sirasso)')
+                            ->helperText('ATTENTION : en Côte d\'Ivoire, la longitude est TOUJOURS NÉGATIVE (avec le signe « - », entre -8.6 et -2.5).')
                             ->numeric()
                             ->minValue(-180.0)
                             ->maxValue(180.0)
@@ -138,6 +142,14 @@ class CityResource extends Resource
                     ->label('Quartiers')
                     ->badge()
                     ->color('info'),
+
+                Tables\Columns\TextColumn::make('center_lat')
+                    ->label('Centre GPS (Lat, Lng)')
+                    ->formatStateUsing(fn (City $record): string => $record->center_lat !== null && $record->center_lng !== null
+                        ? number_format((float) $record->center_lat, 4, '.', '').', '.number_format((float) $record->center_lng, 4, '.', '')
+                        : 'Non défini')
+                    ->color(fn (City $record): string => ($record->center_lng !== null && (float) $record->center_lng > 0) ? 'danger' : 'gray')
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('support_phone')
                     ->label('N° Service Client')

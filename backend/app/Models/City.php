@@ -11,7 +11,9 @@ class City extends Model
 {
     use HasFactory;
 
-    public const RAYON_MAX_VILLE_KM = 25.0;
+    public const RAYON_MAX_VILLE_KM = 45.0;
+
+    public const RAYON_QUARTIER_VILLE_KM = 25.0;
 
     public static function distanceHaversine(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
@@ -31,6 +33,11 @@ class City extends Model
             return true;
         }
 
+        // Coordonnées par défaut (0, 0) = centre non encore configuré par l'administration
+        if (abs((float) $this->center_lat) < 0.0001 && abs((float) $this->center_lng) < 0.0001) {
+            return true;
+        }
+
         $distance = self::distanceHaversine(
             (float) $this->center_lat,
             (float) $this->center_lng,
@@ -38,7 +45,43 @@ class City extends Model
             $lng
         );
 
-        return $distance <= self::RAYON_MAX_VILLE_KM;
+        if ($distance <= self::RAYON_MAX_VILLE_KM) {
+            return true;
+        }
+
+        // Tolérance par proximité directe d'un quartier actif géolocalisé de cette ville
+        $neighborhoods = $this->relationLoaded('neighborhoods')
+            ? $this->neighborhoods
+            : $this->neighborhoods()
+                ->where('is_active', true)
+                ->whereNotNull('lat')
+                ->whereNotNull('lng')
+                ->get(['id', 'city_id', 'is_active', 'lat', 'lng']);
+
+        foreach ($neighborhoods as $neighborhood) {
+            if (! $neighborhood instanceof Neighborhood) {
+                continue;
+            }
+            if (! $neighborhood->is_active || $neighborhood->lat === null || $neighborhood->lng === null) {
+                continue;
+            }
+            if (abs((float) $neighborhood->lat) < 0.0001 && abs((float) $neighborhood->lng) < 0.0001) {
+                continue;
+            }
+
+            $distanceQuartier = self::distanceHaversine(
+                (float) $neighborhood->lat,
+                (float) $neighborhood->lng,
+                $lat,
+                $lng
+            );
+
+            if ($distanceQuartier <= self::RAYON_QUARTIER_VILLE_KM) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected $fillable = [

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,11 +15,13 @@ import 'secure_token_storage.dart';
 ///   - Timeout 8 secondes (réseau ivoirien instable)
 ///   - Injection automatique du JWT dans chaque requête
 ///   - Refresh token transparent (l'utilisateur ne voit rien)
-///   - Déconnexion automatique si refresh token expiré
+///   - Rejeu sécurisé des requêtes multipart (reconstruction d'un FormData frais)
+///   - Déconnexion automatique uniquement si le refresh token est refusé (401/403)
 ///   - Masquage des tokens dans les logs
 
 class ApiClient {
   static const int timeoutSecondes = 8;
+  static const int uploadTimeoutSecondes = 25;
 
   final Dio _dio;
   final FlutterSecureStorage _storage;
@@ -90,8 +93,19 @@ class ApiClient {
             try {
               e.requestOptions.extra['_retried_after_refresh'] = true;
               e.requestOptions.headers['Authorization'] = 'Bearer $nouveauToken';
+
+              // Dio 5 interdit de réutiliser un FormData déjà finalisé : on reconstruit
+              // un FormData frais à partir du builder mémorisé lors de l'upload multipart.
+              final formDataBuilder = e.requestOptions.extra['_formDataBuilder'];
+              if (formDataBuilder is FutureOr<FormData> Function()) {
+                e.requestOptions.data = await formDataBuilder();
+              }
+
               final cloneResponse = await _dio.fetch(e.requestOptions);
               return handler.resolve(cloneResponse);
+            } on DioException catch (retryError) {
+              // Propager la vraie erreur du rejeu (ex: 422 validation) au lieu de la masquer par l'ancien 401
+              return handler.next(retryError);
             } catch (_) {
               return handler.next(e);
             }
@@ -124,15 +138,30 @@ class ApiClient {
       }
 
       final dioRefresh = _refreshDioBuilder?.call() ??
-          Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
+          Dio(
+            BaseOptions(
+              baseUrl: _dio.options.baseUrl,
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 10),
+              sendTimeout: const Duration(seconds: 10),
+              headers: const {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+            ),
+          );
       if (_refreshDioBuilder == null && _httpClientAdapter != null) {
         dioRefresh.httpClientAdapter = _httpClientAdapter;
       }
 
       final response = await dioRefresh.post(
         '/auth/refresh',
+        data: {'refresh_token': refreshToken},
         options: Options(
-          headers: {'Authorization': 'Bearer $refreshToken'},
+          headers: {
+            'Authorization': 'Bearer $refreshToken',
+            'Accept': 'application/json',
+          },
         ),
       );
 
@@ -150,10 +179,18 @@ class ApiClient {
 
       completer.complete(nouveauToken);
       return nouveauToken;
+    } on DioException catch (err) {
+      final status = err.response?.statusCode;
+      // Ne déconnecter l'utilisateur QUE si le serveur rejette explicitement le refresh token (401/403).
+      // Un timeout ou une coupure 3G/4G ne doit JAMAIS effacer la session locale.
+      if (status == 401 || status == 403) {
+        PinLockService.lockInMemory();
+        await _storage.deleteAll();
+        _onDeconnexionForcee();
+      }
+      completer.complete(null);
+      return null;
     } catch (_) {
-      PinLockService.lockInMemory();
-      await _storage.deleteAll();
-      _onDeconnexionForcee();
       completer.complete(null);
       return null;
     } finally {
@@ -195,14 +232,20 @@ class ApiClient {
     required String nomChamp,
     Map<String, dynamic>? donneesSup,
   }) async {
-    final formData = FormData.fromMap({
-      nomChamp: await MultipartFile.fromFile(cheminFichier),
-      ...?donneesSup,
-    });
+    FutureOr<FormData> buildFormData() async => FormData.fromMap({
+          nomChamp: await MultipartFile.fromFile(cheminFichier),
+          ...?donneesSup,
+        });
+
     return _dio.post<T>(
       path,
-      data: formData,
-      options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      data: await buildFormData(),
+      options: Options(
+        headers: {'Content-Type': 'multipart/form-data'},
+        sendTimeout: const Duration(seconds: uploadTimeoutSecondes),
+        receiveTimeout: const Duration(seconds: uploadTimeoutSecondes),
+        extra: {'_formDataBuilder': buildFormData},
+      ),
     );
   }
 
@@ -213,24 +256,39 @@ class ApiClient {
     Map<String, XFile>? files,
     String method = 'PUT',
   }) async {
-    final map = <String, dynamic>{
-      ...fields,
-      if (method.toUpperCase() != 'POST') '_method': method.toUpperCase(),
-    };
-
+    final cachedFiles = <MapEntry<String, ({Uint8List bytes, String fileName})>>[];
     if (files != null) {
       for (final entry in files.entries) {
         final bytes = await entry.value.readAsBytes();
-        final fileName = entry.value.name.isNotEmpty ? entry.value.name : '${entry.key}.jpg';
-        map[entry.key] = MultipartFile.fromBytes(bytes, filename: fileName);
+        final fileName =
+            entry.value.name.isNotEmpty ? entry.value.name : '${entry.key}.jpg';
+        cachedFiles.add(MapEntry(entry.key, (bytes: bytes, fileName: fileName)));
       }
     }
 
-    final formData = FormData.fromMap(map);
+    FutureOr<FormData> buildFormData() {
+      final map = <String, dynamic>{
+        ...fields,
+        if (method.toUpperCase() != 'POST') '_method': method.toUpperCase(),
+      };
+      for (final fileEntry in cachedFiles) {
+        map[fileEntry.key] = MultipartFile.fromBytes(
+          fileEntry.value.bytes,
+          filename: fileEntry.value.fileName,
+        );
+      }
+      return FormData.fromMap(map);
+    }
+
     return _dio.post<T>(
       path,
-      data: formData,
-      options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      data: buildFormData(),
+      options: Options(
+        headers: {'Content-Type': 'multipart/form-data'},
+        sendTimeout: const Duration(seconds: uploadTimeoutSecondes),
+        receiveTimeout: const Duration(seconds: uploadTimeoutSecondes),
+        extra: {'_formDataBuilder': buildFormData},
+      ),
     );
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
@@ -7,14 +8,15 @@ import 'features/auth/screens/login_screen.dart';
 import 'features/gocolis/providers/parcel_draft_recovery.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await PushNotificationService.initialize();
   runApp(
     const ProviderScope(
       child: GoLivreurClientApp(),
     ),
   );
+  // Initialise Firebase/FCM en parallèle sans bloquer la 1re frame du logo (zéro écran noir 2s)
+  unawaited(PushNotificationService.initialize());
 }
 
 class GoLivreurClientApp extends StatelessWidget {

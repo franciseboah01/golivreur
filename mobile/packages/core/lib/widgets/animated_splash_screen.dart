@@ -114,27 +114,25 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     if (isWidgetTest) {
       _controller.forward();
     } else {
-      // Pré-charger le branding avant de lancer le tracé du cercle pour que
-      // le logo personnalisé soit immédiatement visible au centre du cercle.
+      // Démarrer immédiatement le tracé du cercle dès la 1re frame (zéro écran noir d'attente),
+      // tout en synchronisant le branding serveur en parallèle sans bloquer l'affichage.
+      _controller.forward();
       try {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           try {
             if (context.findAncestorWidgetOfExactType<ProviderScope>() != null ||
                 context.findAncestorWidgetOfExactType<UncontrolledProviderScope>() != null) {
-              await ProviderScope.containerOf(context, listen: false)
-                  .read(appBrandingProvider.notifier)
-                  .loadBranding()
-                  .timeout(const Duration(milliseconds: 700), onTimeout: () {});
+              unawaited(
+                ProviderScope.containerOf(context, listen: false)
+                    .read(appBrandingProvider.notifier)
+                    .loadBranding()
+                    .timeout(const Duration(seconds: 2), onTimeout: () {}),
+              );
             }
           } catch (_) {}
-          if (mounted && !_controller.isAnimating && !_controller.isCompleted) {
-            _controller.forward();
-          }
         });
-      } catch (_) {
-        _controller.forward();
-      }
+      } catch (_) {}
     }
 
     if (widget.onInit != null) {

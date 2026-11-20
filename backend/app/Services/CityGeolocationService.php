@@ -18,7 +18,7 @@ class CityGeolocationService
 {
     public const CLIENT_DETECT_MAX_RADIUS_KM = 45.0;
 
-    public const DRIVER_OUTSIDE_CITY_RADIUS_KM = 35.0;
+    public const DRIVER_OUTSIDE_CITY_RADIUS_KM = 45.0;
 
     public const COURIER_REID_SETTING_PREFIX = 'courier_city_reid:';
 
@@ -42,6 +42,10 @@ class CityGeolocationService
         $minDistance = INF;
 
         foreach ($cities as $city) {
+            if (abs((float) $city->center_lat) < 0.0001 && abs((float) $city->center_lng) < 0.0001) {
+                continue;
+            }
+
             $distance = City::distanceHaversine(
                 (float) $city->center_lat,
                 (float) $city->center_lng,
@@ -78,7 +82,12 @@ class CityGeolocationService
      */
     public function detectCityChange(?City $registeredCity, float $lat, float $lng, float $outsideThresholdKm = self::DRIVER_OUTSIDE_CITY_RADIUS_KM): ?array
     {
-        if ($registeredCity === null || $registeredCity->center_lat === null || $registeredCity->center_lng === null) {
+        if (
+            $registeredCity === null
+            || $registeredCity->center_lat === null
+            || $registeredCity->center_lng === null
+            || (abs((float) $registeredCity->center_lat) < 0.0001 && abs((float) $registeredCity->center_lng) < 0.0001)
+        ) {
             return null;
         }
 

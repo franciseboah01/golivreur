@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
@@ -6,14 +7,14 @@ import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'features/auth/screens/business_login_screen.dart';
 import 'features/navigation/screens/business_main_navigation_screen.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await PushNotificationService.initialize();
   runApp(
     const ProviderScope(
       child: GoLivreurBusinessApp(),
     ),
   );
+  unawaited(PushNotificationService.initialize());
 }
 
 class GoLivreurBusinessApp extends StatelessWidget {

@@ -13,6 +13,7 @@ use App\Modules\GoShop\Services\AssignmentService;
 use App\Modules\GoShop\Services\CommissionService;
 use App\Services\ActivityLogService;
 use App\Services\AsyncJobDispatcher;
+use App\Services\CityGeolocationService;
 use App\Services\ConfirmationCodeService;
 use App\Services\NotificationService;
 use App\Services\ParcelPhotoStorageService;
@@ -94,13 +95,13 @@ class ParcelService
 
             if (! $city->estDansLaVille($pickupLat, $pickupLng)) {
                 throw ValidationException::withMessages([
-                    'pickup_lat' => ['Les coordonnées de ramassage sont situées en dehors du périmètre de la ville.'],
+                    'pickup_lat' => [$this->construireMessageHorsPerimetre($city, $pickupLat, $pickupLng, 'ramassage')],
                 ]);
             }
 
             if (! $city->estDansLaVille($deliveryLat, $deliveryLng)) {
                 throw ValidationException::withMessages([
-                    'delivery_lat' => ['Les coordonnées de livraison sont situées en dehors du périmètre de la ville.'],
+                    'delivery_lat' => [$this->construireMessageHorsPerimetre($city, $deliveryLat, $deliveryLng, 'livraison')],
                 ]);
             }
 
@@ -461,6 +462,27 @@ class ParcelService
         $this->smsService->envoyerNotificationColisLivre((string) $livre->recipient_phone, $livre);
 
         return $livre;
+    }
+
+    private function construireMessageHorsPerimetre(City $city, float $lat, float $lng, string $typeLabel): string
+    {
+        $distanceKm = ($city->center_lat !== null && $city->center_lng !== null)
+            ? round(City::distanceHaversine((float) $city->center_lat, (float) $city->center_lng, $lat, $lng), 1)
+            : null;
+
+        $nearest = app(CityGeolocationService::class)->findNearestActiveCity($lat, $lng);
+        if ($nearest !== null && (int) $nearest['city']->id !== (int) $city->id) {
+            $detectedName = $nearest['city']->name;
+            $distText = $distanceKm !== null ? " ({$distanceKm} km du centre)" : '';
+
+            return "Les coordonnées de {$typeLabel} sont en dehors du périmètre de {$city->name}{$distText} : position détectée proche de {$detectedName}.";
+        }
+
+        if ($distanceKm !== null) {
+            return "Les coordonnées de {$typeLabel} sont en dehors du périmètre de {$city->name} ({$distanceKm} km du centre GPS configuré). Vérifiez les coordonnées GPS de la ville dans l'administration.";
+        }
+
+        return "Les coordonnées de {$typeLabel} sont situées en dehors du périmètre de {$city->name}.";
     }
 
     private function verifierStatutRamassage(Parcel $parcel): void

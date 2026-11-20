@@ -315,3 +315,60 @@ it('stocke un numéro de service client par ville et l\'expose dans /cities, /ci
         ->assertOk()
         ->assertJsonPath('donnees.support_phone', '+2250708091011');
 });
+
+// ─── PÉRIMÈTRE GPS VILLE (45 KM + QUARTIERS + DIAGNOSTIC CLAIR) ──────────────
+
+it('accepte les coordonnées dans un rayon élargi de 45 km ou proche d\'un quartier actif, et retourne un diagnostic précis hors ville', function () {
+    $abidjan = City::factory()->create([
+        'name' => 'Abidjan',
+        'is_active' => true,
+        'center_lat' => 5.3600,
+        'center_lng' => -4.0083,
+    ]);
+    $daloa = City::factory()->create([
+        'name' => 'Daloa',
+        'is_active' => true,
+        'center_lat' => 6.8770,
+        'center_lng' => -6.4502,
+    ]);
+
+    $grandBassamZone = Neighborhood::create([
+        'city_id' => $abidjan->id,
+        'name' => 'Grand-Bassam',
+        'is_active' => true,
+        'distance_km' => 30.0,
+        'lat' => 5.2118,
+        'lng' => -3.7388,
+    ]);
+
+    // 1. ~34 km du centre d'Abidjan (Grand-Bassam) -> accepté (rayon élargi 45 km)
+    expect($abidjan->estDansLaVille(5.2118, -3.7388))->toBeTrue();
+
+    // 2. Point situé à ~55 km du centre mais à 18 km d'un quartier actif d'Abidjan -> accepté
+    expect($abidjan->estDansLaVille(5.1500, -3.6000))->toBeTrue();
+
+    // 3. Point situé à Daloa (~310 km) -> refusé avec diagnostic précis nommant les deux villes
+    $client = User::factory()->create([
+        'role' => 'client',
+        'city_id' => $abidjan->id,
+        'is_active' => true,
+    ]);
+    $token = JWTAuth::fromUser($client);
+
+    $res = $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson('/api/v1/client/parcels', [
+            'recipient_name' => 'Yao Konan',
+            'recipient_phone' => '0701020304',
+            'neighborhood_id' => $grandBassamZone->id,
+            'pickup_lat' => 6.8770,
+            'pickup_lng' => -6.4502,
+            'size' => 'petit',
+            'payment_method' => 'cash',
+        ]);
+
+    $res->assertStatus(422)
+        ->assertJsonValidationErrors(['pickup_lat']);
+
+    $errorMsg = (string) ($res->json('errors.pickup_lat.0') ?? '');
+    expect($errorMsg)->toContain('Abidjan')->toContain('Daloa');
+});

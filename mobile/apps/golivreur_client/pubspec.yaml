@@ -41,9 +41,10 @@ dependencies:
   laravel_echo: ^1.0.0-beta.1
   pusher_channels_flutter: ^2.2.0
 
-  # Images
+  # Images & Caméra in-app (évite le kill mémoire Android de la caméra externe)
   cached_network_image: 3.3.1
   image_picker: 1.0.7
+  camera: 0.10.5+9
 
   # UI
   shimmer: 3.0.0
