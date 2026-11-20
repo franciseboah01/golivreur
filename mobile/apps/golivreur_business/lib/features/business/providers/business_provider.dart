@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/env_config.dart';
@@ -299,30 +300,241 @@ final businessProfileProvider =
   return BusinessProfileNotifier(api);
 });
 
+// ─── Schéma Dynamique du Catalogue (piloté par le Dictionnaire Admin) ─────────
+class CatalogFieldDefinition {
+  final int id;
+  final String code;
+  final String label;
+  final String fieldType; // text | textarea | currency | number | image | select | boolean
+  final bool isCore;
+  final bool isRequired;
+  final int sortOrder;
+  final String? placeholder;
+  final List<String> options;
+
+  const CatalogFieldDefinition({
+    required this.id,
+    required this.code,
+    required this.label,
+    required this.fieldType,
+    this.isCore = false,
+    this.isRequired = false,
+    this.sortOrder = 100,
+    this.placeholder,
+    this.options = const [],
+  });
+
+  factory CatalogFieldDefinition.fromJson(Map<String, dynamic> json) {
+    final rawOptions = json['options'] is List ? json['options'] as List : const [];
+    final rawLabel = (json['label'] ?? '').toString().trim();
+    final safeLabel = rawLabel.toLowerCase() == 'nom' ? 'Nom du produit' : rawLabel;
+
+    return CatalogFieldDefinition(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      code: (json['code'] ?? '').toString(),
+      label: safeLabel,
+      fieldType: (json['field_type'] ?? 'text').toString(),
+      isCore: json['is_core'] == true || json['is_core'] == 1,
+      isRequired: json['is_required'] == true || json['is_required'] == 1,
+      sortOrder: (json['sort_order'] as num?)?.toInt() ?? 100,
+      placeholder: json['placeholder']?.toString(),
+      options: rawOptions.map((e) => e.toString()).where((e) => e.isNotEmpty).toList(),
+    );
+  }
+}
+
+class MerchantCatalogSchema {
+  final bool isLoading;
+  final bool isLoaded;
+  final String? errorMessage;
+  final int? categoryId;
+  final String categorySlug;
+  final String categoryName;
+  final bool isFood;
+  final List<CatalogFieldDefinition> fields;
+
+  const MerchantCatalogSchema({
+    this.isLoading = false,
+    this.isLoaded = false,
+    this.errorMessage,
+    this.categoryId,
+    this.categorySlug = '',
+    this.categoryName = '',
+    this.isFood = false,
+    this.fields = const [],
+  });
+
+  MerchantCatalogSchema copyWith({
+    bool? isLoading,
+    bool? isLoaded,
+    String? errorMessage,
+    bool clearError = false,
+    int? categoryId,
+    String? categorySlug,
+    String? categoryName,
+    bool? isFood,
+    List<CatalogFieldDefinition>? fields,
+  }) {
+    return MerchantCatalogSchema(
+      isLoading: isLoading ?? this.isLoading,
+      isLoaded: isLoaded ?? this.isLoaded,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      categoryId: categoryId ?? this.categoryId,
+      categorySlug: categorySlug ?? this.categorySlug,
+      categoryName: categoryName ?? this.categoryName,
+      isFood: isFood ?? this.isFood,
+      fields: fields ?? this.fields,
+    );
+  }
+}
+
+class BusinessCatalogSchemaNotifier extends StateNotifier<MerchantCatalogSchema> {
+  final ApiClient? _api;
+
+  BusinessCatalogSchemaNotifier([this._api]) : super(const MerchantCatalogSchema());
+
+  void reinitialiser() {
+    state = const MerchantCatalogSchema();
+  }
+
+  Future<void> chargerSchema() async {
+    if (_api == null) return;
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final res = await _api.get('/merchant/catalog-schema');
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map) {
+        final d = Map<String, dynamic>.from(res.data['donnees'] as Map);
+        final cat = d['merchant_category'] is Map
+            ? Map<String, dynamic>.from(d['merchant_category'] as Map)
+            : const <String, dynamic>{};
+        final rawFields = d['fields'] is List ? d['fields'] as List : const [];
+        final parsedFields = rawFields
+            .whereType<Map>()
+            .map((e) => CatalogFieldDefinition.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+        state = MerchantCatalogSchema(
+          isLoading: false,
+          isLoaded: true,
+          categoryId: (cat['id'] as num?)?.toInt(),
+          categorySlug: (cat['slug'] ?? '').toString(),
+          categoryName: (cat['name'] ?? '').toString(),
+          isFood: cat['is_food'] == true,
+          fields: parsedFields,
+        );
+        return;
+      }
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Impossible de charger la configuration du catalogue.',
+      );
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: ApiClient.messageErreur(e),
+      );
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Impossible de charger les champs de votre type de commerce.',
+      );
+    }
+  }
+}
+
+final businessCatalogSchemaProvider =
+    StateNotifierProvider<BusinessCatalogSchemaNotifier, MerchantCatalogSchema>((ref) {
+  final api = ref.watch(apiClientProvider);
+  return BusinessCatalogSchemaNotifier(api);
+});
+
 // ─── Catalogue & Gestion des Stocks en direct ─────────────────────────────────
+class BusinessProductAttributeDisplay {
+  final String code;
+  final String label;
+  final String fieldType;
+  final dynamic value;
+
+  const BusinessProductAttributeDisplay({
+    required this.code,
+    required this.label,
+    required this.fieldType,
+    required this.value,
+  });
+
+  factory BusinessProductAttributeDisplay.fromJson(Map<String, dynamic> json) =>
+      BusinessProductAttributeDisplay(
+        code: (json['code'] ?? '').toString(),
+        label: (json['label'] ?? json['code'] ?? '').toString(),
+        fieldType: (json['field_type'] ?? 'text').toString(),
+        value: json['value'],
+      );
+}
+
 class BusinessProductItem {
   final int id;
   final String name;
   final double price;
-  final String category;
+  final String? category;
   final String? description;
+  final String? photoUrl;
+  final int? quantity;
   final bool isAvailable;
+  final Map<String, dynamic> attributes;
+  final List<BusinessProductAttributeDisplay> orderedAttributes;
 
   const BusinessProductItem({
     required this.id,
     required this.name,
     required this.price,
-    required this.category,
+    this.category,
     this.description,
+    this.photoUrl,
+    this.quantity,
     this.isAvailable = true,
+    this.attributes = const {},
+    this.orderedAttributes = const [],
   });
+
+  factory BusinessProductItem.fromJson(Map<String, dynamic> json) {
+    final rawAttrs = json['attributes'] is Map
+        ? Map<String, dynamic>.from(json['attributes'] as Map)
+        : const <String, dynamic>{};
+    final rawOrdered = json['ordered_attributes'] is List
+        ? json['ordered_attributes'] as List
+        : const [];
+
+    return BusinessProductItem(
+      id: (json['id'] as num).toInt(),
+      name: (json['name'] ?? '').toString(),
+      price: num.tryParse('${json['price'] ?? 0}')?.toDouble() ?? 0,
+      category: json['category']?.toString(),
+      description: json['description']?.toString(),
+      photoUrl: GoLivreurEnv.resolveMediaUrl(json['photo_url']?.toString()),
+      quantity: json['quantity'] != null ? (json['quantity'] as num?)?.toInt() : null,
+      isAvailable: json['is_available'] == true || json['is_available'] == 1,
+      attributes: rawAttrs,
+      orderedAttributes: rawOrdered
+          .whereType<Map>()
+          .map((e) => BusinessProductAttributeDisplay.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
 
   BusinessProductItem copyWith({
     String? name,
     double? price,
     String? category,
     String? description,
+    String? photoUrl,
+    int? quantity,
     bool? isAvailable,
+    Map<String, dynamic>? attributes,
+    List<BusinessProductAttributeDisplay>? orderedAttributes,
   }) {
     return BusinessProductItem(
       id: id,
@@ -330,7 +542,11 @@ class BusinessProductItem {
       price: price ?? this.price,
       category: category ?? this.category,
       description: description ?? this.description,
+      photoUrl: photoUrl ?? this.photoUrl,
+      quantity: quantity ?? this.quantity,
       isAvailable: isAvailable ?? this.isAvailable,
+      attributes: attributes ?? this.attributes,
+      orderedAttributes: orderedAttributes ?? this.orderedAttributes,
     );
   }
 }
@@ -355,18 +571,7 @@ class BusinessCatalogNotifier extends StateNotifier<List<BusinessProductItem>> {
         final list = res.data['donnees'] as List;
         state = list
             .whereType<Map>()
-            .map((raw) {
-              final json = Map<String, dynamic>.from(raw);
-              return BusinessProductItem(
-                id: (json['id'] as num).toInt(),
-                name: (json['name'] ?? '').toString(),
-                price: num.tryParse('${json['price'] ?? 0}')?.toDouble() ?? 0,
-                category: (json['category'] ?? 'Catalogue').toString(),
-                description: json['description']?.toString(),
-                isAvailable:
-                    json['is_available'] == true || json['is_available'] == 1,
-              );
-            })
+            .map((raw) => BusinessProductItem.fromJson(Map<String, dynamic>.from(raw)))
             .toList();
       }
     } catch (_) {}
@@ -387,67 +592,73 @@ class BusinessCatalogNotifier extends StateNotifier<List<BusinessProductItem>> {
     }).toList();
   }
 
-  Future<void> addProduct({
-    required String name,
-    required double price,
-    required String category,
-    String? description,
+  /// Crée ou met à jour un produit en envoyant STRICTEMENT les champs du schéma Admin.
+  Future<(bool, String?)> saveDynamicProduct({
+    int? productId,
+    required Map<String, dynamic> coreFields,
+    required Map<String, dynamic> dynamicAttributes,
+    XFile? photoFile,
   }) async {
-    if (_api == null) return;
-    try {
-      final res = await _api.post('/merchant/products', data: {
-        'name': name,
-        'price': price,
-        'category': category,
-        'description': description,
-        'is_available': true,
-      });
-      if ((res.statusCode == 201 || res.statusCode == 200) &&
-          res.data is Map &&
-          res.data['donnees'] is Map) {
-        final json = Map<String, dynamic>.from(res.data['donnees'] as Map);
-        final created = BusinessProductItem(
-          id: (json['id'] as num).toInt(),
-          name: (json['name'] ?? name).toString(),
-          price: num.tryParse('${json['price'] ?? price}')?.toDouble() ?? price,
-          category: (json['category'] ?? category).toString(),
-          description: json['description']?.toString() ?? description,
-          isAvailable:
-              json['is_available'] == true || json['is_available'] == 1,
-        );
-        state = [...state, created];
-        return;
-      }
-    } catch (_) {}
-    await chargerCatalogue();
-  }
+    if (_api == null) {
+      return (false, 'Client API non initialisé.');
+    }
 
-  void updateProduct(
-    int id, {
-    required String name,
-    required double price,
-    required String category,
-    String? description,
-  }) {
-    state = state.map((p) {
-      if (p.id == id) {
-        return p.copyWith(
-          name: name,
-          price: price,
-          category: category,
-          description: description,
+    final isEdit = productId != null;
+    final path = isEdit ? '/merchant/products/$productId' : '/merchant/products';
+
+    try {
+      final Response<dynamic> res;
+      if (photoFile != null) {
+        final multipartFields = <String, dynamic>{};
+        for (final entry in coreFields.entries) {
+          if (entry.value != null) {
+            multipartFields[entry.key] = '${entry.value}';
+          }
+        }
+        if (dynamicAttributes.isNotEmpty) {
+          multipartFields['attributes'] = jsonEncode(dynamicAttributes);
+        }
+        if (!isEdit) {
+          multipartFields['is_available'] = '1';
+        }
+        res = await _api.uploadMultipart(
+          path,
+          method: isEdit ? 'PUT' : 'POST',
+          fields: multipartFields,
+          files: {'photo': photoFile},
         );
+      } else {
+        final body = <String, dynamic>{
+          ...coreFields,
+          if (dynamicAttributes.isNotEmpty) 'attributes': dynamicAttributes,
+          if (!isEdit) 'is_available': true,
+        };
+        res = isEdit
+            ? await _api.put(path, data: body)
+            : await _api.post(path, data: body);
       }
-      return p;
-    }).toList();
-    _safeIgnore(
-      _api?.put('/merchant/products/$id', data: {
-        'name': name,
-        'price': price,
-        'category': category,
-        'description': description,
-      }),
-    );
+
+      if ((res.statusCode == 200 || res.statusCode == 201) &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map) {
+        final item = BusinessProductItem.fromJson(
+          Map<String, dynamic>.from(res.data['donnees'] as Map),
+        );
+        if (isEdit) {
+          state = state.map((p) => p.id == item.id ? item : p).toList();
+        } else {
+          state = [item, ...state];
+        }
+        return (true, null);
+      }
+
+      return (false, 'Réponse inattendue du serveur.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Impossible d\'enregistrer l\'article.');
+    }
   }
 
   void deleteProduct(int id) {

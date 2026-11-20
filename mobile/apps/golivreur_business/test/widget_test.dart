@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golivreur_business/features/auth/screens/business_login_screen.dart';
+import 'package:golivreur_business/features/catalog/screens/business_catalog_screen.dart';
 import 'package:golivreur_business/features/navigation/screens/business_main_navigation_screen.dart';
 import 'package:golivreur_business/main.dart';
 import 'package:golivreur_core/services/api_client.dart';
@@ -92,6 +93,60 @@ class _FakeHttpClientAdapter implements HttpClientAdapter {
           'address': 'Daloa',
           'is_open': true,
           'prep_time_minutes': 20,
+        },
+      '/merchant/catalog-schema' => {
+          'merchant_category': {
+            'id': 1,
+            'slug': 'restaurant',
+            'name': 'Restauration & Maquis',
+            'is_food': true,
+          },
+          'fields': [
+            {
+              'id': 1,
+              'code': 'name',
+              'label': 'Nom du plat',
+              'field_type': 'text',
+              'is_core': true,
+              'is_required': true,
+              'sort_order': 10,
+              'placeholder': 'Ex: Garba Thon VIP',
+              'options': [],
+            },
+            {
+              'id': 2,
+              'code': 'price',
+              'label': 'Prix du plat (F CFA)',
+              'field_type': 'currency',
+              'is_core': true,
+              'is_required': true,
+              'sort_order': 20,
+              'placeholder': 'Ex: 1500',
+              'options': [],
+            },
+            {
+              'id': 3,
+              'code': 'ingredients',
+              'label': 'Ingrédients',
+              'field_type': 'textarea',
+              'is_core': false,
+              'is_required': false,
+              'sort_order': 30,
+              'placeholder': 'Attiéké, thon...',
+              'options': [],
+            },
+            {
+              'id': 4,
+              'code': 'quantity',
+              'label': 'Portions disponibles',
+              'field_type': 'number',
+              'is_core': true,
+              'is_required': false,
+              'sort_order': 90,
+              'placeholder': 'Ex: 20',
+              'options': [],
+            },
+          ],
         },
       _ => <dynamic>[],
     };
@@ -221,5 +276,52 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets(
+      'BusinessCatalogScreen génère les champs dynamiques dans l\'ordre exact de l\'Admin sans jamais afficher un champ non coché',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _fakeBusinessOverrides(),
+        child: const MaterialApp(
+          home: BusinessCatalogScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Bouton adapté à la restauration
+    expect(find.text('Ajouter un plat'), findsOneWidget);
+
+    await tester.tap(find.text('Ajouter un plat'));
+    await tester.pumpAndSettle();
+
+    // Libellés précis présents (jamais juste "Nom")
+    final nomPlatFinder = find.text('Nom du plat *');
+    final prixFinder = find.text('Prix du plat (F CFA) *');
+    final ingredientsFinder = find.text('Ingrédients');
+    final quantiteFinder = find.text('Portions disponibles');
+
+    expect(nomPlatFinder, findsOneWidget);
+    expect(prixFinder, findsOneWidget);
+    expect(ingredientsFinder, findsOneWidget);
+    expect(quantiteFinder, findsOneWidget);
+
+    // Champs NON cochés pour la restauration strictement absents
+    expect(find.text('Marque'), findsNothing);
+    expect(find.text('Contenance'), findsNothing);
+    expect(find.text('Taille'), findsNothing);
+    expect(find.text('Nom'), findsNothing);
+
+    // Vérifie l'ordre vertical strict défini par l'Admin : Nom du plat < Prix < Ingrédients < Quantité
+    final yNom = tester.getTopLeft(nomPlatFinder).dy;
+    final yPrix = tester.getTopLeft(prixFinder).dy;
+    final yIngredients = tester.getTopLeft(ingredientsFinder).dy;
+    final yQuantite = tester.getTopLeft(quantiteFinder).dy;
+
+    expect(yNom, lessThan(yPrix));
+    expect(yPrix, lessThan(yIngredients));
+    expect(yIngredients, lessThan(yQuantite));
   });
 }

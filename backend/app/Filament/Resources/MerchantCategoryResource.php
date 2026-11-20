@@ -5,9 +5,13 @@ namespace App\Filament\Resources;
 use App\Filament\Components\EmojiSelectField;
 use App\Filament\Components\ImageUploadField;
 use App\Filament\Resources\MerchantCategoryResource\Pages;
+use App\Models\CatalogField;
 use App\Models\MerchantCategory;
+use App\Services\CatalogSchemaService;
+use Closure;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -22,16 +26,15 @@ class MerchantCategoryResource extends Resource
 
     protected static ?string $navigationGroup = 'Partenaires';
 
-    protected static ?string $navigationLabel = 'Catégories d\'Activité';
+    protected static ?string $navigationLabel = 'Types de Commerce';
 
-    protected static ?string $modelLabel = 'Catégorie d\'Activité';
+    protected static ?string $modelLabel = 'Type de Commerce';
 
-    protected static ?string $pluralModelLabel = 'Catégories d\'Activité';
+    protected static ?string $pluralModelLabel = 'Types de Commerce';
 
     protected static ?int $navigationSort = 4;
 
-    // Retirée du menu principal : accessible depuis Commerces Partenaires
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     public static function canAccess(): bool
     {
@@ -80,9 +83,81 @@ class MerchantCategoryResource extends Resource
                             ->columnSpanFull(),
 
                         Forms\Components\Toggle::make('is_active')
-                            ->label('Catégorie active (visible dans l\'admin et sur l\'application mobile)')
+                            ->label('Type de commerce actif (visible dans l\'admin et sur l\'application mobile)')
                             ->default(true),
                     ])->columns(2),
+
+                Forms\Components\Section::make('Champs du Catalogue Produits (Cocher & Ordonner)')
+                    ->description('Cochez les champs autorisés pour ce Type de Commerce et réordonnez-les par glisser-déposer (ou flèches ↑ ↓). L\'ordre défini ici est l\'ordre exact affiché dans GL Business. Tout champ décoché est bloqué côté API (erreur 403).')
+                    ->schema([
+                        Forms\Components\Repeater::make('catalog_field_config')
+                            ->label('Champs de la bibliothèque centrale')
+                            ->reorderable(true)
+                            ->reorderableWithButtons()
+                            ->addable(false)
+                            ->deletable(false)
+                            ->collapsible()
+                            ->collapsed(false)
+                            ->default(fn (): array => app(CatalogSchemaService::class)->buildDefaultConfigRowsForNewCategory())
+                            ->itemLabel(function (array $state): string {
+                                $enabled = ! empty($state['enabled']);
+                                $label = is_string($state['custom_label'] ?? null) && trim($state['custom_label']) !== ''
+                                    ? trim($state['custom_label'])
+                                    : (string) ($state['default_label'] ?? $state['code'] ?? 'Champ');
+                                $type = (string) ($state['field_type'] ?? 'text');
+                                $typeLabel = CatalogField::fieldTypeLabels()[$type] ?? $type;
+                                $req = ! empty($state['is_required']) ? ' • Obligatoire' : '';
+
+                                return ($enabled ? '[COCHÉ] ' : '[Décoché] ')."{$label} ({$typeLabel}{$req})";
+                            })
+                            ->schema([
+                                Forms\Components\Hidden::make('catalog_field_id'),
+                                Forms\Components\Hidden::make('code'),
+                                Forms\Components\Hidden::make('default_label'),
+                                Forms\Components\Hidden::make('field_type'),
+
+                                Forms\Components\Checkbox::make('enabled')
+                                    ->label('Autoriser ce champ')
+                                    ->live()
+                                    ->columnSpan(3),
+
+                                Forms\Components\TextInput::make('custom_label')
+                                    ->label('Libellé précis affiché au commerçant')
+                                    ->placeholder('Ex: Nom du plat, Nom du produit, Marque...')
+                                    ->required(fn (Get $get): bool => ! empty($get('enabled')))
+                                    ->maxLength(120)
+                                    ->disabled(fn (Get $get): bool => empty($get('enabled')))
+                                    ->dehydrated()
+                                    ->rule(fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                                        if (empty($get('enabled'))) {
+                                            return;
+                                        }
+                                        if (is_string($value) && app(CatalogSchemaService::class)->isForbiddenGenericLabel($value)) {
+                                            $fail('Utilisez un libellé précis (ex: « Nom du plat » ou « Nom du produit »), jamais « Nom » seul.');
+                                        }
+                                    })
+                                    ->columnSpan(5),
+
+                                Forms\Components\Placeholder::make('code_badge')
+                                    ->label('Code / Type')
+                                    ->content(function (Get $get): string {
+                                        $code = (string) ($get('code') ?? '');
+                                        $type = (string) ($get('field_type') ?? 'text');
+                                        $typeLabel = CatalogField::fieldTypeLabels()[$type] ?? $type;
+
+                                        return "{$code} ({$typeLabel})";
+                                    })
+                                    ->columnSpan(2),
+
+                                Forms\Components\Toggle::make('is_required')
+                                    ->label('Obligatoire')
+                                    ->disabled(fn (Get $get): bool => empty($get('enabled')))
+                                    ->dehydrated()
+                                    ->columnSpan(2),
+                            ])
+                            ->columns(12)
+                            ->columnSpanFull(),
+                    ]),
             ]);
     }
 
@@ -129,6 +204,13 @@ class MerchantCategoryResource extends Resource
                     ->falseIcon('heroicon-o-x-circle')
                     ->trueColor('success')
                     ->falseColor('danger'),
+
+                Tables\Columns\TextColumn::make('catalog_fields_count')
+                    ->counts('catalogFields')
+                    ->label('Champs actifs')
+                    ->badge()
+                    ->color('success')
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('merchants_count')
                     ->counts('merchants')

@@ -87,6 +87,7 @@ class _BusinessMainNavigationScreenState
   Future<void> _synchroniserDonneesServeur() async {
     await Future.wait([
       ref.read(businessProfileProvider.notifier).chargerProfil(),
+      ref.read(businessCatalogSchemaProvider.notifier).chargerSchema(),
       ref.read(businessCatalogProvider.notifier).chargerCatalogue(),
       ref.read(businessOrdersProvider.notifier).chargerCommandes(),
       ref.read(revenueStatsProvider.notifier).chargerRevenus(),
@@ -97,6 +98,7 @@ class _BusinessMainNavigationScreenState
     if (index == 0) {
       ref.read(businessOrdersProvider.notifier).chargerCommandes();
     } else if (index == 1) {
+      ref.read(businessCatalogSchemaProvider.notifier).chargerSchema();
       ref.read(businessCatalogProvider.notifier).chargerCatalogue();
     } else if (index == 2) {
       ref.read(revenueStatsProvider.notifier).chargerRevenus();

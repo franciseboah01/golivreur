@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Merchant;
 
+use App\Exceptions\UnauthorizedCatalogFieldException;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Courier;
@@ -11,6 +12,7 @@ use App\Models\Product;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Modules\GoShop\Services\OrderService;
+use App\Services\CatalogSchemaService;
 use App\Services\SettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -137,14 +139,32 @@ class MerchantController extends Controller
         ]);
     }
 
-    public function products(): JsonResponse
+    /**
+     * Retourne les champs du Dictionnaire cochés et ordonnés par l'Admin
+     * pour le Type de Commerce du commerçant connecté.
+     */
+    public function catalogSchema(CatalogSchemaService $schemaService): JsonResponse
     {
-        $merchant = $this->getMerchant();
+        $merchant = $this->getMerchant()->load('categoryModel');
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => $schemaService->getSchemaForMerchant($merchant),
+        ]);
+    }
+
+    public function products(CatalogSchemaService $schemaService): JsonResponse
+    {
+        $merchant = $this->getMerchant()->load('categoryModel');
+        $schema = $schemaService->getSchemaForMerchant($merchant);
 
         $products = Product::where('merchant_id', $merchant->id)
             ->orderBy('category')
             ->orderBy('sort_order')
-            ->get();
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (Product $product): array => $schemaService->formatProductForApi($product, $schema['fields']))
+            ->values();
 
         return response()->json([
             'succes' => true,
@@ -152,50 +172,68 @@ class MerchantController extends Controller
         ]);
     }
 
-    public function storeProduct(Request $request): JsonResponse
+    public function storeProduct(Request $request, CatalogSchemaService $schemaService): JsonResponse
     {
-        $merchant = $this->getMerchant();
+        $merchant = $this->getMerchant()->load('categoryModel');
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:200',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:100',
-            'category' => 'nullable|string|max:100',
-            'is_available' => 'boolean',
-        ]);
+        try {
+            $extracted = $schemaService->validateAndExtractProductPayload($merchant, $request);
+        } catch (UnauthorizedCatalogFieldException $e) {
+            return response()->json([
+                'succes' => false,
+                'code' => 'UNAUTHORIZED_CATALOG_FIELD',
+                'forbidden_fields' => $e->forbiddenFields,
+                'message' => $e->getMessage(),
+            ], 403);
+        }
 
         $product = Product::create([
-            ...$validated,
+            ...$extracted['core_data'],
             'merchant_id' => $merchant->id,
+            'custom_attributes' => $extracted['custom_attributes'] !== []
+                ? $extracted['custom_attributes']
+                : null,
         ]);
 
         return response()->json([
             'succes' => true,
-            'donnees' => $product,
+            'donnees' => $schemaService->formatProductForApi($product, $extracted['schema_fields']),
+            'message' => 'Article ajouté au catalogue avec succès.',
         ], 201);
     }
 
-    public function updateProduct(Request $request, Product $product): JsonResponse
+    public function updateProduct(Request $request, Product $product, CatalogSchemaService $schemaService): JsonResponse
     {
-        $merchant = $this->getMerchant();
+        $merchant = $this->getMerchant()->load('categoryModel');
 
         if ($product->merchant_id !== $merchant->id) {
             return response()->json(['succes' => false, 'message' => 'Accès refusé.'], 403);
         }
 
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:200',
-            'description' => 'nullable|string',
-            'price' => 'sometimes|required|numeric|min:100',
-            'category' => 'nullable|string|max:100',
-            'is_available' => 'boolean',
-        ]);
+        try {
+            $extracted = $schemaService->validateAndExtractProductPayload($merchant, $request, $product);
+        } catch (UnauthorizedCatalogFieldException $e) {
+            return response()->json([
+                'succes' => false,
+                'code' => 'UNAUTHORIZED_CATALOG_FIELD',
+                'forbidden_fields' => $e->forbiddenFields,
+                'message' => $e->getMessage(),
+            ], 403);
+        }
 
-        $product->update($validated);
+        $updatePayload = $extracted['core_data'];
+        if ($extracted['has_custom_attributes_update']) {
+            $updatePayload['custom_attributes'] = $extracted['custom_attributes'] !== []
+                ? $extracted['custom_attributes']
+                : null;
+        }
+
+        $product->update($updatePayload);
 
         return response()->json([
             'succes' => true,
-            'donnees' => $product,
+            'donnees' => $schemaService->formatProductForApi($product->fresh(), $extracted['schema_fields']),
+            'message' => 'Article mis à jour avec succès.',
         ]);
     }
 

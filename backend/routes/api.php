@@ -188,6 +188,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
     Route::prefix('merchant')->middleware('role:merchant')->group(function () {
         Route::get('profile', [ProfileController::class, 'showBusiness']);
         Route::get('status', [MerchantController::class, 'status']);
+        Route::get('catalog-schema', [MerchantController::class, 'catalogSchema']);
 
         Route::middleware('active_merchant')->group(function () {
             Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateBusiness']);
@@ -198,7 +199,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
             Route::post('orders/{order}/ready', [MerchantController::class, 'readyOrder']);
             Route::get('products', [MerchantController::class, 'products']);
             Route::post('products', [MerchantController::class, 'storeProduct']);
-            Route::put('products/{product}', [MerchantController::class, 'updateProduct']);
+            Route::match(['put', 'post'], 'products/{product}', [MerchantController::class, 'updateProduct']);
             Route::delete('products/{product}', [MerchantController::class, 'deleteProduct']);
             Route::get('wallet', [MerchantController::class, 'wallet']);
             Route::get('priority-courier', [MerchantController::class, 'priorityCourier']);
