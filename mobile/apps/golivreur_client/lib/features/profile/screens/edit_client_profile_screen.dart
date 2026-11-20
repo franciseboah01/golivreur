@@ -251,11 +251,20 @@ class _EditClientProfileScreenState
                               sheetError = null;
                               infoMessage = null;
                             });
+                            final cleanTarget = AuthNotifier.normalizePhone(
+                              newPhoneCtrl.text,
+                            );
                             final (ok, msg) = await ref
                                 .read(authProvider.notifier)
                                 .demanderOtpChangementTelephone(
                                     newPhoneCtrl.text);
                             if (!ctx.mounted) return;
+                            if (ok &&
+                                ref.read(authProvider).user?.phone ==
+                                    cleanTarget) {
+                              Navigator.of(ctx).pop(true);
+                              return;
+                            }
                             setSheetState(() {
                               busy = false;
                               if (ok) {

@@ -25,6 +25,7 @@ class LoginRequest extends FormRequest
     {
         return [
             'phone' => ['required', 'string'],
+            'use_firebase_otp' => ['nullable', 'boolean'],
         ];
     }
 }

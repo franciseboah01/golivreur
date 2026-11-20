@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/atoms/widgets_atomiques.dart';
 import 'package:golivreur_core/widgets/golivreur_logo.dart';
+import '../../../main.dart';
+import '../../gocolis/providers/gocolis_provider.dart';
 import '../../goshop/providers/goshop_provider.dart';
+import '../../goshop/providers/order_provider.dart';
 import '../providers/auth_provider.dart';
 import 'otp_verification_screen.dart';
 import 'login_screen.dart';
@@ -48,6 +51,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         );
 
     if (success && mounted) {
+      if (ref.read(authProvider).status == AuthStatus.authenticated) {
+        ref.read(cartProvider.notifier).clear();
+        ref.read(searchQueryProvider.notifier).state = '';
+        ref.invalidate(clientAddressesProvider);
+        ref.invalidate(favoritesProvider);
+        ref.invalidate(clientNotificationsProvider);
+        ref.invalidate(ordersHistoryProvider);
+        ref.invalidate(parcelsHistoryProvider);
+        ref.read(weatherProvider.notifier).chargerStatutVille();
+        ref.read(clientAddressesProvider.notifier).chargerAdresses();
+        ref.read(favoritesProvider.notifier).chargerFavoris();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Numéro vérifié automatiquement ! Bienvenue sur GoLivreur.'),
+            backgroundColor: GoLivreurTheme.succes,
+          ),
+        );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const ClientAuthGate()),
+          (route) => false,
+        );
+        return;
+      }
+
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => OtpVerificationScreen(

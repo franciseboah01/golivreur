@@ -14,6 +14,7 @@ use App\Models\ActivityLog;
 use App\Models\OtpCode;
 use App\Models\User;
 use App\Services\CityGeolocationService;
+use App\Services\FirebasePhoneAuthService;
 use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -219,6 +220,30 @@ class ProfileController extends Controller
         }
         RateLimiter::hit($rateKey, 600);
 
+        if ($request->boolean('use_firebase_otp')) {
+            ActivityLog::create([
+                'user_id' => $user->id,
+                'action' => 'client_phone_change_otp_sent',
+                'entity_type' => 'user',
+                'entity_id' => $user->id,
+                'properties' => [
+                    'provider' => 'firebase',
+                    'new_phone_masked' => substr($newPhone, 0, 2).'****'.substr($newPhone, -3),
+                ],
+                'ip_address' => $request->ip(),
+                'severity' => 'info',
+            ]);
+
+            return response()->json([
+                'succes' => true,
+                'message' => 'Vérification SMS prête sur votre nouveau numéro.',
+                'donnees' => [
+                    'firebase_otp' => true,
+                    'phone_e164' => "+225{$newPhone}",
+                ],
+            ]);
+        }
+
         $purpose = "phone_chg_{$user->id}";
         OtpCode::where('purpose', $purpose)
             ->where('is_used', false)
@@ -252,10 +277,12 @@ class ProfileController extends Controller
     }
 
     /**
-     * Étape 2 : Vérifie le code OTP reçu sur le nouveau numéro et met à jour `users.phone`.
+     * Étape 2 : Vérifie le code OTP (Firebase ID Token ou code 6 chiffres historique) et met à jour `users.phone`.
      */
-    public function confirmClientPhoneChange(Request $request): JsonResponse
-    {
+    public function confirmClientPhoneChange(
+        Request $request,
+        FirebasePhoneAuthService $firebasePhoneAuthService,
+    ): JsonResponse {
         /** @var User $user */
         $user = $request->user();
 
@@ -269,14 +296,63 @@ class ProfileController extends Controller
                 'regex:/^(01|05|07|21|25|27)[0-9]{8}$/',
                 Rule::unique('users', 'phone')->ignore($user->id),
             ],
-            'code' => ['required', 'string', 'regex:/^[0-9]{6}$/'],
+            'firebase_id_token' => ['nullable', 'string'],
+            'code' => ['required_without:firebase_id_token', 'nullable', 'string', 'regex:/^[0-9]{6}$/'],
         ], [
             'phone.unique' => 'Ce numéro de téléphone est déjà utilisé par un autre compte.',
             'code.regex' => 'Veuillez saisir le code OTP à 6 chiffres.',
         ]);
 
         $newPhone = (string) $validated['phone'];
-        $code = (string) $validated['code'];
+        $firebaseIdToken = trim((string) ($validated['firebase_id_token'] ?? ''));
+
+        if ($firebaseIdToken !== '') {
+            try {
+                $verifiedPhone = $firebasePhoneAuthService->verifyIdToken($firebaseIdToken);
+            } catch (\InvalidArgumentException $e) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
+            if ($verifiedPhone !== $newPhone) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Le numéro vérifié par SMS ne correspond pas au nouveau numéro saisi.',
+                ], 422);
+            }
+
+            DB::transaction(function () use ($user, $newPhone, $request): void {
+                $user->update([
+                    'phone' => $newPhone,
+                    'phone_verified_at' => now(),
+                ]);
+
+                ActivityLog::create([
+                    'user_id' => $user->id,
+                    'action' => 'client_phone_changed',
+                    'entity_type' => 'user',
+                    'entity_id' => $user->id,
+                    'properties' => [
+                        'provider' => 'firebase',
+                        'new_phone_masked' => substr($newPhone, 0, 2).'****'.substr($newPhone, -3),
+                    ],
+                    'ip_address' => $request->ip(),
+                    'severity' => 'warning',
+                ]);
+            });
+
+            RateLimiter::clear("client_phone_otp:{$user->id}");
+
+            return response()->json([
+                'succes' => true,
+                'message' => 'Votre numéro de téléphone a été confirmé et mis à jour avec succès.',
+                'donnees' => new ClientProfileResource($user->fresh()->load('city')),
+            ]);
+        }
+
+        $code = (string) ($validated['code'] ?? '');
         $purpose = "phone_chg_{$user->id}";
 
         $otp = OtpCode::where('phone', $newPhone)

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
@@ -26,24 +27,38 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  ConsumerState<OtpVerificationScreen> createState() =>
+      _OtpVerificationScreenState();
 }
 
 class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   final _otpController = TextEditingController();
   int _rebours = 60;
   Timer? _timer;
+  StreamSubscription<({String phoneE164, String idToken})>? _autoVerifySub;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     _startTimer();
+    final expectedE164 = FirebasePhoneOtpService.toE164Ivorian(widget.phone);
+    _autoVerifySub = FirebasePhoneOtpService.onAutoVerified.listen((event) {
+      if (!mounted || _isSubmitting) return;
+      if (event.phoneE164 == expectedE164) {
+        _verify(autoFirebaseIdToken: event.idToken);
+      }
+    });
   }
 
   void _startTimer() {
     _rebours = 60;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
       if (_rebours > 0) {
         setState(() => _rebours--);
       } else {
@@ -54,48 +69,60 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
   @override
   void dispose() {
+    _autoVerifySub?.cancel();
     _timer?.cancel();
     _otpController.dispose();
     super.dispose();
   }
 
-  void _verify() async {
+  Future<void> _verify({String? autoFirebaseIdToken}) async {
+    if (_isSubmitting) return;
     final code = _otpController.text.trim();
-    if (code.length != 4) return;
+    if (autoFirebaseIdToken == null && code.length != 6) return;
 
-    final notifier = ref.read(authProvider.notifier);
-    final success = widget.isRegister
-        ? await notifier.verifierOtpInscription(
-            phone: widget.phone,
-            code: code,
-            name: widget.name,
-            cityId: widget.cityId,
-            password: widget.password,
-          )
-        : await notifier.verifierOtpConnexion(phone: widget.phone, code: code);
+    _isSubmitting = true;
+    try {
+      final notifier = ref.read(authProvider.notifier);
+      final success = widget.isRegister
+          ? await notifier.verifierOtpInscription(
+              phone: widget.phone,
+              code: code,
+              firebaseIdToken: autoFirebaseIdToken,
+              name: widget.name,
+              cityId: widget.cityId,
+              password: widget.password,
+            )
+          : await notifier.verifierOtpConnexion(
+              phone: widget.phone,
+              code: code,
+              firebaseIdToken: autoFirebaseIdToken,
+            );
 
-    if (success && mounted) {
-      ref.read(cartProvider.notifier).clear();
-      ref.read(searchQueryProvider.notifier).state = '';
-      ref.invalidate(clientAddressesProvider);
-      ref.invalidate(favoritesProvider);
-      ref.invalidate(clientNotificationsProvider);
-      ref.invalidate(ordersHistoryProvider);
-      ref.invalidate(parcelsHistoryProvider);
-      ref.read(weatherProvider.notifier).chargerStatutVille();
-      ref.read(clientAddressesProvider.notifier).chargerAdresses();
-      ref.read(favoritesProvider.notifier).chargerFavoris();
+      if (success && mounted) {
+        ref.read(cartProvider.notifier).clear();
+        ref.read(searchQueryProvider.notifier).state = '';
+        ref.invalidate(clientAddressesProvider);
+        ref.invalidate(favoritesProvider);
+        ref.invalidate(clientNotificationsProvider);
+        ref.invalidate(ordersHistoryProvider);
+        ref.invalidate(parcelsHistoryProvider);
+        ref.read(weatherProvider.notifier).chargerStatutVille();
+        ref.read(clientAddressesProvider.notifier).chargerAdresses();
+        ref.read(favoritesProvider.notifier).chargerFavoris();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connexion réussie ! Bienvenue sur GoLivreur.'),
-          backgroundColor: GoLivreurTheme.succes,
-        ),
-      );
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const ClientAuthGate()),
-        (route) => false,
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Connexion réussie ! Bienvenue sur GoLivreur.'),
+            backgroundColor: GoLivreurTheme.succes,
+          ),
+        );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const ClientAuthGate()),
+          (route) => false,
+        );
+      }
+    } finally {
+      _isSubmitting = false;
     }
   }
 
@@ -105,7 +132,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
-      appBar: AppBar(title: const Text('Validation OTP')),
+      appBar: AppBar(title: const Text('Validation SMS OTP')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -130,7 +157,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Un code à 4 chiffres a été envoyé au +225 ${widget.phone}',
+                'Un code à 6 chiffres a été envoyé au +225 ${widget.phone}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: GoLivreurTheme.texteSecondaire,
@@ -156,15 +183,20 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
               TextFormField(
                 controller: _otpController,
                 keyboardType: TextInputType.number,
-                maxLength: 4,
+                maxLength: 6,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 32, letterSpacing: 16, fontWeight: FontWeight.bold),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: const TextStyle(
+                  fontSize: 28,
+                  letterSpacing: 10,
+                  fontWeight: FontWeight.bold,
+                ),
                 decoration: const InputDecoration(
                   counterText: '',
-                  hintText: '••••',
+                  hintText: '••••••',
                 ),
                 onChanged: (val) {
-                  if (val.length == 4) _verify();
+                  if (val.length == 6) _verify();
                 },
               ),
               const SizedBox(height: 24),
@@ -178,17 +210,48 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                 child: _rebours > 0
                     ? Text('Renvoyer un code dans ${_rebours}s')
                     : TextButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          final navigator = Navigator.of(context);
                           _startTimer();
                           if (widget.isRegister) {
-                            ref.read(authProvider.notifier).demanderOtpInscription(
+                            final ok = await ref
+                                .read(authProvider.notifier)
+                                .demanderOtpInscription(
                                   phone: widget.phone,
                                   name: widget.name ?? '',
                                   cityId: widget.cityId ?? 1,
                                   password: widget.password,
+                                  isResend: true,
                                 );
+                            if (ok &&
+                                mounted &&
+                                ref.read(authProvider).status ==
+                                    AuthStatus.authenticated) {
+                              navigator.pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder: (_) => const ClientAuthGate(),
+                                ),
+                                (route) => false,
+                              );
+                            }
                           } else {
-                            ref.read(authProvider.notifier).demanderOtpConnexion(widget.phone);
+                            final ok = await ref
+                                .read(authProvider.notifier)
+                                .demanderOtpConnexion(
+                                  widget.phone,
+                                  isResend: true,
+                                );
+                            if (ok &&
+                                mounted &&
+                                ref.read(authProvider).status ==
+                                    AuthStatus.authenticated) {
+                              navigator.pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder: (_) => const ClientAuthGate(),
+                                ),
+                                (route) => false,
+                              );
+                            }
                           }
                         },
                         child: const Text('Renvoyer un nouveau code'),

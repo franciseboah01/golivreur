@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golivreur_core/services/firebase_phone_otp_service.dart';
 import 'package:golivreur_core/services/gps_location_service.dart';
 import 'package:golivreur_core/services/pin_lock_service.dart';
 import 'package:golivreur_core/services/push_notification_service.dart';
@@ -199,6 +201,38 @@ void main() {
 
       expect(tapped?.type, 'wallet_cash_deposit');
       expect(find.text('Dépôt espèces crédité (+10 000 F CFA)'), findsNothing);
+    });
+  });
+
+  group('FirebasePhoneOtpService', () {
+    test('normalise les numeros ivoiriens au format E.164 (+225XXXXXXXXXX)', () {
+      expect(FirebasePhoneOtpService.toE164Ivorian('0700000001'), '+2250700000001');
+      expect(FirebasePhoneOtpService.toE164Ivorian('07 00 00 00 01'), '+2250700000001');
+      expect(FirebasePhoneOtpService.toE164Ivorian('+225 05 00 00 00 02'), '+2250500000002');
+      expect(FirebasePhoneOtpService.toE164Ivorian('00225 0100000003'), '+2250100000003');
+      expect(FirebasePhoneOtpService.toE164Ivorian('2250701020304'), '+2250701020304');
+      expect(FirebasePhoneOtpService.toE164Ivorian(''), '');
+    });
+
+    test('traduit proprement les erreurs Firebase Phone Auth en francais', () {
+      expect(
+        FirebasePhoneOtpService.mapFirebaseError(
+          FirebaseAuthException(code: 'invalid-verification-code'),
+        ),
+        contains('Code SMS incorrect'),
+      );
+      expect(
+        FirebasePhoneOtpService.mapFirebaseError(
+          FirebaseAuthException(code: 'app-not-authorized'),
+        ),
+        contains('SHA-1'),
+      );
+      expect(
+        FirebasePhoneOtpService.mapFirebaseError(
+          FirebaseAuthException(code: 'quota-exceeded'),
+        ),
+        contains('Quota SMS'),
+      );
     });
   });
 }

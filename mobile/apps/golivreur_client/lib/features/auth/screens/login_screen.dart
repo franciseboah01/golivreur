@@ -8,6 +8,7 @@ import '../../gocolis/providers/gocolis_provider.dart';
 import '../../goshop/providers/goshop_provider.dart';
 import '../../goshop/providers/order_provider.dart';
 import '../providers/auth_provider.dart';
+import 'otp_verification_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -30,6 +31,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  void _onPostLoginSuccess() {
+    ref.read(cartProvider.notifier).clear();
+    ref.read(searchQueryProvider.notifier).state = '';
+    ref.invalidate(clientAddressesProvider);
+    ref.invalidate(favoritesProvider);
+    ref.invalidate(clientNotificationsProvider);
+    ref.invalidate(ordersHistoryProvider);
+    ref.invalidate(parcelsHistoryProvider);
+    ref.invalidate(promoBannersProvider);
+    ref.read(weatherProvider.notifier).chargerStatutVille();
+    ref.read(clientAddressesProvider.notifier).chargerAdresses();
+    ref.read(favoritesProvider.notifier).chargerFavoris();
+  }
+
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -40,17 +55,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         .connexionParMotDePasse(phone, password);
 
     if (success && mounted) {
-      ref.read(cartProvider.notifier).clear();
-      ref.read(searchQueryProvider.notifier).state = '';
-      ref.invalidate(clientAddressesProvider);
-      ref.invalidate(favoritesProvider);
-      ref.invalidate(clientNotificationsProvider);
-      ref.invalidate(ordersHistoryProvider);
-      ref.invalidate(parcelsHistoryProvider);
-      ref.invalidate(promoBannersProvider);
-      ref.read(weatherProvider.notifier).chargerStatutVille();
-      ref.read(clientAddressesProvider.notifier).chargerAdresses();
-      ref.read(favoritesProvider.notifier).chargerFavoris();
+      _onPostLoginSuccess();
     } else if (mounted) {
       final roleMissing = ref.read(authProvider).roleMissingInfo;
       if (roleMissing != null) {
@@ -66,6 +71,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           },
         );
       }
+    }
+  }
+
+  Future<void> _submitOtpLogin() async {
+    final phone = AuthNotifier.normalizePhone(_phoneController.text);
+    if (phone.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Saisissez d\'abord votre numéro ivoirien à 10 chiffres.',
+          ),
+          backgroundColor: GoLivreurTheme.erreur,
+        ),
+      );
+      return;
+    }
+
+    final success =
+        await ref.read(authProvider.notifier).demanderOtpConnexion(phone);
+
+    if (success && mounted) {
+      if (ref.read(authProvider).status == AuthStatus.authenticated) {
+        _onPostLoginSuccess();
+        return;
+      }
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => OtpVerificationScreen(
+            phone: phone,
+            isRegister: false,
+          ),
+        ),
+      );
     }
   }
 
@@ -173,6 +211,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   label: 'Se connecter',
                   estEnChargement: authState.status == AuthStatus.loading,
                   onPressed: _submit,
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: authState.status == AuthStatus.loading
+                      ? null
+                      : _submitOtpLogin,
+                  icon: const Icon(Icons.sms_outlined, size: 18),
+                  label: const Text('Se connecter par code SMS (OTP)'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: GoLivreurTheme.primaire,
+                    side: const BorderSide(color: GoLivreurTheme.primaire),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Row(

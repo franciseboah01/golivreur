@@ -28,6 +28,7 @@ class RegisterRequest extends FormRequest
             'name' => ['nullable', 'string', 'max:255'],
             'city_id' => ['nullable', 'integer'],
             'password' => ['nullable', 'string', 'min:6', 'max:100'],
+            'use_firebase_otp' => ['nullable', 'boolean'],
         ];
     }
 }

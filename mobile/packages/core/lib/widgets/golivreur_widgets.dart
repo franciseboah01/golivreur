@@ -1,4 +1,5 @@
 export '../providers/branding_provider.dart';
+export '../services/firebase_phone_otp_service.dart';
 export '../services/gps_location_service.dart';
 export '../services/pin_lock_service.dart';
 export '../services/push_notification_service.dart';

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/services/api_client.dart';
+import 'package:golivreur_core/services/firebase_phone_otp_service.dart';
 import 'package:golivreur_core/services/gps_location_service.dart';
 import 'package:golivreur_core/services/push_notification_service.dart';
 import 'package:golivreur_core/services/secure_token_storage.dart';
@@ -186,10 +187,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String name,
     required int cityId,
     String? password,
+    bool isResend = false,
   }) async {
     final cleanPhone = normalizePhone(phone);
     final cleanName = name.trim();
     final cleanPassword = password?.trim();
+    final useFirebaseOtp = FirebasePhoneOtpService.isFirebaseReady;
+
     state = state.copyWith(
       status: AuthStatus.loading,
       phoneNumber: cleanPhone,
@@ -206,9 +210,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
         if (cleanPassword != null && cleanPassword.isNotEmpty)
           'password': cleanPassword,
         'role': 'client',
+        'use_firebase_otp': useFirebaseOtp,
       });
 
       if (res.statusCode == 200) {
+        if (useFirebaseOtp) {
+          final fbRes = await FirebasePhoneOtpService.sendOtp(
+            cleanPhone,
+            isResend: isResend,
+          );
+          if (!fbRes.success) {
+            state = state.copyWith(
+              status: AuthStatus.error,
+              errorMessage: fbRes.errorMessage ??
+                  'Impossible d\'envoyer le code SMS via Firebase.',
+            );
+            return false;
+          }
+          if (fbRes.isAutoVerified) {
+            return await verifierOtpInscription(
+              phone: cleanPhone,
+              code: '',
+              firebaseIdToken: fbRes.autoVerifiedIdToken,
+              name: cleanName,
+              cityId: cityId,
+              password: cleanPassword,
+            );
+          }
+        }
+
         state = state.copyWith(
           status: AuthStatus.otpSent,
           phoneNumber: cleanPhone,
@@ -240,6 +270,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> verifierOtpInscription({
     required String phone,
     required String code,
+    String? firebaseIdToken,
     String? name,
     int? cityId,
     String? password,
@@ -251,10 +282,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
     try {
+      String? resolvedFirebaseToken = firebaseIdToken;
+      if ((resolvedFirebaseToken == null || resolvedFirebaseToken.isEmpty) &&
+          FirebasePhoneOtpService.hasActiveVerificationFor(cleanPhone)) {
+        final fbVerify = await FirebasePhoneOtpService.verifySmsCode(code);
+        if (!fbVerify.success || fbVerify.idToken == null) {
+          state = state.copyWith(
+            status: AuthStatus.error,
+            errorMessage: fbVerify.errorMessage ?? 'Code SMS incorrect ou expiré.',
+          );
+          return false;
+        }
+        resolvedFirebaseToken = fbVerify.idToken;
+      }
+
       final res = await _apiClient.post('/auth/verify-register', data: {
         'phone': cleanPhone,
-        'code': code.trim(),
-        'otp': code.trim(),
+        if (resolvedFirebaseToken != null && resolvedFirebaseToken.isNotEmpty)
+          'firebase_id_token': resolvedFirebaseToken,
+        if (code.trim().isNotEmpty) 'code': code.trim(),
+        if (code.trim().isNotEmpty) 'otp': code.trim(),
         if (effectiveName.isNotEmpty) 'name': effectiveName,
         if (effectiveCityId != null) 'city_id': effectiveCityId,
         if (effectivePassword.isNotEmpty) 'password': effectivePassword,
@@ -396,8 +443,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return false;
   }
 
-  Future<bool> demanderOtpConnexion(String phone) async {
+  Future<bool> demanderOtpConnexion(
+    String phone, {
+    bool isResend = false,
+  }) async {
     final cleanPhone = normalizePhone(phone);
+    final useFirebaseOtp = FirebasePhoneOtpService.isFirebaseReady;
+
     state = state.copyWith(
       status: AuthStatus.loading,
       clearPendingRegistration: true,
@@ -406,9 +458,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final res = await _apiClient.post('/auth/login', data: {
         'phone': cleanPhone,
+        'use_firebase_otp': useFirebaseOtp,
       });
 
       if (res.statusCode == 200) {
+        if (useFirebaseOtp) {
+          final fbRes = await FirebasePhoneOtpService.sendOtp(
+            cleanPhone,
+            isResend: isResend,
+          );
+          if (!fbRes.success) {
+            state = state.copyWith(
+              status: AuthStatus.error,
+              errorMessage: fbRes.errorMessage ??
+                  'Impossible d\'envoyer le code SMS via Firebase.',
+            );
+            return false;
+          }
+          if (fbRes.isAutoVerified) {
+            return await verifierOtpConnexion(
+              phone: cleanPhone,
+              code: '',
+              firebaseIdToken: fbRes.autoVerifiedIdToken,
+            );
+          }
+        }
+
         state = state.copyWith(
           status: AuthStatus.otpSent,
           phoneNumber: cleanPhone,
@@ -440,14 +515,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> verifierOtpConnexion({
     required String phone,
     required String code,
+    String? firebaseIdToken,
   }) async {
     final cleanPhone = normalizePhone(phone);
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
     try {
+      String? resolvedFirebaseToken = firebaseIdToken;
+      if ((resolvedFirebaseToken == null || resolvedFirebaseToken.isEmpty) &&
+          FirebasePhoneOtpService.hasActiveVerificationFor(cleanPhone)) {
+        final fbVerify = await FirebasePhoneOtpService.verifySmsCode(code);
+        if (!fbVerify.success || fbVerify.idToken == null) {
+          state = state.copyWith(
+            status: AuthStatus.error,
+            errorMessage: fbVerify.errorMessage ?? 'Code SMS incorrect ou expiré.',
+          );
+          return false;
+        }
+        resolvedFirebaseToken = fbVerify.idToken;
+      }
+
       final res = await _apiClient.post('/auth/verify-login', data: {
         'phone': cleanPhone,
-        'code': code.trim(),
-        'otp': code.trim(),
+        if (resolvedFirebaseToken != null && resolvedFirebaseToken.isNotEmpty)
+          'firebase_id_token': resolvedFirebaseToken,
+        if (code.trim().isNotEmpty) 'code': code.trim(),
+        if (code.trim().isNotEmpty) 'otp': code.trim(),
       });
 
       if (res.statusCode == 200) {
@@ -609,12 +701,39 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<(bool, String)> demanderOtpChangementTelephone(String newPhone) async {
+    final cleanPhone = normalizePhone(newPhone);
+    final useFirebaseOtp = FirebasePhoneOtpService.isFirebaseReady;
+
     try {
       final res = await _apiClient.post(
         '/client/profile/phone/request-otp',
-        data: {'phone': normalizePhone(newPhone)},
+        data: {
+          'phone': cleanPhone,
+          'use_firebase_otp': useFirebaseOtp,
+        },
       );
       if (res.statusCode == 200 && res.data['succes'] == true) {
+        if (useFirebaseOtp) {
+          final fbRes = await FirebasePhoneOtpService.sendOtp(cleanPhone);
+          if (!fbRes.success) {
+            return (
+              false,
+              fbRes.errorMessage ?? 'Impossible d\'envoyer le code SMS.',
+            );
+          }
+          if (fbRes.isAutoVerified) {
+            return await confirmerChangementTelephone(
+              newPhone: cleanPhone,
+              code: '',
+              firebaseIdToken: fbRes.autoVerifiedIdToken,
+            );
+          }
+          return (
+            true,
+            'Un code SMS à 6 chiffres a été envoyé au +225 $cleanPhone.',
+          );
+        }
+
         return (
           true,
           res.data['message']?.toString() ??
@@ -635,13 +754,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<(bool, String)> confirmerChangementTelephone({
     required String newPhone,
     required String code,
+    String? firebaseIdToken,
   }) async {
+    final cleanPhone = normalizePhone(newPhone);
     try {
+      String? resolvedFirebaseToken = firebaseIdToken;
+      if ((resolvedFirebaseToken == null || resolvedFirebaseToken.isEmpty) &&
+          FirebasePhoneOtpService.hasActiveVerificationFor(cleanPhone)) {
+        final fbVerify = await FirebasePhoneOtpService.verifySmsCode(code);
+        if (!fbVerify.success || fbVerify.idToken == null) {
+          return (
+            false,
+            fbVerify.errorMessage ?? 'Code SMS incorrect ou expiré.',
+          );
+        }
+        resolvedFirebaseToken = fbVerify.idToken;
+      }
+
       final res = await _apiClient.post(
         '/client/profile/phone/confirm',
         data: {
-          'phone': normalizePhone(newPhone),
-          'code': code.trim(),
+          'phone': cleanPhone,
+          if (resolvedFirebaseToken != null && resolvedFirebaseToken.isNotEmpty)
+            'firebase_id_token': resolvedFirebaseToken,
+          if (code.trim().isNotEmpty) 'code': code.trim(),
         },
       );
       if (res.statusCode == 200 &&

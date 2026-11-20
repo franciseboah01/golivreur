@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\VehicleType;
 use App\Models\Wallet;
 use App\Services\ActivityLogService;
+use App\Services\FirebasePhoneAuthService;
 use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,10 +34,12 @@ class AuthController extends Controller
     public function __construct(
         private readonly SmsService $smsService,
         private readonly ActivityLogService $activityLogService,
+        private readonly FirebasePhoneAuthService $firebasePhoneAuthService,
     ) {}
 
     /**
-     * Étape 1 — Inscription : envoie un OTP SMS au numéro fourni.
+     * Étape 1 — Inscription : valide la disponibilité du numéro et prépare l'OTP SMS
+     * (via Firebase Phone Auth si `use_firebase_otp=true`, sinon via passerelle SMS historique).
      */
     public function register(RegisterRequest $request): JsonResponse
     {
@@ -62,15 +65,6 @@ class AuthController extends Controller
             ], 409);
         }
 
-        // Générer et envoyer l'OTP (jamais loggé)
-        $code = (string) random_int(1000, 9999);
-        $otpRecord = OtpCode::create([
-            'phone' => $phone,
-            'code_hash' => Hash::make($code),
-            'purpose' => 'register',
-            'expires_at' => now()->addMinutes(5),
-        ]);
-
         // Mémoriser les informations d'inscription pour l'étape 2 (/verify-register)
         $pendingName = trim((string) $request->input('name', ''));
         $pendingCityId = $request->input('city_id');
@@ -85,6 +79,27 @@ class AuthController extends Controller
                 'password_hash' => $pendingPasswordHash,
             ], now()->addMinutes(15));
         }
+
+        // Mode Firebase Phone Auth : le mobile déclenche l'envoi du SMS réel via Firebase SDK
+        if ($request->boolean('use_firebase_otp')) {
+            return response()->json([
+                'succes' => true,
+                'message' => "Vérification SMS prête pour le {$this->masquerTelephone($phone)}.",
+                'donnees' => [
+                    'firebase_otp' => true,
+                    'phone_e164' => "+225{$phone}",
+                ],
+            ], 200);
+        }
+
+        // Mode passerelle SMS historique (jamais loggé)
+        $code = (string) random_int(1000, 9999);
+        $otpRecord = OtpCode::create([
+            'phone' => $phone,
+            'code_hash' => Hash::make($code),
+            'purpose' => 'register',
+            'expires_at' => now()->addMinutes(5),
+        ]);
 
         if (! $this->smsService->envoyerOtp($phone, $code, 'inscription')) {
             $otpRecord->delete();
@@ -102,40 +117,64 @@ class AuthController extends Controller
     }
 
     /**
-     * Étape 2 — Vérification OTP et création du compte.
+     * Étape 2 — Vérification OTP (Firebase ID Token ou code OTP historique) et création du compte.
      */
     public function verifierOtpInscription(VerifyOtpRequest $request): JsonResponse
     {
         $phone = (string) $request->input('phone');
         $otp = (string) ($request->input('otp') ?? $request->input('code'));
+        $firebaseIdToken = trim((string) $request->input('firebase_id_token', ''));
         $meta = Cache::get("register_meta:{$phone}", []);
         $rawName = trim((string) ($request->input('name') ?: ($meta['name'] ?? '')));
         $name = $rawName !== '' ? $rawName : 'Client';
 
-        $otpRecord = OtpCode::where('phone', $phone)
-            ->where('purpose', 'register')
-            ->where('is_used', false)
-            ->where('expires_at', '>', now())
-            ->latest()
-            ->first();
+        $otpRecord = null;
+        $verifiedViaFirebase = false;
 
-        if (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash)) {
-            if ($otpRecord) {
-                $otpRecord->increment('attempts');
-                if ($otpRecord->attempts >= 5) {
-                    $otpRecord->update(['is_used' => true]);
-
-                    return response()->json([
-                        'succes' => false,
-                        'message' => 'Trop de tentatives de validation. Votre code a été invalidé. Veuillez demander un nouveau code.',
-                    ], 429);
-                }
+        if ($firebaseIdToken !== '') {
+            try {
+                $verifiedPhone = $this->firebasePhoneAuthService->verifyIdToken($firebaseIdToken);
+            } catch (\InvalidArgumentException $e) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
             }
 
-            return response()->json([
-                'succes' => false,
-                'message' => 'Code incorrect ou expiré.',
-            ], 422);
+            if ($verifiedPhone !== $phone) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Le numéro vérifié par SMS ne correspond pas au numéro saisi.',
+                ], 422);
+            }
+
+            $verifiedViaFirebase = true;
+        } else {
+            $otpRecord = OtpCode::where('phone', $phone)
+                ->where('purpose', 'register')
+                ->where('is_used', false)
+                ->where('expires_at', '>', now())
+                ->latest()
+                ->first();
+
+            if (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash)) {
+                if ($otpRecord) {
+                    $otpRecord->increment('attempts');
+                    if ($otpRecord->attempts >= 5) {
+                        $otpRecord->update(['is_used' => true]);
+
+                        return response()->json([
+                            'succes' => false,
+                            'message' => 'Trop de tentatives de validation. Votre code a été invalidé. Veuillez demander un nouveau code.',
+                        ], 429);
+                    }
+                }
+
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Code incorrect ou expiré.',
+                ], 422);
+            }
         }
 
         if (User::where('phone', $phone)->exists()) {
@@ -146,7 +185,9 @@ class AuthController extends Controller
         }
 
         // Supprimer l'OTP après validation réussie (CDC 11.4) et consommer les métadonnées
-        $otpRecord->delete();
+        if ($otpRecord !== null) {
+            $otpRecord->delete();
+        }
         Cache::forget("register_meta:{$phone}");
         RateLimiter::clear("otp_register:{$phone}");
 
@@ -171,6 +212,16 @@ class AuthController extends Controller
         ]);
         $user->load('city');
 
+        if ($verifiedViaFirebase) {
+            $this->activityLogService->log(
+                userId: $user->id,
+                action: 'client_registered_firebase_otp',
+                entityType: 'user',
+                entityId: $user->id,
+                properties: ['ip' => $request->ip()],
+            );
+        }
+
         $token = JWTAuth::fromUser($user);
 
         return response()->json([
@@ -186,7 +237,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Connexion — envoie un OTP au numéro existant.
+     * Connexion — vérifie le compte et prépare l'OTP SMS au numéro existant.
      */
     public function login(LoginRequest $request): JsonResponse
     {
@@ -214,6 +265,17 @@ class AuthController extends Controller
                 'succes' => false,
                 'message' => 'Numéro non reconnu ou compte désactivé.',
             ], 404);
+        }
+
+        if ($request->boolean('use_firebase_otp')) {
+            return response()->json([
+                'succes' => true,
+                'message' => "Vérification SMS prête pour le {$this->masquerTelephone($phone)}.",
+                'donnees' => [
+                    'firebase_otp' => true,
+                    'phone_e164' => "+225{$phone}",
+                ],
+            ]);
         }
 
         $code = (string) random_int(1000, 9999);
@@ -626,38 +688,62 @@ class AuthController extends Controller
     }
 
     /**
-     * Vérification OTP connexion et génération du JWT.
+     * Vérification OTP connexion (Firebase ID Token ou code OTP historique) et génération du JWT.
      */
     public function verifierOtpConnexion(VerifyOtpRequest $request): JsonResponse
     {
         $phone = (string) $request->input('phone');
         $otp = (string) ($request->input('otp') ?? $request->input('code'));
+        $firebaseIdToken = trim((string) $request->input('firebase_id_token', ''));
         $deviceToken = $request->input('device_token');
 
-        $otpRecord = OtpCode::where('phone', $phone)
-            ->where('purpose', 'login')
-            ->where('is_used', false)
-            ->where('expires_at', '>', now())
-            ->latest()
-            ->first();
+        $otpRecord = null;
+        $verifiedViaFirebase = false;
 
-        if (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash)) {
-            if ($otpRecord) {
-                $otpRecord->increment('attempts');
-                if ($otpRecord->attempts >= 5) {
-                    $otpRecord->update(['is_used' => true]);
-
-                    return response()->json([
-                        'succes' => false,
-                        'message' => 'Trop de tentatives de validation. Votre code a été invalidé. Veuillez demander un nouveau code.',
-                    ], 429);
-                }
+        if ($firebaseIdToken !== '') {
+            try {
+                $verifiedPhone = $this->firebasePhoneAuthService->verifyIdToken($firebaseIdToken);
+            } catch (\InvalidArgumentException $e) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
             }
 
-            return response()->json([
-                'succes' => false,
-                'message' => 'Code incorrect ou expiré.',
-            ], 422);
+            if ($verifiedPhone !== $phone) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Le numéro vérifié par SMS ne correspond pas au numéro saisi.',
+                ], 422);
+            }
+
+            $verifiedViaFirebase = true;
+        } else {
+            $otpRecord = OtpCode::where('phone', $phone)
+                ->where('purpose', 'login')
+                ->where('is_used', false)
+                ->where('expires_at', '>', now())
+                ->latest()
+                ->first();
+
+            if (! $otpRecord || ! Hash::check($otp, $otpRecord->code_hash)) {
+                if ($otpRecord) {
+                    $otpRecord->increment('attempts');
+                    if ($otpRecord->attempts >= 5) {
+                        $otpRecord->update(['is_used' => true]);
+
+                        return response()->json([
+                            'succes' => false,
+                            'message' => 'Trop de tentatives de validation. Votre code a été invalidé. Veuillez demander un nouveau code.',
+                        ], 429);
+                    }
+                }
+
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Code incorrect ou expiré.',
+                ], 422);
+            }
         }
 
         $user = User::where('phone', $phone)
@@ -672,7 +758,9 @@ class AuthController extends Controller
             ], 404);
         }
 
-        $otpRecord->delete();
+        if ($otpRecord !== null) {
+            $otpRecord->delete();
+        }
         RateLimiter::clear("otp_login:{$phone}");
 
         // Session unique pour merchants et drivers (CDC 9.2 & ADR-002)
@@ -701,7 +789,10 @@ class AuthController extends Controller
         $this->activityLogService->log(
             userId: $user->id,
             action: 'user_login',
-            properties: ['ip' => $request->ip()],
+            properties: [
+                'ip' => $request->ip(),
+                'auth_method' => $verifiedViaFirebase ? 'firebase_phone_otp' : 'legacy_otp',
+            ],
         );
 
         return response()->json([
