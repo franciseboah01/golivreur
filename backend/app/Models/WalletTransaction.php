@@ -43,6 +43,9 @@ class WalletTransaction extends Model
         });
     }
 
+    /**
+     * @return BelongsTo<Wallet, $this>
+     */
     public function wallet(): BelongsTo
     {
         return $this->belongsTo(Wallet::class);

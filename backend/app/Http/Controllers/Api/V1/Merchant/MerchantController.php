@@ -240,17 +240,22 @@ class MerchantController extends Controller
         $monthQuery = (clone $baseQuery)->where('delivered_at', '>=', $monthStart);
 
         $versements = WalletTransaction::where('wallet_id', $wallet->id)
-            ->whereIn('type', ['withdrawal', 'payout', 'debit'])
+            ->whereIn('type', ['deposit', 'withdrawal', 'payout', 'debit', 'adjustment'])
             ->latest()
-            ->limit(20)
+            ->limit(25)
             ->get()
             ->map(function (WalletTransaction $tx): array {
+                $amount = (float) $tx->amount;
+                $isCredit = $amount >= 0 && ! in_array($tx->type, ['withdrawal', 'payout', 'debit'], true);
+
                 return [
                     'id' => $tx->reference ?: 'VER-'.$tx->id,
-                    'montant' => (int) round(abs((float) $tx->amount)),
-                    'date' => $tx->created_at?->format('d/m/Y') ?? '',
+                    'type' => $isCredit ? 'credit' : 'debit',
+                    'tx_type' => (string) $tx->type,
+                    'montant' => (int) round(abs($amount)),
+                    'date' => $tx->created_at?->format('d/m/Y H:i') ?? '',
                     'statut' => (string) ($tx->status ?? 'completed'),
-                    'description' => (string) ($tx->description ?? ''),
+                    'description' => (string) ($tx->description ?? ($isCredit ? 'Dépôt espèces' : 'Versement / Retrait')),
                 ];
             })
             ->values();

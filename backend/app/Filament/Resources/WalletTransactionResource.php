@@ -56,7 +56,7 @@ class WalletTransactionResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery()->with('wallet');
 
         if (! FilamentCityScope::isLocal()) {
             return $query;
@@ -148,16 +148,48 @@ class WalletTransactionResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('wallet_id')
-                    ->label('Portefeuille N°')
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('partner_info')
+                    ->label('Titulaire & Téléphone')
+                    ->getStateUsing(function (WalletTransaction $record): string {
+                        $wallet = $record->wallet;
+                        if (! $wallet) {
+                            return "Portefeuille #{$record->wallet_id}";
+                        }
+
+                        if ($wallet->owner_type === 'merchant') {
+                            $merchant = Merchant::with('user:id,phone')->find($wallet->owner_id);
+
+                            return $merchant
+                                ? "🏪 {$merchant->name} (".($merchant->user->phone ?? '-').')'
+                                : "🏪 Commerce #{$wallet->owner_id}";
+                        }
+
+                        if ($wallet->owner_type === 'courier') {
+                            $courier = Courier::with('user:id,name,phone')->find($wallet->owner_id);
+
+                            return $courier
+                                ? '🏍️ '.($courier->user->name ?? "Livreur #{$wallet->owner_id}").' ('.($courier->user->phone ?? '-').')'
+                                : "🏍️ Livreur #{$wallet->owner_id}";
+                        }
+
+                        return "Portefeuille #{$record->wallet_id}";
+                    }),
 
                 Tables\Columns\TextColumn::make('type')
                     ->label('Type')
                     ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'deposit', 'credit_delivery', 'credit_shipping' => 'success',
+                        'withdrawal', 'debit_cash_remittance' => 'danger',
+                        'adjustment', 'refund' => 'warning',
+                        default => 'gray',
+                    })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'deposit' => 'Dépôt',
-                        'withdrawal' => 'Retrait',
+                        'deposit' => 'Dépôt espèces',
+                        'withdrawal' => 'Retrait / Débit',
+                        'credit_delivery' => 'Gain GoShop',
+                        'credit_shipping' => 'Gain GoColis',
+                        'debit_cash_remittance' => 'Reversement Cash',
                         'order_payment' => 'Paiement Commande',
                         'parcel_payment' => 'Paiement Course',
                         'delivery_fee' => 'Course Livreur',
@@ -169,7 +201,7 @@ class WalletTransactionResource extends Resource
 
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Montant')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA')
+                    ->formatStateUsing(fn ($state) => ((float) $state >= 0 ? '+' : '').number_format((float) $state, 0, ',', ' ').' F CFA')
                     ->color(fn ($state) => (float) $state >= 0 ? 'success' : 'danger')
                     ->sortable(),
 
@@ -177,6 +209,11 @@ class WalletTransactionResource extends Resource
                     ->label('Nouveau Solde')
                     ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' F CFA')
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('description')
+                    ->label('Motif / Libellé')
+                    ->limit(45)
+                    ->tooltip(fn (WalletTransaction $record): ?string => $record->description),
 
                 Tables\Columns\TextColumn::make('status')
                     ->label('Statut')
@@ -204,12 +241,12 @@ class WalletTransactionResource extends Resource
                 Tables\Filters\SelectFilter::make('type')
                     ->label('Filtrer par Type')
                     ->options([
-                        'deposit' => 'Dépôt',
-                        'withdrawal' => 'Retrait',
-                        'order_payment' => 'Paiement Commande',
-                        'parcel_payment' => 'Paiement Course',
-                        'delivery_fee' => 'Course Livreur',
-                        'commission' => 'Commission',
+                        'deposit' => 'Dépôt espèces',
+                        'withdrawal' => 'Retrait / Débit',
+                        'credit_delivery' => 'Gain GoShop',
+                        'credit_shipping' => 'Gain GoColis',
+                        'debit_cash_remittance' => 'Reversement Cash',
+                        'adjustment' => 'Ajustement',
                         'refund' => 'Remboursement',
                     ]),
                 Tables\Filters\SelectFilter::make('status')

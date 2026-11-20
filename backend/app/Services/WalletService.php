@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\Courier;
+use App\Models\Merchant;
+use App\Models\Notification as InAppNotification;
 use App\Models\Order;
 use App\Models\Parcel;
 use App\Models\User;
@@ -125,6 +128,245 @@ class WalletService
         ]);
 
         return $transaction;
+    }
+
+    /**
+     * Crédite (dépôt espèces reçu en agence) ou débite (retrait/prélèvement espèces)
+     * le portefeuille virtuel d'un Commerce ou d'un Livreur.
+     *
+     * - Vérifie strictement l'habilitation Finances et le périmètre ville du gestionnaire.
+     * - Transaction atomique + garde-fou solde >= 0.
+     * - Traçabilité immuable (wallet_transactions + activity_logs) + notification in-app immédiate.
+     */
+    public function effectuerOperationEspeces(
+        string $ownerType,
+        int $ownerId,
+        string $direction,
+        int $montant,
+        string $motif,
+        User $gestionnaire,
+        ?string $ipAddress = null,
+    ): WalletTransaction {
+        $estAutorise = in_array($gestionnaire->role, [
+            'super_admin',
+            'dg_national',
+            'national_finance',
+            'city_manager',
+            'city_finance',
+        ], true) || (
+            in_array($gestionnaire->role, User::ADMIN_ROLES, true)
+            && $gestionnaire->hasHabilitationTab('finances')
+        );
+
+        if (! $estAutorise) {
+            throw new AuthorizationException('Vous n\'êtes pas autorisé à effectuer une opération espèces sur un portefeuille.');
+        }
+
+        if (! in_array($ownerType, ['merchant', 'courier'], true)) {
+            throw new \InvalidArgumentException('Type de bénéficiaire invalide (merchant ou courier attendu).');
+        }
+
+        if (! in_array($direction, ['credit', 'debit'], true)) {
+            throw new \InvalidArgumentException('Sens d\'opération invalide (credit ou debit attendu).');
+        }
+
+        if ($montant <= 0) {
+            throw new \InvalidArgumentException('Le montant de l\'opération espèces doit être strictement supérieur à 0 F CFA.');
+        }
+
+        $motifNettoye = trim($motif);
+        if ($motifNettoye === '') {
+            $motifNettoye = $direction === 'credit'
+                ? 'Dépôt espèces au guichet'
+                : 'Retrait espèces au guichet';
+        }
+
+        if ($ownerType === 'merchant') {
+            $owner = Merchant::with(['user', 'city'])->findOrFail($ownerId);
+            $ownerCityId = $owner->city_id !== null ? (int) $owner->city_id : null;
+            $ownerLabel = $owner->name;
+            $ownerUserId = (int) $owner->user_id;
+            $ownerPhone = (string) ($owner->user->phone ?? '');
+            $roleLabel = 'Commerce';
+        } else {
+            $owner = Courier::with(['user', 'city'])->findOrFail($ownerId);
+            $ownerCityId = $owner->city_id !== null ? (int) $owner->city_id : null;
+            $ownerLabel = (string) ($owner->user->name ?? "Livreur #{$owner->id}");
+            $ownerUserId = (int) $owner->user_id;
+            $ownerPhone = (string) ($owner->user->phone ?? '');
+            $roleLabel = 'Livreur';
+        }
+
+        if (! FilamentCityScope::canAccessCityId($ownerCityId, $gestionnaire)) {
+            throw new AuthorizationException('Action interdite : ce partenaire n\'appartient pas à votre ville d\'affectation.');
+        }
+
+        $wallet = $this->obtenirOuCreerWallet($ownerType, $ownerId);
+        $type = $direction === 'credit' ? 'deposit' : 'withdrawal';
+        $montantSigne = $direction === 'credit' ? $montant : -$montant;
+        $prefix = $direction === 'credit' ? 'Dépôt espèces en agence' : 'Retrait espèces en agence';
+        $description = "{$prefix} — {$motifNettoye} (par {$gestionnaire->name})";
+
+        $transaction = $this->effectuerTransaction(
+            wallet: $wallet,
+            type: $type,
+            montant: $montantSigne,
+            description: $description,
+            processedBy: $gestionnaire->id,
+        );
+
+        ActivityLog::create([
+            'user_id' => $gestionnaire->id,
+            'action' => $direction === 'credit' ? 'wallet_cash_deposit' : 'wallet_cash_withdrawal',
+            'entity_type' => 'wallet',
+            'entity_id' => $wallet->id,
+            'properties' => [
+                'wallet_id' => $wallet->id,
+                'owner_type' => $ownerType,
+                'owner_id' => $ownerId,
+                'owner_name' => $ownerLabel,
+                'owner_phone' => $ownerPhone,
+                'city_id' => $ownerCityId,
+                'transaction_id' => $transaction->id,
+                'reference' => $transaction->reference,
+                'direction' => $direction,
+                'amount' => $montantSigne,
+                'reason' => $motifNettoye,
+                'balance_before' => (int) round((float) $transaction->balance_before),
+                'balance_after' => (int) round((float) $transaction->balance_after),
+                'processed_by_name' => $gestionnaire->name,
+            ],
+            'ip_address' => $ipAddress ?? request()?->ip(),
+            'severity' => 'warning',
+        ]);
+
+        if ($ownerUserId > 0) {
+            $montantFormate = number_format($montant, 0, ',', ' ');
+            $soldeApresFormate = number_format((int) round((float) $transaction->balance_after), 0, ',', ' ');
+
+            InAppNotification::create([
+                'user_id' => $ownerUserId,
+                'type' => $direction === 'credit' ? 'wallet_cash_deposit' : 'wallet_cash_withdrawal',
+                'title' => $direction === 'credit'
+                    ? "Dépôt espèces crédité (+{$montantFormate} F CFA)"
+                    : "Retrait espèces débité (-{$montantFormate} F CFA)",
+                'body' => $direction === 'credit'
+                    ? "Votre portefeuille {$roleLabel} a été crédité de {$montantFormate} F CFA en espèces ({$motifNettoye}). Nouveau solde : {$soldeApresFormate} F CFA (Réf : {$transaction->reference})."
+                    : "Votre portefeuille {$roleLabel} a été débité de {$montantFormate} F CFA en espèces ({$motifNettoye}). Nouveau solde : {$soldeApresFormate} F CFA (Réf : {$transaction->reference}).",
+                'data' => [
+                    'wallet_id' => $wallet->id,
+                    'owner_type' => $ownerType,
+                    'transaction_id' => $transaction->id,
+                    'reference' => $transaction->reference,
+                    'amount' => $montantSigne,
+                    'balance_after' => (int) round((float) $transaction->balance_after),
+                ],
+                'is_read' => false,
+            ]);
+        }
+
+        return $transaction;
+    }
+
+    /**
+     * Recherche un Commerce et/ou un Livreur par numéro de téléphone ivoirien
+     * pour le guichet Caisse Espèces (en respectant l'isolation ville).
+     *
+     * @return array{
+     *     user: array{id: int, name: string, phone: string, city_name: string|null, is_active: bool},
+     *     merchant: array<string, mixed>|null,
+     *     courier: array<string, mixed>|null,
+     *     out_of_scope_city: bool
+     * }|null
+     */
+    public function rechercherPartenaireParTelephone(string $rawPhone, User $gestionnaire): ?array
+    {
+        $cleaned = preg_replace('/[\s\.\-\(\)]+/', '', trim($rawPhone)) ?? '';
+        if (str_starts_with($cleaned, '+225')) {
+            $phone = substr($cleaned, 4);
+        } elseif (str_starts_with($cleaned, '00225')) {
+            $phone = substr($cleaned, 5);
+        } elseif (strlen($cleaned) === 13 && str_starts_with($cleaned, '225')) {
+            $phone = substr($cleaned, 3);
+        } else {
+            $phone = $cleaned;
+        }
+
+        if ($phone === '') {
+            return null;
+        }
+
+        $user = User::with(['city', 'merchant.city', 'courier.city'])
+            ->whereNull('deleted_at')
+            ->where(function ($q) use ($phone, $cleaned): void {
+                $q->where('phone', $phone)
+                    ->orWhere('phone', $cleaned)
+                    ->orWhere('phone', '+225'.$phone);
+            })
+            ->first();
+
+        if (! $user) {
+            return null;
+        }
+
+        $merchantInfo = null;
+        $courierInfo = null;
+        $outOfScope = false;
+
+        if ($user->merchant) {
+            $mCityId = $user->merchant->city_id !== null ? (int) $user->merchant->city_id : null;
+            if (FilamentCityScope::canAccessCityId($mCityId, $gestionnaire)) {
+                $mWallet = Wallet::where('owner_type', 'merchant')
+                    ->where('owner_id', $user->merchant->id)
+                    ->first();
+                $merchantInfo = [
+                    'owner_type' => 'merchant',
+                    'owner_id' => $user->merchant->id,
+                    'name' => $user->merchant->name,
+                    'city_name' => $user->merchant->city->name ?? $user->city->name ?? 'Non définie',
+                    'is_active' => (bool) $user->merchant->is_active,
+                    'balance' => $mWallet ? (int) round((float) $mWallet->balance) : 0,
+                    'wallet_id' => $mWallet?->id,
+                ];
+            } else {
+                $outOfScope = true;
+            }
+        }
+
+        if ($user->courier) {
+            $cCityId = $user->courier->city_id !== null ? (int) $user->courier->city_id : null;
+            if (FilamentCityScope::canAccessCityId($cCityId, $gestionnaire)) {
+                $cWallet = Wallet::where('owner_type', 'courier')
+                    ->where('owner_id', $user->courier->id)
+                    ->first();
+                $courierInfo = [
+                    'owner_type' => 'courier',
+                    'owner_id' => $user->courier->id,
+                    'name' => $user->name,
+                    'vehicle_plate' => $user->courier->vehicle_plate ?: 'Sans plaque',
+                    'vehicle_type' => $user->courier->vehicle_type ?: 'moto',
+                    'city_name' => $user->courier->city->name ?? $user->city->name ?? 'Non définie',
+                    'is_active' => (bool) $user->courier->is_active,
+                    'balance' => $cWallet ? (int) round((float) $cWallet->balance) : 0,
+                    'wallet_id' => $cWallet?->id,
+                ];
+            } else {
+                $outOfScope = true;
+            }
+        }
+
+        return [
+            'user' => [
+                'id' => $user->id,
+                'name' => (string) $user->name,
+                'phone' => (string) $user->phone,
+                'city_name' => $user->city?->name,
+                'is_active' => (bool) $user->is_active,
+            ],
+            'merchant' => $merchantInfo,
+            'courier' => $courierInfo,
+            'out_of_scope_city' => $outOfScope && $merchantInfo === null && $courierInfo === null,
+        ];
     }
 
     /**
@@ -367,7 +609,7 @@ class WalletService
                     throw new \InvalidArgumentException('Solde portefeuille livreur insuffisant pour effectuer le reversement en espèces.');
                 }
 
-                $estCreditRevenu = $montantEntier > 0 && ! in_array($type, ['withdrawal', 'debit_cash_remittance'], true);
+                $estCreditRevenu = $montantEntier > 0 && ! in_array($type, ['withdrawal', 'debit_cash_remittance', 'deposit'], true);
                 $estRetrait = $type === 'withdrawal';
 
                 // Ligne de transaction immuable créée dans le même SAVEPOINT (contrainte unique DB en filet)
