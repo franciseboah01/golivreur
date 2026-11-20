@@ -1,9 +1,13 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/services/api_client.dart' hide apiClientProvider;
+import 'package:golivreur_core/services/gps_location_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../profile/screens/client_addresses_screen.dart';
 import '../providers/goshop_provider.dart';
+import '../providers/order_provider.dart';
 import 'suivi_gps_screen.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
@@ -14,10 +18,8 @@ class CartScreen extends ConsumerStatefulWidget {
 }
 
 class _CartScreenState extends ConsumerState<CartScreen> {
-  final _instructionsController = TextEditingController(
-    text: 'Face au maquis, portail bleu, m\'appeler à l\'arrivée.',
-  );
-  String _selectedPaymentMethod = 'wave'; // wave, orange_money, mtn, moov, cash
+  final _instructionsController = TextEditingController();
+  String _selectedPaymentMethod = 'cash'; // cash par défaut (D-PAIEMENT-1)
   bool _isSubmitting = false;
 
   @override
@@ -26,53 +28,132 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     super.dispose();
   }
 
-  void _submitOrder() async {
+  Future<void> _submitOrder() async {
     final cart = ref.read(cartProvider);
     if (cart.items.isEmpty || cart.merchant == null) return;
 
     final destination = ref.read(activeDeliveryDestinationProvider);
     final estimate = ref.read(cartDeliveryEstimateProvider);
+    final weather = ref.read(weatherProvider);
+    final merchant = cart.merchant!;
 
     setState(() => _isSubmitting = true);
 
+    double deliveryLat = destination.lat;
+    double deliveryLng = destination.lng;
+
+    // 1. Si les coordonnées du quartier/adresse ne sont pas définies, tenter la position GPS puis le centre-ville / commerce
+    if (deliveryLat.abs() < 0.0001 || deliveryLng.abs() < 0.0001) {
+      final gps = await GpsLocationService.obtenirPositionSilencieuse();
+      if (gps != null &&
+          gps.isSuccess &&
+          gps.lat != null &&
+          gps.lng != null &&
+          gps.lat!.abs() > 0.0001 &&
+          gps.lng!.abs() > 0.0001) {
+        deliveryLat = gps.lat!;
+        deliveryLng = gps.lng!;
+      } else if (weather.centerLat != null &&
+          weather.centerLng != null &&
+          weather.centerLat!.abs() > 0.0001 &&
+          weather.centerLng!.abs() > 0.0001) {
+        deliveryLat = weather.centerLat!;
+        deliveryLng = weather.centerLng!;
+      } else if (merchant.lat.abs() > 0.0001 && merchant.lng.abs() > 0.0001) {
+        deliveryLat = merchant.lat;
+        deliveryLng = merchant.lng;
+      } else {
+        deliveryLat = 6.8770;
+        deliveryLng = -6.4502;
+      }
+    }
+
+    final deliveryAddress = destination.fullAddress.trim().isNotEmpty
+        ? destination.fullAddress.trim()
+        : (destination.neighborhood.trim().isNotEmpty
+            ? destination.neighborhood.trim()
+            : (destination.cityName.trim().isNotEmpty
+                ? destination.cityName.trim()
+                : merchant.address));
+
+    final paymentConfig =
+        ref.read(clientPaymentMethodsProvider).valueOrNull ??
+            const ClientPaymentMethodsConfig();
+    final effectivePaymentMethod =
+        paymentConfig.activeModes.contains(_selectedPaymentMethod)
+            ? _selectedPaymentMethod
+            : paymentConfig.defaultMethod;
+
     final api = ref.read(apiClientProvider);
-    int orderId = 1;
 
     try {
       final payload = {
-        'merchant_id': cart.merchant!.id,
+        'merchant_id': merchant.id,
         'items': cart.items
             .map((item) => {
                   'product_id': item.product.id,
                   'quantity': item.quantity,
                 })
             .toList(),
-        'delivery_address': destination.fullAddress,
-        'delivery_lat': destination.lat,
-        'delivery_lng': destination.lng,
-        'special_instructions': _instructionsController.text.trim(),
-        'payment_method': _selectedPaymentMethod,
+        'delivery_address':
+            deliveryAddress.isNotEmpty ? deliveryAddress : 'Centre-ville',
+        'delivery_lat': deliveryLat,
+        'delivery_lng': deliveryLng,
+        if (_instructionsController.text.trim().isNotEmpty)
+          'special_instructions': _instructionsController.text.trim(),
+        'payment_method': effectivePaymentMethod,
         'distance_km': estimate.distanceKm,
       };
 
       final response = await api.post('/client/orders', data: payload);
-      if (response.statusCode == 201 && response.data['donnees'] != null) {
-        orderId = response.data['donnees']['id'] as int;
-      }
-    } catch (_) {
-      // Fallback hors-ligne si le serveur est injoignable
-      orderId = 1;
-    } finally {
-      if (mounted) {
+      final donnees = response.data is Map ? response.data['donnees'] : null;
+      final createdId = donnees is Map
+          ? int.tryParse('${donnees['id'] ?? ''}')
+          : null;
+
+      if ((response.statusCode == 201 || response.statusCode == 200) &&
+          createdId != null &&
+          createdId > 0) {
+        if (!mounted) return;
         setState(() => _isSubmitting = false);
         ref.read(cartProvider.notifier).clear();
+        ref.invalidate(ordersHistoryProvider);
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => SuiviGPSScreen(orderId: orderId),
+            builder: (_) => SuiviGPSScreen(orderId: createdId),
           ),
         );
+        return;
       }
+
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de valider la commande. Veuillez réessayer.'),
+          backgroundColor: GoLivreurTheme.erreur,
+        ),
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ApiClient.messageErreur(e)),
+          backgroundColor: GoLivreurTheme.erreur,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur lors de l\'envoi de la commande. Vérifiez votre connexion.'),
+          backgroundColor: GoLivreurTheme.erreur,
+        ),
+      );
     }
   }
 
@@ -206,6 +287,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final destination = ref.watch(activeDeliveryDestinationProvider);
     final estimate = ref.watch(cartDeliveryEstimateProvider);
     final weather = ref.watch(weatherProvider);
+    final paymentConfig =
+        ref.watch(clientPaymentMethodsProvider).valueOrNull ??
+            const ClientPaymentMethodsConfig();
+    final activeModes = paymentConfig.activeModes;
+    if (!activeModes.contains(_selectedPaymentMethod)) {
+      _selectedPaymentMethod = paymentConfig.defaultMethod;
+    }
     final merchant = cart.merchant;
     final total = cart.subtotal + estimate.deliveryFee;
 
@@ -422,7 +510,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             ),
             const SizedBox(height: 20),
 
-            // ─── Mode de Paiement (5 options ivoiriennes validées) ──────────
+            // ─── Mode de Paiement (synchronisé avec paiements.modes_actifs) ─
             const Text(
               'Moyen de paiement',
               style: TextStyle(
@@ -432,46 +520,57 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            _buildPaymentOption(
-              id: 'wave',
-              title: 'Wave (1% de frais)',
-              subtitle: 'Paiement instantané par QR ou code',
-              icon: Icons.waves,
-              iconColor: const Color(0xFF1EA8E7),
-            ),
-            const SizedBox(height: 8),
-            _buildPaymentOption(
-              id: 'orange_money',
-              title: 'Orange Money Côte d\'Ivoire',
-              subtitle: 'Validation par code secret #144#',
-              icon: Icons.phone_android,
-              iconColor: const Color(0xFFFF6600),
-            ),
-            const SizedBox(height: 8),
-            _buildPaymentOption(
-              id: 'mtn',
-              title: 'MTN Mobile Money',
-              subtitle: 'Validation par push MoMo *133#',
-              icon: Icons.flash_on,
-              iconColor: const Color(0xFFFFCC00),
-            ),
-            const SizedBox(height: 8),
-            _buildPaymentOption(
-              id: 'moov',
-              title: 'Moov Money (Flooz)',
-              subtitle: 'Paiement sécurisé via code Flooz',
-              icon: Icons.account_balance_wallet,
-              iconColor: const Color(0xFF005CA9),
-            ),
-            const SizedBox(height: 8),
-            _buildPaymentOption(
-              id: 'cash',
-              title: 'Espèces à la livraison',
-              subtitle: 'Payer directement au livreur à la réception',
-              icon: Icons.payments_outlined,
-              iconColor: GoLivreurTheme.secondaire,
-            ),
-            const SizedBox(height: 24),
+            if (activeModes.contains('cash')) ...[
+              _buildPaymentOption(
+                id: 'cash',
+                title: 'Espèces à la livraison',
+                subtitle: 'Payer directement au livreur à la réception',
+                icon: Icons.payments_outlined,
+                iconColor: GoLivreurTheme.secondaire,
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (activeModes.contains('wave')) ...[
+              _buildPaymentOption(
+                id: 'wave',
+                title: 'Wave Mobile Money',
+                subtitle: 'Paiement instantané par QR ou code',
+                icon: Icons.waves,
+                iconColor: const Color(0xFF1EA8E7),
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (activeModes.contains('orange_money')) ...[
+              _buildPaymentOption(
+                id: 'orange_money',
+                title: 'Orange Money Côte d\'Ivoire',
+                subtitle: 'Validation par code secret #144#',
+                icon: Icons.phone_android,
+                iconColor: const Color(0xFFFF6600),
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (activeModes.contains('mtn_momo')) ...[
+              _buildPaymentOption(
+                id: 'mtn_momo',
+                title: 'MTN Mobile Money',
+                subtitle: 'Validation par push MoMo *133#',
+                icon: Icons.flash_on,
+                iconColor: const Color(0xFFFFCC00),
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (activeModes.contains('moov')) ...[
+              _buildPaymentOption(
+                id: 'moov',
+                title: 'Moov Money (Flooz)',
+                subtitle: 'Paiement sécurisé via code Flooz',
+                icon: Icons.account_balance_wallet,
+                iconColor: const Color(0xFF005CA9),
+              ),
+              const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 16),
 
             // ─── Récapitulatif Coûts ───────────────────────────────────────
             Container(

@@ -17,21 +17,47 @@ class BusinessOrdersScreen extends ConsumerStatefulWidget {
 
 class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
   Timer? _countdownTimer;
+  Timer? _pollTimer;
   int _rebours = 45;
 
   @override
   void initState() {
     super.initState();
     _startTimer();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (!mounted) return;
+      ref.read(businessOrdersProvider.notifier).chargerCommandes();
+    });
   }
 
   void _startTimer() {
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_rebours > 0) {
-        setState(() => _rebours--);
-      } else {
+      if (!mounted) {
         timer.cancel();
+        return;
+      }
+      final pending = ref
+          .read(businessOrdersProvider)
+          .where((o) => o.status == BusinessOrderStatus.pending)
+          .toList();
+      if (pending.isEmpty) {
+        if (_rebours != 45) {
+          setState(() => _rebours = 45);
+        }
+        return;
+      }
+      final elapsed =
+          DateTime.now().difference(pending.first.createdAt).inSeconds;
+      final remaining = (45 - elapsed).clamp(0, 45);
+      setState(() => _rebours = remaining);
+      if (remaining == 0) {
+        ref.read(businessOrdersProvider.notifier).chargerCommandes();
       }
     });
   }
@@ -39,6 +65,7 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _pollTimer?.cancel();
     super.dispose();
   }
 
@@ -148,9 +175,15 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: RefreshIndicator(
+        color: GoLivreurTheme.secondaire,
+        onRefresh: () async {
+          await ref.read(businessOrdersProvider.notifier).chargerCommandes();
+        },
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
           // ─── Commandes En Attente (Compte à rebours 45s) ──────────────────
           if (pendingOrders.isNotEmpty) ...[
             Row(
@@ -230,6 +263,7 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
           else
             ...pastOrders.map((order) => _buildPastOrderCard(order)),
         ],
+        ),
       ),
     );
   }

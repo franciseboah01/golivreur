@@ -6,11 +6,14 @@ use App\Enums\PaymentMethod;
 use App\Filament\Components\SearchableSelect;
 use App\Filament\Resources\ParcelResource\Pages;
 use App\Filament\Support\FilamentCityScope;
+use App\Models\ActivityLog;
 use App\Models\Courier;
 use App\Models\Parcel;
 use App\Models\ParcelPhoto;
 use App\Models\User;
 use App\Modules\GoColis\Services\ParcelService;
+use App\Services\CourseOfferService;
+use App\Services\NotificationService;
 use App\Services\RefundService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -368,6 +371,77 @@ class ParcelResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make()->label('Détail'),
+
+                Tables\Actions\Action::make('reassignCourier')
+                    ->label('Assigner livreur')
+                    ->icon('heroicon-m-arrow-path')
+                    ->color('warning')
+                    ->form(fn (Parcel $record): array => [
+                        Forms\Components\Select::make('courier_id')
+                            ->label('Livreur assigné')
+                            ->options(fn () => Courier::where('is_active', true)
+                                ->where('city_id', $record->city_id)
+                                ->with('user')
+                                ->get()
+                                ->mapWithKeys(
+                                    fn ($courier) => [$courier->id => ($courier->user->name ?? "Livreur #{$courier->id}").($courier->vehicle_plate ? " ({$courier->vehicle_plate})" : '')]
+                                ))
+                            ->searchable()
+                            ->required(),
+                    ])
+                    ->visible(fn (Parcel $record): bool => ! in_array($record->status, [
+                        Parcel::STATUS_DELIVERED,
+                        Parcel::STATUS_CANCELLED,
+                        Parcel::STATUS_REFUSED,
+                        Parcel::STATUS_LOST,
+                    ], true))
+                    ->action(function (Parcel $record, array $data): void {
+                        FilamentCityScope::authorizeRecord($record);
+
+                        $courier = Courier::where('id', (int) $data['courier_id'])
+                            ->where('is_active', true)
+                            ->where('city_id', $record->city_id)
+                            ->first();
+
+                        if (! $courier) {
+                            Notification::make()
+                                ->title('Livreur invalide ou hors de la ville du colis.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        $oldCourier = $record->courier_id;
+                        $nextStatus = in_array($record->status, [Parcel::STATUS_PENDING, Parcel::STATUS_WAITING], true)
+                            ? Parcel::STATUS_ACCEPTED
+                            : $record->status;
+
+                        $record->update([
+                            'courier_id' => $courier->id,
+                            'status' => $nextStatus,
+                        ]);
+
+                        app(CourseOfferService::class)->cloturerOffresPourCourse($record);
+                        if ($fresh = $record->fresh()) {
+                            app(NotificationService::class)->notifierColisAccepteLivreur($fresh);
+                        }
+
+                        ActivityLog::create([
+                            'user_id' => auth()->id(),
+                            'action' => 'parcel_reassigned',
+                            'entity_type' => 'parcel',
+                            'entity_id' => $record->id,
+                            'properties' => ['old_courier' => $oldCourier, 'new_courier' => $courier->id],
+                            'ip_address' => request()->ip(),
+                            'severity' => 'info',
+                        ]);
+
+                        Notification::make()
+                            ->title("Colis #{$record->id} assigné au livreur")
+                            ->success()
+                            ->send();
+                    }),
 
                 Tables\Actions\Action::make('unlockSenderCode')
                     ->label('Débloquer Code Enlèvement')

@@ -13,6 +13,7 @@ use App\Modules\GoShop\Services\OrderService;
 use App\Services\CityGeolocationService;
 use App\Services\CourierCapacityService;
 use App\Services\CourierRefusalService;
+use App\Services\CourseOfferService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
@@ -166,9 +167,13 @@ class DriverController extends Controller
         ]);
     }
 
-    public function courses(): JsonResponse
+    public function courses(CourseOfferService $offerService, AssignmentService $assignmentService): JsonResponse
     {
         $courier = $this->getCourier();
+
+        if ($courier->is_online && $courier->is_active && $courier->city_id) {
+            $offerService->rattraperOffresExpireesVille((int) $courier->city_id, $assignmentService);
+        }
 
         $orders = Order::where('courier_id', $courier->id)
             ->whereIn('status', [
@@ -191,11 +196,14 @@ class DriverController extends Controller
             ->with(['sender', 'photos'])
             ->get();
 
+        $offers = $offerService->obtenirOffresActivesPourLivreur($courier);
+
         return response()->json([
             'succes' => true,
             'donnees' => [
                 'orders' => $orders,
                 'parcels' => $parcels,
+                'offers' => $offers,
             ],
         ]);
     }
@@ -250,6 +258,14 @@ class DriverController extends Controller
                 ], 422);
             }
 
+            $offerService = app(CourseOfferService::class);
+            if ($offerService->estReserveeAutreLivreur($lockedOrder, $lockedCourier)) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Cette course est actuellement proposée en exclusivité à un autre livreur.',
+                ], 409);
+            }
+
             $montantAReverser = $lockedOrder->payment_method === 'cash'
                 ? $walletService->calculerMontantAReverserOrder($lockedOrder)
                 : 0;
@@ -287,6 +303,8 @@ class DriverController extends Controller
             if ($lockedCourier->consecutive_refusals > 0) {
                 $lockedCourier->update(['consecutive_refusals' => 0]);
             }
+
+            $offerService->cloturerOffresPourCourse($lockedOrder);
 
             $freshOrder = $lockedOrder->fresh() ?? $lockedOrder;
             $notificationService->notifierCommandeAccepteeLivreur($freshOrder);
@@ -340,6 +358,14 @@ class DriverController extends Controller
                 ], 422);
             }
 
+            $offerService = app(CourseOfferService::class);
+            if ($offerService->estReserveeAutreLivreur($lockedParcel, $lockedCourier)) {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Cette expédition est actuellement proposée en exclusivité à un autre livreur.',
+                ], 409);
+            }
+
             $montantAReverser = $lockedParcel->payment_method === 'cash'
                 ? $walletService->calculerMontantAReverserParcel($lockedParcel)
                 : 0;
@@ -372,6 +398,8 @@ class DriverController extends Controller
             if ($lockedCourier->consecutive_refusals > 0) {
                 $lockedCourier->update(['consecutive_refusals' => 0]);
             }
+
+            $offerService->cloturerOffresPourCourse($lockedParcel);
 
             $freshParcel = $lockedParcel->fresh() ?? $lockedParcel;
             $notificationService->notifierColisAccepteLivreur($freshParcel);
@@ -428,6 +456,8 @@ class DriverController extends Controller
                 $lockedOrder->courier_id === null
                 && in_array($lockedOrder->status, [Order::STATUS_ACCEPTED, Order::STATUS_READY, Order::STATUS_WAITING], true)
             ) {
+                app(CourseOfferService::class)->cloturerOffresPourCourse($lockedOrder, (int) $lockedCourier->user_id);
+
                 return $refusalService->enregistrerRefusProposition(
                     lockedCourier: $lockedCourier,
                     lockedCourse: $lockedOrder,
@@ -446,10 +476,14 @@ class DriverController extends Controller
         if (isset($outcome['reassign_tentative'], $outcome['exclude_courier_id'])) {
             $freshOrder = $order->fresh();
             if ($freshOrder && $freshOrder->courier_id === null) {
+                $exclusions = array_values(array_unique([
+                    ...app(CourseOfferService::class)->obtenirExclusionsPourCourse($freshOrder),
+                    $outcome['exclude_courier_id'],
+                ]));
                 $assignmentService->attribuerLivreurGoShop(
                     order: $freshOrder,
                     tentative: $outcome['reassign_tentative'],
-                    exclusions: [$outcome['exclude_courier_id']],
+                    exclusions: $exclusions,
                 );
             }
         }
@@ -515,6 +549,8 @@ class DriverController extends Controller
             }
 
             if ($lockedParcel->courier_id === null && in_array($lockedParcel->status, [Parcel::STATUS_PENDING, Parcel::STATUS_WAITING], true)) {
+                app(CourseOfferService::class)->cloturerOffresPourCourse($lockedParcel, (int) $lockedCourier->user_id);
+
                 return $refusalService->enregistrerRefusProposition(
                     lockedCourier: $lockedCourier,
                     lockedCourse: $lockedParcel,
@@ -533,10 +569,14 @@ class DriverController extends Controller
         if (isset($outcome['reassign_tentative'], $outcome['exclude_courier_id'])) {
             $freshParcel = $parcel->fresh();
             if ($freshParcel && $freshParcel->courier_id === null) {
+                $exclusions = array_values(array_unique([
+                    ...app(CourseOfferService::class)->obtenirExclusionsPourCourse($freshParcel),
+                    $outcome['exclude_courier_id'],
+                ]));
                 $assignmentService->attribuerLivreurGoColis(
                     parcel: $freshParcel,
                     tentative: $outcome['reassign_tentative'],
-                    exclusions: [$outcome['exclude_courier_id']],
+                    exclusions: $exclusions,
                 );
             }
         }

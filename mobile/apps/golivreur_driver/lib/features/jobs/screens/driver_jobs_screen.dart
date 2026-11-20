@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/services/gps_location_service.dart';
 import 'package:golivreur_core/widgets/osm_live_tracking_map.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../auth/screens/driver_login_screen.dart';
 import '../../driver/providers/driver_provider.dart';
 
@@ -19,18 +20,115 @@ class DriverJobsScreen extends ConsumerStatefulWidget {
 
 class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
   final _codeController = TextEditingController();
+  final _imagePicker = ImagePicker();
   Timer? _countdownTimer;
-  final int _secondsLeft = 30;
+  Timer? _pollTimer;
+  int _secondsLeft = 30;
+  int? _trackedIncomingJobId;
+  DriverJobType? _trackedIncomingType;
   bool _verifying = false;
+  bool _uploadingPhoto = false;
+  bool _processingAction = false;
 
   @override
   void initState() {
     super.initState();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (!mounted) return;
+      final profile = ref.read(driverProfileProvider);
+      if (!profile.isOnline) return;
+      final job = ref.read(driverActiveJobProvider);
+      if (job == null ||
+          job.step == DriverJobStep.incoming ||
+          job.step == DriverJobStep.accepted) {
+        ref.read(driverActiveJobProvider.notifier).chargerCourses();
+      }
+    });
+  }
+
+  void _syncIncomingCountdown(DriverJob? activeJob) {
+    if (activeJob == null || activeJob.step != DriverJobStep.incoming) {
+      _countdownTimer?.cancel();
+      _countdownTimer = null;
+      _trackedIncomingJobId = null;
+      _trackedIncomingType = null;
+      return;
+    }
+
+    if (_trackedIncomingJobId != activeJob.id ||
+        _trackedIncomingType != activeJob.type ||
+        _countdownTimer == null) {
+      _trackedIncomingJobId = activeJob.id;
+      _trackedIncomingType = activeJob.type;
+      _secondsLeft = activeJob.offerRemainingSeconds > 0
+          ? activeJob.offerRemainingSeconds
+          : 30;
+      _countdownTimer?.cancel();
+      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        if (_secondsLeft > 1) {
+          setState(() => _secondsLeft--);
+        } else {
+          timer.cancel();
+          _countdownTimer = null;
+          ref.read(driverActiveJobProvider.notifier).chargerCourses();
+        }
+      });
+    }
+  }
+
+  Future<void> _captureAndUploadParcelPhoto(String type) async {
+    if (_uploadingPhoto) return;
+    XFile? picked;
+    try {
+      picked = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 82,
+        maxWidth: 1600,
+      );
+    } catch (_) {
+      picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 82,
+        maxWidth: 1600,
+      );
+    }
+    if (picked == null || !mounted) return;
+
+    setState(() => _uploadingPhoto = true);
+    final profile = ref.read(driverProfileProvider);
+    final (ok, msg) = await ref
+        .read(driverActiveJobProvider.notifier)
+        .uploadParcelPhoto(
+          type: type,
+          photo: picked,
+          lat: profile.currentLat,
+          lng: profile.currentLng,
+        );
+    if (!mounted) return;
+    setState(() => _uploadingPhoto = false);
+    if (msg != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: ok ? GoLivreurTheme.succes : GoLivreurTheme.erreur,
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _pollTimer?.cancel();
     _codeController.dispose();
     super.dispose();
   }
@@ -83,6 +181,7 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
   Widget build(BuildContext context) {
     final profile = ref.watch(driverProfileProvider);
     final activeJob = ref.watch(driverActiveJobProvider);
+    _syncIncomingCountdown(activeJob);
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -393,7 +492,20 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
           title: 'Aller au commerce / expéditeur',
           destination: job.pickupAddress,
           buttonLabel: 'Je suis arrivé sur place',
-          onAction: () => ref.read(driverActiveJobProvider.notifier).arrivedAtMerchant(),
+          onAction: () async {
+            final (ok, msg) = await ref
+                .read(driverActiveJobProvider.notifier)
+                .arrivedAtMerchant();
+            if (!context.mounted) return;
+            if (!ok && msg != null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(msg),
+                  backgroundColor: GoLivreurTheme.erreur,
+                ),
+              );
+            }
+          },
         );
       case DriverJobStep.atMerchant:
         return _buildAtMerchantStep(context, ref, job);
@@ -507,10 +619,25 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                             side: const BorderSide(color: GoLivreurTheme.erreur, width: 1.5),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          onPressed: () {
-                            _countdownTimer?.cancel();
-                            ref.read(driverActiveJobProvider.notifier).refuseJob();
-                          },
+                          onPressed: _processingAction
+                              ? null
+                              : () async {
+                                  _countdownTimer?.cancel();
+                                  setState(() => _processingAction = true);
+                                  final (_, msg) = await ref
+                                      .read(driverActiveJobProvider.notifier)
+                                      .refuseJob();
+                                  await ref
+                                      .read(driverProfileProvider.notifier)
+                                      .chargerProfil();
+                                  if (!context.mounted) return;
+                                  setState(() => _processingAction = false);
+                                  if (msg != null && msg.isNotEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(msg)),
+                                    );
+                                  }
+                                },
                           child: const Text('Refuser', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                         ),
                       ),
@@ -524,10 +651,25 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                             backgroundColor: GoLivreurTheme.secondaire,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          onPressed: () {
-                            _countdownTimer?.cancel();
-                            ref.read(driverActiveJobProvider.notifier).acceptJob();
-                          },
+                          onPressed: _processingAction
+                              ? null
+                              : () async {
+                                  _countdownTimer?.cancel();
+                                  setState(() => _processingAction = true);
+                                  final (ok, msg) = await ref
+                                      .read(driverActiveJobProvider.notifier)
+                                      .acceptJob();
+                                  if (!context.mounted) return;
+                                  setState(() => _processingAction = false);
+                                  if (!ok && msg != null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(msg),
+                                        backgroundColor: GoLivreurTheme.erreur,
+                                      ),
+                                    );
+                                  }
+                                },
                           child: const Text('Accepter la course', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
                         ),
                       ),
@@ -672,24 +814,56 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: GoLivreurTheme.bordure),
+                border: Border.all(
+                  color: job.pickupPhotoUploaded
+                      ? GoLivreurTheme.succes
+                      : GoLivreurTheme.bordure,
+                ),
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.camera_alt_outlined, size: 40, color: GoLivreurTheme.secondaire),
+                  Icon(
+                    job.pickupPhotoUploaded
+                        ? Icons.check_circle
+                        : Icons.camera_alt_outlined,
+                    size: 40,
+                    color: job.pickupPhotoUploaded
+                        ? GoLivreurTheme.succes
+                        : GoLivreurTheme.secondaire,
+                  ),
                   const SizedBox(height: 8),
-                  const Text('Photo obligatoire du colis scellé', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    job.pickupPhotoUploaded
+                        ? 'Photo de ramassage enregistrée ✓'
+                        : 'Photo obligatoire du colis scellé',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
-                  const Text('Photographiez le colis avec l\'étiquette bien visible', style: TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire)),
+                  const Text(
+                    'Photographiez le colis avec l\'étiquette bien visible avant de saisir le code expéditeur',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: GoLivreurTheme.texteSecondaire,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('📸 Photo du colis capturée avec succès !')),
-                      );
-                    },
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Prendre la photo'),
+                    onPressed: _uploadingPhoto
+                        ? null
+                        : () => _captureAndUploadParcelPhoto('pickup'),
+                    icon: _uploadingPhoto
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.camera_alt),
+                    label: Text(
+                      job.pickupPhotoUploaded
+                          ? 'Reprendre la photo'
+                          : 'Prendre la photo',
+                    ),
                   ),
                 ],
               ),
@@ -846,6 +1020,105 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
             ),
           ],
           const SizedBox(height: 16),
+          if (job.type == DriverJobType.gocolis) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: (job.atRecipientReached && job.deliveryPhotoUploaded)
+                      ? GoLivreurTheme.succes
+                      : GoLivreurTheme.bordure,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Étapes obligatoires avant remise du colis :',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: job.atRecipientReached
+                          ? GoLivreurTheme.succes
+                          : GoLivreurTheme.secondaire,
+                      side: BorderSide(
+                        color: job.atRecipientReached
+                            ? GoLivreurTheme.succes
+                            : GoLivreurTheme.secondaire,
+                      ),
+                    ),
+                    onPressed: (_processingAction || job.atRecipientReached)
+                        ? null
+                        : () async {
+                            setState(() => _processingAction = true);
+                            final (ok, msg) = await ref
+                                .read(driverActiveJobProvider.notifier)
+                                .arrivedAtRecipient();
+                            if (!context.mounted) return;
+                            setState(() => _processingAction = false);
+                            if (msg != null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(msg),
+                                  backgroundColor: ok
+                                      ? GoLivreurTheme.succes
+                                      : GoLivreurTheme.erreur,
+                                ),
+                              );
+                            }
+                          },
+                    icon: Icon(
+                      job.atRecipientReached
+                          ? Icons.check_circle
+                          : Icons.place_outlined,
+                    ),
+                    label: Text(
+                      job.atRecipientReached
+                          ? '1. Arrivée chez le destinataire enregistrée ✓'
+                          : '1. Signaler mon arrivée chez le destinataire',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: job.deliveryPhotoUploaded
+                          ? GoLivreurTheme.succes
+                          : GoLivreurTheme.secondaire,
+                      side: BorderSide(
+                        color: job.deliveryPhotoUploaded
+                            ? GoLivreurTheme.succes
+                            : GoLivreurTheme.secondaire,
+                      ),
+                    ),
+                    onPressed: (!job.atRecipientReached || _uploadingPhoto)
+                        ? null
+                        : () => _captureAndUploadParcelPhoto('delivery'),
+                    icon: _uploadingPhoto
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            job.deliveryPhotoUploaded
+                                ? Icons.check_circle
+                                : Icons.camera_alt_outlined,
+                          ),
+                    label: Text(
+                      job.deliveryPhotoUploaded
+                          ? '2. Photo de remise enregistrée ✓'
+                          : '2. Prendre la photo de remise du colis',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(

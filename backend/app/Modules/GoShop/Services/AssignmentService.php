@@ -5,6 +5,7 @@ namespace App\Modules\GoShop\Services;
 use App\Jobs\AlerterAdminPasDelivreur;
 use App\Jobs\NotifierLivreurGoColis;
 use App\Jobs\NotifierLivreurGoShop;
+use App\Models\City;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\Parcel;
@@ -388,11 +389,14 @@ class AssignmentService
             ->whereNotIn('id', $excludeIds);
 
         if ($lat && $lng) {
+            $foundCity = City::find($cityId);
+            $cityRadiusKm = $foundCity !== null ? (float) $foundCity->radius_km : (float) self::RAYON_ETENDU_KM;
+            $maxSearchRadiusKm = max((float) self::RAYON_ETENDU_KM, $cityRadiusKm);
             $haversine = '(6371 * acos(least(1.0, greatest(-1.0, cos(radians(?)) * cos(radians(current_lat)) * cos(radians(current_lng) - radians(?)) + sin(radians(?)) * sin(radians(current_lat))))))';
 
             $baseQuery = $baseQuery
                 ->selectRaw("*, {$haversine} AS distance", [$lat, $lng, $lat])
-                ->whereRaw("{$haversine} < ?", [$lat, $lng, $lat, self::RAYON_ETENDU_KM])
+                ->whereRaw("{$haversine} < ?", [$lat, $lng, $lat, $maxSearchRadiusKm])
                 ->orderBy('distance');
         }
 

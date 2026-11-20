@@ -662,14 +662,40 @@ final activeDeliveryDestinationProvider = Provider<ActiveDeliveryDestination>((r
     fullAddress = activeCityName;
   }
 
-  final resolvedLat = matched?.lat ?? (q.lat != 0 ? q.lat : (weather.centerLat ?? 0.0));
-  final resolvedLng = matched?.lng ?? (q.lng != 0 ? q.lng : (weather.centerLng ?? 0.0));
+  final matchedLat = (matched?.lat != null && matched!.lat!.abs() > 0.0001)
+      ? matched.lat!
+      : null;
+  final matchedLng = (matched?.lng != null && matched!.lng!.abs() > 0.0001)
+      ? matched.lng!
+      : null;
+  final resolvedLat = matchedLat ??
+      (q.lat.abs() > 0.0001
+          ? q.lat
+          : ((weather.centerLat != null && weather.centerLat!.abs() > 0.0001)
+              ? weather.centerLat!
+              : 0.0));
+  final resolvedLng = matchedLng ??
+      (q.lng.abs() > 0.0001
+          ? q.lng
+          : ((weather.centerLng != null && weather.centerLng!.abs() > 0.0001)
+              ? weather.centerLng!
+              : 0.0));
+
+  final safeFullAddress = fullAddress.trim().isNotEmpty
+      ? fullAddress.trim()
+      : (matched?.neighborhood.isNotEmpty == true
+          ? matched!.neighborhood
+          : (weather.neighborhoods.isNotEmpty
+              ? weather.neighborhoods.first.name
+              : 'Centre-ville'));
 
   return ActiveDeliveryDestination(
     cityName: activeCityName,
-    neighborhood: neighborhood,
+    neighborhood: neighborhood.isNotEmpty
+        ? neighborhood
+        : (matched?.neighborhood ?? ''),
     matchedAddress: matched,
-    fullAddress: fullAddress,
+    fullAddress: safeFullAddress,
     lat: resolvedLat,
     lng: resolvedLng,
   );
@@ -1075,5 +1101,52 @@ final promoBannersProvider = FutureProvider<List<PromoBannerModel>>((ref) async 
   } catch (_) {}
   return const [];
 });
+
+// ─── Modes de Paiement Actifs (synchronisés avec GET /client/payment-methods) ─
+class ClientPaymentMethodsConfig {
+  final String defaultMethod;
+  final List<String> activeModes;
+
+  const ClientPaymentMethodsConfig({
+    this.defaultMethod = 'cash',
+    this.activeModes = const ['cash'],
+  });
+}
+
+final clientPaymentMethodsProvider =
+    FutureProvider<ClientPaymentMethodsConfig>((ref) async {
+  final api = ref.watch(apiClientProvider);
+  final auth = ref.watch(authProvider);
+  final weather = ref.watch(weatherProvider);
+  final cityId = auth.user?.cityId ?? weather.cityId;
+
+  try {
+    final res = await api.get(
+      '/client/payment-methods',
+      queryParameters: cityId != null ? {'city_id': cityId} : null,
+    );
+    if (res.statusCode == 200 &&
+        res.data is Map &&
+        res.data['succes'] == true &&
+        res.data['donnees'] is Map) {
+      final d = Map<String, dynamic>.from(res.data['donnees'] as Map);
+      final rawActive =
+          d['modes_actifs'] is List ? (d['modes_actifs'] as List) : const [];
+      final modes = rawActive
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final def = (d['default']?.toString().trim() ?? 'cash');
+      if (modes.isNotEmpty) {
+        return ClientPaymentMethodsConfig(
+          defaultMethod: modes.contains(def) ? def : modes.first,
+          activeModes: modes,
+        );
+      }
+    }
+  } catch (_) {}
+  return const ClientPaymentMethodsConfig();
+});
+
 
 

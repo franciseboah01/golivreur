@@ -11,6 +11,8 @@ use App\Models\Courier;
 use App\Models\Order;
 use App\Models\User;
 use App\Modules\GoShop\Services\OrderService;
+use App\Services\CourseOfferService;
+use App\Services\NotificationService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -405,7 +407,20 @@ class OrderResource extends Resource
                         }
 
                         $oldCourier = $record->courier_id;
-                        $record->update(['courier_id' => $courier->id]);
+                        $nextStatus = $record->status === Order::STATUS_WAITING
+                            ? ($record->ready_at !== null ? Order::STATUS_READY : Order::STATUS_ACCEPTED)
+                            : $record->status;
+
+                        $record->update([
+                            'courier_id' => $courier->id,
+                            'status' => $nextStatus,
+                            'accepted_at' => $record->accepted_at ?? now(),
+                        ]);
+
+                        app(CourseOfferService::class)->cloturerOffresPourCourse($record);
+                        if ($fresh = $record->fresh()) {
+                            app(NotificationService::class)->notifierCommandeAccepteeLivreur($fresh);
+                        }
 
                         ActivityLog::create([
                             'user_id' => auth()->id(),

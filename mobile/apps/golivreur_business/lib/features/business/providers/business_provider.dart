@@ -757,9 +757,13 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
 
   static BusinessOrder _mapJsonToBusinessOrder(Map<String, dynamic> json) {
     final statusStr = json['status']?.toString() ?? 'pending';
+    final hasReadyAt =
+        json['ready_at'] != null && '${json['ready_at']}'.trim().isNotEmpty;
     final status = switch (statusStr) {
       'pending' => BusinessOrderStatus.pending,
       'accepted' => BusinessOrderStatus.accepted,
+      'waiting' =>
+        hasReadyAt ? BusinessOrderStatus.ready : BusinessOrderStatus.accepted,
       'ready' => BusinessOrderStatus.ready,
       'picked_up' || 'in_transit' => BusinessOrderStatus.pickedUp,
       'delivered' => BusinessOrderStatus.delivered,
@@ -785,6 +789,12 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
         ? Map<String, dynamic>.from(json['client'] as Map)
         : <String, dynamic>{};
 
+    final createdAt = json['created_at'] != null
+        ? DateTime.tryParse('${json['created_at']}') ?? DateTime.now()
+        : DateTime.now();
+    final elapsedSec = DateTime.now().difference(createdAt).inSeconds;
+    final remSec = (45 - elapsedSec).clamp(0, 45);
+
     return BusinessOrder(
       id: (json['id'] as num).toInt(),
       clientName: (client['name'] ?? 'Client').toString(),
@@ -795,46 +805,54 @@ class BusinessOrdersNotifier extends StateNotifier<List<BusinessOrder>> {
           num.tryParse('${json['products_total'] ?? 0}')?.toDouble() ?? 0,
       paymentMethod: (json['payment_method'] ?? 'cash').toString(),
       status: status,
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse('${json['created_at']}') ?? DateTime.now()
-          : DateTime.now(),
-      secondsRemaining: 45,
+      createdAt: createdAt,
+      secondsRemaining: remSec,
     );
   }
 
-  void acceptOrder(int orderId) {
+  Future<void> acceptOrder(int orderId) async {
     state = state.map((o) {
       if (o.id == orderId) {
         return o.copyWith(status: BusinessOrderStatus.accepted);
       }
       return o;
     }).toList();
-    _safeIgnore(_api?.post('/merchant/orders/$orderId/accept'));
+    if (_api == null) return;
+    try {
+      await _api.post('/merchant/orders/$orderId/accept');
+    } catch (_) {}
+    await chargerCommandes();
   }
 
-  void refuseOrder(int orderId) {
+  Future<void> refuseOrder(int orderId) async {
     state = state.map((o) {
       if (o.id == orderId) {
         return o.copyWith(status: BusinessOrderStatus.refused);
       }
       return o;
     }).toList();
-    _safeIgnore(
-      _api?.post(
+    if (_api == null) return;
+    try {
+      await _api.post(
         '/merchant/orders/$orderId/refuse',
         data: {'raison': 'Rupture de stock'},
-      ),
-    );
+      );
+    } catch (_) {}
+    await chargerCommandes();
   }
 
-  void markOrderReady(int orderId) {
+  Future<void> markOrderReady(int orderId) async {
     state = state.map((o) {
       if (o.id == orderId) {
         return o.copyWith(status: BusinessOrderStatus.ready);
       }
       return o;
     }).toList();
-    _safeIgnore(_api?.post('/merchant/orders/$orderId/ready'));
+    if (_api == null) return;
+    try {
+      await _api.post('/merchant/orders/$orderId/ready');
+    } catch (_) {}
+    await chargerCommandes();
   }
 }
 

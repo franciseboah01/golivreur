@@ -111,9 +111,19 @@ class OrderService
             }
 
             // Calcul distance serveur Haversine entre merchant (pickup) et delivery (coef routier approché CDC = 1.0)
+            $hasRealMerchantGps = $merchant->lat !== null
+                && $merchant->lng !== null
+                && ! (abs((float) $merchant->lat) < 0.0001 && abs((float) $merchant->lng) < 0.0001);
+            $pickupLat = $hasRealMerchantGps
+                ? (float) $merchant->lat
+                : (float) ($city->center_lat ?? $deliveryLat);
+            $pickupLng = $hasRealMerchantGps
+                ? (float) $merchant->lng
+                : (float) ($city->center_lng ?? $deliveryLng);
+
             $haversineDistance = City::distanceHaversine(
-                (float) $merchant->lat,
-                (float) $merchant->lng,
+                $pickupLat,
+                $pickupLng,
                 $deliveryLat,
                 $deliveryLng
             );
@@ -153,8 +163,8 @@ class OrderService
                 'delivery_address' => $donnees['delivery_address'],
                 'delivery_lat' => $deliveryLat,
                 'delivery_lng' => $deliveryLng,
-                'pickup_lat' => $merchant->lat,
-                'pickup_lng' => $merchant->lng,
+                'pickup_lat' => $pickupLat,
+                'pickup_lng' => $pickupLng,
                 'distance_km' => $distanceKm,
                 'special_instructions' => $donnees['special_instructions'] ?? null,
             ]);

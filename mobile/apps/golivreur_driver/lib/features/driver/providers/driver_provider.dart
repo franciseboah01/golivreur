@@ -6,10 +6,6 @@ import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/services/gps_location_service.dart';
 import 'package:image_picker/image_picker.dart';
 
-void _safeIgnore(Future<dynamic>? f) {
-  f?.then((_) {}, onError: (_) {});
-}
-
 // ─── Transactions Portefeuille ────────────────────────────────────────────────
 class DriverTransaction {
   final String id;
@@ -515,6 +511,9 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
       if (gps.isSuccess && gps.lat != null && gps.lng != null) {
         lat = gps.lat;
         lng = gps.lng;
+      } else {
+        lat = state.currentLat ?? state.cityCenterLat;
+        lng = state.currentLng ?? state.cityCenterLng;
       }
     }
 
@@ -602,6 +601,11 @@ class DriverJob {
   final String? parcelSize; // Pour GoColis (Petit, Moyen, Grand)
   final DriverJobStep step;
   final int failedCodeAttempts;
+  final int offerRemainingSeconds;
+  final bool pickupPhotoUploaded;
+  final bool deliveryPhotoUploaded;
+  final bool atRecipientReached;
+  final String rawStatus;
 
   const DriverJob({
     required this.id,
@@ -618,11 +622,21 @@ class DriverJob {
     this.parcelSize,
     this.step = DriverJobStep.incoming,
     this.failedCodeAttempts = 0,
+    this.offerRemainingSeconds = 30,
+    this.pickupPhotoUploaded = false,
+    this.deliveryPhotoUploaded = false,
+    this.atRecipientReached = false,
+    this.rawStatus = 'pending',
   });
 
   DriverJob copyWith({
     DriverJobStep? step,
     int? failedCodeAttempts,
+    int? offerRemainingSeconds,
+    bool? pickupPhotoUploaded,
+    bool? deliveryPhotoUploaded,
+    bool? atRecipientReached,
+    String? rawStatus,
   }) {
     return DriverJob(
       id: id,
@@ -639,6 +653,13 @@ class DriverJob {
       parcelSize: parcelSize,
       step: step ?? this.step,
       failedCodeAttempts: failedCodeAttempts ?? this.failedCodeAttempts,
+      offerRemainingSeconds:
+          offerRemainingSeconds ?? this.offerRemainingSeconds,
+      pickupPhotoUploaded: pickupPhotoUploaded ?? this.pickupPhotoUploaded,
+      deliveryPhotoUploaded:
+          deliveryPhotoUploaded ?? this.deliveryPhotoUploaded,
+      atRecipientReached: atRecipientReached ?? this.atRecipientReached,
+      rawStatus: rawStatus ?? this.rawStatus,
     );
   }
 }
@@ -665,19 +686,21 @@ class DriverActiveJobNotifier extends StateNotifier<DriverJob?> {
           res.data['succes'] == true &&
           res.data['donnees'] is Map) {
         final donnees = Map<String, dynamic>.from(res.data['donnees'] as Map);
-        final orders = donnees['orders'] is List ? donnees['orders'] as List : const [];
+        final orders =
+            donnees['orders'] is List ? donnees['orders'] as List : const [];
         final parcels =
             donnees['parcels'] is List ? donnees['parcels'] as List : const [];
 
+        // 1. Course GoShop déjà acceptée / en cours
         if (orders.isNotEmpty && orders.first is Map) {
           final o = Map<String, dynamic>.from(orders.first as Map);
-          final statusStr = o['status']?.toString() ?? 'pending';
+          final statusStr = o['status']?.toString() ?? 'accepted';
           final step = switch (statusStr) {
             'accepted' => DriverJobStep.accepted,
             'ready' => DriverJobStep.atMerchant,
             'picked_up' || 'in_transit' => DriverJobStep.inTransit,
             'delivered' => DriverJobStep.completed,
-            _ => DriverJobStep.incoming,
+            _ => DriverJobStep.accepted,
           };
 
           final merchant = o['merchant'] is Map
@@ -685,56 +708,153 @@ class DriverActiveJobNotifier extends StateNotifier<DriverJob?> {
               : <String, dynamic>{};
 
           state = DriverJob(
-            id: (o['id'] as num).toInt(),
+            id: num.tryParse('${o['id'] ?? 0}')?.toInt() ?? 0,
             type: DriverJobType.goshop,
             title: (merchant['name'] ?? 'Commande #${o['id']}').toString(),
-            pickupAddress: (merchant['address'] ?? 'Adresse commerce').toString(),
-            deliveryAddress: (o['delivery_address'] ?? 'Adresse client').toString(),
-            pickupLat: num.tryParse('${o['pickup_lat'] ?? merchant['lat'] ?? ''}')
-                ?.toDouble(),
-            pickupLng: num.tryParse('${o['pickup_lng'] ?? merchant['lng'] ?? ''}')
-                ?.toDouble(),
-            deliveryLat:
-                num.tryParse('${o['delivery_lat'] ?? ''}')?.toDouble(),
-            deliveryLng:
-                num.tryParse('${o['delivery_lng'] ?? ''}')?.toDouble(),
-            distanceKm: (o['distance_km'] as num?)?.toDouble() ?? 0,
+            pickupAddress:
+                (merchant['address'] ?? 'Adresse commerce').toString(),
+            deliveryAddress:
+                (o['delivery_address'] ?? 'Adresse client').toString(),
+            pickupLat:
+                num.tryParse('${o['pickup_lat'] ?? merchant['lat'] ?? ''}')
+                    ?.toDouble(),
+            pickupLng:
+                num.tryParse('${o['pickup_lng'] ?? merchant['lng'] ?? ''}')
+                    ?.toDouble(),
+            deliveryLat: num.tryParse('${o['delivery_lat'] ?? ''}')?.toDouble(),
+            deliveryLng: num.tryParse('${o['delivery_lng'] ?? ''}')?.toDouble(),
+            distanceKm:
+                num.tryParse('${o['distance_km'] ?? 0}')?.toDouble() ?? 0,
             payout:
                 num.tryParse('${o['courier_amount'] ?? 0}')?.toDouble() ?? 0,
             step: step,
+            rawStatus: statusStr,
           );
           return;
         }
 
+        // 2. Expédition GoColis déjà acceptée / en cours
         if (parcels.isNotEmpty && parcels.first is Map) {
           final p = Map<String, dynamic>.from(parcels.first as Map);
-          final statusStr = p['status']?.toString() ?? 'pending';
+          final statusStr = p['status']?.toString() ?? 'accepted';
           final step = switch (statusStr) {
             'accepted' => DriverJobStep.accepted,
             'at_sender' => DriverJobStep.atMerchant,
-            'picked_up' || 'in_transit' || 'at_recipient' => DriverJobStep.inTransit,
+            'picked_up' ||
+            'in_transit' ||
+            'at_recipient' =>
+              DriverJobStep.inTransit,
             'delivered' => DriverJobStep.completed,
-            _ => DriverJobStep.incoming,
+            _ => DriverJobStep.accepted,
           };
 
+          final photos = p['photos'] is List ? p['photos'] as List : const [];
+          final hasPickupPhoto = photos.any(
+            (ph) => ph is Map && ph['type']?.toString() == 'pickup',
+          );
+          final hasDeliveryPhoto = photos.any(
+            (ph) => ph is Map && ph['type']?.toString() == 'delivery',
+          );
+
           state = DriverJob(
-            id: (p['id'] as num).toInt(),
+            id: num.tryParse('${p['id'] ?? 0}')?.toInt() ?? 0,
             type: DriverJobType.gocolis,
             title: 'Colis #${p['id']}',
-            pickupAddress: (p['pickup_address'] ?? 'Adresse expéditeur').toString(),
+            pickupAddress:
+                (p['pickup_address'] ?? 'Adresse expéditeur').toString(),
             deliveryAddress:
                 (p['delivery_address'] ?? 'Adresse destinataire').toString(),
             pickupLat: num.tryParse('${p['pickup_lat'] ?? ''}')?.toDouble(),
             pickupLng: num.tryParse('${p['pickup_lng'] ?? ''}')?.toDouble(),
-            deliveryLat:
-                num.tryParse('${p['delivery_lat'] ?? ''}')?.toDouble(),
-            deliveryLng:
-                num.tryParse('${p['delivery_lng'] ?? ''}')?.toDouble(),
-            distanceKm: (p['distance_km'] as num?)?.toDouble() ?? 0,
+            deliveryLat: num.tryParse('${p['delivery_lat'] ?? ''}')?.toDouble(),
+            deliveryLng: num.tryParse('${p['delivery_lng'] ?? ''}')?.toDouble(),
+            distanceKm:
+                num.tryParse('${p['distance_km'] ?? 0}')?.toDouble() ?? 0,
             payout:
                 num.tryParse('${p['courier_amount'] ?? 0}')?.toDouble() ?? 0,
-            parcelSize: p['size']?.toString(),
+            parcelSize: (p['size_label'] ?? p['size'])?.toString(),
             step: step,
+            pickupPhotoUploaded: hasPickupPhoto,
+            deliveryPhotoUploaded: hasDeliveryPhoto,
+            atRecipientReached: statusStr == 'at_recipient',
+            rawStatus: statusStr,
+          );
+          return;
+        }
+
+        // 3. Proposition exclusive en attente d'acceptation (fenêtre de 30s)
+        final rawOffers = donnees['offers'] is Map
+            ? Map<String, dynamic>.from(donnees['offers'] as Map)
+            : const <String, dynamic>{};
+        final offeredOrders = rawOffers['orders'] is List
+            ? rawOffers['orders'] as List
+            : const [];
+        final offeredParcels = rawOffers['parcels'] is List
+            ? rawOffers['parcels'] as List
+            : const [];
+
+        if (offeredOrders.isNotEmpty && offeredOrders.first is Map) {
+          final o = Map<String, dynamic>.from(offeredOrders.first as Map);
+          final merchant = o['merchant'] is Map
+              ? Map<String, dynamic>.from(o['merchant'] as Map)
+              : <String, dynamic>{};
+          final remSec =
+              num.tryParse('${o['offer_remaining_seconds'] ?? 30}')?.toInt() ??
+                  30;
+
+          state = DriverJob(
+            id: num.tryParse('${o['id'] ?? 0}')?.toInt() ?? 0,
+            type: DriverJobType.goshop,
+            title: (merchant['name'] ?? 'Commande #${o['id']}').toString(),
+            pickupAddress:
+                (merchant['address'] ?? 'Adresse commerce').toString(),
+            deliveryAddress:
+                (o['delivery_address'] ?? 'Adresse client').toString(),
+            pickupLat:
+                num.tryParse('${o['pickup_lat'] ?? merchant['lat'] ?? ''}')
+                    ?.toDouble(),
+            pickupLng:
+                num.tryParse('${o['pickup_lng'] ?? merchant['lng'] ?? ''}')
+                    ?.toDouble(),
+            deliveryLat: num.tryParse('${o['delivery_lat'] ?? ''}')?.toDouble(),
+            deliveryLng: num.tryParse('${o['delivery_lng'] ?? ''}')?.toDouble(),
+            distanceKm:
+                num.tryParse('${o['distance_km'] ?? 0}')?.toDouble() ?? 0,
+            payout:
+                num.tryParse('${o['courier_amount'] ?? 0}')?.toDouble() ?? 0,
+            step: DriverJobStep.incoming,
+            offerRemainingSeconds: remSec > 0 ? remSec : 30,
+            rawStatus: o['status']?.toString() ?? 'accepted',
+          );
+          return;
+        }
+
+        if (offeredParcels.isNotEmpty && offeredParcels.first is Map) {
+          final p = Map<String, dynamic>.from(offeredParcels.first as Map);
+          final remSec =
+              num.tryParse('${p['offer_remaining_seconds'] ?? 30}')?.toInt() ??
+                  30;
+
+          state = DriverJob(
+            id: num.tryParse('${p['id'] ?? 0}')?.toInt() ?? 0,
+            type: DriverJobType.gocolis,
+            title: 'Colis #${p['id']}',
+            pickupAddress:
+                (p['pickup_address'] ?? 'Secteur expéditeur').toString(),
+            deliveryAddress:
+                (p['delivery_address'] ?? 'Secteur destinataire').toString(),
+            pickupLat: num.tryParse('${p['pickup_lat'] ?? ''}')?.toDouble(),
+            pickupLng: num.tryParse('${p['pickup_lng'] ?? ''}')?.toDouble(),
+            deliveryLat: num.tryParse('${p['delivery_lat'] ?? ''}')?.toDouble(),
+            deliveryLng: num.tryParse('${p['delivery_lng'] ?? ''}')?.toDouble(),
+            distanceKm:
+                num.tryParse('${p['distance_km'] ?? 0}')?.toDouble() ?? 0,
+            payout:
+                num.tryParse('${p['courier_amount'] ?? 0}')?.toDouble() ?? 0,
+            parcelSize: (p['size_label'] ?? p['size'])?.toString(),
+            step: DriverJobStep.incoming,
+            offerRemainingSeconds: remSec > 0 ? remSec : 30,
+            rawStatus: p['status']?.toString() ?? 'pending',
           );
           return;
         }
@@ -744,32 +864,172 @@ class DriverActiveJobNotifier extends StateNotifier<DriverJob?> {
     } catch (_) {}
   }
 
-  void acceptJob() {
-    if (state == null) return;
+  Future<(bool, String?)> acceptJob() async {
+    if (state == null) return (false, 'Aucune proposition active.');
     final current = state!;
+    if (_api == null) {
+      state = current.copyWith(step: DriverJobStep.accepted);
+      return (true, null);
+    }
+
     final endpoint = current.type == DriverJobType.gocolis
         ? '/driver/parcels/${current.id}/accept'
         : '/driver/orders/${current.id}/accept';
-    state = current.copyWith(step: DriverJobStep.accepted);
-    _safeIgnore(_api?.post(endpoint));
+
+    try {
+      final res = await _api.post(endpoint);
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true) {
+        state = current.copyWith(
+          step: DriverJobStep.accepted,
+          rawStatus: 'accepted',
+        );
+        await chargerCourses();
+        return (true, res.data['message']?.toString());
+      }
+      await chargerCourses();
+      return (false, 'Impossible d\'accepter cette course.');
+    } on DioException catch (e) {
+      final err = ApiClient.messageErreur(e);
+      await chargerCourses();
+      return (false, err);
+    } catch (_) {
+      return (false, 'Erreur réseau lors de l\'acceptation.');
+    }
   }
 
-  void refuseJob() {
-    if (state == null) return;
+  Future<(bool, String?)> refuseJob() async {
+    if (state == null) return (false, null);
     final current = state!;
+    state = null;
+    if (_api == null) return (true, null);
+
     final endpoint = current.type == DriverJobType.gocolis
         ? '/driver/parcels/${current.id}/refuse'
         : '/driver/orders/${current.id}/refuse';
-    _safeIgnore(_api?.post(endpoint));
-    state = null;
+
+    try {
+      final res = await _api.post(endpoint);
+      final msg =
+          res.data is Map ? res.data['message']?.toString() : 'Course refusée.';
+      await chargerCourses();
+      return (true, msg);
+    } on DioException catch (e) {
+      await chargerCourses();
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Erreur réseau lors du refus.');
+    }
   }
 
-  void arrivedAtMerchant() {
-    if (state == null) return;
+  Future<(bool, String?)> arrivedAtMerchant() async {
+    if (state == null) return (false, null);
     final current = state!;
-    state = current.copyWith(step: DriverJobStep.atMerchant);
-    if (current.type == DriverJobType.gocolis) {
-      _safeIgnore(_api?.post('/driver/parcels/${current.id}/at-sender'));
+    if (current.type != DriverJobType.gocolis || _api == null) {
+      state = current.copyWith(step: DriverJobStep.atMerchant);
+      return (true, null);
+    }
+
+    try {
+      final res = await _api.post('/driver/parcels/${current.id}/at-sender');
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true) {
+        state = current.copyWith(
+          step: DriverJobStep.atMerchant,
+          rawStatus: 'at_sender',
+        );
+        return (true, res.data['message']?.toString());
+      }
+      return (false, 'Impossible d\'enregistrer l\'arrivée chez l\'expéditeur.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Erreur réseau lors du signalement d\'arrivée.');
+    }
+  }
+
+  Future<(bool, String?)> arrivedAtRecipient() async {
+    if (state == null) return (false, null);
+    final current = state!;
+    if (current.type != DriverJobType.gocolis || _api == null) {
+      state = current.copyWith(
+        atRecipientReached: true,
+        rawStatus: 'at_recipient',
+      );
+      return (true, null);
+    }
+
+    try {
+      final res = await _api.post('/driver/parcels/${current.id}/at-recipient');
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true) {
+        state = current.copyWith(
+          atRecipientReached: true,
+          rawStatus: 'at_recipient',
+        );
+        return (true, res.data['message']?.toString());
+      }
+      return (
+        false,
+        'Impossible d\'enregistrer l\'arrivée chez le destinataire.',
+      );
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Erreur réseau lors du signalement d\'arrivée.');
+    }
+  }
+
+  Future<(bool, String?)> uploadParcelPhoto({
+    required String type,
+    required XFile photo,
+    double? lat,
+    double? lng,
+  }) async {
+    if (state == null) return (false, 'Aucune expédition active.');
+    final current = state!;
+    if (_api == null) {
+      state = current.copyWith(
+        pickupPhotoUploaded:
+            type == 'pickup' ? true : current.pickupPhotoUploaded,
+        deliveryPhotoUploaded:
+            type == 'delivery' ? true : current.deliveryPhotoUploaded,
+      );
+      return (true, 'Photo enregistrée.');
+    }
+
+    try {
+      final res = await _api.uploadMultipart(
+        '/driver/parcels/${current.id}/photos',
+        fields: {
+          'type': type,
+          if (lat != null) 'lat': lat.toString(),
+          if (lng != null) 'lng': lng.toString(),
+        },
+        files: {'photo': photo},
+      );
+      if ((res.statusCode == 201 || res.statusCode == 200) &&
+          res.data is Map &&
+          res.data['succes'] == true) {
+        state = current.copyWith(
+          pickupPhotoUploaded:
+              type == 'pickup' ? true : current.pickupPhotoUploaded,
+          deliveryPhotoUploaded:
+              type == 'delivery' ? true : current.deliveryPhotoUploaded,
+        );
+        return (
+          true,
+          res.data['message']?.toString() ?? 'Photo de preuve enregistrée.',
+        );
+      }
+      return (false, 'Impossible d\'envoyer la photo de preuve.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Erreur lors de l\'envoi de la photo.');
     }
   }
 

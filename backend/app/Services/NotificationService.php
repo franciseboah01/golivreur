@@ -184,23 +184,53 @@ class NotificationService
 
     public function proposerCourseGoShop(Courier $livreur, Order $order): void
     {
+        $delaiSecondes = $this->settingsService->getDelaiRegle(
+            'acceptation_livreur_secondes',
+            $order->city_id ? (int) $order->city_id : null,
+            30,
+        );
+        $now = now();
+
         $this->createNotification(
             userId: $livreur->user_id,
             type: 'course_offer_goshop',
             title: 'Nouvelle course GoShop disponible',
             body: "Course #{$order->id} — gain : {$order->courier_amount} F CFA",
-            data: ['order_id' => $order->id],
+            data: [
+                'order_id' => $order->id,
+                'courier_id' => $livreur->id,
+                'tentative' => max(1, (int) $order->assignment_attempts),
+                'proposed_at' => $now->toIso8601String(),
+                'expires_at' => $now->copy()->addSeconds($delaiSecondes)->toIso8601String(),
+                'expires_in_seconds' => $delaiSecondes,
+            ],
         );
     }
 
     public function proposerCourseGoColis(Courier $livreur, Parcel $parcel): void
     {
+        $delaiSecondes = $this->settingsService->getDelaiRegle(
+            'acceptation_livreur_secondes',
+            $parcel->city_id ? (int) $parcel->city_id : null,
+            30,
+        );
+        $now = now();
+
         $this->createNotification(
             userId: $livreur->user_id,
             type: 'course_offer_gocolis',
             title: 'Nouvelle expédition GoColis disponible',
             body: "Colis {$parcel->size_label} — gain : {$parcel->courier_amount} F CFA",
-            data: ['parcel_id' => $parcel->id, 'size' => $parcel->size, 'size_label' => $parcel->size_label],
+            data: [
+                'parcel_id' => $parcel->id,
+                'size' => $parcel->size,
+                'size_label' => $parcel->size_label,
+                'courier_id' => $livreur->id,
+                'tentative' => max(1, (int) $parcel->assignment_attempts),
+                'proposed_at' => $now->toIso8601String(),
+                'expires_at' => $now->copy()->addSeconds($delaiSecondes)->toIso8601String(),
+                'expires_in_seconds' => $delaiSecondes,
+            ],
         );
     }
 

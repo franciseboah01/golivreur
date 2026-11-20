@@ -116,8 +116,14 @@ class OrderSweepService
 
                 $previousAttempts = (int) $lockedOrder->assignment_attempts;
                 $nextAttempt = $previousAttempts + 1;
+                $exclusions = app(CourseOfferService::class)->obtenirExclusionsPourCourse($lockedOrder);
+                app(CourseOfferService::class)->cloturerOffresPourCourse($lockedOrder);
 
-                $this->assignmentService->attribuerLivreurGoShop($lockedOrder, tentative: $nextAttempt);
+                $this->assignmentService->attribuerLivreurGoShop(
+                    order: $lockedOrder,
+                    tentative: $nextAttempt,
+                    exclusions: $exclusions,
+                );
                 $lockedOrder->refresh();
 
                 $this->activityLogService->log(
