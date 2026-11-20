@@ -631,6 +631,7 @@ final businessOrdersProvider =
 // ─── Données Statistiques Revenus ─────────────────────────────────────────────
 class DisbursementItem {
   final String id;
+  final String type; // credit | debit
   final double amount;
   final String provider;
   final String date;
@@ -638,6 +639,7 @@ class DisbursementItem {
 
   const DisbursementItem({
     required this.id,
+    this.type = 'debit',
     required this.amount,
     required this.provider,
     required this.date,
@@ -645,15 +647,29 @@ class DisbursementItem {
   });
 
   factory DisbursementItem.fromJson(Map<String, dynamic> json) {
+    final rawType = (json['type'] ?? '').toString().toLowerCase();
+    final txType = (json['tx_type'] ?? '').toString().toLowerCase();
+    final isCredit = rawType == 'credit' || txType == 'deposit';
+    final rawStatus = (json['statut'] ?? json['status'] ?? 'Effectué').toString();
+    final localizedStatus = switch (rawStatus.toLowerCase()) {
+      'completed' => 'Validé',
+      'pending' => 'En attente',
+      'failed' => 'Échoué',
+      _ => rawStatus,
+    };
+
     return DisbursementItem(
       id: (json['id'] ?? '').toString(),
+      type: isCredit ? 'credit' : 'debit',
       amount: num.tryParse('${json['montant'] ?? json['amount'] ?? 0}')
               ?.toDouble() ??
           0,
-      provider: (json['description'] ?? json['provider'] ?? 'Versement')
+      provider: (json['description'] ??
+              json['provider'] ??
+              (isCredit ? 'Dépôt espèces' : 'Versement / Retrait'))
           .toString(),
       date: (json['date'] ?? '').toString(),
-      status: (json['statut'] ?? json['status'] ?? 'Effectué').toString(),
+      status: localizedStatus,
     );
   }
 }

@@ -20,6 +20,18 @@ class BusinessRevenueScreen extends ConsumerWidget {
         title: const Text('Revenus & Performances'),
         backgroundColor: Colors.white,
         elevation: 0.5,
+        actions: [
+          IconButton(
+            tooltip: 'Actualiser le solde',
+            icon: const Icon(Icons.refresh, color: Color(0xFF2E75B6)),
+            onPressed: () async {
+              await Future.wait([
+                ref.read(businessProfileProvider.notifier).chargerProfil(),
+                ref.read(revenueStatsProvider.notifier).chargerRevenus(),
+              ]);
+            },
+          ),
+        ],
       ),
       body: RefreshIndicator(
         color: const Color(0xFF2E75B6),
@@ -124,7 +136,7 @@ class BusinessRevenueScreen extends ConsumerWidget {
                         SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Wave, Orange Money & MTN MoMo',
+                            'Espèces en agence, Wave, Orange Money & MTN MoMo',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
@@ -380,7 +392,7 @@ class BusinessRevenueScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             const Text(
-              'Derniers Versements Mobile Money',
+              'Mouvements Portefeuille & Versements',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -405,7 +417,7 @@ class BusinessRevenueScreen extends ConsumerWidget {
                     ),
                     SizedBox(height: 10),
                     Text(
-                      'Aucun versement effectué pour le moment',
+                      'Aucun mouvement enregistré pour le moment',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -414,7 +426,7 @@ class BusinessRevenueScreen extends ConsumerWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Vos virements Mobile Money apparaîtront ici dès que vos premières commandes seront réglées.',
+                      'Vos dépôts espèces en agence, retraits et versements Mobile Money apparaîtront ici en temps réel.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,
@@ -426,59 +438,90 @@ class BusinessRevenueScreen extends ConsumerWidget {
               )
             else
               ...stats.versementsRecents.map(
-                (v) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: GoLivreurTheme.bordure),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${v.amount.toInt()} F CFA',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                            Text(
-                              '${v.provider}${v.date.isNotEmpty ? " • ${v.date}" : ""}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: GoLivreurTheme.texteSecondaire,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: GoLivreurTheme.succes.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          v.status,
-                          style: const TextStyle(
-                            color: GoLivreurTheme.succes,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                (v) {
+                  final isCredit = v.type == 'credit';
+                  final accent = isCredit
+                      ? GoLivreurTheme.succes
+                      : GoLivreurTheme.erreur;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: GoLivreurTheme.bordure),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isCredit
+                                ? Icons.arrow_downward
+                                : Icons.arrow_upward,
+                            color: accent,
+                            size: 18,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${isCredit ? "+" : "-"}${v.amount.toInt()} F CFA',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: accent,
+                                ),
+                              ),
+                              Text(
+                                v.provider,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: GoLivreurTheme.textePrincipal,
+                                ),
+                              ),
+                              if (v.date.isNotEmpty)
+                                Text(
+                                  v.date,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: GoLivreurTheme.texteSecondaire,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: GoLivreurTheme.succes.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            v.status,
+                            style: const TextStyle(
+                              color: GoLivreurTheme.succes,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             const SizedBox(height: 20),
           ],

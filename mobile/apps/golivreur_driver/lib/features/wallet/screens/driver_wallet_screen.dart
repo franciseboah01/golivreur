@@ -17,6 +17,14 @@ class DriverWalletScreen extends ConsumerWidget {
         title: const Text('Mon Portefeuille Virtuel'),
         backgroundColor: Colors.white,
         elevation: 0.5,
+        actions: [
+          IconButton(
+            tooltip: 'Actualiser le solde',
+            icon: const Icon(Icons.refresh, color: GoLivreurTheme.secondaire),
+            onPressed: () =>
+                ref.read(driverProfileProvider.notifier).chargerPortefeuille(),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         color: GoLivreurTheme.secondaire,

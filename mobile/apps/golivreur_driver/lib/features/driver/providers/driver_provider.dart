@@ -28,11 +28,13 @@ class DriverTransaction {
 
   factory DriverTransaction.fromJson(Map<String, dynamic> json) {
     final rawType = (json['type'] ?? '').toString().toLowerCase();
-    final isDebit = rawType == 'debit' ||
+    final rawAmount = num.tryParse('${json['amount'] ?? 0}')?.toDouble() ?? 0;
+    final isDebit = rawAmount < 0 ||
+        rawType == 'debit' ||
         rawType == 'withdrawal' ||
         rawType == 'payout' ||
-        rawType == 'commission';
-    final rawAmount = num.tryParse('${json['amount'] ?? 0}')?.toDouble() ?? 0;
+        rawType == 'commission' ||
+        rawType == 'debit_cash_remittance';
     final createdAt = (json['created_at'] ?? json['date'] ?? '').toString();
 
     return DriverTransaction(

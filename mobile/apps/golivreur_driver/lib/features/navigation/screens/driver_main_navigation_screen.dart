@@ -18,13 +18,15 @@ class DriverMainNavigationScreen extends ConsumerStatefulWidget {
 }
 
 class _DriverMainNavigationScreenState
-    extends ConsumerState<DriverMainNavigationScreen> {
+    extends ConsumerState<DriverMainNavigationScreen>
+    with WidgetsBindingObserver {
   late int _currentIndex;
   late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentIndex = widget.initialIndex;
     _pages = [
       DriverJobsScreen(onSwitchTab: _switchToTab),
@@ -36,6 +38,20 @@ class _DriverMainNavigationScreenState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _synchroniserDonneesServeur();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(driverProfileProvider.notifier).chargerPortefeuille();
+      ref.read(driverActiveJobProvider.notifier).chargerCourses();
+    }
   }
 
   void _switchToTab(int tabIndex) {
