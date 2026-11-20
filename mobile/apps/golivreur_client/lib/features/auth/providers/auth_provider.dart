@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/services/gps_location_service.dart';
+import 'package:golivreur_core/services/push_notification_service.dart';
 import 'package:golivreur_core/services/secure_token_storage.dart';
 import 'package:golivreur_core/services/sso_switch_service.dart';
 import 'package:golivreur_core/widgets/role_missing_dialog.dart';
@@ -844,6 +845,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> forcerDeconnexionLocale() async {
     _bootstrapped = false;
+    PushNotificationService.clearTokenSync();
     await SecureTokenStorage.clearSessionTokens(_storage);
     try {
       await _storage.delete(key: cachedUserKey);

@@ -1,6 +1,7 @@
 export '../providers/branding_provider.dart';
 export '../services/gps_location_service.dart';
 export '../services/pin_lock_service.dart';
+export '../services/push_notification_service.dart';
 export '../services/secure_token_storage.dart';
 export '../services/sso_switch_service.dart';
 export 'animated_splash_screen.dart';
@@ -10,6 +11,7 @@ export 'force_password_change_screen.dart';
 export 'golivreur_error_view.dart';
 export 'golivreur_loading.dart';
 export 'golivreur_logo.dart';
+export 'in_app_push_banner.dart';
 export 'osm_live_tracking_map.dart';
 export 'osm_location_picker_screen.dart';
 export 'pin_lock_screen.dart';

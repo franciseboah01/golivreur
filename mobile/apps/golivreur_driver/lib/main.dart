@@ -6,8 +6,9 @@ import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'features/auth/screens/driver_login_screen.dart';
 import 'features/navigation/screens/driver_main_navigation_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await PushNotificationService.initialize();
   runApp(
     const ProviderScope(
       child: GoLivreurDriverApp(),
@@ -29,6 +30,9 @@ class GoLivreurDriverApp extends StatelessWidget {
       title: 'GL Driver',
       theme: GoLivreurTheme.theme,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => InAppPushOverlay(
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: DriverRootGate(showSplash: showSplash),
     );
   }

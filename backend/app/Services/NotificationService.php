@@ -234,6 +234,28 @@ class NotificationService
         );
     }
 
+    /**
+     * Notifie immédiatement un Commerce ou un Livreur (base + Push FCM / Push In-App)
+     * lors d'un dépôt ou retrait espèces en agence (Caisse Espèces).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function notifierOperationEspeces(
+        int $userId,
+        string $type,
+        string $title,
+        string $body,
+        array $data = [],
+    ): Notification {
+        return $this->createNotification(
+            userId: $userId,
+            type: $type,
+            title: $title,
+            body: $body,
+            data: $data,
+        );
+    }
+
     private function createNotification(int $userId, string $type, string $title, string $body, array $data = []): Notification
     {
         $notification = Notification::create([
@@ -254,12 +276,13 @@ class NotificationService
                 default => [FcmChannels::GENERAL, false, null],
             };
 
+            $pushData = array_merge(['type' => $type], $data);
             AsyncJobDispatcher::dispatchAfterCommit(
                 static fn () => SendPushNotification::dispatch(
                     $deviceToken,
                     $title,
                     $body,
-                    $data,
+                    $pushData,
                     $channelId,
                     $highPriority,
                     $ttlSeconds,

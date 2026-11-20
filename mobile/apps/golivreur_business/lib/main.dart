@@ -6,8 +6,9 @@ import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'features/auth/screens/business_login_screen.dart';
 import 'features/navigation/screens/business_main_navigation_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await PushNotificationService.initialize();
   runApp(
     const ProviderScope(
       child: GoLivreurBusinessApp(),
@@ -29,6 +30,9 @@ class GoLivreurBusinessApp extends StatelessWidget {
       title: 'GL Business',
       theme: GoLivreurTheme.theme,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => InAppPushOverlay(
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: BusinessRootGate(showSplash: showSplash),
     );
   }

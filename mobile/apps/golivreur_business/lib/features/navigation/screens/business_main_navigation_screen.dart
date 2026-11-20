@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/services/api_client.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../orders/screens/business_orders_screen.dart';
 import '../../catalog/screens/business_catalog_screen.dart';
 import '../../revenue/screens/business_revenue_screen.dart';
@@ -22,6 +25,8 @@ class _BusinessMainNavigationScreenState
     with WidgetsBindingObserver {
   late int _currentIndex;
   late final List<Widget> _pages;
+  StreamSubscription<InAppPushMessage>? _pushMsgSub;
+  StreamSubscription<InAppPushMessage>? _pushTapSub;
 
   @override
   void initState() {
@@ -37,11 +42,31 @@ class _BusinessMainNavigationScreenState
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _synchroniserDonneesServeur();
+      PushNotificationService.syncTokenWithBackend(ref.read(apiClientProvider));
+    });
+
+    _pushMsgSub = PushNotificationService.onForegroundMessage.listen((_) {
+      if (!mounted) return;
+      ref.read(businessOrdersProvider.notifier).chargerCommandes();
+      ref.read(revenueStatsProvider.notifier).chargerRevenus();
+      ref.read(businessProfileProvider.notifier).chargerProfil();
+    });
+
+    _pushTapSub = PushNotificationService.onNotificationTap.listen((msg) {
+      if (!mounted) return;
+      final t = msg.type.toLowerCase();
+      if (t.contains('wallet_cash')) {
+        _switchToTab(2);
+      } else if (t.contains('order')) {
+        _switchToTab(0);
+      }
     });
   }
 
   @override
   void dispose() {
+    _pushMsgSub?.cancel();
+    _pushTapSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

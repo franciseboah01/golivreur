@@ -6,8 +6,9 @@ import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await PushNotificationService.initialize();
   runApp(
     const ProviderScope(
       child: GoLivreurClientApp(),
@@ -29,6 +30,9 @@ class GoLivreurClientApp extends StatelessWidget {
       title: 'GL Client',
       theme: GoLivreurTheme.theme,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => InAppPushOverlay(
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: ClientRootGate(showSplash: showSplash),
     );
   }

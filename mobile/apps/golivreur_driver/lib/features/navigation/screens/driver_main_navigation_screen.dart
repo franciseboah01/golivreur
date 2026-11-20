@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/services/api_client.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import '../../driver/providers/driver_provider.dart';
 import '../../jobs/screens/driver_jobs_screen.dart';
 import '../../wallet/screens/driver_wallet_screen.dart';
@@ -22,6 +25,8 @@ class _DriverMainNavigationScreenState
     with WidgetsBindingObserver {
   late int _currentIndex;
   late final List<Widget> _pages;
+  StreamSubscription<InAppPushMessage>? _pushMsgSub;
+  StreamSubscription<InAppPushMessage>? _pushTapSub;
 
   @override
   void initState() {
@@ -37,11 +42,31 @@ class _DriverMainNavigationScreenState
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _synchroniserDonneesServeur();
+      PushNotificationService.syncTokenWithBackend(ref.read(apiClientProvider));
+    });
+
+    _pushMsgSub = PushNotificationService.onForegroundMessage.listen((_) {
+      if (!mounted) return;
+      ref.read(driverActiveJobProvider.notifier).chargerCourses();
+      ref.read(driverProfileProvider.notifier).chargerPortefeuille();
+      ref.read(driverProfileProvider.notifier).chargerProfil();
+    });
+
+    _pushTapSub = PushNotificationService.onNotificationTap.listen((msg) {
+      if (!mounted) return;
+      final t = msg.type.toLowerCase();
+      if (t.contains('wallet_cash')) {
+        _switchToTab(1);
+      } else if (t.contains('course') || t.contains('order') || t.contains('parcel')) {
+        _switchToTab(0);
+      }
     });
   }
 
   @override
   void dispose() {
+    _pushMsgSub?.cancel();
+    _pushTapSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

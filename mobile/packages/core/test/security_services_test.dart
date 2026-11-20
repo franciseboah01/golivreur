@@ -1,9 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golivreur_core/services/gps_location_service.dart';
 import 'package:golivreur_core/services/pin_lock_service.dart';
+import 'package:golivreur_core/services/push_notification_service.dart';
 import 'package:golivreur_core/services/secure_token_storage.dart';
 import 'package:golivreur_core/services/sso_switch_service.dart';
+import 'package:golivreur_core/widgets/in_app_push_banner.dart';
 
 class _InMemorySecureStorage extends Fake implements FlutterSecureStorage {
   final Map<String, String> data = {};
@@ -154,6 +157,48 @@ void main() {
       expect(km, greaterThan(200));
       expect(km, lessThan(235));
       expect(GpsLocationService.distanceKm(6.8770, -6.4502, 6.8770, -6.4502), closeTo(0, 0.001));
+    });
+  });
+
+  group('InAppPushOverlay (Push In-App)', () {
+    testWidgets('affiche la banniere flottante a la reception dun Push In-App et se ferme proprement', (tester) async {
+      InAppPushMessage? received;
+      InAppPushMessage? tapped;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: InAppPushOverlay(
+            onMessageReceived: (m) => received = m,
+            onMessageTapped: (m) => tapped = m,
+            child: const Scaffold(body: Center(child: Text('Contenu App'))),
+          ),
+        ),
+      );
+
+      expect(find.text('Contenu App'), findsOneWidget);
+
+      PushNotificationService.emitInAppMessage(
+        InAppPushMessage(
+          title: 'Dépôt espèces crédité (+10 000 F CFA)',
+          body: 'Votre portefeuille Commerce a été crédité.',
+          type: 'wallet_cash_deposit',
+          channelId: 'general',
+          data: const {'type': 'wallet_cash_deposit'},
+          receivedAt: DateTime.now(),
+        ),
+      );
+
+      await tester.pump();
+
+      expect(received?.type, 'wallet_cash_deposit');
+      expect(find.text('Dépôt espèces crédité (+10 000 F CFA)'), findsOneWidget);
+      expect(find.text('Votre portefeuille Commerce a été crédité.'), findsOneWidget);
+
+      await tester.tap(find.text('Dépôt espèces crédité (+10 000 F CFA)'));
+      await tester.pump();
+
+      expect(tapped?.type, 'wallet_cash_deposit');
+      expect(find.text('Dépôt espèces crédité (+10 000 F CFA)'), findsNothing);
     });
   });
 }

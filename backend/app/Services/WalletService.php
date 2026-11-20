@@ -6,7 +6,6 @@ use App\Filament\Support\FilamentCityScope;
 use App\Models\ActivityLog;
 use App\Models\Courier;
 use App\Models\Merchant;
-use App\Models\Notification as InAppNotification;
 use App\Models\Order;
 use App\Models\Parcel;
 use App\Models\User;
@@ -244,16 +243,17 @@ class WalletService
             $montantFormate = number_format($montant, 0, ',', ' ');
             $soldeApresFormate = number_format((int) round((float) $transaction->balance_after), 0, ',', ' ');
 
-            InAppNotification::create([
-                'user_id' => $ownerUserId,
-                'type' => $direction === 'credit' ? 'wallet_cash_deposit' : 'wallet_cash_withdrawal',
-                'title' => $direction === 'credit'
+            app(NotificationService::class)->notifierOperationEspeces(
+                userId: $ownerUserId,
+                type: $direction === 'credit' ? 'wallet_cash_deposit' : 'wallet_cash_withdrawal',
+                title: $direction === 'credit'
                     ? "Dépôt espèces crédité (+{$montantFormate} F CFA)"
                     : "Retrait espèces débité (-{$montantFormate} F CFA)",
-                'body' => $direction === 'credit'
+                body: $direction === 'credit'
                     ? "Votre portefeuille {$roleLabel} a été crédité de {$montantFormate} F CFA en espèces ({$motifNettoye}). Nouveau solde : {$soldeApresFormate} F CFA (Réf : {$transaction->reference})."
                     : "Votre portefeuille {$roleLabel} a été débité de {$montantFormate} F CFA en espèces ({$motifNettoye}). Nouveau solde : {$soldeApresFormate} F CFA (Réf : {$transaction->reference}).",
-                'data' => [
+                data: [
+                    'type' => $direction === 'credit' ? 'wallet_cash_deposit' : 'wallet_cash_withdrawal',
                     'wallet_id' => $wallet->id,
                     'owner_type' => $ownerType,
                     'transaction_id' => $transaction->id,
@@ -261,8 +261,7 @@ class WalletService
                     'amount' => $montantSigne,
                     'balance_after' => (int) round((float) $transaction->balance_after),
                 ],
-                'is_read' => false,
-            ]);
+            );
         }
 
         return $transaction;

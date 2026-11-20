@@ -1,21 +1,29 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/widgets/golivreur_widgets.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../goshop/providers/goshop_provider.dart';
 import '../../goshop/screens/goshop_home_screen.dart';
 import '../../gocolis/screens/gocolis_home_screen.dart';
 import '../../orders/screens/orders_tracking_history_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 
-class MainNavigationScreen extends StatefulWidget {
+class MainNavigationScreen extends ConsumerStatefulWidget {
   final int initialIndex;
 
   const MainNavigationScreen({super.key, this.initialIndex = 0});
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  ConsumerState<MainNavigationScreen> createState() =>
+      _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   late int _currentIndex;
+  StreamSubscription<InAppPushMessage>? _pushMsgSub;
+  StreamSubscription<InAppPushMessage>? _pushTapSub;
 
   final List<Widget> _pages = const [
     GoShopHomeScreen(),
@@ -28,6 +36,33 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PushNotificationService.syncTokenWithBackend(ref.read(apiClientProvider));
+    });
+
+    _pushMsgSub = PushNotificationService.onForegroundMessage.listen((_) {
+      if (!mounted) return;
+      ref.invalidate(clientNotificationsProvider);
+    });
+
+    _pushTapSub = PushNotificationService.onNotificationTap.listen((msg) {
+      if (!mounted) return;
+      final t = msg.type.toLowerCase();
+      if (t.contains('parcel')) {
+        setState(() => _currentIndex = 1);
+      } else if (t.contains('order')) {
+        setState(() => _currentIndex = 2);
+      }
+      ref.invalidate(clientNotificationsProvider);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pushMsgSub?.cancel();
+    _pushTapSub?.cancel();
+    super.dispose();
   }
 
   @override

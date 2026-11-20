@@ -1,12 +1,14 @@
 <?php
 
 use App\Filament\Pages\CashWalletOperationsPage;
+use App\Jobs\SendPushNotification;
 use App\Models\City;
 use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\User;
 use App\Services\WalletService;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -201,4 +203,41 @@ it('bloque strictement toute operation especes par un gestionnaire local sur un 
         motif: 'Client non autorisé',
         gestionnaire: $client,
     ))->toThrow(AuthorizationException::class);
+});
+
+it('declenche un Push FCM (SendPushNotification) vers le telephone du partenaire lors dun depot especes', function () {
+    Bus::fake([SendPushNotification::class]);
+
+    $manager = User::factory()->create([
+        'role' => 'city_manager',
+        'city_id' => $this->daloa->id,
+        'is_active' => true,
+    ]);
+
+    $driverUser = User::factory()->create([
+        'role' => 'driver',
+        'city_id' => $this->daloa->id,
+        'is_active' => true,
+        'device_token' => 'fcm-test-device-token-1234567890',
+    ]);
+    $courier = Courier::factory()->create([
+        'user_id' => $driverUser->id,
+        'city_id' => $this->daloa->id,
+        'is_active' => true,
+    ]);
+
+    app(WalletService::class)->effectuerOperationEspeces(
+        ownerType: 'courier',
+        ownerId: $courier->id,
+        direction: 'credit',
+        montant: 10000,
+        motif: 'Recharge agence push test',
+        gestionnaire: $manager,
+    );
+
+    Bus::assertDispatched(SendPushNotification::class, function (SendPushNotification $job): bool {
+        return $job->deviceToken === 'fcm-test-device-token-1234567890'
+            && str_contains($job->title, '10 000 F CFA')
+            && ($job->data['type'] ?? null) === 'wallet_cash_deposit';
+    });
 });
