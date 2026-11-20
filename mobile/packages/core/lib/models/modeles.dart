@@ -15,6 +15,7 @@ class UserModel {
   final List<String> roles;
   final int? cityId;
   final String? cityName;
+  final String? supportPhone;
   final String? defaultAddress;
   final String language;
   final bool notificationsEnabled;
@@ -33,6 +34,7 @@ class UserModel {
     this.roles = const [],
     this.cityId,
     this.cityName,
+    this.supportPhone,
     this.defaultAddress,
     this.language = 'fr',
     this.notificationsEnabled = true,
@@ -75,6 +77,7 @@ class UserModel {
       roles: parsedRoles,
       cityId: json['city_id'] as int?,
       cityName: json['city_name'] as String?,
+      supportPhone: json['support_phone'] as String?,
       defaultAddress: json['default_address'] as String?,
       language: json['language'] as String? ?? 'fr',
       notificationsEnabled: json['notifications_enabled'] as bool? ?? true,
@@ -93,6 +96,7 @@ class UserModel {
     List<String>? roles,
     int? cityId,
     String? cityName,
+    String? supportPhone,
     String? defaultAddress,
     String? language,
     bool? notificationsEnabled,
@@ -111,6 +115,7 @@ class UserModel {
       roles: roles ?? this.roles,
       cityId: cityId ?? this.cityId,
       cityName: cityName ?? this.cityName,
+      supportPhone: supportPhone ?? this.supportPhone,
       defaultAddress: defaultAddress ?? this.defaultAddress,
       language: language ?? this.language,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
@@ -131,6 +136,7 @@ class UserModel {
         'roles': roles,
         'city_id': cityId,
         'city_name': cityName,
+        'support_phone': supportPhone,
         'default_address': defaultAddress,
         'language': language,
         'notifications_enabled': notificationsEnabled,

@@ -20,6 +20,7 @@ class BusinessProfileState {
   final String? photoUrl;
   final String quarter;
   final String? cityName;
+  final String? supportPhone;
   final double? lat;
   final double? lng;
   final double? cityCenterLat;
@@ -51,6 +52,7 @@ class BusinessProfileState {
     this.photoUrl,
     this.quarter = '',
     this.cityName,
+    this.supportPhone,
     this.lat,
     this.lng,
     this.cityCenterLat,
@@ -83,6 +85,7 @@ class BusinessProfileState {
     String? photoUrl,
     String? quarter,
     String? cityName,
+    String? supportPhone,
     double? lat,
     double? lng,
     double? cityCenterLat,
@@ -114,6 +117,7 @@ class BusinessProfileState {
       photoUrl: photoUrl ?? this.photoUrl,
       quarter: quarter ?? this.quarter,
       cityName: cityName ?? this.cityName,
+      supportPhone: supportPhone ?? this.supportPhone,
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
       cityCenterLat: cityCenterLat ?? this.cityCenterLat,
@@ -166,6 +170,7 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
       ),
       quarter: d['address'] as String? ?? state.quarter,
       cityName: d['city_name'] as String? ?? state.cityName,
+      supportPhone: d['support_phone'] as String? ?? state.supportPhone,
       lat: (d['lat'] as num?)?.toDouble() ?? state.lat,
       lng: (d['lng'] as num?)?.toDouble() ?? state.lng,
       cityCenterLat:

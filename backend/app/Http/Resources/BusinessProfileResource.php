@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\User;
+use App\Services\SettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -40,6 +41,9 @@ class BusinessProfileResource extends JsonResource
             'roles' => $this->effectiveRoles(),
             'city_id' => $merchant->city_id ?? $this->city_id,
             'city_name' => ($merchant->city ?? $this->city)?->name,
+            'support_phone' => app(SettingsService::class)->getCitySupportPhone(
+                ($merchant->city_id ?? $this->city_id) !== null ? (int) ($merchant->city_id ?? $this->city_id) : null,
+            ),
             'city_center_lat' => ($merchant->city ?? $this->city)?->center_lat !== null
                 ? (float) ($merchant->city ?? $this->city)->center_lat
                 : null,

@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Models\User;
 use App\Models\VehicleType;
 use App\Services\CityGeolocationService;
+use App\Services\SettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -38,6 +39,9 @@ class DriverProfileResource extends JsonResource
             'roles' => $this->effectiveRoles(),
             'city_id' => $courier->city_id ?? $this->city_id,
             'city_name' => $city?->name,
+            'support_phone' => app(SettingsService::class)->getCitySupportPhone(
+                ($courier->city_id ?? $this->city_id) !== null ? (int) ($courier->city_id ?? $this->city_id) : null,
+            ),
             'city_center_lat' => $city?->center_lat !== null ? (float) $city->center_lat : null,
             'city_center_lng' => $city?->center_lng !== null ? (float) $city->center_lng : null,
             'city_reidentification_required' => $reidFlag !== null,

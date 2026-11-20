@@ -94,6 +94,13 @@ class CityResource extends Resource
                             ->maxValue(180.0)
                             ->step(0.000001)
                             ->nullable(),
+                        Forms\Components\TextInput::make('support_phone')
+                            ->label('Numéro de service / Support client de la ville')
+                            ->placeholder('Ex: +225 07 01 02 03 04 ou 0701020304')
+                            ->helperText('Visible et appelable directement depuis GL Client, GL Business et GL Driver pour cette ville.')
+                            ->tel()
+                            ->maxLength(30)
+                            ->columnSpanFull(),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Majorations & Sécurité Urbaine')
@@ -131,6 +138,13 @@ class CityResource extends Resource
                     ->label('Quartiers')
                     ->badge()
                     ->color('info'),
+
+                Tables\Columns\TextColumn::make('support_phone')
+                    ->label('N° Service Client')
+                    ->icon('heroicon-m-phone')
+                    ->color('success')
+                    ->copyable()
+                    ->copyMessage('Numéro de service copié'),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Opérationnelle')

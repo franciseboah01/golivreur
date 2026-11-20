@@ -2,6 +2,8 @@
 
 use App\Models\ActivityLog;
 use App\Models\City;
+use App\Models\Courier;
+use App\Models\Merchant;
 use App\Models\Neighborhood;
 use App\Models\OtpCode;
 use App\Models\Parcel;
@@ -9,6 +11,7 @@ use App\Models\ParcelPhoto;
 use App\Models\User;
 use App\Services\Auth\PasswordResetService;
 use App\Services\FirebasePhoneAuthService;
+use App\Services\SettingsService;
 use App\Services\SmsService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
@@ -260,4 +263,55 @@ it('crée une expédition GoColis avec quartier dynamique, photo du colis et pai
             ->where('entity_id', $parcel->id)
             ->exists()
     )->toBeTrue();
+});
+
+// ─── NUMÉRO DE SERVICE CLIENT PAR VILLE (ADMIN + 3 APPS) ─────────────────────
+
+it('stocke un numéro de service client par ville et l\'expose dans /cities, /city-status et les 3 profils mobiles', function () {
+    $city = City::factory()->create(['name' => 'Sirasso', 'is_active' => true]);
+    app(SettingsService::class)->setCitySupportPhone($city->id, '0708091011');
+
+    expect($city->fresh()->support_phone)->toBe('+2250708091011');
+
+    // 1. Endpoint public /cities
+    $citiesRes = $this->getJson('/api/v1/cities')->assertOk();
+    $sirasso = collect($citiesRes->json('donnees'))->firstWhere('id', $city->id);
+    expect($sirasso['support_phone'] ?? null)->toBe('+2250708091011');
+
+    // 2. Endpoint public /client/city-status
+    $this->getJson("/api/v1/client/city-status?city_id={$city->id}")
+        ->assertOk()
+        ->assertJsonPath('donnees.support_phone', '+2250708091011');
+
+    // 3. Profil Client + Forgot Password renvoient le numéro de service de la ville
+    $client = User::factory()->create(['role' => 'client', 'city_id' => $city->id, 'phone' => '0700000044', 'is_active' => true]);
+    $this->withHeader('Authorization', 'Bearer '.JWTAuth::fromUser($client))
+        ->getJson('/api/v1/client/profile')
+        ->assertOk()
+        ->assertJsonPath('donnees.support_phone', '+2250708091011');
+
+    $this->postJson('/api/v1/auth/password-reset/request', [
+        'phone' => '0700000044',
+        'use_firebase_otp' => true,
+    ])
+        ->assertOk()
+        ->assertJsonPath('donnees.support_phone', '+2250708091011');
+
+    // 4. Profil Business
+    auth('api')->logout();
+    $merchantUser = User::factory()->create(['role' => 'merchant', 'city_id' => $city->id, 'is_active' => true]);
+    Merchant::factory()->create(['user_id' => $merchantUser->id, 'city_id' => $city->id, 'is_active' => true]);
+    $this->withHeader('Authorization', 'Bearer '.JWTAuth::fromUser($merchantUser))
+        ->getJson('/api/v1/merchant/profile')
+        ->assertOk()
+        ->assertJsonPath('donnees.support_phone', '+2250708091011');
+
+    // 5. Profil Driver
+    auth('api')->logout();
+    $driverUser = User::factory()->create(['role' => 'driver', 'city_id' => $city->id, 'is_active' => true]);
+    Courier::factory()->create(['user_id' => $driverUser->id, 'city_id' => $city->id, 'is_active' => true]);
+    $this->withHeader('Authorization', 'Bearer '.JWTAuth::fromUser($driverUser))
+        ->getJson('/api/v1/driver/profile')
+        ->assertOk()
+        ->assertJsonPath('donnees.support_phone', '+2250708091011');
 });

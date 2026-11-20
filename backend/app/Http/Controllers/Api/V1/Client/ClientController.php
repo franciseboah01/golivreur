@@ -434,10 +434,7 @@ class ClientController extends Controller
 
         $isRainMode = (bool) ($city->rain_mode_active ?? false);
         $branding = $settingsService->getBranding();
-        $contenus = $settingsService->get('contenus', $city?->id);
-        $supportPhone = is_array($contenus) && is_string($contenus['support_whatsapp'] ?? null) && trim($contenus['support_whatsapp']) !== ''
-            ? trim($contenus['support_whatsapp'])
-            : (string) SettingsService::DEFAULTS['contenus']['support_whatsapp'];
+        $supportPhone = $settingsService->getCitySupportPhone($city?->id);
 
         $neighborhoods = $city
             ? Neighborhood::query()

@@ -93,7 +93,16 @@ Route::middleware('throttle:20,1')->group(function () {
             'rain_mode_active',
             'emergency_mode_active',
             'emergency_mode_message',
-        ]),
+        ])->map(static fn (City $city): array => [
+            'id' => $city->id,
+            'name' => $city->name,
+            'center_lat' => $city->center_lat,
+            'center_lng' => $city->center_lng,
+            'rain_mode_active' => (bool) $city->rain_mode_active,
+            'emergency_mode_active' => (bool) $city->emergency_mode_active,
+            'emergency_mode_message' => $city->emergency_mode_message,
+            'support_phone' => $city->support_phone,
+        ])->values(),
     ]));
 });
 

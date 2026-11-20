@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\SettingsService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -90,5 +91,13 @@ class City extends Model
     public function neighborhoods(): HasMany
     {
         return $this->hasMany(Neighborhood::class);
+    }
+
+    /**
+     * Numéro de service / support client officiel de cette ville (via SettingsService, sans migration).
+     */
+    public function getSupportPhoneAttribute(): string
+    {
+        return app(SettingsService::class)->getCitySupportPhone((int) $this->id);
     }
 }

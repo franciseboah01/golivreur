@@ -214,11 +214,13 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
           IconButton(
             icon: const Icon(Icons.help_outline, color: GoLivreurTheme.texteSecondaire),
             tooltip: 'Support Partenaires',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Contactez votre agence Support Partenaires GoLivreur$cityLabel.')),
-              );
-            },
+            onPressed: () => SupportContactSheet.show(
+              context,
+              cityName: profile.cityName,
+              supportPhone: profile.supportPhone,
+              title: 'Assistance Partenaires',
+              accentColor: const Color(0xFF2E75B6),
+            ),
           ),
         ],
       ),
@@ -512,15 +514,19 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.texteSecondaire),
-                  title: const Text('Assistance Partenaires'),
-                  subtitle: Text('Agence GoLivreur$cityLabel'),
+                  leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.secondaire),
+                  title: Text('Assistance Partenaires$cityLabel'),
+                  subtitle: Text(
+                    'N° de service : ${profile.supportPhone ?? SupportContactService.defaultSupportPhone} • Appuyer pour appeler',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Contactez votre agence GoLivreur$cityLabel.')),
-                    );
-                  },
+                  onTap: () => SupportContactSheet.show(
+                    context,
+                    cityName: profile.cityName,
+                    supportPhone: profile.supportPhone,
+                    title: 'Assistance Partenaires',
+                    accentColor: const Color(0xFF2E75B6),
+                  ),
                 ),
                 const Divider(height: 1),
                 ListTile(

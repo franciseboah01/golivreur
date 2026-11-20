@@ -218,6 +218,91 @@ class SettingsService
     }
 
     /**
+     * Retourne le numéro de service / support client configuré pour une ville
+     * (repli automatique sur le numéro global puis la valeur par défaut CDC).
+     */
+    public function getCitySupportPhone(?int $cityId = null): string
+    {
+        $contenus = $this->get('contenus', $cityId);
+
+        if (is_array($contenus)) {
+            foreach (['service_phone', 'support_whatsapp'] as $field) {
+                $candidate = $contenus[$field] ?? null;
+                if (is_string($candidate) && trim($candidate) !== '') {
+                    return trim($candidate);
+                }
+            }
+        }
+
+        return (string) self::DEFAULTS['contenus']['support_whatsapp'];
+    }
+
+    /**
+     * Retourne uniquement le numéro de service défini spécifiquement pour cette ville (ou null si hérité).
+     */
+    public function getOwnCitySupportPhone(int $cityId): ?string
+    {
+        $setting = Setting::where('key', 'contenus')->where('city_id', $cityId)->first();
+        if (! $setting || ! is_array($setting->value)) {
+            return null;
+        }
+
+        foreach (['service_phone', 'support_whatsapp'] as $field) {
+            $candidate = $setting->value[$field] ?? null;
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return trim($candidate);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Enregistre le numéro de service / support client d'une ville sans modification de schéma SQL
+     * (stocké dans `settings` avec `key = 'contenus'` et `city_id = $cityId`).
+     */
+    public function setCitySupportPhone(int $cityId, ?string $rawPhone, ?int $userId = null): void
+    {
+        $clean = trim((string) $rawPhone);
+        $existingSetting = Setting::where('key', 'contenus')->where('city_id', $cityId)->first();
+        $current = is_array($existingSetting?->value)
+            ? $existingSetting->value
+            : self::DEFAULTS['contenus'];
+
+        if ($clean === '') {
+            if ($existingSetting !== null) {
+                unset($current['service_phone']);
+                $current['support_whatsapp'] = self::DEFAULTS['contenus']['support_whatsapp'];
+                $this->set('contenus', $current, $cityId, $userId, 'Numéro de service ville réinitialisé');
+            }
+
+            return;
+        }
+
+        $digits = preg_replace('/[\s\.\-\(\)]+/', '', $clean) ?? $clean;
+        if (preg_match('/^(01|05|07|21|25|27)[0-9]{8}$/', $digits)) {
+            $formatted = "+225{$digits}";
+        } elseif (str_starts_with($digits, '00225')) {
+            $formatted = '+225'.substr($digits, 5);
+        } elseif (strlen($digits) === 13 && str_starts_with($digits, '225')) {
+            $formatted = "+{$digits}";
+        } else {
+            $formatted = $clean;
+        }
+
+        $current['service_phone'] = $formatted;
+        $current['support_whatsapp'] = $formatted;
+
+        $this->set(
+            'contenus',
+            $current,
+            $cityId,
+            $userId,
+            "Numéro de service client ville #{$cityId}",
+        );
+    }
+
+    /**
      * Retourne l'identité visuelle GoLivreur (logo personnalisé si existant, sinon emoji par défaut).
      *
      * @return array{logo_path: ?string, logo_url: ?string, default_emoji: string}

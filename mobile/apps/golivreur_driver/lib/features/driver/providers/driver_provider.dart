@@ -101,6 +101,7 @@ class DriverProfileState {
   final String? idCardNumber;
   final String? driverLicenseNumber;
   final String? cityName;
+  final String? supportPhone;
   final double? cityCenterLat;
   final double? cityCenterLng;
   final double? currentLat;
@@ -136,6 +137,7 @@ class DriverProfileState {
     this.idCardNumber,
     this.driverLicenseNumber,
     this.cityName,
+    this.supportPhone,
     this.cityCenterLat,
     this.cityCenterLng,
     this.currentLat,
@@ -172,6 +174,7 @@ class DriverProfileState {
     String? idCardNumber,
     String? driverLicenseNumber,
     String? cityName,
+    String? supportPhone,
     double? cityCenterLat,
     double? cityCenterLng,
     double? currentLat,
@@ -208,6 +211,7 @@ class DriverProfileState {
       idCardNumber: idCardNumber ?? this.idCardNumber,
       driverLicenseNumber: driverLicenseNumber ?? this.driverLicenseNumber,
       cityName: cityName ?? this.cityName,
+      supportPhone: supportPhone ?? this.supportPhone,
       cityCenterLat: cityCenterLat ?? this.cityCenterLat,
       cityCenterLng: cityCenterLng ?? this.cityCenterLng,
       currentLat: currentLat ?? this.currentLat,
@@ -343,6 +347,7 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
       idCardNumber: d['id_card_number'] as String?,
       driverLicenseNumber: d['driver_license_number'] as String?,
       cityName: d['city_name'] as String? ?? state.cityName,
+      supportPhone: d['support_phone'] as String? ?? state.supportPhone,
       cityCenterLat:
           (d['city_center_lat'] as num?)?.toDouble() ?? state.cityCenterLat,
       cityCenterLng:

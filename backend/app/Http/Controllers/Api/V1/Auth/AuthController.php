@@ -22,6 +22,7 @@ use App\Models\Wallet;
 use App\Services\ActivityLogService;
 use App\Services\Auth\PasswordResetService;
 use App\Services\FirebasePhoneAuthService;
+use App\Services\SettingsService;
 use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -1019,6 +1020,9 @@ class AuthController extends Controller
             'roles' => $user->effectiveRoles(),
             'city_id' => $user->city_id,
             'city_name' => $user->city?->name,
+            'support_phone' => app(SettingsService::class)->getCitySupportPhone(
+                $user->city_id !== null ? (int) $user->city_id : null,
+            ),
             'default_address' => $user->default_address,
             'language' => $user->language ?? 'fr',
             'notifications_enabled' => (bool) ($user->notifications_enabled ?? true),

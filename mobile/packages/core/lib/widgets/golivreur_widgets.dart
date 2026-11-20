@@ -19,3 +19,4 @@ export 'osm_location_picker_screen.dart';
 export 'pin_lock_screen.dart';
 export 'profile_avatar_picker.dart';
 export 'role_missing_dialog.dart';
+export 'support_contact_sheet.dart';

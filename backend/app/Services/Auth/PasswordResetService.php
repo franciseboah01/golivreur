@@ -49,7 +49,11 @@ class PasswordResetService
      */
     public function requestReset(string $phone, bool $useFirebaseOtp, ?string $ip = null): array
     {
-        $supportPhone = $this->getSupportPhone();
+        $user = User::where('phone', $phone)
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->first();
+        $supportPhone = $this->getSupportPhone($user?->city_id !== null ? (int) $user->city_id : null);
 
         if ($this->isLocked($phone)) {
             return $this->lockedResponse($supportPhone);
@@ -61,11 +65,6 @@ class PasswordResetService
 
             return $this->lockedResponse($supportPhone);
         }
-
-        $user = User::where('phone', $phone)
-            ->where('is_active', true)
-            ->whereNull('deleted_at')
-            ->first();
 
         if (! $user) {
             return [
@@ -157,7 +156,8 @@ class PasswordResetService
      */
     public function recordFailedAttempt(string $phone, ?string $ip = null): array
     {
-        $supportPhone = $this->getSupportPhone();
+        $cityId = User::where('phone', $phone)->value('city_id');
+        $supportPhone = $this->getSupportPhone($cityId !== null ? (int) $cityId : null);
 
         if ($this->isLocked($phone)) {
             return $this->lockedResponse($supportPhone);
@@ -188,7 +188,8 @@ class PasswordResetService
         ?string $firebaseIdToken,
         ?string $ip = null,
     ): array {
-        $supportPhone = $this->getSupportPhone();
+        $cityId = User::where('phone', $phone)->value('city_id');
+        $supportPhone = $this->getSupportPhone($cityId !== null ? (int) $cityId : null);
 
         if ($this->isLocked($phone)) {
             return $this->lockedResponse($supportPhone);
@@ -276,16 +277,9 @@ class PasswordResetService
         ];
     }
 
-    public function getSupportPhone(): string
+    public function getSupportPhone(?int $cityId = null): string
     {
-        $contenus = $this->settingsService->get('contenus');
-        $raw = is_array($contenus) ? ($contenus['support_whatsapp'] ?? null) : null;
-
-        if (is_string($raw) && trim($raw) !== '') {
-            return trim($raw);
-        }
-
-        return (string) SettingsService::DEFAULTS['contenus']['support_whatsapp'];
+        return $this->settingsService->getCitySupportPhone($cityId);
     }
 
     /**

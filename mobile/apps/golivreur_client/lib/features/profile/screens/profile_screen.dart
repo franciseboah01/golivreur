@@ -54,6 +54,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = authState.user;
     final photoUrl = GoLivreurEnv.resolveMediaUrl(user?.photoUrl);
     final registeredCity = (user?.cityName ?? '').trim();
+    final weatherSupport = ref.watch(weatherProvider).supportPhone;
+    final citySupportPhone = (user?.supportPhone?.trim().isNotEmpty == true)
+        ? user!.supportPhone!.trim()
+        : weatherSupport;
     final activeDefaultAddress = addressesState.defaultAddress?.formattedAddress ??
         (user?.defaultAddress?.trim() ?? '');
 
@@ -241,20 +245,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   title: registeredCity.isNotEmpty
                       ? 'Support client & Urgence ($registeredCity)'
                       : 'Support client & Urgence',
-                  subtitle: registeredCity.isNotEmpty
-                      ? 'Assistance agence locale $registeredCity'
-                      : 'Assistance agence locale GoLivreur',
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          registeredCity.isNotEmpty
-                              ? 'Contactez votre agence Support GoLivreur ($registeredCity).'
-                              : 'Contactez votre agence Support GoLivreur.',
-                        ),
-                      ),
-                    );
-                  },
+                  subtitle: 'N° de service : $citySupportPhone • Appuyer pour appeler',
+                  onTap: () => SupportContactSheet.show(
+                    context,
+                    cityName: registeredCity,
+                    supportPhone: citySupportPhone,
+                    title: 'Support client & Urgence',
+                    accentColor: GoLivreurTheme.secondaire,
+                  ),
                 ),
               ],
             ),

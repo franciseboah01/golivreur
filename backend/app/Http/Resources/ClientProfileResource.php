@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\User;
+use App\Services\SettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -25,6 +26,7 @@ class ClientProfileResource extends JsonResource
             'roles' => $this->effectiveRoles(),
             'city_id' => $this->city_id,
             'city_name' => $this->city?->name,
+            'support_phone' => app(SettingsService::class)->getCitySupportPhone($this->city_id ? (int) $this->city_id : null),
             'default_address' => $this->default_address,
             'language' => $this->language ?? 'fr',
             'notifications_enabled' => (bool) ($this->notifications_enabled ?? true),

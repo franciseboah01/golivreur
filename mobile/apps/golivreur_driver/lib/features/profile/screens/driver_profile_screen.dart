@@ -57,14 +57,13 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
           IconButton(
             icon: const Icon(Icons.help_outline, color: GoLivreurTheme.texteSecondaire),
             tooltip: 'Support Agence',
-            onPressed: () {
-              final citySuffix = (profile.cityName != null && profile.cityName!.isNotEmpty)
-                  ? ' (${profile.cityName})'
-                  : '';
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Contactez votre agence Support GoLivreur$citySuffix.')),
-              );
-            },
+            onPressed: () => SupportContactSheet.show(
+              context,
+              cityName: profile.cityName,
+              supportPhone: profile.supportPhone,
+              title: 'Support Agence',
+              accentColor: GoLivreurTheme.secondaire,
+            ),
           ),
         ],
       ),
@@ -360,22 +359,23 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.texteSecondaire),
+                  leading: const Icon(Icons.phone_in_talk, color: GoLivreurTheme.secondaire),
                   title: Text(
                     (profile.cityName != null && profile.cityName!.isNotEmpty)
                         ? 'Support Agence ${profile.cityName}'
                         : 'Support Agence GoLivreur',
                   ),
-                  subtitle: const Text('Assistance opérationnelle & dispatch'),
+                  subtitle: Text(
+                    'N° de service : ${profile.supportPhone ?? SupportContactService.defaultSupportPhone} • Appuyer pour appeler',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    final citySuffix = (profile.cityName != null && profile.cityName!.isNotEmpty)
-                        ? ' (${profile.cityName})'
-                        : '';
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Contactez le responsable opérationnel de votre agence$citySuffix.')),
-                    );
-                  },
+                  onTap: () => SupportContactSheet.show(
+                    context,
+                    cityName: profile.cityName,
+                    supportPhone: profile.supportPhone,
+                    title: 'Support Agence',
+                    accentColor: GoLivreurTheme.secondaire,
+                  ),
                 ),
                 const Divider(height: 1),
                 ListTile(
