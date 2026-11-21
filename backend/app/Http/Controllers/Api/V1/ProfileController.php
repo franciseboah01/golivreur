@@ -13,7 +13,6 @@ use App\Http\Resources\DriverProfileResource;
 use App\Models\ActivityLog;
 use App\Models\OtpCode;
 use App\Models\User;
-use App\Services\CityGeolocationService;
 use App\Services\FirebasePhoneAuthService;
 use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
@@ -97,23 +96,7 @@ class ProfileController extends Controller
         $user = $request->user();
         $validated = $request->validated();
 
-        // 1. Le nom est verrouillé après l'inscription pour le client
-        if (
-            array_key_exists('name', $validated)
-            && trim((string) $user->name) !== ''
-            && trim((string) $validated['name']) !== trim((string) $user->name)
-        ) {
-            return response()->json([
-                'succes' => false,
-                'code' => 'NAME_LOCKED',
-                'message' => 'Le nom ne peut plus être modifié après inscription. Contactez le service client en cas d\'erreur.',
-                'errors' => [
-                    'name' => ['Le nom ne peut plus être modifié après inscription.'],
-                ],
-            ], 422);
-        }
-
-        // 2. Le numéro de téléphone exige un OTP confirmé sur le nouveau numéro
+        // 1. Le numéro de téléphone exige un OTP confirmé sur le nouveau numéro
         if (
             array_key_exists('phone', $validated)
             && (string) $validated['phone'] !== (string) $user->phone
@@ -128,7 +111,7 @@ class ProfileController extends Controller
             ], 422);
         }
 
-        // 3. L'ajout ou modification d'email exige un code de confirmation envoyé à l'adresse email
+        // 2. L'ajout ou modification d'email exige un code de confirmation envoyé à l'adresse email
         if (array_key_exists('email', $validated)) {
             $incomingEmail = $validated['email'] !== null ? strtolower(trim((string) $validated['email'])) : null;
             $currentEmail = $user->email !== null ? strtolower(trim((string) $user->email)) : null;
@@ -147,7 +130,7 @@ class ProfileController extends Controller
 
         DB::transaction(function () use ($user, $validated, $request) {
             $userData = [];
-            foreach (['language', 'notifications_enabled', 'default_address'] as $field) {
+            foreach (['name', 'language', 'notifications_enabled', 'default_address'] as $field) {
                 if (array_key_exists($field, $validated)) {
                     $userData[$field] = $validated[$field];
                 }
@@ -616,32 +599,16 @@ class ProfileController extends Controller
 
         $validated = $request->validated();
 
-        DB::transaction(function () use ($user, $courier, $validated, $request) {
-            $userData = $this->extractCommonUserData($validated);
-
-            $courierData = [];
-            foreach (['vehicle_type', 'vehicle_plate', 'id_card_number', 'driver_license_number'] as $field) {
+        DB::transaction(function () use ($user, $validated, $request) {
+            $userData = [];
+            foreach (['language', 'notifications_enabled'] as $field) {
                 if (array_key_exists($field, $validated)) {
-                    $courierData[$field] = $validated[$field];
+                    $userData[$field] = $validated[$field];
                 }
-            }
-
-            if ($request->hasFile('photo')) {
-                $newPath = $this->replacePublicFile(
-                    $request->file('photo'),
-                    $courier->photo_path ?: $user->photo_path,
-                    'livreurs'
-                );
-                $courierData['photo_path'] = $newPath;
-                $userData['photo_path'] = $newPath;
             }
 
             if (! empty($userData)) {
                 $user->update($userData);
-            }
-
-            if (! empty($courierData)) {
-                $courier->update($courierData);
             }
 
             $this->logProfileUpdate($user, 'driver_profile_updated', $request->ip());
@@ -649,7 +616,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'succes' => true,
-            'message' => 'Profil livreur mis à jour avec succès.',
+            'message' => 'Préférences livreur mises à jour avec succès.',
             'donnees' => new DriverProfileResource($user->fresh()->load(['city', 'courier.city'])),
         ]);
     }
@@ -687,42 +654,12 @@ class ProfileController extends Controller
 
         $validated = $request->validated();
 
-        $hasLat = array_key_exists('lat', $validated) && $validated['lat'] !== null && $validated['lat'] !== '';
-        $hasLng = array_key_exists('lng', $validated) && $validated['lng'] !== null && $validated['lng'] !== '';
-        if ($hasLat && $hasLng) {
-            $newLat = (float) $validated['lat'];
-            $newLng = (float) $validated['lng'];
-            $merchant->loadMissing('city');
-
-            if ($merchant->city && ! $merchant->city->estDansLaVille($newLat, $newLng)) {
-                $cityChange = app(CityGeolocationService::class)->detectCityChange($merchant->city, $newLat, $newLng);
-                $detectedCityName = $cityChange !== null && $cityChange['detected_city'] !== null
-                    ? $cityChange['detected_city']->name
-                    : null;
-                $cityHint = $detectedCityName !== null
-                    ? " (position détectée vers {$detectedCityName})"
-                    : '';
-
-                return response()->json([
-                    'succes' => false,
-                    'code' => 'MERCHANT_CITY_CHANGE_FORBIDDEN',
-                    'message' => "Position GPS hors de la ville d'implantation ({$merchant->city->name}){$cityHint}. Un commerce qui change de ville doit recréer sa boutique dans la nouvelle ville.",
-                    'errors' => [
-                        'lat' => ['Un commerce ne peut pas changer de ville. Créez une nouvelle boutique dans la nouvelle ville.'],
-                    ],
-                ], 422);
-            }
-        }
-
-        DB::transaction(function () use ($user, $merchant, $validated, $request, $hasLat, $hasLng) {
-            $userData = $this->extractCommonUserData($validated);
-
-            if ($request->hasFile('photo')) {
-                $userData['photo_path'] = $this->replacePublicFile(
-                    $request->file('photo'),
-                    $user->photo_path,
-                    'profils'
-                );
+        DB::transaction(function () use ($user, $merchant, $validated, $request) {
+            $userData = [];
+            foreach (['language', 'notifications_enabled'] as $field) {
+                if (array_key_exists($field, $validated)) {
+                    $userData[$field] = $validated[$field];
+                }
             }
 
             if (! empty($userData)) {
@@ -730,21 +667,10 @@ class ProfileController extends Controller
             }
 
             $merchantData = [];
-            if (array_key_exists('business_name', $validated)) {
-                $merchantData['name'] = $validated['business_name'];
-            } elseif (array_key_exists('merchant_name', $validated)) {
-                $merchantData['name'] = $validated['merchant_name'];
-            }
-
-            foreach (['category', 'emoji', 'address', 'description', 'prep_time_minutes'] as $field) {
+            foreach (['emoji', 'description', 'prep_time_minutes', 'is_open'] as $field) {
                 if (array_key_exists($field, $validated)) {
                     $merchantData[$field] = $validated[$field];
                 }
-            }
-
-            if ($hasLat && $hasLng) {
-                $merchantData['lat'] = (float) $validated['lat'];
-                $merchantData['lng'] = (float) $validated['lng'];
             }
 
             if (array_key_exists('open_hours', $validated)) {
@@ -825,20 +751,6 @@ class ProfileController extends Controller
     }
 
     // ─── HELPERS PRIVÉS ───────────────────────────────────────────────────────
-
-    private function extractCommonUserData(array $validated): array
-    {
-        $fields = ['name', 'phone', 'email', 'language', 'notifications_enabled'];
-        $data = [];
-
-        foreach ($fields as $field) {
-            if (array_key_exists($field, $validated)) {
-                $data[$field] = $validated[$field];
-            }
-        }
-
-        return $data;
-    }
 
     /**
      * Enregistre le nouveau fichier sur le disque public et supprime l'ancien fichier s'il existe.

@@ -14,7 +14,7 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 
 // ─── TESTS PROFIL CLIENT ──────────────────────────────────────────────────────
 
-it('client : verrouille le nom, exige un OTP pour changer téléphone ou email, et permet photo/adresse/préférences', function () {
+it('client : autorise nom/avatar, exige un OTP pour changer téléphone ou email, et permet photo/adresse/préférences', function () {
     Storage::fake('public');
     Mail::fake();
 
@@ -36,11 +36,11 @@ it('client : verrouille le nom, exige un OTP pour changer téléphone ou email, 
         ->assertJsonPath('donnees.name', 'Client Initial')
         ->assertJsonPath('donnees.phone', '0701000010');
 
-    // 2. Tentative de modification directe du nom -> 422 NAME_LOCKED
+    // 2. Modification libre du nom (Lot 9A Point 1 : nom et avatar libres pour le client)
     $this->withHeader('Authorization', "Bearer {$token}")
-        ->putJson('/api/v1/client/profile', ['name' => 'Nom Piraté'])
-        ->assertStatus(422)
-        ->assertJsonPath('code', 'NAME_LOCKED');
+        ->putJson('/api/v1/client/profile', ['name' => 'Client Modifié'])
+        ->assertOk()
+        ->assertJsonPath('donnees.name', 'Client Modifié');
 
     // 3. Tentative de modification directe du téléphone sans OTP -> 422 PHONE_OTP_REQUIRED
     $this->withHeader('Authorization', "Bearer {$token}")
@@ -122,7 +122,7 @@ it('client : verrouille le nom, exige un OTP pour changer téléphone ou email, 
 
     $res1->assertOk()
         ->assertJsonPath('succes', true)
-        ->assertJsonPath('donnees.name', 'Client Initial')
+        ->assertJsonPath('donnees.name', 'Client Modifié')
         ->assertJsonPath('donnees.phone', '0701000099')
         ->assertJsonPath('donnees.email', 'client.modifie@golivreur.ci')
         ->assertJsonPath('donnees.default_address', 'Quartier Lobia, Rue 4')
@@ -197,7 +197,7 @@ it('client : un driver ne peut pas modifier le profil client (403)', function ()
 
 // ─── TESTS PROFIL DRIVER ──────────────────────────────────────────────────────
 
-it('driver : peut lire, mettre à jour véhicule/permis/photo et rejette accès non autorisé (403)', function () {
+it('driver : lecture seule sur identite/vehicule/permis/photo (403 field_admin_only) et rejette accès non autorisé', function () {
     Storage::fake('public');
 
     $city = City::factory()->create();
@@ -208,10 +208,8 @@ it('driver : peut lire, mettre à jour véhicule/permis/photo et rejette accès 
         'vehicle_type' => 'moto',
         'vehicle_plate' => '1111 AB 01',
     ]);
-    $otherClient = User::factory()->create(['role' => 'client', 'phone' => '0701000098', 'city_id' => $city->id]);
 
     $tokenDriver = JWTAuth::fromUser($driverUser);
-    $tokenClient = JWTAuth::fromUser($otherClient);
 
     // Lecture
     $this->withHeader('Authorization', "Bearer {$tokenDriver}")
@@ -219,33 +217,30 @@ it('driver : peut lire, mettre à jour véhicule/permis/photo et rejette accès 
         ->assertOk()
         ->assertJsonPath('donnees.vehicle_plate', '1111 AB 01');
 
-    // Mise à jour + photo
+    // Champs réservés admin -> 403 field_admin_only (Lot 9A Point 1)
     $photo = UploadedFile::fake()->image('driver.webp', 350, 350);
     $this->withHeader('Authorization', "Bearer {$tokenDriver}")
         ->post('/api/v1/driver/profile', [
             '_method' => 'PUT',
             'name' => 'Koffi Livreur Pro',
-            'phone' => '0703000088',
             'vehicle_type' => 'tricycle',
             'vehicle_plate' => '9999 XY 01',
             'driver_license_number' => 'CI-PERM-2026',
             'photo' => $photo,
         ])
-        ->assertOk()
-        ->assertJsonPath('donnees.name', 'Koffi Livreur Pro')
-        ->assertJsonPath('donnees.vehicle_type', 'tricycle')
-        ->assertJsonPath('donnees.vehicle_plate', '9999 XY 01')
-        ->assertJsonPath('donnees.driver_license_number', 'CI-PERM-2026');
+        ->assertStatus(403)
+        ->assertJsonPath('code', 'field_admin_only');
 
-    $courier->refresh();
-    expect($courier->photo_path)->toStartWith('livreurs/');
-    Storage::disk('public')->assertExists($courier->photo_path);
-
-    // Validation échouée -> 422
+    // Préférences de langue autorisées
     $this->withHeader('Authorization', "Bearer {$tokenDriver}")
-        ->putJson('/api/v1/driver/profile', ['email' => 'pas-un-email'])
+        ->putJson('/api/v1/driver/profile', ['language' => 'en'])
+        ->assertOk();
+
+    // Validation échouée sur langue invalide -> 422
+    $this->withHeader('Authorization', "Bearer {$tokenDriver}")
+        ->putJson('/api/v1/driver/profile', ['language' => 'zz'])
         ->assertStatus(422)
-        ->assertJsonValidationErrors(['email']);
+        ->assertJsonValidationErrors(['language']);
 });
 
 it('driver : un client ne peut pas accéder au profil driver (403)', function () {
@@ -260,7 +255,7 @@ it('driver : un client ne peut pas accéder au profil driver (403)', function ()
 
 // ─── TESTS PROFIL BUSINESS ────────────────────────────────────────────────────
 
-it('business : peut lire, modifier boutique/catégorie/emoji/logo/horaires et bloque autre rôle (403)', function () {
+it('business : peut lire, modifier description/emoji/logo/horaires et rejette champs admin (403 field_admin_only)', function () {
     Storage::fake('public');
 
     $city = City::factory()->create();
@@ -283,10 +278,8 @@ it('business : peut lire, modifier boutique/catégorie/emoji/logo/horaires et bl
         'is_active' => true,
         'is_open' => true,
     ]);
-    $otherUser = User::factory()->create(['role' => 'driver', 'phone' => '0703000077', 'city_id' => $city->id]);
 
     $tokenBiz = JWTAuth::fromUser($merchantUser);
-    $tokenDriver = JWTAuth::fromUser($otherUser);
 
     // Lecture
     $this->withHeader('Authorization', "Bearer {$tokenBiz}")
@@ -294,26 +287,21 @@ it('business : peut lire, modifier boutique/catégorie/emoji/logo/horaires et bl
         ->assertOk()
         ->assertJsonPath('donnees.business_name', 'Ancien Maquis');
 
-    // Mise à jour + upload logo & photo vitrine
+    // Mise à jour champs libres + logo & photo vitrine
     $logo = UploadedFile::fake()->image('logo.png', 256, 256);
     $storePhoto = UploadedFile::fake()->image('vitrine.jpg', 640, 480);
 
     $this->withHeader('Authorization', "Bearer {$tokenBiz}")
         ->post('/api/v1/merchant/profile', [
             '_method' => 'PUT',
-            'name' => 'Adjoua Gérante',
-            'business_name' => 'Palais du Gâteau',
-            'category' => 'patisserie',
             'emoji' => '🧁',
-            'address' => 'Avenue Centrale, Daloa',
             'description' => 'Gâteaux et viennoiseries maison',
             'open_hours' => '07h00 - 21h00',
             'logo' => $logo,
             'merchant_photo' => $storePhoto,
         ])
         ->assertOk()
-        ->assertJsonPath('donnees.business_name', 'Palais du Gâteau')
-        ->assertJsonPath('donnees.category', 'patisserie')
+        ->assertJsonPath('donnees.business_name', 'Ancien Maquis')
         ->assertJsonPath('donnees.emoji', '🧁')
         ->assertJsonPath('donnees.open_hours_text', '07h00 - 21h00');
 
@@ -323,11 +311,11 @@ it('business : peut lire, modifier boutique/catégorie/emoji/logo/horaires et bl
     Storage::disk('public')->assertExists($merchant->logo_path);
     Storage::disk('public')->assertExists($merchant->photo_path);
 
-    // Validation échouée -> 422
+    // Champs réservés admin -> 403 field_admin_only (Lot 9A Point 1)
     $this->withHeader('Authorization', "Bearer {$tokenBiz}")
-        ->putJson('/api/v1/business/profile', ['business_name' => 'A'])
-        ->assertStatus(422)
-        ->assertJsonValidationErrors(['business_name']);
+        ->putJson('/api/v1/business/profile', ['business_name' => 'Palais du Gâteau'])
+        ->assertStatus(403)
+        ->assertJsonPath('code', 'field_admin_only');
 });
 
 it('business : un driver ne peut pas modifier le profil business (403)', function () {

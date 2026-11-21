@@ -4,6 +4,18 @@ namespace App\Http\Requests\Profile;
 
 class UpdateClientProfileRequest extends BaseProfileRequest
 {
+    protected function adminOnlyFields(): array
+    {
+        return [
+            'city_id',
+            'role',
+            'is_active',
+            'status',
+            'password',
+            'phone_verified_at',
+        ];
+    }
+
     public function rules(): array
     {
         return array_merge($this->commonUserRules(), [

@@ -4,13 +4,34 @@ namespace App\Http\Requests\Profile;
 
 class UpdateDriverProfileRequest extends BaseProfileRequest
 {
+    protected function adminOnlyFields(): array
+    {
+        return [
+            'name',
+            'email',
+            'phone',
+            'photo',
+            'avatar',
+            'city_id',
+            'role',
+            'is_active',
+            'status',
+            'password',
+            'vehicle_type',
+            'vehicle_plate',
+            'driver_license_number',
+            'id_card_number',
+            'documents',
+            'commission_rate',
+            'penalty_until',
+        ];
+    }
+
     public function rules(): array
     {
-        return array_merge($this->commonUserRules(), [
-            'vehicle_type' => ['sometimes', 'required', 'string', 'max:50'],
-            'vehicle_plate' => ['sometimes', 'nullable', 'string', 'max:30'],
-            'driver_license_number' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'id_card_number' => ['sometimes', 'nullable', 'string', 'max:50'],
-        ]);
+        return [
+            'language' => ['sometimes', 'string', 'in:fr,en'],
+            'notifications_enabled' => ['sometimes', 'boolean'],
+        ];
     }
 }

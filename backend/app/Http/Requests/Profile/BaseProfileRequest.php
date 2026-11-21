@@ -4,6 +4,7 @@ namespace App\Http\Requests\Profile;
 
 use App\Http\Requests\Concerns\NormalizesIvorianPhone;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
 abstract class BaseProfileRequest extends FormRequest
@@ -11,7 +12,18 @@ abstract class BaseProfileRequest extends FormRequest
     use NormalizesIvorianPhone;
 
     /**
-     * Empêche la modification d'un autre utilisateur via un paramètre user_id usurpé.
+     * Liste des champs strictement réservés à l'administration (rejet explicite 403 field_admin_only).
+     *
+     * @return list<string>
+     */
+    protected function adminOnlyFields(): array
+    {
+        return [];
+    }
+
+    /**
+     * Empêche la modification d'un autre utilisateur via un paramètre user_id usurpé
+     * et rejette explicitement en 403 (code: field_admin_only) tout champ réservé à l'administration.
      */
     public function authorize(): bool
     {
@@ -21,6 +33,26 @@ abstract class BaseProfileRequest extends FormRequest
 
         if ($this->filled('user_id') && (int) $this->input('user_id') !== (int) auth()->id()) {
             return false;
+        }
+
+        $forbidden = $this->adminOnlyFields();
+        if (! empty($forbidden)) {
+            $incomingKeys = array_unique(array_merge(
+                array_keys($this->all()),
+                array_keys($this->allFiles()),
+            ));
+            $blocked = array_values(array_intersect($incomingKeys, $forbidden));
+
+            if (! empty($blocked)) {
+                $first = $blocked[0];
+                throw new HttpResponseException(response()->json([
+                    'succes' => false,
+                    'code' => 'field_admin_only',
+                    'field' => $first,
+                    'fields' => $blocked,
+                    'message' => 'Modification refusée : le champ « '.$first.' » est réservé à l\'administration GoLivreur.',
+                ], 403));
+            }
         }
 
         return true;
