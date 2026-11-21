@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Profile\UpdateBusinessProfileRequest;
 use App\Http\Requests\Profile\UpdateClientProfileRequest;
@@ -26,6 +27,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 /**
  * Contrôleur API gérant la consultation et la mise à jour du profil
@@ -714,6 +716,241 @@ class ProfileController extends Controller
             'donnees' => new BusinessProfileResource(
                 $user->fresh()->load(['city', 'merchant.city', 'merchant.categoryModel'])
             ),
+        ]);
+    }
+
+    // ─── CHANGEMENT DE TÉLÉPHONE UNIFIÉ PAR OTP (CLIENT, LIVREUR, COMMERÇANT) ─
+
+    /**
+     * POST /api/v1/me/phone/request {new_phone}
+     * Envoie un OTP au NOUVEAU numéro (mêmes limites/throttles, SmsGateway, aucun code dans les logs).
+     */
+    public function requestPhoneChangeOtp(Request $request, SmsService $smsService): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $rawPhone = (string) ($request->input('new_phone') ?? $request->input('phone', ''));
+        $normalized = $this->normalizeIvorianPhone($rawPhone);
+        $request->merge(['new_phone' => $normalized]);
+
+        $validated = $request->validate([
+            'new_phone' => [
+                'required',
+                'string',
+                'regex:/^(01|05|07|21|25|27)[0-9]{8}$/',
+            ],
+        ], [
+            'new_phone.required' => 'Veuillez saisir votre nouveau numéro de téléphone.',
+            'new_phone.regex' => 'Format ivoirien invalide : 10 chiffres attendus (ex: 0701000001).',
+        ]);
+
+        $newPhone = (string) $validated['new_phone'];
+        if ($newPhone === (string) $user->phone) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Ce numéro est déjà celui associé à votre compte.',
+                'errors' => ['new_phone' => ['Saisissez un nouveau numéro différent de l\'actuel.']],
+            ], 422);
+        }
+
+        // Unicité stricte incluant les comptes soft-deleted
+        if (User::withTrashed()->where('phone', $newPhone)->where('id', '!=', $user->id)->exists()) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Ce numéro de téléphone est déjà associé à un autre compte.',
+                'errors' => ['new_phone' => ['Ce numéro de téléphone est déjà utilisé.']],
+            ], 422);
+        }
+
+        $rateKey = "phone_change_otp:{$user->id}";
+        $maxAttempts = app()->environment('local', 'testing') ? 10 : 3;
+        if (RateLimiter::tooManyAttempts($rateKey, $maxAttempts)) {
+            $seconds = RateLimiter::availableIn($rateKey);
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Trop de demandes de code. Réessayez dans '.ceil($seconds / 60).' minute(s).',
+            ], 429);
+        }
+        RateLimiter::hit($rateKey, 3600);
+
+        $purpose = "phone_chg_{$user->id}";
+        OtpCode::where('purpose', $purpose)
+            ->where('is_used', false)
+            ->update(['is_used' => true]);
+
+        $plainCode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        $otpRecord = OtpCode::create([
+            'phone' => $newPhone,
+            'code_hash' => Hash::make($plainCode),
+            'code_enc' => Crypt::encryptString($plainCode),
+            'purpose' => $purpose,
+            'expires_at' => now()->addMinutes(5),
+        ]);
+
+        if (! $smsService->envoyerOtp($newPhone, $plainCode, 'phone_change')) {
+            $otpRecord->delete();
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Impossible d\'envoyer le code SMS pour le moment. Veuillez réessayer.',
+            ], 503);
+        }
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'action' => 'user_phone_change_otp_requested',
+            'entity_type' => 'user',
+            'entity_id' => $user->id,
+            'properties' => [
+                'role' => $user->role,
+                'new_phone_masked' => substr($newPhone, 0, 2).'****'.substr($newPhone, -3),
+            ],
+            'ip_address' => $request->ip(),
+            'severity' => 'info',
+        ]);
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Un code OTP de confirmation à 6 chiffres a été envoyé sur votre nouveau numéro.',
+        ]);
+    }
+
+    /**
+     * POST /api/v1/me/phone/confirm {code}
+     * Vérifie l'OTP, met à jour le numéro en transaction, révoque toutes les AUTRES sessions
+     * et refresh tokens, et renvoie un nouveau jeton pour la session courante.
+     */
+    public function confirmPhoneChange(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'regex:/^[0-9]{6}$/'],
+        ], [
+            'code.required' => 'Veuillez saisir le code OTP reçu par SMS.',
+            'code.regex' => 'Veuillez saisir le code OTP à 6 chiffres.',
+        ]);
+
+        $code = (string) $validated['code'];
+        $purpose = "phone_chg_{$user->id}";
+
+        $otp = OtpCode::where('purpose', $purpose)
+            ->where('is_used', false)
+            ->where('expires_at', '>', now())
+            ->latest('id')
+            ->first();
+
+        if (! $otp) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Code OTP expiré ou introuvable. Demandez un nouveau code.',
+            ], 422);
+        }
+
+        if ($otp->attempts >= 5) {
+            $otp->update(['is_used' => true]);
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Trop de tentatives incorrectes. Veuillez demander un nouveau code OTP.',
+            ], 429);
+        }
+
+        if (! Hash::check($code, $otp->code_hash)) {
+            $otp->increment('attempts');
+            if ($otp->attempts >= 5) {
+                $otp->update(['is_used' => true]);
+
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Trop de tentatives incorrectes. Veuillez demander un nouveau code OTP.',
+                ], 429);
+            }
+
+            return response()->json([
+                'succes' => false,
+                'message' => 'Code OTP incorrect.',
+            ], 422);
+        }
+
+        $newPhone = (string) $otp->phone;
+        if (User::withTrashed()->where('phone', $newPhone)->where('id', '!=', $user->id)->exists()) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Ce numéro de téléphone est déjà associé à un autre compte.',
+            ], 422);
+        }
+
+        $oldPhone = (string) $user->phone;
+
+        $tokens = DB::transaction(function () use ($otp, $user, $newPhone, $oldPhone, $request): array {
+            $otp->delete();
+            OtpCode::where('purpose', "phone_chg_{$user->id}")->delete();
+            if ($oldPhone !== '') {
+                OtpCode::where('phone', $oldPhone)->delete();
+            }
+
+            // Révoquer tous les refresh tokens existants
+            AuthController::revokeUserRefreshTokens($user->id);
+
+            $user->update([
+                'phone' => $newPhone,
+                'phone_verified_at' => now(),
+            ]);
+
+            $freshUser = $user->fresh()->load('city');
+            $newAccessToken = JWTAuth::fromUser($freshUser);
+            $newJti = (string) JWTAuth::setToken($newAccessToken)->getPayload()->get('jti');
+            $newRefreshToken = AuthController::issueRotatingRefreshToken($freshUser);
+
+            // Invalide immédiatement toutes les AUTRES sessions JWT (client, driver, merchant)
+            $freshUser->update(['session_token' => $newJti]);
+
+            ActivityLog::create([
+                'user_id' => $freshUser->id,
+                'action' => 'user_phone_changed',
+                'entity_type' => 'user',
+                'entity_id' => $freshUser->id,
+                'properties' => [
+                    'role' => $freshUser->role,
+                    'old_phone_masked' => substr($oldPhone, 0, 2).'****'.substr($oldPhone, -3),
+                    'new_phone_masked' => substr($newPhone, 0, 2).'****'.substr($newPhone, -3),
+                    'other_sessions_revoked' => true,
+                ],
+                'ip_address' => $request->ip(),
+                'severity' => 'warning',
+            ]);
+
+            return [
+                'access_token' => $newAccessToken,
+                'refresh_token' => $newRefreshToken,
+                'user' => $freshUser,
+            ];
+        });
+
+        RateLimiter::clear("phone_change_otp:{$user->id}");
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Votre numéro de téléphone a été mis à jour avec succès.',
+            'donnees' => [
+                'access_token' => $tokens['access_token'],
+                'refresh_token' => $tokens['refresh_token'],
+                'token_type' => 'bearer',
+                'expires_in' => (int) config('jwt.ttl', 20) * 60,
+                'user' => [
+                    'id' => $tokens['user']->id,
+                    'name' => $tokens['user']->name,
+                    'phone' => $tokens['user']->phone,
+                    'email' => $tokens['user']->email,
+                    'role' => $tokens['user']->role,
+                    'roles' => $tokens['user']->effectiveRoles(),
+                ],
+            ],
         ]);
     }
 

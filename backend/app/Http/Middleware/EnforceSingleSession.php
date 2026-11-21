@@ -18,7 +18,7 @@ class EnforceSingleSession
     {
         $user = auth('api')->user() ?: $request->user();
 
-        if ($user && in_array($user->role, ['merchant', 'driver', 'courier'])) {
+        if ($user) {
             $freshUser = $user->fresh();
             if ($freshUser && $freshUser->session_token) {
                 try {

@@ -562,8 +562,8 @@ class AuthController extends Controller
         if (! $user) {
             return response()->json([
                 'succes' => false,
-                'message' => 'Numéro de téléphone non reconnu ou compte désactivé.',
-            ], 404);
+                'message' => 'Identifiants incorrects.',
+            ], 401);
         }
 
         $passwordMatches = $user->password && Hash::check($password, $user->password);
@@ -676,6 +676,8 @@ class AuthController extends Controller
         if (in_array($user->role, ['merchant', 'driver', 'courier'], true) || in_array($appType, ['business', 'driver'], true)) {
             $jti = (string) JWTAuth::setToken($token)->getPayload()->get('jti');
             $user->update(['session_token' => $jti]);
+        } elseif ($user->session_token !== null) {
+            $user->update(['session_token' => null]);
         }
 
         $mustChangePassword = $user->mustChangePassword();
@@ -791,6 +793,8 @@ class AuthController extends Controller
         if (in_array($user->role, ['merchant', 'driver', 'courier'])) {
             $jti = (string) JWTAuth::setToken($token)->getPayload()->get('jti');
             $user->update(['session_token' => $jti]);
+        } elseif ($user->session_token !== null) {
+            $user->update(['session_token' => null]);
         }
 
         $this->activityLogService->log(
@@ -872,7 +876,7 @@ class AuthController extends Controller
      */
     public function refresh(Request $request): JsonResponse
     {
-        $rawToken = $request->bearerToken() ?: (string) $request->input('refresh_token');
+        $rawToken = (string) ($request->input('refresh_token') ?: $request->bearerToken());
 
         if (! $rawToken) {
             return response()->json([

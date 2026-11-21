@@ -92,7 +92,8 @@ class ClientResource extends Resource
                             ->required(),
                         Forms\Components\TextInput::make('phone')
                             ->label('Numéro de téléphone')
-                            ->required(),
+                            ->required()
+                            ->unique(ignoreRecord: true),
                         Forms\Components\TextInput::make('email')
                             ->label('Adresse email')
                             ->email()

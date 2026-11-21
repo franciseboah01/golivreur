@@ -88,6 +88,7 @@ class UserResource extends Resource
                             ->label('Numéro de Téléphone (Identifiant principal)')
                             ->tel()
                             ->required()
+                            ->unique(ignoreRecord: true)
                             ->maxLength(20),
                         Forms\Components\TextInput::make('email')
                             ->label('Adresse Email (Optionnelle)')

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Services\SettingsService;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
 /**
@@ -78,6 +80,79 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     protected $appends = [
         'photo_url',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $user): void {
+            if (is_string($user->phone) && $user->phone !== '') {
+                $user->phone = self::normalizePhone($user->phone);
+            }
+        });
+
+        static::updating(function (self $user): void {
+            if (! $user->isDirty('phone')) {
+                return;
+            }
+
+            $oldPhone = (string) ($user->getOriginal('phone') ?? '');
+            if ($oldPhone === '' || $oldPhone === (string) $user->phone) {
+                return;
+            }
+
+            $actor = auth()->user();
+            if ($actor instanceof self && $actor->is_admin && (int) $actor->id !== (int) $user->id) {
+                $user->device_token = null;
+                $user->session_token = 'revoked_'.Str::uuid()->toString();
+            }
+        });
+
+        static::updated(function (self $user): void {
+            if (! $user->wasChanged('phone')) {
+                return;
+            }
+
+            $oldPhone = (string) ($user->getOriginal('phone') ?? '');
+            if ($oldPhone !== '') {
+                OtpCode::where('phone', $oldPhone)->delete();
+            }
+
+            $actor = auth()->user();
+            if ($actor instanceof self && $actor->is_admin && (int) $actor->id !== (int) $user->id) {
+                AuthController::revokeUserRefreshTokens((int) $user->id);
+
+                ActivityLog::create([
+                    'user_id' => $actor->id,
+                    'action' => 'user_phone_changed_by_admin',
+                    'entity_type' => 'user',
+                    'entity_id' => $user->id,
+                    'properties' => [
+                        'old_phone_masked' => substr($oldPhone, 0, 2).'****'.substr($oldPhone, -3),
+                        'new_phone_masked' => substr((string) $user->phone, 0, 2).'****'.substr((string) $user->phone, -3),
+                        'sessions_revoked' => true,
+                        'device_token_cleared' => true,
+                    ],
+                    'ip_address' => request()->ip(),
+                    'severity' => 'warning',
+                ]);
+            }
+        });
+    }
+
+    public static function normalizePhone(string $raw): string
+    {
+        $cleaned = preg_replace('/[\s\.\-\(\)]+/', '', trim($raw)) ?? '';
+        if (str_starts_with($cleaned, '+225')) {
+            return substr($cleaned, 4);
+        }
+        if (str_starts_with($cleaned, '00225')) {
+            return substr($cleaned, 5);
+        }
+        if (strlen($cleaned) === 13 && str_starts_with($cleaned, '225')) {
+            return substr($cleaned, 3);
+        }
+
+        return $cleaned;
+    }
 
     /**
      * URL publique de la photo de profil utilisateur.

@@ -134,9 +134,11 @@ Route::prefix('webhooks')->group(function () {
 // ─── Routes protégées par JWT ─────────────────────────────────────────────────
 Route::middleware(['auth:api', 'active_account', 'single_session'])->group(function () {
 
-    // ─── Profil unifié & mot de passe ─────────────────────────────────────────
+    // ─── Profil unifié, téléphone (OTP) & mot de passe ────────────────────────
     Route::get('profile', [ProfileController::class, 'show']);
     Route::put('profile/password', [ProfileController::class, 'updatePassword']);
+    Route::post('me/phone/request', [ProfileController::class, 'requestPhoneChangeOtp']);
+    Route::post('me/phone/confirm', [ProfileController::class, 'confirmPhoneChange']);
     Route::get('profile/{user}', [ProfileController::class, 'showForUser']);
     Route::match(['put', 'post'], 'profile/{user}', [ProfileController::class, 'updateForUser']);
 
