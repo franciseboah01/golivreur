@@ -532,6 +532,27 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.amber.shade200),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.battery_saver_outlined, size: 18, color: Colors.orange),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Astuce : désactivez l\'optimisation batterie pour GoLivreur Driver dans les paramètres Android afin de recevoir les courses même écran verrouillé.',
+                    style: TextStyle(fontSize: 11.5, color: GoLivreurTheme.textePrincipal),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -835,6 +856,8 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                   ],
                 ],
               ),
+              const SizedBox(height: 10),
+              _buildCourseInfoStrip(job),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -870,6 +893,8 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
             isGoColis ? 'Ramassage Colis — Photo & Code Expéditeur' : 'Récupération Commande au Maquis/Restaurant',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 10),
+          _buildCourseInfoStrip(job),
           const SizedBox(height: 12),
           if (isGoColis) ...[
             Container(
@@ -1037,6 +1062,8 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
           ),
           const SizedBox(height: 6),
           Text('Destination : ${job.deliveryAddress}', style: const TextStyle(color: GoLivreurTheme.texteSecondaire)),
+          const SizedBox(height: 10),
+          _buildCourseInfoStrip(job),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
@@ -1508,6 +1535,85 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCourseInfoStrip(DriverJob job) {
+    final rows = <Widget>[];
+    if (job.parcelSize != null && job.parcelSize!.isNotEmpty) {
+      rows.add(_infoChip(Icons.inventory_2_outlined, 'Taille : ${job.parcelSize}'));
+    }
+    if (job.pickupContactName != null || job.pickupContactPhone != null) {
+      final label = [
+        if (job.pickupContactName != null) job.pickupContactName!,
+        if (job.pickupContactPhone != null) job.pickupContactPhone!,
+      ].join(' • ');
+      rows.add(_infoChip(Icons.storefront_outlined, 'Ramassage : $label'));
+    }
+    if (job.deliveryContactName != null || job.deliveryContactPhone != null) {
+      final label = [
+        if (job.deliveryContactName != null) job.deliveryContactName!,
+        if (job.deliveryContactPhone != null) job.deliveryContactPhone!,
+      ].join(' • ');
+      rows.add(_infoChip(Icons.person_pin_circle_outlined, 'Client : $label'));
+    }
+    if (job.amountToCollect > 0) {
+      rows.add(
+        _infoChip(
+          Icons.payments_outlined,
+          'À encaisser en espèces : ${job.amountToCollect.toInt()} F CFA',
+          highlight: true,
+        ),
+      );
+    } else if (job.paymentMethod != null && job.paymentMethod != 'cash') {
+      rows.add(_infoChip(Icons.verified_outlined, 'Déjà payé en ligne'));
+    }
+    if (job.instructions != null && job.instructions!.isNotEmpty) {
+      rows.add(_infoChip(Icons.notes_outlined, 'Instructions : ${job.instructions}'));
+    }
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: GoLivreurTheme.fond,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: GoLivreurTheme.bordure),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: rows,
+      ),
+    );
+  }
+
+  Widget _infoChip(IconData icon, String text, {bool highlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: highlight ? GoLivreurTheme.primaire : GoLivreurTheme.texteSecondaire,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: highlight ? FontWeight.bold : FontWeight.w500,
+                color: highlight
+                    ? GoLivreurTheme.primaire
+                    : GoLivreurTheme.textePrincipal,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

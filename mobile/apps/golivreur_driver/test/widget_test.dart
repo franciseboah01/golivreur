@@ -9,7 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'package:golivreur_driver/features/auth/screens/driver_login_screen.dart';
+import 'package:golivreur_driver/features/driver/providers/driver_provider.dart';
 import 'package:golivreur_driver/features/navigation/screens/driver_main_navigation_screen.dart';
+import 'package:golivreur_driver/features/profile/screens/edit_driver_profile_screen.dart';
 import 'package:golivreur_driver/main.dart';
 
 class _FakeSecureStorage extends Fake implements FlutterSecureStorage {
@@ -248,5 +250,63 @@ void main() {
     await tester.pump();
 
     expect(find.byType(Image), findsOneWidget);
+  });
+
+  test('DriverJob.fromCourseJson parse un colis assigné manuellement sans planter', () {
+    final job = DriverJob.fromCourseJson(
+      {
+        'id': 42,
+        'course_type': 'gocolis',
+        'status': 'accepted',
+        'pickup_address': 'Marché Daloa',
+        'delivery_address': 'Quartier Tazibouo',
+        'pickup_lat': 6.88,
+        'pickup_lng': -6.45,
+        'delivery_lat': null,
+        'delivery_lng': null,
+        'distance_km': 3.4,
+        'size_label': 'Moyen',
+        'instructions': 'Appeler à la barrière bleue',
+        'pickup_contact_name': 'Kouamé',
+        'pickup_contact_phone': '0701020304',
+        'delivery_contact_name': 'Awa',
+        'delivery_contact_phone': '0705060708',
+        'courier_amount': 1200,
+        'amount_to_collect': 1500,
+        'payment_method': 'cash',
+      },
+      type: DriverJobType.gocolis,
+    );
+
+    expect(job.id, 42);
+    expect(job.step, DriverJobStep.accepted);
+    expect(job.parcelSize, 'Moyen');
+    expect(job.pickupContactName, 'Kouamé');
+    expect(job.deliveryContactPhone, '0705060708');
+    expect(job.instructions, 'Appeler à la barrière bleue');
+    expect(job.amountToCollect, 1500);
+    expect(job.deliveryLat, isNull);
+  });
+
+  testWidgets('EditDriverProfileScreen affiche le dossier en lecture seule et les actions OTP / mot de passe',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _fakeDriverOverrides(),
+        child: const MaterialApp(home: EditDriverProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Contactez l\'agence GoLivreur pour modifier ces informations'),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Téléphone (changement par OTP)'),
+      200,
+    );
+    expect(find.text('Téléphone (changement par OTP)'), findsOneWidget);
+    expect(find.text('Changer mon mot de passe'), findsOneWidget);
   });
 }

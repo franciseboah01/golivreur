@@ -145,8 +145,34 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 6),
-                        Row(
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: profile.accountStatus == 'actif'
+                                    ? Colors.green.shade100
+                                    : profile.accountStatus == 'suspendu'
+                                        ? Colors.red.shade100
+                                        : Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                profile.accountStatus,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: profile.accountStatus == 'actif'
+                                      ? Colors.green.shade900
+                                      : profile.accountStatus == 'suspendu'
+                                          ? Colors.red.shade900
+                                          : Colors.orange.shade900,
+                                ),
+                              ),
+                            ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
@@ -154,25 +180,24 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const Icon(Icons.star, size: 13, color: Colors.amber),
                                   const SizedBox(width: 3),
                                   Text(
                                     profile.totalRatings > 0
                                         ? '${profile.averageRating.toStringAsFixed(1)} (${profile.totalRatings} avis)'
-                                        : 'Nouveau livreur',
+                                        : '${profile.completedDeliveries} livraison${profile.completedDeliveries > 1 ? 's' : ''}',
                                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
                                   ),
                                 ],
                               ),
                             ),
-                            if (profile.cityName != null && profile.cityName!.isNotEmpty) ...[
-                              const SizedBox(width: 8),
+                            if (profile.cityName != null && profile.cityName!.isNotEmpty)
                               Text(
                                 profile.cityName!,
                                 style: const TextStyle(fontSize: 12, color: GoLivreurTheme.texteSecondaire),
                               ),
-                            ],
                           ],
                         ),
                       ],
@@ -326,8 +351,8 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
               children: [
                 ListTile(
                   leading: const Icon(Icons.manage_accounts_outlined, color: GoLivreurTheme.secondaire),
-                  title: const Text('Modifier mon profil'),
-                  subtitle: const Text('Nom, téléphone, véhicule, plaque et photo'),
+                  title: const Text('Mon compte & sécurité'),
+                  subtitle: const Text('Infos dossier (lecture seule), téléphone OTP, mot de passe'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _openEditProfile,
                 ),

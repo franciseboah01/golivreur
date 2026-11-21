@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/env_config.dart';
 import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/services/gps_location_service.dart';
+import 'package:golivreur_core/services/secure_token_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 // ─── Transactions Portefeuille ────────────────────────────────────────────────
@@ -111,6 +112,9 @@ class DriverProfileState {
   final double walletBalance;
   final double averageRating;
   final int totalRatings;
+  final String accountStatus;
+  final int completedDeliveries;
+  final bool passwordSet;
   final int coursesToday;
   final int coursesWeek;
   final double earningsToday;
@@ -149,6 +153,9 @@ class DriverProfileState {
     this.walletBalance = 0,
     this.averageRating = 0,
     this.totalRatings = 0,
+    this.accountStatus = 'actif',
+    this.completedDeliveries = 0,
+    this.passwordSet = true,
     this.coursesToday = 0,
     this.coursesWeek = 0,
     this.earningsToday = 0,
@@ -189,6 +196,9 @@ class DriverProfileState {
     double? walletBalance,
     double? averageRating,
     int? totalRatings,
+    String? accountStatus,
+    int? completedDeliveries,
+    bool? passwordSet,
     int? coursesToday,
     int? coursesWeek,
     double? earningsToday,
@@ -234,6 +244,9 @@ class DriverProfileState {
       walletBalance: walletBalance ?? this.walletBalance,
       averageRating: averageRating ?? this.averageRating,
       totalRatings: totalRatings ?? this.totalRatings,
+      accountStatus: accountStatus ?? this.accountStatus,
+      completedDeliveries: completedDeliveries ?? this.completedDeliveries,
+      passwordSet: passwordSet ?? this.passwordSet,
       coursesToday: coursesToday ?? this.coursesToday,
       coursesWeek: coursesWeek ?? this.coursesWeek,
       earningsToday: earningsToday ?? this.earningsToday,
@@ -424,9 +437,19 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
       notificationsEnabled:
           d['notifications_enabled'] as bool? ?? state.notificationsEnabled,
       isOnline: isOnline,
-      averageRating:
-          (d['average_rating'] as num?)?.toDouble() ?? state.averageRating,
+      averageRating: (d['average_rating'] as num?)?.toDouble() ??
+          (d['rating'] as num?)?.toDouble() ??
+          state.averageRating,
       totalRatings: (d['total_ratings'] as num?)?.toInt() ?? state.totalRatings,
+      accountStatus:
+          (d['account_status'] as String?)?.trim().isNotEmpty == true
+              ? (d['account_status'] as String).trim()
+              : state.accountStatus,
+      completedDeliveries: (d['completed_deliveries'] as num?)?.toInt() ??
+          state.completedDeliveries,
+      passwordSet: d['password_set'] is bool
+          ? d['password_set'] as bool
+          : state.passwordSet,
       roles: d['roles'] is List
           ? (d['roles'] as List).map((e) => e.toString()).toList()
           : state.roles,
@@ -456,36 +479,22 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
     } catch (_) {}
   }
 
-  Future<(bool, String?)> mettreAJourProfil({
-    required String name,
-    required String phone,
-    String? email,
-    required String vehicleType,
-    String? vehiclePlate,
-    String? idCardNumber,
-    String? driverLicenseNumber,
+  /// Seules les préférences locales (langue / notifications) sont modifiables par le livreur.
+  /// Identité, véhicule, pièces, ville et photo sont réservés à l'agence GoLivreur.
+  Future<(bool, String?)> mettreAJourPreferences({
     String language = 'fr',
     bool notificationsEnabled = true,
-    XFile? photo,
   }) async {
     if (_api == null) {
       return (false, 'Client API non initialisé.');
     }
     try {
-      final res = await _api.uploadMultipart(
+      final res = await _api.put(
         '/driver/profile',
-        fields: {
-          'name': name,
-          'phone': phone,
-          'email': email ?? '',
-          'vehicle_type': vehicleType,
-          'vehicle_plate': vehiclePlate ?? '',
-          'id_card_number': idCardNumber ?? '',
-          'driver_license_number': driverLicenseNumber ?? '',
+        data: {
           'language': language,
-          'notifications_enabled': notificationsEnabled ? '1' : '0',
+          'notifications_enabled': notificationsEnabled,
         },
-        files: photo != null ? {'photo': photo} : null,
       );
 
       if (res.statusCode == 200 &&
@@ -501,7 +510,82 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
     } on DioException catch (e) {
       return (false, ApiClient.messageErreur(e));
     } catch (_) {
-      return (false, 'Impossible de mettre à jour le profil.');
+      return (false, 'Impossible de mettre à jour vos préférences.');
+    }
+  }
+
+  Future<(bool, String?)> demanderChangementTelephone(String newPhone) async {
+    if (_api == null) return (false, 'Client API non initialisé.');
+    try {
+      final res = await _api.post(
+        '/me/phone/request',
+        data: {'new_phone': newPhone.trim()},
+      );
+      if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
+        return (true, res.data['message']?.toString());
+      }
+      return (false, 'Impossible d\'envoyer le code OTP.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Erreur réseau lors de la demande OTP.');
+    }
+  }
+
+  Future<(bool, String?)> confirmerChangementTelephone(String code) async {
+    if (_api == null) return (false, 'Client API non initialisé.');
+    try {
+      final res = await _api.post(
+        '/me/phone/confirm',
+        data: {'code': code.trim()},
+      );
+      if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
+        final donnees = res.data['donnees'] is Map
+            ? Map<String, dynamic>.from(res.data['donnees'] as Map)
+            : const <String, dynamic>{};
+        final accessToken = donnees['access_token']?.toString();
+        final refreshToken = donnees['refresh_token']?.toString();
+        if (accessToken != null && accessToken.isNotEmpty) {
+          final storage = SecureTokenStorage.createStorage();
+          await storage.write(key: 'access_token', value: accessToken);
+          if (refreshToken != null && refreshToken.isNotEmpty) {
+            await storage.write(key: 'refresh_token', value: refreshToken);
+          }
+        }
+        await chargerProfil();
+        return (true, res.data['message']?.toString() ?? 'Numéro mis à jour.');
+      }
+      return (false, 'Code OTP invalide.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Erreur réseau lors de la confirmation OTP.');
+    }
+  }
+
+  Future<(bool, String?)> definirMotDePasse({
+    String? currentPassword,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    if (_api == null) return (false, 'Client API non initialisé.');
+    try {
+      final payload = <String, dynamic>{
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+        if (currentPassword != null && currentPassword.isNotEmpty)
+          'current_password': currentPassword,
+      };
+      final res = await _api.post('/me/password', data: payload);
+      if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
+        state = state.copyWith(passwordSet: true, mustChangePassword: false);
+        return (true, res.data['message']?.toString() ?? 'Mot de passe mis à jour.');
+      }
+      return (false, 'Impossible de modifier le mot de passe.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Erreur réseau lors de la modification du mot de passe.');
     }
   }
 
@@ -665,6 +749,13 @@ class DriverJob {
   final double distanceKm;
   final double payout;
   final String? parcelSize; // Pour GoColis (Petit, Moyen, Grand)
+  final String? pickupContactName;
+  final String? pickupContactPhone;
+  final String? deliveryContactName;
+  final String? deliveryContactPhone;
+  final String? instructions;
+  final double amountToCollect;
+  final String? paymentMethod;
   final DriverJobStep step;
   final int failedCodeAttempts;
   final int offerRemainingSeconds;
@@ -686,6 +777,13 @@ class DriverJob {
     required this.distanceKm,
     required this.payout,
     this.parcelSize,
+    this.pickupContactName,
+    this.pickupContactPhone,
+    this.deliveryContactName,
+    this.deliveryContactPhone,
+    this.instructions,
+    this.amountToCollect = 0,
+    this.paymentMethod,
     this.step = DriverJobStep.incoming,
     this.failedCodeAttempts = 0,
     this.offerRemainingSeconds = 30,
@@ -694,6 +792,119 @@ class DriverJob {
     this.atRecipientReached = false,
     this.rawStatus = 'pending',
   });
+
+  /// Factory unique tolérante aux champs nullables (DriverCourseResource — attribution auto et manuelle).
+  factory DriverJob.fromCourseJson(
+    Map<String, dynamic> json, {
+    required DriverJobType type,
+    bool isOffer = false,
+  }) {
+    final id = num.tryParse('${json['id'] ?? 0}')?.toInt() ?? 0;
+    final statusStr = (json['status']?.toString() ?? (isOffer ? 'pending' : 'accepted')).trim();
+
+    final DriverJobStep resolvedStep;
+    if (isOffer) {
+      resolvedStep = DriverJobStep.incoming;
+    } else if (type == DriverJobType.goshop) {
+      resolvedStep = switch (statusStr) {
+        'accepted' => DriverJobStep.accepted,
+        'ready' => DriverJobStep.atMerchant,
+        'picked_up' || 'in_transit' => DriverJobStep.inTransit,
+        'delivered' => DriverJobStep.completed,
+        _ => DriverJobStep.accepted,
+      };
+    } else {
+      resolvedStep = switch (statusStr) {
+        'accepted' => DriverJobStep.accepted,
+        'at_sender' => DriverJobStep.atMerchant,
+        'picked_up' || 'in_transit' || 'at_recipient' => DriverJobStep.inTransit,
+        'delivered' => DriverJobStep.completed,
+        _ => DriverJobStep.accepted,
+      };
+    }
+
+    final merchant = json['merchant'] is Map
+        ? Map<String, dynamic>.from(json['merchant'] as Map)
+        : const <String, dynamic>{};
+    final client = json['client'] is Map
+        ? Map<String, dynamic>.from(json['client'] as Map)
+        : const <String, dynamic>{};
+    final sender = json['sender'] is Map
+        ? Map<String, dynamic>.from(json['sender'] as Map)
+        : const <String, dynamic>{};
+
+    final photos = json['photos'] is List ? json['photos'] as List : const [];
+    final hasPickupPhoto = photos.any(
+      (ph) => ph is Map && ph['type']?.toString() == 'pickup',
+    );
+    final hasDeliveryPhoto = photos.any(
+      (ph) => ph is Map && ph['type']?.toString() == 'delivery',
+    );
+
+    final remSec = num.tryParse('${json['offer_remaining_seconds'] ?? 30}')?.toInt() ?? 30;
+    final pickupContactName = _cleanStr(
+      json['pickup_contact_name'] ??
+          (type == DriverJobType.goshop ? merchant['name'] : sender['name']),
+    );
+    final pickupContactPhone = _cleanStr(
+      json['pickup_contact_phone'] ??
+          (type == DriverJobType.goshop ? merchant['phone'] : sender['phone']),
+    );
+    final deliveryContactName = _cleanStr(
+      json['delivery_contact_name'] ??
+          (type == DriverJobType.goshop ? client['name'] : json['recipient_name']),
+    );
+    final deliveryContactPhone = _cleanStr(
+      json['delivery_contact_phone'] ??
+          (type == DriverJobType.goshop ? client['phone'] : json['recipient_phone']),
+    );
+    final instructions = _cleanStr(
+      json['instructions'] ?? json['special_instructions'] ?? json['description'],
+    );
+    final amountToCollect =
+        num.tryParse('${json['amount_to_collect'] ?? json['cash_to_collect'] ?? 0}')
+                ?.toDouble() ??
+            0;
+
+    return DriverJob(
+      id: id,
+      type: type,
+      title: type == DriverJobType.goshop
+          ? (_cleanStr(merchant['name']) ?? 'Commande #$id')
+          : 'Colis #$id',
+      pickupAddress: _cleanStr(json['pickup_address']) ??
+          _cleanStr(merchant['address']) ??
+          (type == DriverJobType.goshop ? 'Adresse commerce' : 'Adresse expéditeur'),
+      deliveryAddress: _cleanStr(json['delivery_address']) ??
+          (type == DriverJobType.goshop ? 'Adresse client' : 'Adresse destinataire'),
+      pickupLat: num.tryParse('${json['pickup_lat'] ?? merchant['lat'] ?? ''}')?.toDouble(),
+      pickupLng: num.tryParse('${json['pickup_lng'] ?? merchant['lng'] ?? ''}')?.toDouble(),
+      deliveryLat: num.tryParse('${json['delivery_lat'] ?? ''}')?.toDouble(),
+      deliveryLng: num.tryParse('${json['delivery_lng'] ?? ''}')?.toDouble(),
+      distanceKm: num.tryParse('${json['distance_km'] ?? 0}')?.toDouble() ?? 0,
+      payout: num.tryParse('${json['courier_amount'] ?? 0}')?.toDouble() ?? 0,
+      parcelSize: _cleanStr(json['size_label'] ?? json['size']),
+      pickupContactName: pickupContactName,
+      pickupContactPhone: pickupContactPhone,
+      deliveryContactName: deliveryContactName,
+      deliveryContactPhone: deliveryContactPhone,
+      instructions: instructions,
+      amountToCollect: amountToCollect,
+      paymentMethod: _cleanStr(json['payment_method']),
+      step: resolvedStep,
+      offerRemainingSeconds: remSec > 0 ? remSec : 30,
+      pickupPhotoUploaded: hasPickupPhoto,
+      deliveryPhotoUploaded: hasDeliveryPhoto,
+      atRecipientReached: statusStr == 'at_recipient',
+      rawStatus: statusStr,
+    );
+  }
+
+  static String? _cleanStr(dynamic value) {
+    final s = value?.toString().trim();
+    if (s == null || s.isEmpty || s == 'null') return null;
+    return s;
+  }
 
   DriverJob copyWith({
     DriverJobStep? step,
@@ -717,6 +928,13 @@ class DriverJob {
       distanceKm: distanceKm,
       payout: payout,
       parcelSize: parcelSize,
+      pickupContactName: pickupContactName,
+      pickupContactPhone: pickupContactPhone,
+      deliveryContactName: deliveryContactName,
+      deliveryContactPhone: deliveryContactPhone,
+      instructions: instructions,
+      amountToCollect: amountToCollect,
+      paymentMethod: paymentMethod,
       step: step ?? this.step,
       failedCodeAttempts: failedCodeAttempts ?? this.failedCodeAttempts,
       offerRemainingSeconds:
@@ -757,93 +975,20 @@ class DriverActiveJobNotifier extends StateNotifier<DriverJob?> {
         final parcels =
             donnees['parcels'] is List ? donnees['parcels'] as List : const [];
 
-        // 1. Course GoShop déjà acceptée / en cours
+        // 1. Course GoShop déjà acceptée / en cours (auto ou assignée manuellement)
         if (orders.isNotEmpty && orders.first is Map) {
-          final o = Map<String, dynamic>.from(orders.first as Map);
-          final statusStr = o['status']?.toString() ?? 'accepted';
-          final step = switch (statusStr) {
-            'accepted' => DriverJobStep.accepted,
-            'ready' => DriverJobStep.atMerchant,
-            'picked_up' || 'in_transit' => DriverJobStep.inTransit,
-            'delivered' => DriverJobStep.completed,
-            _ => DriverJobStep.accepted,
-          };
-
-          final merchant = o['merchant'] is Map
-              ? Map<String, dynamic>.from(o['merchant'] as Map)
-              : <String, dynamic>{};
-
-          state = DriverJob(
-            id: num.tryParse('${o['id'] ?? 0}')?.toInt() ?? 0,
+          state = DriverJob.fromCourseJson(
+            Map<String, dynamic>.from(orders.first as Map),
             type: DriverJobType.goshop,
-            title: (merchant['name'] ?? 'Commande #${o['id']}').toString(),
-            pickupAddress:
-                (merchant['address'] ?? 'Adresse commerce').toString(),
-            deliveryAddress:
-                (o['delivery_address'] ?? 'Adresse client').toString(),
-            pickupLat:
-                num.tryParse('${o['pickup_lat'] ?? merchant['lat'] ?? ''}')
-                    ?.toDouble(),
-            pickupLng:
-                num.tryParse('${o['pickup_lng'] ?? merchant['lng'] ?? ''}')
-                    ?.toDouble(),
-            deliveryLat: num.tryParse('${o['delivery_lat'] ?? ''}')?.toDouble(),
-            deliveryLng: num.tryParse('${o['delivery_lng'] ?? ''}')?.toDouble(),
-            distanceKm:
-                num.tryParse('${o['distance_km'] ?? 0}')?.toDouble() ?? 0,
-            payout:
-                num.tryParse('${o['courier_amount'] ?? 0}')?.toDouble() ?? 0,
-            step: step,
-            rawStatus: statusStr,
           );
           return;
         }
 
-        // 2. Expédition GoColis déjà acceptée / en cours
+        // 2. Expédition GoColis déjà acceptée / en cours (auto ou assignée manuellement)
         if (parcels.isNotEmpty && parcels.first is Map) {
-          final p = Map<String, dynamic>.from(parcels.first as Map);
-          final statusStr = p['status']?.toString() ?? 'accepted';
-          final step = switch (statusStr) {
-            'accepted' => DriverJobStep.accepted,
-            'at_sender' => DriverJobStep.atMerchant,
-            'picked_up' ||
-            'in_transit' ||
-            'at_recipient' =>
-              DriverJobStep.inTransit,
-            'delivered' => DriverJobStep.completed,
-            _ => DriverJobStep.accepted,
-          };
-
-          final photos = p['photos'] is List ? p['photos'] as List : const [];
-          final hasPickupPhoto = photos.any(
-            (ph) => ph is Map && ph['type']?.toString() == 'pickup',
-          );
-          final hasDeliveryPhoto = photos.any(
-            (ph) => ph is Map && ph['type']?.toString() == 'delivery',
-          );
-
-          state = DriverJob(
-            id: num.tryParse('${p['id'] ?? 0}')?.toInt() ?? 0,
+          state = DriverJob.fromCourseJson(
+            Map<String, dynamic>.from(parcels.first as Map),
             type: DriverJobType.gocolis,
-            title: 'Colis #${p['id']}',
-            pickupAddress:
-                (p['pickup_address'] ?? 'Adresse expéditeur').toString(),
-            deliveryAddress:
-                (p['delivery_address'] ?? 'Adresse destinataire').toString(),
-            pickupLat: num.tryParse('${p['pickup_lat'] ?? ''}')?.toDouble(),
-            pickupLng: num.tryParse('${p['pickup_lng'] ?? ''}')?.toDouble(),
-            deliveryLat: num.tryParse('${p['delivery_lat'] ?? ''}')?.toDouble(),
-            deliveryLng: num.tryParse('${p['delivery_lng'] ?? ''}')?.toDouble(),
-            distanceKm:
-                num.tryParse('${p['distance_km'] ?? 0}')?.toDouble() ?? 0,
-            payout:
-                num.tryParse('${p['courier_amount'] ?? 0}')?.toDouble() ?? 0,
-            parcelSize: (p['size_label'] ?? p['size'])?.toString(),
-            step: step,
-            pickupPhotoUploaded: hasPickupPhoto,
-            deliveryPhotoUploaded: hasDeliveryPhoto,
-            atRecipientReached: statusStr == 'at_recipient',
-            rawStatus: statusStr,
           );
           return;
         }
@@ -860,67 +1005,19 @@ class DriverActiveJobNotifier extends StateNotifier<DriverJob?> {
             : const [];
 
         if (offeredOrders.isNotEmpty && offeredOrders.first is Map) {
-          final o = Map<String, dynamic>.from(offeredOrders.first as Map);
-          final merchant = o['merchant'] is Map
-              ? Map<String, dynamic>.from(o['merchant'] as Map)
-              : <String, dynamic>{};
-          final remSec =
-              num.tryParse('${o['offer_remaining_seconds'] ?? 30}')?.toInt() ??
-                  30;
-
-          state = DriverJob(
-            id: num.tryParse('${o['id'] ?? 0}')?.toInt() ?? 0,
+          state = DriverJob.fromCourseJson(
+            Map<String, dynamic>.from(offeredOrders.first as Map),
             type: DriverJobType.goshop,
-            title: (merchant['name'] ?? 'Commande #${o['id']}').toString(),
-            pickupAddress:
-                (merchant['address'] ?? 'Adresse commerce').toString(),
-            deliveryAddress:
-                (o['delivery_address'] ?? 'Adresse client').toString(),
-            pickupLat:
-                num.tryParse('${o['pickup_lat'] ?? merchant['lat'] ?? ''}')
-                    ?.toDouble(),
-            pickupLng:
-                num.tryParse('${o['pickup_lng'] ?? merchant['lng'] ?? ''}')
-                    ?.toDouble(),
-            deliveryLat: num.tryParse('${o['delivery_lat'] ?? ''}')?.toDouble(),
-            deliveryLng: num.tryParse('${o['delivery_lng'] ?? ''}')?.toDouble(),
-            distanceKm:
-                num.tryParse('${o['distance_km'] ?? 0}')?.toDouble() ?? 0,
-            payout:
-                num.tryParse('${o['courier_amount'] ?? 0}')?.toDouble() ?? 0,
-            step: DriverJobStep.incoming,
-            offerRemainingSeconds: remSec > 0 ? remSec : 30,
-            rawStatus: o['status']?.toString() ?? 'accepted',
+            isOffer: true,
           );
           return;
         }
 
         if (offeredParcels.isNotEmpty && offeredParcels.first is Map) {
-          final p = Map<String, dynamic>.from(offeredParcels.first as Map);
-          final remSec =
-              num.tryParse('${p['offer_remaining_seconds'] ?? 30}')?.toInt() ??
-                  30;
-
-          state = DriverJob(
-            id: num.tryParse('${p['id'] ?? 0}')?.toInt() ?? 0,
+          state = DriverJob.fromCourseJson(
+            Map<String, dynamic>.from(offeredParcels.first as Map),
             type: DriverJobType.gocolis,
-            title: 'Colis #${p['id']}',
-            pickupAddress:
-                (p['pickup_address'] ?? 'Secteur expéditeur').toString(),
-            deliveryAddress:
-                (p['delivery_address'] ?? 'Secteur destinataire').toString(),
-            pickupLat: num.tryParse('${p['pickup_lat'] ?? ''}')?.toDouble(),
-            pickupLng: num.tryParse('${p['pickup_lng'] ?? ''}')?.toDouble(),
-            deliveryLat: num.tryParse('${p['delivery_lat'] ?? ''}')?.toDouble(),
-            deliveryLng: num.tryParse('${p['delivery_lng'] ?? ''}')?.toDouble(),
-            distanceKm:
-                num.tryParse('${p['distance_km'] ?? 0}')?.toDouble() ?? 0,
-            payout:
-                num.tryParse('${p['courier_amount'] ?? 0}')?.toDouble() ?? 0,
-            parcelSize: (p['size_label'] ?? p['size'])?.toString(),
-            step: DriverJobStep.incoming,
-            offerRemainingSeconds: remSec > 0 ? remSec : 30,
-            rawStatus: p['status']?.toString() ?? 'pending',
+            isOffer: true,
           );
           return;
         }

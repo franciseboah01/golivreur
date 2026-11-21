@@ -119,8 +119,8 @@ class DriverEarningsScreen extends ConsumerWidget {
                             const SizedBox(width: 4),
                             Text(
                               profile.totalRatings > 0
-                                  ? '${profile.averageRating.toStringAsFixed(1)} (${profile.totalRatings} avis)'
-                                  : 'Nouveau livreur • Aucun avis',
+                                  ? '${profile.averageRating.toStringAsFixed(1)} (${profile.totalRatings} avis) • ${profile.completedDeliveries} livraisons'
+                                  : '${profile.accountStatus} • ${profile.completedDeliveries} livraison${profile.completedDeliveries > 1 ? 's' : ''}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
