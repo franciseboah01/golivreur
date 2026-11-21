@@ -119,6 +119,9 @@ class Parcel extends Model
         return $this->belongsTo(City::class);
     }
 
+    /**
+     * @return HasMany<ParcelPhoto, $this>
+     */
     public function photos(): HasMany
     {
         return $this->hasMany(ParcelPhoto::class);

@@ -1,6 +1,5 @@
 <?php
 
-use App\Jobs\AnnulerCommandeTimeout;
 use App\Models\City;
 use App\Models\Merchant;
 use App\Models\Order;
@@ -8,6 +7,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Modules\GoShop\Services\OrderService;
 use App\Services\SettingsService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Queue;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -127,7 +127,7 @@ it('Point 6b : POST /client/orders/{id}/reorder renvoie un panier brouillon reva
         ->assertStatus(403);
 
     // Propriétaire -> 200 panier brouillon revalidé (prix actuel 2000, qté plafonnée à 2, p2 dans unavailable_items)
-    \Illuminate\Support\Facades\Auth::forgetGuards();
+    Auth::forgetGuards();
     $this->app->forgetScopedInstances();
     JWTAuth::unsetToken();
 

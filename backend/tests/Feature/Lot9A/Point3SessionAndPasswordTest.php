@@ -3,8 +3,8 @@
 use App\Models\City;
 use App\Models\OtpCode;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
-use Tymon\JWTAuth\Facades\JWTAuth;
 
 it('Point 3 : refresh token glissant 7j avec rotation et rejet de reutilisation sans OTP', function () {
     $city = City::factory()->create(['name' => 'Daloa']);
@@ -38,7 +38,7 @@ it('Point 3 : refresh token glissant 7j avec rotation et rejet de reutilisation 
         ->and($expiresAt)->not->toBeEmpty();
 
     // L'échéance glissante est bien à ~7 jours à partir de maintenant (soit J+10 depuis le login)
-    $parsedExp = \Illuminate\Support\Carbon::parse($expiresAt);
+    $parsedExp = Carbon::parse($expiresAt);
     expect($parsedExp->diffInDays(now(), true))->toBeGreaterThanOrEqual(6.9);
 
     // Réutilisation de l'ancien refresh token -> 401 et révocation de toute la famille

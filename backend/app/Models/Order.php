@@ -136,6 +136,9 @@ class Order extends Model
         return $this->belongsTo(City::class);
     }
 
+    /**
+     * @return HasMany<OrderItem, $this>
+     */
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);

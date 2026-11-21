@@ -21,6 +21,7 @@ use App\Services\CityGeolocationService;
 use App\Services\ConfirmationCodeService;
 use App\Services\CourierLocationPollingService;
 use App\Services\SettingsService;
+use App\Services\ShopAvailability;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -231,8 +232,8 @@ class ClientController extends Controller
 
         $merchant->load('categoryModel');
 
-        $isOpen = \App\Services\ShopAvailability::isOpen($merchant);
-        $nextOpening = $isOpen ? null : \App\Services\ShopAvailability::nextOpening($merchant);
+        $isOpen = ShopAvailability::isOpen($merchant);
+        $nextOpening = $isOpen ? null : ShopAvailability::nextOpening($merchant);
 
         $flatProducts = $isOpen
             ? $merchant->products()
@@ -771,7 +772,7 @@ class ClientController extends Controller
             if (! $product || ! $product->is_available || ($product->quantity !== null && (int) $product->quantity <= 0)) {
                 $unavailableItems[] = [
                     'product_id' => (int) $item->product_id,
-                    'name' => $item->product_name_snapshot ?: ($product?->name ?? 'Produit indisponible'),
+                    'name' => $item->product_name_snapshot ?: ($product !== null ? $product->name : 'Produit indisponible'),
                     'requested_quantity' => $requestedQty,
                     'available_quantity' => $product && $product->quantity !== null ? max(0, (int) $product->quantity) : 0,
                     'reason' => ! $product ? 'Produit supprimé du catalogue' : 'Produit en rupture ou indisponible',

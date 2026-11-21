@@ -9,13 +9,19 @@ use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\User;
+use App\Models\VehicleType;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Modules\GoShop\Services\OrderService;
 use App\Services\CatalogSchemaService;
 use App\Services\SettingsService;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class MerchantController extends Controller
 {
@@ -499,7 +505,7 @@ class MerchantController extends Controller
     {
         $merchant = $this->getMerchant();
 
-        $rawPhone = \App\Models\User::normalizePhone((string) $request->input('phone', ''));
+        $rawPhone = User::normalizePhone((string) $request->input('phone', ''));
         $request->merge(['phone' => $rawPhone]);
 
         $validated = $request->validate([
@@ -513,7 +519,7 @@ class MerchantController extends Controller
         ]);
 
         $phone = (string) $validated['phone'];
-        if (\App\Models\User::withTrashed()->where('phone', $phone)->exists()) {
+        if (User::withTrashed()->where('phone', $phone)->exists()) {
             return response()->json([
                 'succes' => false,
                 'message' => 'Ce numéro de téléphone est déjà associé à un compte.',
@@ -523,8 +529,8 @@ class MerchantController extends Controller
 
         $vehicleType = strtolower(trim((string) $validated['vehicle_type']));
         if (
-            \App\Models\VehicleType::where('is_active', true)->exists()
-            && ! \App\Models\VehicleType::where('slug', $vehicleType)->where('is_active', true)->exists()
+            VehicleType::where('is_active', true)->exists()
+            && ! VehicleType::where('slug', $vehicleType)->where('is_active', true)->exists()
         ) {
             return response()->json([
                 'succes' => false,
@@ -533,11 +539,11 @@ class MerchantController extends Controller
             ], 422);
         }
 
-        $courier = \Illuminate\Support\Facades\DB::transaction(function () use ($merchant, $validated, $phone, $vehicleType, $request): Courier {
-            $user = \App\Models\User::create([
+        $courier = DB::transaction(function () use ($merchant, $validated, $phone, $vehicleType, $request): Courier {
+            $user = User::create([
                 'name' => trim((string) $validated['name']),
                 'phone' => $phone,
-                'password' => \Illuminate\Support\Facades\Hash::make((string) $validated['password']),
+                'password' => Hash::make((string) $validated['password']),
                 'role' => 'driver',
                 'city_id' => $merchant->city_id,
                 'is_active' => false,
@@ -647,12 +653,12 @@ class MerchantController extends Controller
         if ($weekParam !== '' && preg_match('/^(\d{4})-W(\d{2})$/', $weekParam, $m)) {
             $year = (int) $m[1];
             $week = (int) $m[2];
-            $start = \Carbon\Carbon::now($tz)->setISODate($year, $week, 1)->startOfDay();
-            $end = $start->copy()->endOfWeek(\Carbon\CarbonInterface::SUNDAY);
+            $start = Carbon::now($tz)->setISODate($year, $week, 1)->startOfDay();
+            $end = $start->copy()->endOfWeek(CarbonInterface::SUNDAY);
             $mode = 'week';
             $weekLabel = sprintf('%04d-W%02d', $year, $week);
         } else {
-            $now = \Carbon\Carbon::now($tz);
+            $now = Carbon::now($tz);
             if ($scope === 'today' || $weekParam === '') {
                 $start = $now->copy()->startOfDay();
                 $end = $now->copy()->endOfDay();
@@ -697,7 +703,7 @@ class MerchantController extends Controller
                 'outcome' => $outcome,
                 'outcome_time' => $eventTime?->copy()->setTimezone($tz)->format('H:i'),
                 'outcome_at' => $eventTime?->copy()->setTimezone($tz)->toIso8601String(),
-                'client_name' => $order->client?->name ?? 'Client',
+                'client_name' => $order->client !== null ? $order->client->name : 'Client',
                 'items_count' => $order->items->sum('quantity'),
                 'products_total' => (int) round((float) $order->products_total),
                 'delivery_fee' => (int) round((float) $order->delivery_fee),

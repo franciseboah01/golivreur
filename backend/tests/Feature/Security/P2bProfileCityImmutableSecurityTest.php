@@ -24,17 +24,17 @@ it('P2b interdit (422) le changement de city_id via /profile pour client, driver
 
     $token = JWTAuth::fromUser($user);
 
-    // 1. Route profil dédiée au rôle
+    // 1. Route profil dédiée au rôle (Lot 9A Point 1 : rejet explicite 403 field_admin_only)
     $this->withHeader('Authorization', "Bearer {$token}")
         ->putJson($endpoint, ['city_id' => $cityB->id])
-        ->assertStatus(422)
-        ->assertJsonValidationErrors(['city_id']);
+        ->assertStatus(403)
+        ->assertJsonPath('code', 'field_admin_only');
 
     // 2. Route paramétrique /profile/{user}
     $this->withHeader('Authorization', "Bearer {$token}")
         ->putJson("/api/v1/profile/{$user->id}", ['city_id' => $cityB->id])
-        ->assertStatus(422)
-        ->assertJsonValidationErrors(['city_id']);
+        ->assertStatus(403)
+        ->assertJsonPath('code', 'field_admin_only');
 
     expect($user->fresh()->city_id)->toBe($cityA->id);
 

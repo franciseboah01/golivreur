@@ -101,8 +101,8 @@ class DeliverySettlementService
         /** @var list<array{id: int, owner_type: string, owner_id: int, type: string, amount: int}> $actual */
         $actual = $rows->map(static fn (WalletTransaction $tx): array => [
             'id' => (int) $tx->id,
-            'owner_type' => (string) ($tx->wallet?->owner_type ?? 'unknown'),
-            'owner_id' => (int) ($tx->wallet?->owner_id ?? 0),
+            'owner_type' => $tx->wallet !== null ? (string) $tx->wallet->owner_type : 'unknown',
+            'owner_id' => $tx->wallet !== null ? (int) $tx->wallet->owner_id : 0,
             'type' => (string) $tx->type,
             'amount' => (int) $tx->amount,
         ])->values()->all();

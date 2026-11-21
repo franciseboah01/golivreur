@@ -112,8 +112,8 @@ it('detecte automatiquement la nouvelle ville du client par GPS et rattache comm
         ->putJson('/api/v1/client/profile', [
             'city_id' => $this->daloa->id,
         ])
-        ->assertStatus(422)
-        ->assertJsonValidationErrors(['city_id']);
+        ->assertStatus(403)
+        ->assertJsonPath('code', 'field_admin_only');
 });
 
 it('autorise un commerce a enregistrer son GPS dans sa ville mais interdit de changer de ville', function () {
@@ -132,31 +132,30 @@ it('autorise un commerce a enregistrer son GPS dans sa ville mais interdit de ch
 
     $token = JWTAuth::fromUser($merchantUser);
 
-    // 1. Coordonnées GPS valides dans Daloa -> accepté et retourné dans le profil
+    // 1. Modification directe du GPS par le commerçant refusée 403 field_admin_only (Lot 9A Points 1 & 8a)
     $this->withHeader('Authorization', "Bearer {$token}")
         ->putJson('/api/v1/merchant/profile', [
             'lat' => 6.8812,
             'lng' => -6.4534,
         ])
-        ->assertOk()
-        ->assertJsonPath('succes', true)
-        ->assertJsonPath('donnees.lat', 6.8812)
-        ->assertJsonPath('donnees.lng', -6.4534);
+        ->assertStatus(403)
+        ->assertJsonPath('succes', false)
+        ->assertJsonPath('code', 'field_admin_only');
 
-    expect((float) $merchant->fresh()->lat)->toEqualWithDelta(6.8812, 0.0001);
+    expect((float) $merchant->fresh()->lat)->toEqualWithDelta(6.8770, 0.0001);
 
-    // 2. Tentative de déplacer le commerce à Abidjan via GPS -> bloqué 422 MERCHANT_CITY_CHANGE_FORBIDDEN
+    // 2. Tentative de déplacer le commerce à Abidjan via GPS -> également bloquée 403 field_admin_only
     $this->withHeader('Authorization', "Bearer {$token}")
         ->putJson('/api/v1/merchant/profile', [
             'lat' => 5.3600,
             'lng' => -4.0083,
         ])
-        ->assertStatus(422)
+        ->assertStatus(403)
         ->assertJsonPath('succes', false)
-        ->assertJsonPath('code', 'MERCHANT_CITY_CHANGE_FORBIDDEN');
+        ->assertJsonPath('code', 'field_admin_only');
 
     // Les coordonnées restent inchangées sur Daloa
-    expect((float) $merchant->fresh()->lat)->toEqualWithDelta(6.8812, 0.0001);
+    expect((float) $merchant->fresh()->lat)->toEqualWithDelta(6.8770, 0.0001);
 
     // 3. Pré-inscription d'un nouveau commerce avec GPS hors de la ville choisie -> 422
     MerchantCategory::firstOrCreate(

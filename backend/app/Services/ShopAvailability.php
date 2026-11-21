@@ -48,22 +48,20 @@ class ShopAvailability
         $raw = $commerce->open_hours;
 
         // Défaut 24h/24 7j/7 si aucun horaire configuré
-        if ($raw === null || $raw === '' || (is_array($raw) && empty($raw))) {
+        if ($raw === null || empty($raw)) {
             return true;
         }
 
-        if (is_array($raw)) {
-            if (($raw['always_open'] ?? false) === true) {
-                return true;
-            }
-
-            if (isset($raw['days']) && is_array($raw['days'])) {
-                return self::isInstantInStructuredDays($raw['days'], $now);
-            }
+        if (($raw['always_open'] ?? false) === true) {
+            return true;
         }
 
-        // Compatibilité ascendante avec l'ancien format (`summary`, `open`/`close`, `monday => '08:00-20:00'`)
-        return self::isInstantInLegacyFormat($raw, $now);
+        if (isset($raw['days']) && is_array($raw['days'])) {
+            return self::isInstantInStructuredDays($raw['days'], $now);
+        }
+
+        // Compatibilité ascendante avec l'ancien format (`monday => '08:00-21:00'`, `sunday => 'closed'`, `summary`)
+        return $commerce->estDansHorairesOuverture($now);
     }
 
     /**
@@ -183,45 +181,5 @@ class ShopAvailability
         }
 
         return ((int) $m[1] * 60) + (int) $m[2];
-    }
-
-    private static function isInstantInLegacyFormat(mixed $raw, Carbon $now): bool
-    {
-        if (is_string($raw)) {
-            return self::matchesLegacyRangeString($raw, $now);
-        }
-
-        if (! is_array($raw)) {
-            return true;
-        }
-
-        if (isset($raw['open'], $raw['close'])) {
-            return self::matchesLegacyRangeString("{$raw['open']}-{$raw['close']}", $now);
-        }
-
-        if (isset($raw['summary']) && is_string($raw['summary'])) {
-            return self::matchesLegacyRangeString($raw['summary'], $now);
-        }
-
-        return true;
-    }
-
-    private static function matchesLegacyRangeString(string $range, Carbon $now): bool
-    {
-        if (! preg_match('/([01]?\d|2[0-3])[:hH]([0-5]\d)\s*[-–to]+\s*([01]?\d|2[0-3])[:hH]([0-5]\d)/', $range, $m)) {
-            return true;
-        }
-
-        $open = ((int) $m[1] * 60) + (int) $m[2];
-        $close = ((int) $m[3] * 60) + (int) $m[4];
-        $cur = ($now->hour * 60) + $now->minute;
-
-        if ($open === $close) {
-            return true;
-        }
-
-        return $close > $open
-            ? ($cur >= $open && $cur < $close)
-            : ($cur >= $open || $cur < $close);
     }
 }

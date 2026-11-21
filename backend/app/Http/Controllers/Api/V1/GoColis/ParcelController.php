@@ -9,6 +9,7 @@ use App\Models\City;
 use App\Models\Neighborhood;
 use App\Models\Parcel;
 use App\Models\ParcelPhoto;
+use App\Models\User;
 use App\Modules\GoColis\Services\ParcelService;
 use App\Services\ConfirmationCodeService;
 use App\Services\CourierLocationPollingService;
@@ -523,7 +524,7 @@ class ParcelController extends Controller
      */
     public function cancelClient(Request $request, Parcel $parcel, ParcelService $service): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $raison = is_string($request->input('reason')) ? trim((string) $request->input('reason')) : null;
 

@@ -3,7 +3,9 @@
 namespace App\Http\Resources;
 
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Parcel;
+use App\Models\ParcelPhoto;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -40,7 +42,7 @@ class DriverCourseResource extends JsonResource
             'status' => $order->status,
             'city_id' => $order->city_id,
             'courier_id' => $order->courier_id,
-            'pickup_address' => $order->merchant?->address ?? 'Commerce partenaire',
+            'pickup_address' => $order->merchant !== null ? $order->merchant->address : 'Commerce partenaire',
             'pickup_lat' => $order->pickup_lat !== null ? (float) $order->pickup_lat : ($order->merchant?->lat !== null ? (float) $order->merchant->lat : null),
             'pickup_lng' => $order->pickup_lng !== null ? (float) $order->pickup_lng : ($order->merchant?->lng !== null ? (float) $order->merchant->lng : null),
             'delivery_address' => $order->delivery_address,
@@ -74,13 +76,17 @@ class DriverCourseResource extends JsonResource
                 'name' => $order->client->name,
                 'phone' => $order->client->phone,
             ] : null,
-            'items' => $order->items->map(static fn ($item): array => [
-                'id' => $item->id,
-                'product_id' => $item->product_id,
-                'name' => $item->product_name_snapshot ?: ($item->product?->name ?? 'Article'),
-                'quantity' => (int) $item->quantity,
-                'unit_price' => (float) $item->unit_price,
-            ])->values()->all(),
+            'items' => $order->items->map(static function (OrderItem $item): array {
+                $product = $item->product;
+
+                return [
+                    'id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'name' => $item->product_name_snapshot ?: ($product !== null ? $product->name : 'Article'),
+                    'quantity' => (int) $item->quantity,
+                    'unit_price' => (float) $item->unit_price,
+                ];
+            })->values()->all(),
             'accepted_at' => $order->accepted_at?->toIso8601String(),
             'ready_at' => $order->ready_at?->toIso8601String(),
             'picked_up_at' => $order->picked_up_at?->toIso8601String(),
@@ -134,7 +140,7 @@ class DriverCourseResource extends JsonResource
                 'name' => $parcel->sender->name,
                 'phone' => $parcel->sender->phone,
             ] : null,
-            'photos' => $parcel->photos->map(static fn ($photo): array => [
+            'photos' => $parcel->photos->map(static fn (ParcelPhoto $photo): array => [
                 'id' => $photo->id,
                 'type' => $photo->type,
                 'signed_url' => $photo->signed_url,

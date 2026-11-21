@@ -992,7 +992,7 @@ class ProfileController extends Controller
                 'type' => 'order',
                 'id' => $order->id,
                 'reference' => "Commande #{$order->id}",
-                'label' => $order->merchant?->name ?? 'Commande GoShop',
+                'label' => $order->merchant !== null ? $order->merchant->name : 'Commande GoShop',
                 'status' => $order->status,
                 'code' => $plain,
                 'instruction' => 'Communiquez ce code uniquement au livreur au moment où il vous remet votre commande.',

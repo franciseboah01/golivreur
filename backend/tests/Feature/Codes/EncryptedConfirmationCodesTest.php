@@ -7,6 +7,7 @@ use App\Models\City;
 use App\Models\Courier;
 use App\Models\Merchant;
 use App\Models\Order;
+use App\Models\OtpCode;
 use App\Models\Parcel;
 use App\Models\Product;
 use App\Models\RoleHabilitation;
@@ -361,7 +362,7 @@ it('rend les OTP de connexion, de livraison GoShop et d\'expedition/livraison Go
     $this->postJson('/api/v1/auth/login', ['phone' => '0701122334'])
         ->assertOk();
 
-    $otpRecord = \App\Models\OtpCode::where('phone', '0701122334')->where('purpose', 'login')->latest('id')->first();
+    $otpRecord = OtpCode::where('phone', '0701122334')->where('purpose', 'login')->latest('id')->first();
     expect($otpRecord)->not->toBeNull()
         ->and($otpRecord->code_enc)->not->toBeNull()
         ->and($otpRecord->admin_otp_code)->toMatch('/^\d{4}$/')

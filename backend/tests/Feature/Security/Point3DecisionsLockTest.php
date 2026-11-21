@@ -48,13 +48,13 @@ it('Point 3 verrouille les 4 décisions D-LIVREUR-1, D-VILLE-1, D-ROLE-1, D-MERC
         ->postJson("/api/v1/driver/orders/{$secondOrder->id}/accept")
         ->assertStatus(409);
 
-    // D-VILLE-1 : refus 422 d'auto-changement de ville via /profile
+    // D-VILLE-1 : refus explicite 403 field_admin_only d'auto-changement de ville via /profile (Lot 9A Point 1)
     $otherCity = City::factory()->create();
     $clientUser = User::factory()->create(['role' => 'client', 'city_id' => $city->id]);
     $this->actingAs($clientUser, 'api')
         ->putJson('/api/v1/client/profile', ['city_id' => $otherCity->id])
-        ->assertStatus(422)
-        ->assertJsonValidationErrors('city_id');
+        ->assertStatus(403)
+        ->assertJsonPath('code', 'field_admin_only');
 
     // D-ROLE-1 : refus 403 de city_agent sur /admin/orders et /admin/dashboard
     $cityAgent = User::factory()->create(['role' => 'city_agent', 'city_id' => $city->id]);
