@@ -120,6 +120,8 @@ class DriverProfileState {
   final List<String> roles;
   final bool mustChangePassword;
   final String? pinResetRequiredAt;
+  final GpsPositionResult? lastGpsFailure;
+  final String? manualNeighborhoodName;
 
   const DriverProfileState({
     this.id = 0,
@@ -156,6 +158,8 @@ class DriverProfileState {
     this.roles = const ['driver'],
     this.mustChangePassword = false,
     this.pinResetRequiredAt,
+    this.lastGpsFailure,
+    this.manualNeighborhoodName,
   });
 
   DriverProfileState copyWith({
@@ -194,6 +198,9 @@ class DriverProfileState {
     List<String>? roles,
     bool? mustChangePassword,
     String? pinResetRequiredAt,
+    GpsPositionResult? lastGpsFailure,
+    bool clearGpsFailure = false,
+    String? manualNeighborhoodName,
   }) {
     return DriverProfileState(
       id: id ?? this.id,
@@ -236,6 +243,10 @@ class DriverProfileState {
       roles: roles ?? this.roles,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       pinResetRequiredAt: pinResetRequiredAt ?? this.pinResetRequiredAt,
+      lastGpsFailure:
+          clearGpsFailure ? null : (lastGpsFailure ?? this.lastGpsFailure),
+      manualNeighborhoodName:
+          manualNeighborhoodName ?? this.manualNeighborhoodName,
     );
   }
 }
@@ -278,20 +289,75 @@ class DriverProfileNotifier extends StateNotifier<DriverProfileState> {
     if (_api == null) return (false, null);
 
     final gps = silent
-        ? await GpsLocationService.obtenirPositionSilencieuse()
-        : await GpsLocationService.obtenirPositionActuelle(
+        ? await LocationService.obtenirPositionSilencieuse()
+        : await LocationService.obtenirPositionActuelle(
             withAddressLookup: false,
           );
     if (gps == null || !gps.isSuccess || gps.lat == null || gps.lng == null) {
-      return (false, silent ? null : gps?.errorMessage);
+      // Si un quartier Plan B est déjà actif en mode silencieux, rafraîchir le heartbeat serveur avec ses coordonnées
+      if (silent &&
+          state.manualNeighborhoodName != null &&
+          state.currentLat != null &&
+          state.currentLng != null) {
+        return _transmettreCoordsServeur(
+          state.currentLat!,
+          state.currentLng!,
+          silent: true,
+        );
+      }
+
+      if (!silent || (state.currentLat == null && state.currentLng == null)) {
+        state = state.copyWith(
+          lastGpsFailure: gps ??
+              const GpsPositionResult(
+                errorMessage: LocationService.standardUnavailableMessage,
+                errorType: GpsErrorType.signalUnavailable,
+              ),
+        );
+      }
+      return (
+        false,
+        silent
+            ? null
+            : (gps?.errorMessage ?? LocationService.standardUnavailableMessage),
+      );
     }
 
-    state = state.copyWith(currentLat: gps.lat, currentLng: gps.lng);
+    state = state.copyWith(
+      currentLat: gps.lat,
+      currentLng: gps.lng,
+      clearGpsFailure: true,
+    );
 
+    return _transmettreCoordsServeur(gps.lat!, gps.lng!, silent: silent);
+  }
+
+  /// Plan B Livreur : sélection manuelle d'un quartier de la ville lorsque le GPS capte mal.
+  Future<(bool, String?)> definirPositionQuartierPlanB(
+    FallbackNeighborhoodOption option,
+  ) async {
+    final lat = option.lat ?? state.cityCenterLat ?? 6.8770;
+    final lng = option.lng ?? state.cityCenterLng ?? -6.4502;
+    state = state.copyWith(
+      currentLat: lat,
+      currentLng: lng,
+      manualNeighborhoodName: option.name,
+      clearGpsFailure: true,
+    );
+    if (_api == null) return (true, null);
+    return _transmettreCoordsServeur(lat, lng, silent: false);
+  }
+
+  Future<(bool, String?)> _transmettreCoordsServeur(
+    double lat,
+    double lng, {
+    required bool silent,
+  }) async {
+    if (_api == null) return (false, null);
     try {
       final res = await _api.post('/driver/location', data: {
-        'lat': gps.lat,
-        'lng': gps.lng,
+        'lat': lat,
+        'lng': lng,
       });
       if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
         return (true, null);

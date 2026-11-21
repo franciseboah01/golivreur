@@ -21,11 +21,62 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   final _instructionsController = TextEditingController();
   String _selectedPaymentMethod = 'cash'; // cash par défaut (D-PAIEMENT-1)
   bool _isSubmitting = false;
+  bool _locatingGps = false;
+  GpsPositionResult? _gpsFailure;
+  double? _manualGpsLat;
+  double? _manualGpsLng;
+  String? _manualGpsAddress;
 
   @override
   void dispose() {
     _instructionsController.dispose();
     super.dispose();
+  }
+
+  Future<void> _detectCartGps() async {
+    if (_locatingGps) return;
+    setState(() => _locatingGps = true);
+
+    final res = await LocationService.obtenirPositionActuelle(
+      withAddressLookup: true,
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _locatingGps = false;
+      if (res.isSuccess) {
+        _gpsFailure = null;
+        _manualGpsLat = res.lat;
+        _manualGpsLng = res.lng;
+        _manualGpsAddress = res.formattedAddress;
+        if (res.neighborhoodHint != null &&
+            res.neighborhoodHint!.trim().isNotEmpty) {
+          ref.read(selectedNeighborhoodProvider.notifier).state =
+              res.neighborhoodHint!.trim();
+        }
+      } else {
+        _gpsFailure = res;
+      }
+    });
+
+    if (res.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('📍 Position GPS de livraison actualisée !'),
+          backgroundColor: GoLivreurTheme.secondaire,
+        ),
+      );
+    } else {
+      LocationService.afficherAlerteNonBloquante(
+        context,
+        result: res,
+        onRetry: _detectCartGps,
+        onManualFallback: () => _showQuickAddressPicker(context),
+      );
+      if (mounted) {
+        await _showQuickAddressPicker(context);
+      }
+    }
   }
 
   Future<void> _submitOrder() async {
@@ -39,12 +90,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
     setState(() => _isSubmitting = true);
 
-    double deliveryLat = destination.lat;
-    double deliveryLng = destination.lng;
+    double deliveryLat = _manualGpsLat ?? destination.lat;
+    double deliveryLng = _manualGpsLng ?? destination.lng;
 
     // 1. Si les coordonnées du quartier/adresse ne sont pas définies, tenter la position GPS puis le centre-ville / commerce
     if (deliveryLat.abs() < 0.0001 || deliveryLng.abs() < 0.0001) {
-      final gps = await GpsLocationService.obtenirPositionSilencieuse();
+      final gps = await LocationService.obtenirPositionSilencieuse();
       if (gps != null &&
           gps.isSuccess &&
           gps.lat != null &&
@@ -419,7 +470,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             ),
             const SizedBox(height: 20),
 
-            // ─── Adresse & Quartier de livraison ───────────────────────────
+            // ─── Adresse & Quartier de livraison (+ GPS & Plan B) ──────────
             const Text(
               'Adresse de livraison',
               style: TextStyle(
@@ -436,42 +487,84 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: GoLivreurTheme.bordure),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.location_on, color: GoLivreurTheme.primaire),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          destination.neighborhood,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on,
+                          color: GoLivreurTheme.primaire),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              destination.neighborhood.isNotEmpty
+                                  ? destination.neighborhood
+                                  : 'Quartier de livraison',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _manualGpsAddress?.trim().isNotEmpty == true
+                                  ? _manualGpsAddress!.trim()
+                                  : destination.fullAddress,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: GoLivreurTheme.texteSecondaire,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Distance estimée : ${estimate.distanceKm.toStringAsFixed(1)} km${weather.isRainMode ? " • 🌧️ Mode Pluie" : ""}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: GoLivreurTheme.secondaire,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          destination.fullAddress,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: GoLivreurTheme.texteSecondaire,
-                          ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _locatingGps ? null : _detectCartGps,
+                        icon: _locatingGps
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.my_location, size: 16),
+                        label: const Text('GPS'),
+                      ),
+                      TextButton(
+                        onPressed: () => _showQuickAddressPicker(context),
+                        child: const Text(
+                          'Changer',
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Distance estimée : ${estimate.distanceKm.toStringAsFixed(1)} km${weather.isRainMode ? " • 🌧️ Mode Pluie" : ""}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: GoLivreurTheme.secondaire,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  if (_gpsFailure != null) ...[
+                    const SizedBox(height: 10),
+                    GpsFallbackBanner(
+                      lastResult: _gpsFailure,
+                      isLoading: _locatingGps,
+                      onRetry: _detectCartGps,
+                      onSelectNeighborhood: () =>
+                          _showQuickAddressPicker(context),
+                      manualActionLabel: 'Choisir un quartier (Plan B)',
+                      selectedManualLabel: destination.neighborhood.isNotEmpty
+                          ? destination.neighborhood
+                          : null,
                     ),
-                  ),
-                  TextButton(
-                    onPressed: () => _showQuickAddressPicker(context),
-                    child: const Text('Changer', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
+                  ],
                 ],
               ),
             ),

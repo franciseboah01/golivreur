@@ -104,7 +104,7 @@ class _OsmLocationPickerScreenState extends State<OsmLocationPickerScreen> {
 
   Future<void> _locateMe() async {
     setState(() => _locatingGps = true);
-    final res = await GpsLocationService.obtenirPositionActuelle(
+    final res = await LocationService.obtenirPositionActuelle(
       withAddressLookup: true,
     );
     if (!mounted) return;
@@ -118,22 +118,11 @@ class _OsmLocationPickerScreenState extends State<OsmLocationPickerScreen> {
         _neighborhoodHint = res.neighborhoodHint ?? _neighborhoodHint;
       });
       _mapController.move(target, 16.5);
-    } else if (res.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(res.errorMessage!),
-          action: res.isServiceDisabled
-              ? SnackBarAction(
-                  label: 'Activer GPS',
-                  onPressed: GpsLocationService.ouvrirParametresLocalisation,
-                )
-              : (res.isPermissionDeniedForever
-                  ? SnackBarAction(
-                      label: 'Réglages',
-                      onPressed: GpsLocationService.ouvrirParametresApp,
-                    )
-                  : null),
-        ),
+    } else {
+      LocationService.afficherAlerteNonBloquante(
+        context,
+        result: res,
+        onRetry: _locateMe,
       );
     }
   }

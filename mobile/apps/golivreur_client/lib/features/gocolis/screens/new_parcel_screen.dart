@@ -43,6 +43,8 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
   double? _pickupLng;
   String? _pickupAddressText;
   bool _locatingPickup = false;
+  GpsPositionResult? _pickupGpsFailure;
+  DeliveryNeighborhood? _selectedPickupNeighborhood;
 
   DeliveryNeighborhood? _selectedNeighborhood;
   int? _pendingNeighborhoodId;
@@ -291,11 +293,76 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
     };
   }
 
+  void _applyPickupNeighborhoodPlanB(
+    DeliveryNeighborhood q, {
+    double? cityCenterLat,
+    double? cityCenterLng,
+  }) {
+    final hasGps = q.lat.abs() > 0.0001 || q.lng.abs() > 0.0001;
+    setState(() {
+      _selectedPickupNeighborhood = q;
+      _pickupAddressText = q.name;
+      _pickupLat = hasGps ? q.lat : (cityCenterLat ?? 6.8770);
+      _pickupLng = hasGps ? q.lng : (cityCenterLng ?? -6.4502);
+    });
+  }
+
+  Future<void> _openPickupPlanBSheet() async {
+    final weather = ref.read(weatherProvider);
+    final options = weather.neighborhoods
+        .map(
+          (n) => FallbackNeighborhoodOption(
+            id: n.id,
+            name: n.name,
+            cityName: weather.cityName,
+            lat: n.lat.abs() > 0.0001 ? n.lat : weather.centerLat,
+            lng: n.lng.abs() > 0.0001 ? n.lng : weather.centerLng,
+            distanceKm: n.defaultDistanceKm,
+          ),
+        )
+        .toList();
+
+    final picked = await NeighborhoodPlanBSheet.show(
+      context,
+      title: 'Quartier de ramassage (Plan B)',
+      subtitle: LocationService.standardUnavailableMessage,
+      initialNeighborhoods: options,
+      apiClient: ref.read(apiClientProvider),
+      cityId: weather.cityId,
+      defaultCityName: weather.cityName,
+      fallbackLat: weather.centerLat,
+      fallbackLng: weather.centerLng,
+      onRetryGps: () => _detectPickupGps(silent: false),
+    );
+
+    if (picked == null || !mounted) return;
+    DeliveryNeighborhood? matched;
+    for (final n in weather.neighborhoods) {
+      if ((picked.id != null && n.id == picked.id) ||
+          n.name.toLowerCase() == picked.name.toLowerCase()) {
+        matched = n;
+        break;
+      }
+    }
+    _applyPickupNeighborhoodPlanB(
+      matched ??
+          DeliveryNeighborhood(
+            id: picked.id,
+            name: picked.name,
+            lat: picked.lat ?? weather.centerLat ?? 6.8770,
+            lng: picked.lng ?? weather.centerLng ?? -6.4502,
+            defaultDistanceKm: picked.distanceKm,
+          ),
+      cityCenterLat: weather.centerLat,
+      cityCenterLng: weather.centerLng,
+    );
+  }
+
   Future<void> _detectPickupGps({bool silent = false}) async {
     if (_locatingPickup) return;
     setState(() => _locatingPickup = true);
 
-    final res = await GpsLocationService.obtenirPositionActuelle(
+    final res = await LocationService.obtenirPositionActuelle(
       withAddressLookup: true,
     );
 
@@ -303,12 +370,15 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
     setState(() {
       _locatingPickup = false;
       if (res.isSuccess) {
+        _pickupGpsFailure = null;
         _pickupLat = res.lat;
         _pickupLng = res.lng;
         if (res.formattedAddress != null &&
             res.formattedAddress!.trim().isNotEmpty) {
           _pickupAddressText = res.formattedAddress!.trim();
         }
+      } else {
+        _pickupGpsFailure = res;
       }
     });
 
@@ -317,18 +387,24 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
       if (!mounted) return;
     }
 
-    if (!silent) {
-      if (res.isSuccess) {
+    if (res.isSuccess) {
+      if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Position GPS de ramassage actualisée !'),
             backgroundColor: GoLivreurTheme.secondaire,
           ),
         );
-      } else if (res.errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(res.errorMessage!)),
-        );
+      }
+    } else {
+      LocationService.afficherAlerteNonBloquante(
+        context,
+        result: res,
+        onRetry: () => _detectPickupGps(silent: false),
+        onManualFallback: _openPickupPlanBSheet,
+      );
+      if (!silent && mounted) {
+        await _openPickupPlanBSheet();
       }
     }
   }
@@ -911,7 +987,7 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ─── 1. POSITION GPS DE RAMASSAGE (auto-actualisée) ───────────
+              // ─── 1. POSITION GPS DE RAMASSAGE (auto-actualisée + Plan B) ──
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -919,49 +995,122 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: GoLivreurTheme.bordure),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      _pickupLat != null ? Icons.gps_fixed : Icons.my_location,
-                      color: GoLivreurTheme.secondaire,
+                    Row(
+                      children: [
+                        Icon(
+                          _pickupLat != null
+                              ? Icons.gps_fixed
+                              : Icons.my_location,
+                          color: GoLivreurTheme.secondaire,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Position GPS de ramassage',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _locatingPickup
+                                    ? 'Localisation GPS en cours (max 15s)...'
+                                    : _pickupSummaryText(),
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: GoLivreurTheme.texteSecondaire,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _locatingPickup
+                              ? null
+                              : () => _detectPickupGps(silent: false),
+                          child: _locatingPickup
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : Text(
+                                  _pickupLat != null
+                                      ? 'Actualiser'
+                                      : 'Localiser',
+                                ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Position GPS de ramassage',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _locatingPickup
-                                ? 'Localisation GPS en cours...'
-                                : _pickupSummaryText(),
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              color: GoLivreurTheme.texteSecondaire,
-                            ),
-                          ),
-                        ],
+                    if (_pickupGpsFailure != null) ...[
+                      const SizedBox(height: 10),
+                      GpsFallbackBanner(
+                        lastResult: _pickupGpsFailure,
+                        isLoading: _locatingPickup,
+                        onRetry: () => _detectPickupGps(silent: false),
+                        onSelectNeighborhood: _openPickupPlanBSheet,
+                        manualActionLabel:
+                            'Choisir quartier de ramassage (Plan B)',
+                        selectedManualLabel: _selectedPickupNeighborhood?.name,
                       ),
-                    ),
-                    TextButton(
-                      onPressed: _locatingPickup
-                          ? null
-                          : () => _detectPickupGps(silent: false),
-                      child: _locatingPickup
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(_pickupLat != null ? 'Actualiser' : 'Localiser'),
-                    ),
+                      if (neighborhoods.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<DeliveryNeighborhood>(
+                          key: ValueKey(
+                            'pickup_nb_${_selectedPickupNeighborhood?.id ?? _selectedPickupNeighborhood?.name ?? "none"}',
+                          ),
+                          initialValue: neighborhoods.any(
+                            (n) =>
+                                n.id == _selectedPickupNeighborhood?.id &&
+                                n.name == _selectedPickupNeighborhood?.name,
+                          )
+                              ? neighborhoods.firstWhere(
+                                  (n) =>
+                                      n.id ==
+                                          _selectedPickupNeighborhood?.id &&
+                                      n.name ==
+                                          _selectedPickupNeighborhood?.name,
+                                )
+                              : null,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Quartier de ramassage (Plan B)',
+                            prefixIcon: Icon(Icons.place_outlined),
+                          ),
+                          hint: const Text(
+                            'Choisir un quartier de ramassage',
+                          ),
+                          items: neighborhoods
+                              .map(
+                                (q) => DropdownMenuItem<DeliveryNeighborhood>(
+                                  value: q,
+                                  child: Text(
+                                    q.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              _applyPickupNeighborhoodPlanB(
+                                val,
+                                cityCenterLat: weather.centerLat,
+                                cityCenterLng: weather.centerLng,
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ],
                   ],
                 ),
               ),

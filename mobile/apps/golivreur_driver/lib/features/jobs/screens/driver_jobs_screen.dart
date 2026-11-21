@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
+import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/services/gps_location_service.dart';
 import 'package:golivreur_core/widgets/osm_live_tracking_map.dart';
 import 'package:image_picker/image_picker.dart';
@@ -389,6 +390,68 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
     );
   }
 
+  Future<void> _openDriverPlanBSheet() async {
+    final profile = ref.read(driverProfileProvider);
+    final picked = await NeighborhoodPlanBSheet.show(
+      context,
+      title: 'Votre quartier actuel (Plan B Livreur)',
+      subtitle: LocationService.standardUnavailableMessage,
+      apiClient: ref.read(apiClientProvider),
+      defaultCityName: profile.cityName,
+      fallbackLat: profile.cityCenterLat,
+      fallbackLng: profile.cityCenterLng,
+      onRetryGps: _retryDriverGps,
+    );
+
+    if (picked == null || !mounted) return;
+    final (ok, msg) = await ref
+        .read(driverProfileProvider.notifier)
+        .definirPositionQuartierPlanB(picked);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '📍 Position Plan B enregistrée : quartier ${picked.name}. Vous êtes éligible aux courses.',
+          ),
+          backgroundColor: GoLivreurTheme.succes,
+        ),
+      );
+      await ref.read(driverActiveJobProvider.notifier).chargerCourses();
+    } else if (msg != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: GoLivreurTheme.erreur,
+        ),
+      );
+    }
+  }
+
+  Future<void> _retryDriverGps() async {
+    final (ok, _) = await ref
+        .read(driverProfileProvider.notifier)
+        .envoyerPositionGps(silent: false);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('📍 Position GPS synchronisée avec le serveur.'),
+          backgroundColor: GoLivreurTheme.succes,
+        ),
+      );
+    } else {
+      final failure = ref.read(driverProfileProvider).lastGpsFailure;
+      LocationService.afficherAlerteNonBloquante(
+        context,
+        result: failure,
+        onRetry: _retryDriverGps,
+        onManualFallback: _openDriverPlanBSheet,
+      );
+      await _openDriverPlanBSheet();
+    }
+  }
+
   Widget _buildIdleView(BuildContext context, WidgetRef ref, DriverProfileState profile) {
     final cityTitle = (profile.cityName != null && profile.cityName!.isNotEmpty)
         ? 'En attente de courses sur ${profile.cityName}...'
@@ -403,8 +466,19 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 72),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
         children: [
+          if (profile.lastGpsFailure != null ||
+              profile.manualNeighborhoodName != null) ...[
+            GpsFallbackBanner(
+              lastResult: profile.lastGpsFailure,
+              onRetry: _retryDriverGps,
+              onSelectNeighborhood: _openDriverPlanBSheet,
+              manualActionLabel: 'Choisir mon quartier (Plan B)',
+              selectedManualLabel: profile.manualNeighborhoodName,
+            ),
+            const SizedBox(height: 20),
+          ],
           Center(
             child: Container(
               padding: const EdgeInsets.all(20),
@@ -441,31 +515,20 @@ class _DriverJobsScreenState extends ConsumerState<DriverJobsScreen> {
                 label: const Text('Actualiser les courses'),
               ),
               OutlinedButton.icon(
-                onPressed: () async {
-                  final (ok, msg) = await ref
-                      .read(driverProfileProvider.notifier)
-                      .envoyerPositionGps(silent: false);
-                  if (!context.mounted) return;
-                  if (ok) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('📍 Position GPS synchronisée avec le serveur.'),
-                        backgroundColor: GoLivreurTheme.succes,
-                      ),
-                    );
-                  } else if (msg != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(msg),
-                        backgroundColor: GoLivreurTheme.erreur,
-                      ),
-                    );
-                  }
-                },
+                onPressed: _retryDriverGps,
                 icon: const Icon(Icons.my_location, color: GoLivreurTheme.secondaire),
                 label: Text(
-                  profile.currentLat != null ? 'GPS actif ✓' : 'Actualiser GPS',
+                  profile.manualNeighborhoodName != null
+                      ? 'Plan B : ${profile.manualNeighborhoodName}'
+                      : (profile.currentLat != null
+                          ? 'GPS actif ✓'
+                          : 'Actualiser GPS'),
                 ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _openDriverPlanBSheet,
+                icon: const Icon(Icons.location_city_outlined),
+                label: const Text('Quartier (Plan B)'),
               ),
             ],
           ),

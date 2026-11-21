@@ -39,6 +39,7 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
     double? pickedLat = existing?.lat;
     double? pickedLng = existing?.lng;
     bool isLocatingGps = false;
+    GpsPositionResult? gpsFailureResult;
     bool isDefault = existing?.isDefault ?? ref.read(clientAddressesProvider).addresses.isEmpty;
     bool isSaving = false;
     String? errorText;
@@ -57,13 +58,14 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
               isLocatingGps = true;
               errorText = null;
             });
-            final res = await GpsLocationService.obtenirPositionActuelle(
+            final res = await LocationService.obtenirPositionActuelle(
               withAddressLookup: true,
             );
             if (!ctx.mounted) return;
             setModalState(() {
               isLocatingGps = false;
               if (res.isSuccess) {
+                gpsFailureResult = null;
                 pickedLat = res.lat;
                 pickedLng = res.lng;
                 if (lineCtrl.text.trim().isEmpty &&
@@ -77,7 +79,7 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
                   customQuarterCtrl.text = res.neighborhoodHint!;
                 }
               } else {
-                errorText = res.errorMessage;
+                gpsFailureResult = res;
               }
             });
           }
@@ -201,6 +203,17 @@ class _ClientAddressesScreenState extends ConsumerState<ClientAddressesScreen> {
                             ),
                           ],
                         ),
+                      ),
+                    ],
+                    if (gpsFailureResult != null) ...[
+                      const SizedBox(height: 10),
+                      GpsFallbackBanner(
+                        lastResult: gpsFailureResult,
+                        isLoading: isLocatingGps,
+                        onRetry: detectGps,
+                        selectedManualLabel: quarters.isNotEmpty
+                            ? selectedQuarter
+                            : customQuarterCtrl.text.trim(),
                       ),
                     ],
                     const SizedBox(height: 12),

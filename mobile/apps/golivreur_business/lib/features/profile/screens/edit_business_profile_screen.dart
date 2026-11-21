@@ -58,6 +58,8 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
   bool _isInitialLoading = true;
   bool _isSaving = false;
   bool _locatingGps = false;
+  GpsPositionResult? _gpsFailure;
+  String? _selectedPlanBNeighborhood;
   double? _shopLat;
   double? _shopLng;
   String? _errorMsg;
@@ -146,9 +148,41 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
     } catch (_) {}
   }
 
+  Future<void> _ouvrirPlanBQuartierBoutique() async {
+    final profile = ref.read(businessProfileProvider);
+    final picked = await NeighborhoodPlanBSheet.show(
+      context,
+      title: 'Quartier de la boutique (Plan B)',
+      subtitle: LocationService.standardUnavailableMessage,
+      apiClient: ref.read(apiClientProvider),
+      defaultCityName: profile.cityName,
+      fallbackLat: profile.cityCenterLat,
+      fallbackLng: profile.cityCenterLng,
+      onRetryGps: _detecterGpsBoutique,
+    );
+
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedPlanBNeighborhood = picked.name;
+      _shopLat = picked.lat ?? profile.cityCenterLat ?? 6.8770;
+      _shopLng = picked.lng ?? profile.cityCenterLng ?? -6.4502;
+      if (_addressCtrl.text.trim().isEmpty) {
+        _addressCtrl.text = picked.name;
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '📍 Quartier Plan B sélectionné : ${picked.name}. Pensez à enregistrer.',
+        ),
+        backgroundColor: GoLivreurTheme.succes,
+      ),
+    );
+  }
+
   Future<void> _detecterGpsBoutique() async {
     setState(() => _locatingGps = true);
-    final res = await GpsLocationService.obtenirPositionActuelle(
+    final res = await LocationService.obtenirPositionActuelle(
       withAddressLookup: true,
     );
     if (!mounted) return;
@@ -156,6 +190,7 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
 
     if (res.isSuccess && res.lat != null && res.lng != null) {
       setState(() {
+        _gpsFailure = null;
         _shopLat = res.lat;
         _shopLng = res.lng;
         if (_addressCtrl.text.trim().isEmpty &&
@@ -170,13 +205,15 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
           backgroundColor: GoLivreurTheme.succes,
         ),
       );
-    } else if (res.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(res.errorMessage!),
-          backgroundColor: GoLivreurTheme.erreur,
-        ),
+    } else {
+      setState(() => _gpsFailure = res);
+      LocationService.afficherAlerteNonBloquante(
+        context,
+        result: res,
+        onRetry: _detecterGpsBoutique,
+        onManualFallback: _ouvrirPlanBQuartierBoutique,
       );
+      await _ouvrirPlanBQuartierBoutique();
     }
   }
 
@@ -506,6 +543,17 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: OutlinedButton.icon(
+                                        onPressed: _ouvrirPlanBQuartierBoutique,
+                                        icon: const Icon(Icons.location_city_outlined, size: 16),
+                                        label: const Text(
+                                          'Quartier (Plan B)',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
                                         onPressed: _choisirSurCarteBoutique,
                                         icon: const Icon(Icons.map_outlined, size: 16),
                                         label: const Text(
@@ -516,6 +564,21 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
                                     ),
                                   ],
                                 ),
+                                if (_gpsFailure != null ||
+                                    _selectedPlanBNeighborhood != null) ...[
+                                  const SizedBox(height: 10),
+                                  GpsFallbackBanner(
+                                    lastResult: _gpsFailure,
+                                    isLoading: _locatingGps,
+                                    onRetry: _detecterGpsBoutique,
+                                    onSelectNeighborhood:
+                                        _ouvrirPlanBQuartierBoutique,
+                                    manualActionLabel:
+                                        'Choisir un quartier (Plan B)',
+                                    selectedManualLabel:
+                                        _selectedPlanBNeighborhood,
+                                  ),
+                                ],
                                 const SizedBox(height: 8),
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
