@@ -18,6 +18,7 @@ use App\Services\ConfirmationCodeService;
 use App\Services\DeliverySettlementService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
+use App\Services\ShopAvailability;
 use App\Services\WalletService;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
@@ -90,17 +91,21 @@ class OrderService
                 throw new HttpException(503, $msg);
             }
 
-            // Vérifier que le commerce est ouvert (statut manuel + plage horaires)
-            if (! $merchant->is_open || ! $merchant->is_active) {
-                throw ValidationException::withMessages([
-                    'merchant_id' => ['Ce commerce est actuellement fermé.'],
-                ]);
-            }
+            // Vérifier que le commerce est ouvert (statut manuel + plage horaires Africa/Abidjan)
+            if (! ShopAvailability::isOpen($merchant)) {
+                $nextOpening = ShopAvailability::nextOpening($merchant);
+                $nextHint = $nextOpening !== null ? ' Prochaine ouverture à '.$nextOpening->format('H:i').'.' : '';
 
-            if (! $merchant->estDansHorairesOuverture()) {
-                throw ValidationException::withMessages([
-                    'merchant_id' => ['Ce commerce est actuellement en dehors de ses horaires d\'ouverture.'],
-                ]);
+                throw new HttpResponseException(response()->json([
+                    'succes' => false,
+                    'code' => 'shop_closed',
+                    'next_opening' => $nextOpening?->toIso8601String(),
+                    'next_opening_time' => $nextOpening?->format('H:i'),
+                    'message' => "Ce commerce est actuellement fermé.{$nextHint}",
+                    'errors' => [
+                        'merchant_id' => ["Ce commerce est actuellement fermé.{$nextHint}"],
+                    ],
+                ], 422));
             }
 
             // Vérification coordonnées de livraison dans la ville

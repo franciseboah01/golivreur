@@ -231,17 +231,27 @@ class ClientController extends Controller
 
         $merchant->load('categoryModel');
 
-        $products = $merchant->products()
-            ->where('is_available', true)
-            ->orderBy('sort_order')
-            ->get()
-            ->groupBy('category');
+        $isOpen = \App\Services\ShopAvailability::isOpen($merchant);
+        $nextOpening = $isOpen ? null : \App\Services\ShopAvailability::nextOpening($merchant);
+
+        $flatProducts = $isOpen
+            ? $merchant->products()
+                ->where('is_available', true)
+                ->orderBy('sort_order')
+                ->get()
+            : collect();
+
+        $catalog = $flatProducts->groupBy('category');
 
         return response()->json([
             'succes' => true,
             'donnees' => [
                 'merchant' => new MerchantResource($merchant),
-                'catalog' => $products,
+                'is_open' => $isOpen,
+                'next_opening' => $nextOpening?->toIso8601String(),
+                'next_opening_time' => $nextOpening?->format('H:i'),
+                'catalog' => $catalog,
+                'products' => $flatProducts->values(),
             ],
         ]);
     }

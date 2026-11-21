@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Merchant;
+use App\Services\ShopAvailability;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -24,6 +25,9 @@ class MerchantResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $isOpenNow = ShopAvailability::isOpen($this->resource);
+        $nextOpening = $isOpenNow ? null : ShopAvailability::nextOpening($this->resource);
+
         return [
             'id' => $this->id,
             'city_id' => $this->city_id,
@@ -39,12 +43,14 @@ class MerchantResource extends JsonResource
             'lat' => (float) $this->lat,
             'lng' => (float) $this->lng,
             'prep_time_minutes' => (int) $this->prep_time_minutes,
-            'is_open' => (bool) $this->is_open,
+            'is_open' => $isOpenNow,
+            'next_opening' => $nextOpening?->toIso8601String(),
+            'next_opening_time' => $nextOpening?->format('H:i'),
             'is_active' => (bool) $this->is_active,
             'average_rating' => (float) ($this->average_rating ?? 0),
             'total_ratings' => (int) ($this->total_ratings ?? 0),
-            'products_count' => $this->whenCounted('products'),
-            'products' => $this->whenLoaded('products'),
+            'products_count' => $isOpenNow ? $this->whenCounted('products') : 0,
+            'products' => $isOpenNow ? $this->whenLoaded('products') : [],
         ];
     }
 }
