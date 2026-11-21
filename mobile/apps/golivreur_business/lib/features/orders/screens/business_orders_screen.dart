@@ -115,9 +115,12 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
           children: [
             Row(
               children: [
-                const Text(
-                  'GoLivreur Business',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: GoLivreurTheme.textePrincipal),
+                const Flexible(
+                  child: Text(
+                    'GoLivreur Business',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: GoLivreurTheme.textePrincipal),
+                  ),
                 ),
                 if (profile.cityName != null && profile.cityName!.isNotEmpty) ...[
                   const SizedBox(width: 6),
@@ -129,7 +132,7 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
                     ),
                     child: Text(
                       profile.cityName!.toUpperCase(),
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2E75B6)),
+                      style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF2E75B6)),
                     ),
                   ),
                 ],
@@ -280,13 +283,25 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
               child: Center(child: CircularProgressIndicator()),
             )
           else if (historyState.buckets.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: Text(
-                  'Aucune commande dans l\'historique aujourd\'hui',
-                  style: TextStyle(color: GoLivreurTheme.texteSecondaire),
-                ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Text(
+                    historyState.errorMessage ??
+                        'Aucune commande dans l\'historique aujourd\'hui',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: GoLivreurTheme.texteSecondaire),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () => ref
+                        .read(businessOrderHistoryProvider.notifier)
+                        .chargerAujourdhui(),
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Actualiser l\'historique'),
+                  ),
+                ],
               ),
             )
           else ...[

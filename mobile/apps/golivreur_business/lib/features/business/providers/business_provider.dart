@@ -1339,24 +1339,34 @@ class BusinessHistoryBucket {
     final rawOrders = d['orders'] is List ? d['orders'] as List : const [];
     final scope = (d['scope'] ?? 'today').toString();
     final week = d['week']?.toString();
-    final startDate = d['start_date']?.toString() ?? '';
-    final endDate = d['end_date']?.toString() ?? '';
+    final startDate = (d['period_start'] ?? d['start_date'] ?? '').toString();
+    final endDate = (d['period_end'] ?? d['end_date'] ?? '').toString();
 
     final label = scope == 'today'
         ? 'Aujourd\'hui${startDate.isNotEmpty ? ' ($startDate)' : ''}'
         : 'Semaine ${week ?? ''}${startDate.isNotEmpty && endDate.isNotEmpty ? ' ($startDate → $endDate)' : ''}';
+
+    final ordersCount =
+        (d['orders_count'] as num?)?.toInt() ??
+            (summary['orders_count'] as num?)?.toInt() ??
+            rawOrders.length;
+    final deliveredCount =
+        (d['delivered_count'] as num?)?.toInt() ??
+            (summary['delivered_count'] as num?)?.toInt() ??
+            0;
+    final deliveredMerchantAmount = num.tryParse(
+          '${d['delivered_merchant_amount'] ?? summary['delivered_merchant_amount'] ?? 0}',
+        )?.toDouble() ??
+        0;
 
     return BusinessHistoryBucket(
       scope: scope,
       label: label,
       weekKey: week,
       previousWeek: d['previous_week']?.toString(),
-      ordersCount: (summary['orders_count'] as num?)?.toInt() ?? rawOrders.length,
-      deliveredCount: (summary['delivered_count'] as num?)?.toInt() ?? 0,
-      deliveredMerchantAmount:
-          num.tryParse('${summary['delivered_merchant_amount'] ?? 0}')
-                  ?.toDouble() ??
-              0,
+      ordersCount: ordersCount,
+      deliveredCount: deliveredCount,
+      deliveredMerchantAmount: deliveredMerchantAmount,
       orders: rawOrders
           .whereType<Map>()
           .map((e) => BusinessHistoryOrder.fromJson(Map<String, dynamic>.from(e)))
@@ -1370,12 +1380,14 @@ class BusinessOrderHistoryState {
   final bool loadingMore;
   final List<BusinessHistoryBucket> buckets;
   final String? nextPreviousWeek;
+  final String? errorMessage;
 
   const BusinessOrderHistoryState({
     this.loading = false,
     this.loadingMore = false,
     this.buckets = const [],
     this.nextPreviousWeek,
+    this.errorMessage,
   });
 
   BusinessOrderHistoryState copyWith({
@@ -1383,12 +1395,14 @@ class BusinessOrderHistoryState {
     bool? loadingMore,
     List<BusinessHistoryBucket>? buckets,
     String? nextPreviousWeek,
+    String? errorMessage,
   }) {
     return BusinessOrderHistoryState(
       loading: loading ?? this.loading,
       loadingMore: loadingMore ?? this.loadingMore,
       buckets: buckets ?? this.buckets,
       nextPreviousWeek: nextPreviousWeek ?? this.nextPreviousWeek,
+      errorMessage: errorMessage,
     );
   }
 }
@@ -1406,7 +1420,7 @@ class BusinessOrderHistoryNotifier
 
   Future<void> chargerAujourdhui() async {
     if (_api == null) return;
-    state = state.copyWith(loading: true);
+    state = state.copyWith(loading: true, errorMessage: null);
     try {
       final res = await _api.get('/business/orders/history?scope=today');
       if (res.statusCode == 200 &&
@@ -1416,16 +1430,33 @@ class BusinessOrderHistoryNotifier
         final bucket = BusinessHistoryBucket.fromJson(
           Map<String, dynamic>.from(res.data['donnees'] as Map),
         );
+        // Depuis « Aujourd'hui », le 1er clic « Voir + » charge toute la semaine ISO en cours
+        // (pour ne pas sauter lundi..hier), puis remonte semaine par semaine.
+        final firstMoreWeek =
+            (bucket.weekKey != null && bucket.weekKey!.isNotEmpty)
+                ? bucket.weekKey
+                : bucket.previousWeek;
         state = BusinessOrderHistoryState(
           loading: false,
           buckets: [bucket],
-          nextPreviousWeek: bucket.previousWeek,
+          nextPreviousWeek: firstMoreWeek,
         );
         return;
       }
-      state = state.copyWith(loading: false);
+      state = state.copyWith(
+        loading: false,
+        errorMessage: 'Impossible de charger l\'historique.',
+      );
+    } on DioException catch (e) {
+      state = state.copyWith(
+        loading: false,
+        errorMessage: ApiClient.messageErreur(e),
+      );
     } catch (_) {
-      state = state.copyWith(loading: false);
+      state = state.copyWith(
+        loading: false,
+        errorMessage: 'Erreur réseau lors du chargement de l\'historique.',
+      );
     }
   }
 

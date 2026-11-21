@@ -343,18 +343,16 @@ void main() {
     expect(json['timezone'], 'Africa/Abidjan');
   });
 
-  test('BusinessHistoryBucket parse le résumé jour/semaine et previous_week', () {
+  test('BusinessHistoryBucket parse le résumé jour/semaine (format plat backend) et previous_week', () {
     final bucket = BusinessHistoryBucket.fromJson({
       'scope': 'week',
       'week': '2026-W47',
       'previous_week': '2026-W46',
-      'start_date': '2026-11-16',
-      'end_date': '2026-11-22',
-      'summary': {
-        'orders_count': 4,
-        'delivered_count': 3,
-        'delivered_merchant_amount': 12500,
-      },
+      'period_start': '2026-11-16',
+      'period_end': '2026-11-22',
+      'orders_count': 4,
+      'delivered_count': 3,
+      'delivered_merchant_amount': 12500,
       'orders': [
         {
           'id': 101,
@@ -371,6 +369,7 @@ void main() {
     expect(bucket.deliveredCount, 3);
     expect(bucket.deliveredMerchantAmount, 12500);
     expect(bucket.previousWeek, '2026-W46');
+    expect(bucket.label, contains('2026-11-16'));
     expect(bucket.orders.length, 1);
   });
 
