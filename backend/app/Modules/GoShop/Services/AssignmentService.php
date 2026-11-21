@@ -5,12 +5,16 @@ namespace App\Modules\GoShop\Services;
 use App\Jobs\AlerterAdminPasDelivreur;
 use App\Jobs\NotifierLivreurGoColis;
 use App\Jobs\NotifierLivreurGoShop;
+use App\Models\ActivityLog;
 use App\Models\City;
 use App\Models\Courier;
+use App\Models\Notification;
 use App\Models\Order;
 use App\Models\Parcel;
+use App\Models\User;
 use App\Services\AsyncJobDispatcher;
 use App\Services\CourierCapacityService;
+use App\Services\CourseOfferService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
@@ -404,5 +408,96 @@ class AssignmentService
         $eligible = $baseQuery->get()->first($estCandidatValide);
 
         return $eligible;
+    }
+
+    /**
+     * Affectation manuelle unifiée par un administrateur (Filament / API) pour une commande GoShop ou un colis GoColis :
+     * - Statut cohérent (plus de blocage sur 'waiting' ou 'pending')
+     * - Remise à zéro du compteur de tentatives (`assignment_attempts = 0`)
+     * - Clôture des offres en attente et résolution des alertes `admin_no_driver_alert`
+     * - Notification du livreur ET du client/expéditeur
+     * - Journalisation dans `activity_logs` avec l'admin acteur.
+     */
+    public function assignerManuellementParAdmin(Order|Parcel $course, Courier $courier, User $admin): Order|Parcel
+    {
+        $isOrder = $course instanceof Order;
+        $oldCourierId = $course->courier_id;
+
+        if ($isOrder) {
+            $nextStatus = in_array($course->status, [Order::STATUS_PENDING, Order::STATUS_WAITING], true)
+                ? ($course->ready_at !== null ? Order::STATUS_READY : Order::STATUS_ACCEPTED)
+                : $course->status;
+
+            $course->update([
+                'courier_id' => $courier->id,
+                'status' => $nextStatus,
+                'accepted_at' => $course->accepted_at ?? now(),
+                'assignment_attempts' => 0,
+            ]);
+        } else {
+            $nextStatus = in_array($course->status, [Parcel::STATUS_PENDING, Parcel::STATUS_WAITING], true)
+                ? Parcel::STATUS_ACCEPTED
+                : $course->status;
+
+            $course->update([
+                'courier_id' => $courier->id,
+                'status' => $nextStatus,
+                'assignment_attempts' => 0,
+            ]);
+        }
+
+        // Clôturer les offres en cours pour cette course
+        app(CourseOfferService::class)->cloturerOffresPourCourse($course);
+
+        // Résoudre les alertes "support alerté" (`admin_no_driver_alert`)
+        $idKey = $isOrder ? 'order_id' : 'parcel_id';
+        Notification::where('type', 'admin_no_driver_alert')
+            ->where('is_read', false)
+            ->get()
+            ->filter(static fn (Notification $n): bool => (int) ($n->data[$idKey] ?? 0) === (int) $course->id)
+            ->each(static fn (Notification $n) => $n->update(['is_read' => true]));
+
+        $fresh = $course->fresh();
+
+        // Notifier le client / expéditeur
+        if ($fresh instanceof Order) {
+            $this->notificationService->notifierCommandeAccepteeLivreur($fresh);
+        } elseif ($fresh instanceof Parcel) {
+            $this->notificationService->notifierColisAccepteLivreur($fresh);
+        }
+
+        // Notifier le livreur assigné
+        if ($courier->user_id !== null) {
+            Notification::create([
+                'user_id' => $courier->user_id,
+                'type' => $isOrder ? 'order_assigned' : 'parcel_assigned',
+                'title' => $isOrder ? "Commande #{$course->id} assignée" : "Colis #{$course->id} assigné",
+                'body' => $isOrder
+                    ? 'Une commande GoShop vous a été assignée par le support GoLivreur.'
+                    : 'Une expédition GoColis vous a été assignée par le support GoLivreur.',
+                'data' => [
+                    $idKey => $course->id,
+                    'course_type' => $isOrder ? 'goshop' : 'gocolis',
+                    'assigned_manually' => true,
+                ],
+                'is_read' => false,
+            ]);
+        }
+
+        ActivityLog::create([
+            'user_id' => $admin->id,
+            'action' => $isOrder ? 'order_assigned_manually_by_admin' : 'parcel_assigned_manually_by_admin',
+            'entity_type' => $isOrder ? 'order' : 'parcel',
+            'entity_id' => $course->id,
+            'properties' => [
+                'old_courier_id' => $oldCourierId,
+                'new_courier_id' => $courier->id,
+                'new_status' => $nextStatus,
+            ],
+            'ip_address' => request()?->ip(),
+            'severity' => 'info',
+        ]);
+
+        return $fresh ?? $course;
     }
 }

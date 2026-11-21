@@ -172,6 +172,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::get('parcels', [ParcelController::class, 'indexClient']);
         Route::post('parcels', [ParcelController::class, 'store']);
         Route::get('parcels/{parcel}', [ParcelController::class, 'showClient']);
+        Route::post('parcels/{parcel}/cancel', [ParcelController::class, 'cancelClient']);
         Route::get('parcels/{parcel}/sender-code', [ParcelController::class, 'senderCode']);
         Route::get('parcels/{parcel}/courier-location', [ParcelController::class, 'courierLocation'])
             ->middleware('throttle:client-courier-location');

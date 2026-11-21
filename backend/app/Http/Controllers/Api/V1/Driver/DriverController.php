@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Driver;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\DriverCourseResource;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\Parcel;
@@ -182,7 +183,7 @@ class DriverController extends Controller
                 'picked_up',
                 'in_transit',
             ])
-            ->with(['merchant', 'client', 'items.product'])
+            ->with(['merchant.user', 'client', 'items.product'])
             ->get();
 
         $parcels = Parcel::where('courier_id', $courier->id)
@@ -201,8 +202,8 @@ class DriverController extends Controller
         return response()->json([
             'succes' => true,
             'donnees' => [
-                'orders' => $orders,
-                'parcels' => $parcels,
+                'orders' => DriverCourseResource::collection($orders)->resolve(),
+                'parcels' => DriverCourseResource::collection($parcels)->resolve(),
                 'offers' => $offers,
             ],
         ]);

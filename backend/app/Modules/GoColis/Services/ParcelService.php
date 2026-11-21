@@ -6,8 +6,10 @@ use App\Jobs\AlerterAdminCodeBloque;
 use App\Jobs\AlerterAdminSmsEchec;
 use App\Models\City;
 use App\Models\Courier;
+use App\Models\Notification;
 use App\Models\Parcel;
 use App\Models\ParcelPhoto;
+use App\Models\Refund;
 use App\Models\User;
 use App\Modules\GoShop\Services\AssignmentService;
 use App\Modules\GoShop\Services\CommissionService;
@@ -15,6 +17,7 @@ use App\Services\ActivityLogService;
 use App\Services\AsyncJobDispatcher;
 use App\Services\CityGeolocationService;
 use App\Services\ConfirmationCodeService;
+use App\Services\CourseOfferService;
 use App\Services\DeliverySettlementService;
 use App\Services\NotificationService;
 use App\Services\ParcelPhotoStorageService;
@@ -721,6 +724,94 @@ class ParcelService
             );
 
             return true;
+        });
+    }
+
+    /**
+     * Annule une expédition GoColis à la demande du client expéditeur tant que le colis
+     * n'est pas encore passé à `picked_up` (`pending`, `waiting`, `accepted`, `at_sender`).
+     * Libère et notifie le livreur éventuel, crée une demande de remboursement idempotente
+     * si le paiement en ligne a déjà été encaissé. Aucun frais d'annulation (non défini au CDC).
+     */
+    public function annulerParClient(Parcel $parcel, User $client, ?string $raison = null): Parcel
+    {
+        return DB::transaction(function () use ($parcel, $client, $raison): Parcel {
+            /** @var Parcel $lockedParcel */
+            $lockedParcel = Parcel::with('courier.user')->lockForUpdate()->findOrFail($parcel->id);
+
+            if ((int) $lockedParcel->sender_id !== (int) $client->id) {
+                throw new HttpException(403, 'Accès refusé à cette expédition.');
+            }
+
+            if (! in_array($lockedParcel->status, [
+                Parcel::STATUS_PENDING,
+                Parcel::STATUS_WAITING,
+                Parcel::STATUS_ACCEPTED,
+                Parcel::STATUS_AT_SENDER,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    'status' => ['Impossible d\'annuler ce colis après le ramassage ou sa clôture.'],
+                ]);
+            }
+
+            $previousCourier = $lockedParcel->courier;
+
+            $lockedParcel->update([
+                'status' => Parcel::STATUS_CANCELLED,
+                'courier_id' => null,
+                'cancelled_at' => now(),
+            ]);
+
+            app(CourseOfferService::class)->cloturerOffresPourCourse($lockedParcel);
+
+            // Libérer et notifier le livreur si un livreur était assigné
+            if ($previousCourier !== null && $previousCourier->user_id !== null) {
+                Notification::create([
+                    'user_id' => $previousCourier->user_id,
+                    'type' => 'parcel_cancelled',
+                    'title' => "Colis #{$lockedParcel->id} annulé",
+                    'body' => 'L\'expéditeur a annulé cette expédition avant le ramassage. Vous êtes de nouveau disponible.',
+                    'data' => [
+                        'parcel_id' => $lockedParcel->id,
+                        'course_type' => 'gocolis',
+                    ],
+                    'is_read' => false,
+                ]);
+            }
+
+            // Paiement en ligne déjà encaissé -> demande de remboursement idempotente
+            if ($lockedParcel->payment_status === 'paid' && ! Refund::where('parcel_id', $lockedParcel->id)->exists()) {
+                $montantRemboursement = (int) $lockedParcel->shipping_fee + (int) $lockedParcel->insurance_amount;
+                if ($montantRemboursement > 0) {
+                    Refund::create([
+                        'city_id' => $lockedParcel->city_id,
+                        'order_id' => null,
+                        'parcel_id' => $lockedParcel->id,
+                        'client_id' => $lockedParcel->sender_id,
+                        'amount' => $montantRemboursement,
+                        'reason' => 'Annulation expédition GoColis par le client avant ramassage'.($raison ? " : {$raison}" : ''),
+                        'status' => Refund::STATUS_REQUESTED,
+                        'cost_bearer' => Refund::COST_PLATFORM,
+                        'requested_by' => $client->id,
+                    ]);
+                }
+            }
+
+            $this->activityLogService->log(
+                userId: $client->id,
+                action: 'parcel_cancelled_by_client',
+                entityType: 'parcel',
+                entityId: $lockedParcel->id,
+                properties: [
+                    'city_id' => $lockedParcel->city_id,
+                    'previous_courier_id' => $previousCourier?->id,
+                    'payment_status' => $lockedParcel->payment_status,
+                    'reason' => $raison,
+                ],
+                severity: 'info',
+            );
+
+            return $lockedParcel->fresh(['photos']);
         });
     }
 

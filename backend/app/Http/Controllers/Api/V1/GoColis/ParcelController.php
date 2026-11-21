@@ -519,6 +519,24 @@ class ParcelController extends Controller
     }
 
     /**
+     * Annulation d'une expédition GoColis par le client avant ramassage (`picked_up`).
+     */
+    public function cancelClient(Request $request, Parcel $parcel, ParcelService $service): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        $raison = is_string($request->input('reason')) ? trim((string) $request->input('reason')) : null;
+
+        $cancelled = $service->annulerParClient($parcel, $user, $raison ?: null);
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Expédition annulée avec succès.',
+            'donnees' => $cancelled,
+        ]);
+    }
+
+    /**
      * Suivi bêta de position livreur pour une expédition GoColis (D-BETA-1, 1 req / 5s).
      */
     public function courierLocation(Parcel $parcel, CourierLocationPollingService $pollingService): JsonResponse

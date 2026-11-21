@@ -10,6 +10,7 @@ use App\Models\ActivityLog;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\User;
+use App\Modules\GoShop\Services\AssignmentService;
 use App\Modules\GoShop\Services\OrderService;
 use App\Services\CourseOfferService;
 use App\Services\NotificationService;
@@ -414,31 +415,9 @@ class OrderResource extends Resource
                             return;
                         }
 
-                        $oldCourier = $record->courier_id;
-                        $nextStatus = $record->status === Order::STATUS_WAITING
-                            ? ($record->ready_at !== null ? Order::STATUS_READY : Order::STATUS_ACCEPTED)
-                            : $record->status;
-
-                        $record->update([
-                            'courier_id' => $courier->id,
-                            'status' => $nextStatus,
-                            'accepted_at' => $record->accepted_at ?? now(),
-                        ]);
-
-                        app(CourseOfferService::class)->cloturerOffresPourCourse($record);
-                        if ($fresh = $record->fresh()) {
-                            app(NotificationService::class)->notifierCommandeAccepteeLivreur($fresh);
-                        }
-
-                        ActivityLog::create([
-                            'user_id' => auth()->id(),
-                            'action' => 'order_reassigned',
-                            'entity_type' => 'order',
-                            'entity_id' => $record->id,
-                            'properties' => ['old_courier' => $oldCourier, 'new_courier' => $data['courier_id']],
-                            'ip_address' => request()->ip(),
-                            'severity' => 'info',
-                        ]);
+                        /** @var User $admin */
+                        $admin = auth()->user();
+                        app(AssignmentService::class)->assignerManuellementParAdmin($record, $courier, $admin);
 
                         Notification::make()
                             ->title("Commande #{$record->id} réassignée")

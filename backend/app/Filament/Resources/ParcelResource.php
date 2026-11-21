@@ -12,6 +12,7 @@ use App\Models\Parcel;
 use App\Models\ParcelPhoto;
 use App\Models\User;
 use App\Modules\GoColis\Services\ParcelService;
+use App\Modules\GoShop\Services\AssignmentService;
 use App\Services\CourseOfferService;
 use App\Services\NotificationService;
 use App\Services\RefundService;
@@ -268,6 +269,7 @@ class ParcelResource extends Resource
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'pending' => 'En attente',
+                        'waiting' => 'En attente de livreur',
                         'assigned', 'accepted', 'at_sender' => 'Assigné',
                         'in_transit', 'picked_up' => 'En transit',
                         'delivered' => 'Livré',
@@ -438,30 +440,9 @@ class ParcelResource extends Resource
                             return;
                         }
 
-                        $oldCourier = $record->courier_id;
-                        $nextStatus = in_array($record->status, [Parcel::STATUS_PENDING, Parcel::STATUS_WAITING], true)
-                            ? Parcel::STATUS_ACCEPTED
-                            : $record->status;
-
-                        $record->update([
-                            'courier_id' => $courier->id,
-                            'status' => $nextStatus,
-                        ]);
-
-                        app(CourseOfferService::class)->cloturerOffresPourCourse($record);
-                        if ($fresh = $record->fresh()) {
-                            app(NotificationService::class)->notifierColisAccepteLivreur($fresh);
-                        }
-
-                        ActivityLog::create([
-                            'user_id' => auth()->id(),
-                            'action' => 'parcel_reassigned',
-                            'entity_type' => 'parcel',
-                            'entity_id' => $record->id,
-                            'properties' => ['old_courier' => $oldCourier, 'new_courier' => $courier->id],
-                            'ip_address' => request()->ip(),
-                            'severity' => 'info',
-                        ]);
+                        /** @var User $admin */
+                        $admin = auth()->user();
+                        app(AssignmentService::class)->assignerManuellementParAdmin($record, $courier, $admin);
 
                         Notification::make()
                             ->title("Colis #{$record->id} assigné au livreur")
