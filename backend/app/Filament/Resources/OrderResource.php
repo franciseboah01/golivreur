@@ -363,6 +363,7 @@ class OrderResource extends Resource
                             'cancel_reason' => $data['cancellation_reason'],
                             'cancelled_at' => now(),
                         ]);
+                        app(OrderService::class)->restaurerStockCommande($record);
 
                         ActivityLog::create([
                             'user_id' => auth()->id(),

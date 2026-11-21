@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Order;
 use App\Models\User;
+use App\Modules\GoShop\Services\OrderService;
 use App\Services\ActivityLogService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
@@ -61,6 +62,7 @@ class AnnulerCommandePaiementTimeout implements ShouldQueue
                 'cancelled_at' => now(),
                 'cancel_reason' => "Délai de paiement en ligne dépassé ({$delaiMinutes} min).",
             ]);
+            app(OrderService::class)->restaurerStockCommande($order);
 
             if ($order->client instanceof User) {
                 $notificationService->notifierPaiementEchoue($order->client, $order);

@@ -166,6 +166,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::post('orders', [ClientController::class, 'createOrder']);
         Route::get('orders', [ClientController::class, 'orders']);
         Route::get('orders/{order}', [ClientController::class, 'showOrder']);
+        Route::post('orders/{order}/reorder', [ClientController::class, 'reorderOrder']);
         Route::get('orders/{order}/confirmation-code', [ClientController::class, 'orderConfirmationCode']);
         Route::get('orders/{order}/courier-location', [ClientController::class, 'orderCourierLocation'])
             ->middleware('throttle:client-courier-location');

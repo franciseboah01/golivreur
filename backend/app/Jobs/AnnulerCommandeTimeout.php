@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Order;
+use App\Modules\GoShop\Services\OrderService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use Illuminate\Bus\Queueable;
@@ -58,6 +59,7 @@ class AnnulerCommandeTimeout implements ShouldQueue
                     'cancelled_at' => now(),
                     'cancel_reason' => "Délai d'acceptation dépassé ({$delaiSecondes}s).",
                 ]);
+                app(OrderService::class)->restaurerStockCommande($order);
                 $notificationService->notifierCommandeRefusee($order);
                 Log::info("Commande #{$orderId} annulée pour timeout {$delaiSecondes}s.");
 

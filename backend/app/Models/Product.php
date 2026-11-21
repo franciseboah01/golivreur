@@ -47,6 +47,16 @@ class Product extends Model
         'custom_attributes' => 'array',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (self $product): void {
+            if ($product->quantity !== null && (int) $product->quantity <= 0) {
+                $product->quantity = 0;
+                $product->is_available = false;
+            }
+        });
+    }
+
     /**
      * Résout une URL publique exploitable pour la photo du produit
      * (compatible avec les anciens liens complets et les uploads locaux sur le disque `public`).

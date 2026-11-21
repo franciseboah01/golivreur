@@ -19,6 +19,7 @@ use App\Services\DeliverySettlementService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -281,6 +282,8 @@ class OrderService
                 'cancel_reason' => $raison ?: 'Refusé par le commerce.',
             ]);
 
+            $this->restaurerStockCommande($lockedOrder);
+
             if ($lockedOrder->payment_status === 'paid' && ! Refund::where('order_id', $lockedOrder->id)->exists()) {
                 $montantRemboursement = (int) round((float) $lockedOrder->products_total + (float) $lockedOrder->delivery_fee);
                 if ($montantRemboursement > 0) {
@@ -537,27 +540,78 @@ class OrderService
         });
     }
 
+    /**
+     * Rétablit le stock des produits à quantité limitée lorsqu'une commande est annulée,
+     * refusée ou expire sans paiement. Un produit qui repasse de 0 à >0 redevient disponible.
+     */
+    public function restaurerStockCommande(Order $order): void
+    {
+        $items = $order->items()->get();
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $productIds = $items->pluck('product_id')->filter()->unique()->sort()->values()->all();
+        if (empty($productIds)) {
+            return;
+        }
+
+        /** @var array<int, Product> $products */
+        $products = Product::whereIn('id', $productIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id')
+            ->all();
+
+        foreach ($items as $item) {
+            $product = $products[(int) $item->product_id] ?? null;
+            if (! $product || $product->quantity === null) {
+                continue;
+            }
+
+            $oldQty = (int) $product->quantity;
+            $newQty = $oldQty + (int) $item->quantity;
+            $product->update([
+                'quantity' => $newQty,
+                'is_available' => $oldQty === 0 && $newQty > 0 ? true : $product->is_available,
+            ]);
+        }
+    }
+
     // ─── Méthodes privées ─────────────────────────────────────────────────────
 
     /**
-     * Résout les produits du commerce et calcule le total côté serveur.
+     * Résout les produits du commerce avec verrou atomique (`lockForUpdate`),
+     * vérifie et décrémente le stock (null = illimité, 0 = indisponible),
+     * et calcule le total côté serveur.
      *
      * @param  array<int, array<string, mixed>>  $items
      * @return array{0: float, 1: array<int, Product>}
      */
     private function resoudreProduitsEtTotal(Merchant $merchant, array $items): array
     {
-        $productIds = array_column($items, 'product_id');
+        $productIds = array_values(array_unique(array_map(static fn (array $i): int => (int) $i['product_id'], $items)));
+        sort($productIds);
+
         /** @var array<int, Product> $resolved */
         $resolved = Product::where('merchant_id', $merchant->id)
             ->whereIn('id', $productIds)
+            ->orderBy('id')
+            ->lockForUpdate()
             ->get()
             ->keyBy('id')
             ->all();
 
-        $total = 0.0;
+        // Agréger les quantités demandées par produit (au cas où un product_id est répété)
+        $requestedByProduct = [];
         foreach ($items as $item) {
-            $productId = (int) $item['product_id'];
+            $pid = (int) $item['product_id'];
+            $requestedByProduct[$pid] = ($requestedByProduct[$pid] ?? 0) + (int) $item['quantity'];
+        }
+
+        $total = 0.0;
+        foreach ($requestedByProduct as $productId => $qty) {
             $product = $resolved[$productId] ?? null;
             if (! $product) {
                 throw ValidationException::withMessages([
@@ -565,13 +619,35 @@ class OrderService
                 ]);
             }
 
-            if (! $product->is_available) {
-                throw ValidationException::withMessages([
-                    'items' => ["Le produit « {$product->name} » n'est actuellement pas disponible."],
+            if (! $product->is_available || ($product->quantity !== null && (int) $product->quantity <= 0)) {
+                throw new HttpResponseException(response()->json([
+                    'succes' => false,
+                    'code' => 'insufficient_stock',
+                    'product_id' => $product->id,
+                    'available_quantity' => $product->quantity !== null ? max(0, (int) $product->quantity) : 0,
+                    'message' => "Le produit « {$product->name} » n'est actuellement pas disponible.",
+                ], 422));
+            }
+
+            if ($product->quantity !== null && (int) $product->quantity < $qty) {
+                throw new HttpResponseException(response()->json([
+                    'succes' => false,
+                    'code' => 'insufficient_stock',
+                    'product_id' => $product->id,
+                    'available_quantity' => (int) $product->quantity,
+                    'message' => "Stock insuffisant pour « {$product->name} » ({$product->quantity} disponible(s)).",
+                ], 422));
+            }
+
+            if ($product->quantity !== null) {
+                $newQty = max(0, (int) $product->quantity - $qty);
+                $product->update([
+                    'quantity' => $newQty,
+                    'is_available' => $newQty > 0,
                 ]);
             }
 
-            $total += (float) $product->price * (int) $item['quantity'];
+            $total += (float) $product->price * $qty;
         }
 
         return [$total, $resolved];

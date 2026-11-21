@@ -729,6 +729,82 @@ class ClientController extends Controller
         ]);
     }
 
+    /**
+     * POST /api/v1/client/orders/{order}/reorder
+     * Ne crée PAS de commande : renvoie un panier brouillon revalidé (prix actuels,
+     * quantités plafonnées au stock, lignes indisponibles listées, boutique ouverte ou non).
+     */
+    public function reorderOrder(Order $order): JsonResponse
+    {
+        if ((int) $order->client_id !== (int) auth()->id()) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Accès refusé à cette commande.',
+            ], 403);
+        }
+
+        $order->load(['merchant', 'items.product']);
+        $merchant = $order->merchant;
+        $merchantIsOpen = $merchant !== null
+            && $merchant->is_active
+            && $merchant->is_open
+            && $merchant->estDansHorairesOuverture();
+
+        $draftItems = [];
+        $unavailableItems = [];
+        $estimatedSubtotal = 0;
+
+        foreach ($order->items as $item) {
+            $product = $item->product;
+            $requestedQty = (int) $item->quantity;
+
+            if (! $product || ! $product->is_available || ($product->quantity !== null && (int) $product->quantity <= 0)) {
+                $unavailableItems[] = [
+                    'product_id' => (int) $item->product_id,
+                    'name' => $item->product_name_snapshot ?: ($product?->name ?? 'Produit indisponible'),
+                    'requested_quantity' => $requestedQty,
+                    'available_quantity' => $product && $product->quantity !== null ? max(0, (int) $product->quantity) : 0,
+                    'reason' => ! $product ? 'Produit supprimé du catalogue' : 'Produit en rupture ou indisponible',
+                ];
+
+                continue;
+            }
+
+            $availableQty = $product->quantity !== null ? (int) $product->quantity : null;
+            $finalQty = $availableQty !== null ? min($requestedQty, $availableQty) : $requestedQty;
+            $unitPrice = (int) $product->price;
+            $estimatedSubtotal += $unitPrice * $finalQty;
+
+            $draftItems[] = [
+                'product_id' => (int) $product->id,
+                'name' => $product->name,
+                'photo_url' => $product->photo_url,
+                'requested_quantity' => $requestedQty,
+                'quantity' => $finalQty,
+                'available_quantity' => $availableQty,
+                'capped' => $finalQty < $requestedQty,
+                'unit_price' => $unitPrice,
+                'previous_unit_price' => (int) round((float) $item->unit_price),
+                'price_changed' => $unitPrice !== (int) round((float) $item->unit_price),
+                'line_total' => $unitPrice * $finalQty,
+            ];
+        }
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Panier brouillon revalidé.',
+            'donnees' => [
+                'source_order_id' => $order->id,
+                'merchant_id' => $merchant?->id,
+                'merchant_name' => $merchant?->name,
+                'merchant_is_open' => $merchantIsOpen,
+                'items' => $draftItems,
+                'unavailable_items' => $unavailableItems,
+                'estimated_subtotal' => $estimatedSubtotal,
+            ],
+        ]);
+    }
+
     private function formatAddress(ClientAddress $address): array
     {
         return [
