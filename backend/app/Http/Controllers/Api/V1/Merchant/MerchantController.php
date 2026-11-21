@@ -634,6 +634,100 @@ class MerchantController extends Controller
     }
 
     /**
+     * GET /api/v1/business/orders/history?scope=today | ?week=YYYY-Www
+     * Historique isolé par commerce en fuseau Africa/Abidjan (jour ou semaine ISO lundi-dimanche).
+     */
+    public function ordersHistory(Request $request): JsonResponse
+    {
+        $merchant = $this->getMerchant();
+        $tz = 'Africa/Abidjan';
+        $scope = strtolower(trim((string) $request->query('scope', '')));
+        $weekParam = trim((string) $request->query('week', ''));
+
+        if ($weekParam !== '' && preg_match('/^(\d{4})-W(\d{2})$/', $weekParam, $m)) {
+            $year = (int) $m[1];
+            $week = (int) $m[2];
+            $start = \Carbon\Carbon::now($tz)->setISODate($year, $week, 1)->startOfDay();
+            $end = $start->copy()->endOfWeek(\Carbon\CarbonInterface::SUNDAY);
+            $mode = 'week';
+            $weekLabel = sprintf('%04d-W%02d', $year, $week);
+        } else {
+            $now = \Carbon\Carbon::now($tz);
+            if ($scope === 'today' || $weekParam === '') {
+                $start = $now->copy()->startOfDay();
+                $end = $now->copy()->endOfDay();
+                $mode = 'today';
+                $weekLabel = $now->format('o-\WW');
+            } else {
+                return response()->json([
+                    'succes' => false,
+                    'message' => 'Format de semaine invalide. Format attendu : YYYY-Www (ex: 2026-W47).',
+                ], 422);
+            }
+        }
+
+        $orders = Order::where('merchant_id', $merchant->id)
+            ->whereBetween('created_at', [$start->copy()->utc(), $end->copy()->utc()])
+            ->with(['client:id,name', 'items'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        $deliveredAmount = 0;
+        $deliveredCount = 0;
+
+        $formatted = $orders->map(static function (Order $order) use ($tz, &$deliveredAmount, &$deliveredCount): array {
+            $outcome = match ($order->status) {
+                Order::STATUS_DELIVERED => 'livrée',
+                Order::STATUS_REFUSED => 'refusée',
+                Order::STATUS_CANCELLED => 'annulée',
+                Order::STATUS_DISPUTED => 'échec',
+                default => $order->payment_status === 'failed' ? 'échec' : 'en cours',
+            };
+
+            if ($order->status === Order::STATUS_DELIVERED) {
+                $deliveredCount++;
+                $deliveredAmount += (int) round((float) $order->merchant_amount);
+            }
+
+            $eventTime = $order->delivered_at ?? $order->cancelled_at ?? $order->updated_at ?? $order->created_at;
+
+            return [
+                'id' => $order->id,
+                'status' => $order->status,
+                'outcome' => $outcome,
+                'outcome_time' => $eventTime?->copy()->setTimezone($tz)->format('H:i'),
+                'outcome_at' => $eventTime?->copy()->setTimezone($tz)->toIso8601String(),
+                'client_name' => $order->client?->name ?? 'Client',
+                'items_count' => $order->items->sum('quantity'),
+                'products_total' => (int) round((float) $order->products_total),
+                'delivery_fee' => (int) round((float) $order->delivery_fee),
+                'merchant_amount' => (int) round((float) $order->merchant_amount),
+                'payment_method' => $order->payment_method,
+                'created_at' => $order->created_at?->copy()->setTimezone($tz)->toIso8601String(),
+            ];
+        })->values();
+
+        $prevWeek = $start->copy()->subWeek()->format('o-\WW');
+        $nextWeek = $start->copy()->addWeek()->format('o-\WW');
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'scope' => $mode,
+                'week' => $weekLabel,
+                'period_start' => $start->toDateString(),
+                'period_end' => $end->toDateString(),
+                'previous_week' => $prevWeek,
+                'next_week' => $nextWeek,
+                'orders_count' => $formatted->count(),
+                'delivered_count' => $deliveredCount,
+                'delivered_merchant_amount' => $deliveredAmount,
+                'orders' => $formatted,
+            ],
+        ]);
+    }
+
+    /**
      * DELETE /api/v1/business/priority-drivers/select
      */
     public function clearPriorityDriver(SettingsService $settingsService): JsonResponse

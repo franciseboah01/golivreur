@@ -189,6 +189,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
         Route::get('profile', [ProfileController::class, 'showBusiness']);
         Route::middleware('active_merchant')->group(function () {
             Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateBusiness']);
+            Route::get('orders/history', [MerchantController::class, 'ordersHistory']);
             Route::get('priority-drivers', [MerchantController::class, 'listPriorityDrivers']);
             Route::post('priority-drivers', [MerchantController::class, 'createPriorityDriver']);
             Route::put('priority-drivers/{courier}/select', [MerchantController::class, 'selectPriorityDriver']);
