@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Order;
+use App\Models\Parcel;
 use App\Models\User;
 use App\Models\VehicleType;
 use App\Services\CityGeolocationService;
@@ -27,6 +29,19 @@ class DriverProfileResource extends JsonResource
             ? app(CityGeolocationService::class)->getCourierReidentificationFlag($courier)
             : null;
         $city = $courier->city ?? $this->city;
+
+        $accountStatus = 'suspendu';
+        if ($courier !== null && $courier->is_active && $this->is_active) {
+            $accountStatus = 'actif';
+        } elseif ($courier === null || ($courier->activated_at === null && ($courier->validation_status ?? 'pending') !== 'rejected')) {
+            $accountStatus = 'en attente de validation';
+        }
+
+        $completedDeliveries = $courier !== null
+            ? Order::where('courier_id', $courier->id)->where('status', Order::STATUS_DELIVERED)->count()
+                + Parcel::where('courier_id', $courier->id)->where('status', Parcel::STATUS_DELIVERED)->count()
+            : 0;
+        $rating = (float) ($courier->average_rating ?? 0);
 
         return [
             'id' => $this->id,
@@ -57,7 +72,10 @@ class DriverProfileResource extends JsonResource
             'driver_license_number' => $courier?->driver_license_number,
             'is_online' => (bool) ($courier->is_online ?? false),
             'is_active' => (bool) ($courier->is_active ?? $this->is_active),
-            'average_rating' => (float) ($courier->average_rating ?? 0),
+            'account_status' => $accountStatus,
+            'completed_deliveries' => $completedDeliveries,
+            'rating' => $rating,
+            'average_rating' => $rating,
             'total_ratings' => (int) ($courier->total_ratings ?? 0),
             'password_set' => ! empty($this->password),
             'must_change_password' => $this->mustChangePassword(),
