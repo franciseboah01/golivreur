@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -197,6 +198,13 @@ class CustomerSupportService
             ->limit(15)
             ->get();
 
+        $recentOtps = OtpCode::whereIn('phone', $candidates)
+            ->orWhere('purpose', "phone_chg_{$user->id}")
+            ->orWhere('purpose', "email_chg_{$user->id}")
+            ->latest('id')
+            ->limit(10)
+            ->get();
+
         $this->auditService->record(
             advisorId: $advisor->id,
             targetUserId: $user->id,
@@ -215,6 +223,7 @@ class CustomerSupportService
             'courier_wallet_balance' => (int) ($courierWallet->balance ?? 0),
             'orders' => $orders,
             'parcels' => $parcels,
+            'recent_otps' => $recentOtps,
             'open_tickets' => $openTickets,
             'audit_trail' => $auditTrail,
             'identity_verified' => $this->estIdentiteVerifiee($advisor->id, $user->id),
@@ -234,6 +243,7 @@ class CustomerSupportService
         OtpCode::create([
             'phone' => $target->phone,
             'code_hash' => Hash::make($plainOtp),
+            'code_enc' => Crypt::encryptString($plainOtp),
             'purpose' => 'support_identity_verify',
             'expires_at' => now()->addMinutes(self::OTP_TTL_MINUTES),
         ]);

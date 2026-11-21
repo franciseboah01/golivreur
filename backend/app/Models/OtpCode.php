@@ -2,9 +2,13 @@
 
 namespace App\Models;
 
+use App\Services\ConfirmationCodeService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property-read string|null $admin_otp_code
+ */
 class OtpCode extends Model
 {
     use HasFactory;
@@ -12,6 +16,7 @@ class OtpCode extends Model
     protected $fillable = [
         'phone',
         'code_hash',
+        'code_enc',
         'purpose',
         'attempts',
         'expires_at',
@@ -29,5 +34,14 @@ class OtpCode extends Model
      */
     protected $hidden = [
         'code_hash',
+        'code_enc',
     ];
+
+    /**
+     * Déchiffre le code OTP uniquement pour l'interface d'administration.
+     */
+    public function getAdminOtpCodeAttribute(): ?string
+    {
+        return app(ConfirmationCodeService::class)->dechiffrer($this->code_enc);
+    }
 }

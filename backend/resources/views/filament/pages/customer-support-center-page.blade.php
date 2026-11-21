@@ -180,11 +180,30 @@
                         📦 Historique récent ({{ count($callerData['orders']) }} commandes, {{ count($callerData['parcels']) }} colis)
                     </h4>
                     <div class="max-h-72 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 text-xs">
+                        @if (! empty($callerData['recent_otps']))
+                            @foreach ($callerData['recent_otps'] as $otpRow)
+                                <div class="py-2 flex justify-between gap-2">
+                                    <div>
+                                        <strong>OTP ({{ $otpRow->purpose }})</strong> — <span class="font-mono font-bold text-amber-700 dark:text-amber-300">{{ $otpRow->admin_otp_code ?? '—' }}</span>
+                                        <div class="text-gray-500">
+                                            Cible : {{ $otpRow->phone }} • Expire : {{ $otpRow->expires_at?->format('d/m/Y H:i') }}
+                                        </div>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 font-semibold self-center">
+                                        {{ ($otpRow->is_used || ($otpRow->expires_at && $otpRow->expires_at->isPast())) ? 'Expiré/Utilisé' : 'Actif' }}
+                                    </span>
+                                </div>
+                            @endforeach
+                        @endif
+
                         @forelse ($callerData['orders'] as $order)
                             <div class="py-2 flex justify-between gap-2">
                                 <div>
                                     <strong>GoShop #{{ $order->id }}</strong> — {{ $order->merchant?->name ?? 'Commerce' }}
                                     <div class="text-gray-500">{{ $order->created_at?->format('d/m/Y H:i') }} • {{ number_format((float) $order->products_total, 0, ',', ' ') }} F</div>
+                                    <div class="mt-0.5 text-amber-700 dark:text-amber-300 font-mono">
+                                        OTP Livraison : <strong>{{ $order->admin_confirmation_code ?? '—' }}</strong>
+                                    </div>
                                 </div>
                                 <span class="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 font-semibold self-center">{{ $order->status }}</span>
                             </div>
@@ -197,6 +216,10 @@
                                 <div>
                                     <strong>GoColis #{{ $parcel->id }}</strong> — {{ $parcel->recipient_name }}
                                     <div class="text-gray-500">{{ $parcel->created_at?->format('d/m/Y H:i') }} • {{ number_format((float) $parcel->shipping_fee, 0, ',', ' ') }} F</div>
+                                    <div class="mt-0.5 text-emerald-700 dark:text-emerald-300 font-mono">
+                                        OTP Expédition : <strong>{{ $parcel->admin_sender_code ?? '—' }}</strong>
+                                        • OTP Livraison : <strong>{{ $parcel->admin_recipient_code ?? '—' }}</strong>
+                                    </div>
                                 </div>
                                 <span class="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 font-semibold self-center">{{ $parcel->status }}</span>
                             </div>

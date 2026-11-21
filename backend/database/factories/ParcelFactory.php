@@ -6,6 +6,7 @@ use App\Models\City;
 use App\Models\Parcel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 
 class ParcelFactory extends Factory
@@ -25,7 +26,9 @@ class ParcelFactory extends Factory
             'has_insurance' => false,
             'insurance_amount' => 0,
             'sender_code' => Hash::make('1234'),
+            'sender_code_enc' => Crypt::encryptString('1234'),
             'recipient_code' => Hash::make('5678'),
+            'recipient_code_enc' => Crypt::encryptString('5678'),
             'recipient_name' => fake()->name(),
             'recipient_phone' => '07'.fake()->numerify('########'),
             'delivery_address' => fake()->address(),

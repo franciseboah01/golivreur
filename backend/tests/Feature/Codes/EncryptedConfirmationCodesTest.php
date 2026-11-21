@@ -151,15 +151,21 @@ it('P7 Point 1 GoColis: stocke sender_code_enc, bloque tiers/apres picked_up et 
 
     $parcel = Parcel::findOrFail($createRes->json('donnees.id'));
     expect($parcel->sender_code_enc)->not->toBeNull();
+    expect($parcel->recipient_code_enc)->not->toBeNull();
     $senderPlain = Crypt::decryptString((string) $parcel->sender_code_enc);
+    $recipientPlain = Crypt::decryptString((string) $parcel->recipient_code_enc);
     expect($senderPlain)->toMatch('/^\d{4}$/')
-        ->and(Hash::check($senderPlain, $parcel->sender_code))->toBeTrue();
+        ->and(Hash::check($senderPlain, $parcel->sender_code))->toBeTrue()
+        ->and($recipientPlain)->toMatch('/^\d{4}$/')
+        ->and(Hash::check($recipientPlain, $parcel->recipient_code))->toBeTrue()
+        ->and($parcel->admin_sender_code)->toBe($senderPlain)
+        ->and($parcel->admin_recipient_code)->toBe($recipientPlain);
 
     // JSON generique showClient ne contient aucun code
     $showRes = $this->withHeader('Authorization', "Bearer {$senderToken}")
         ->getJson("/api/v1/client/parcels/{$parcel->id}")
         ->assertOk();
-    expect($showRes->json('donnees'))->not->toHaveKeys(['sender_code', 'sender_code_enc', 'recipient_code', 'sender_code_plain']);
+    expect($showRes->json('donnees'))->not->toHaveKeys(['sender_code', 'sender_code_enc', 'recipient_code', 'recipient_code_enc', 'sender_code_plain']);
 
     // Avant picked_up (pending, waiting, accepted, at_sender) -> 200
     foreach ([Parcel::STATUS_PENDING, Parcel::STATUS_WAITING, Parcel::STATUS_ACCEPTED, Parcel::STATUS_AT_SENDER] as $statusBefore) {
@@ -343,4 +349,29 @@ it('P7 Point 1 legacy et regeneration admin: renvoie 409 sur code sans chiffreme
         ->callTableAction('regenerateSenderCode', $legacyParcel)
         ->assertHasNoTableActionErrors();
     expect(ActivityLog::where('action', 'parcel_sender_code_regenerated')->where('entity_id', $legacyParcel->id)->count())->toBe(2);
+});
+
+it('rend les OTP de connexion, de livraison GoShop et d\'expedition/livraison GoColis visibles pour l\'admin', function () {
+    $this->seed(RoleHabilitationSeeder::class);
+
+    $city = City::factory()->create(['name' => 'Daloa']);
+    $client = User::factory()->create(['role' => 'client', 'phone' => '0701122334', 'city_id' => $city->id, 'is_active' => true]);
+
+    // 1. OTP de connexion stocké chiffré et lisible par l'admin
+    $this->postJson('/api/v1/auth/login', ['phone' => '0701122334'])
+        ->assertOk();
+
+    $otpRecord = \App\Models\OtpCode::where('phone', '0701122334')->where('purpose', 'login')->latest('id')->first();
+    expect($otpRecord)->not->toBeNull()
+        ->and($otpRecord->code_enc)->not->toBeNull()
+        ->and($otpRecord->admin_otp_code)->toMatch('/^\d{4}$/')
+        ->and($client->fresh()->admin_latest_otp_code)->toBe($otpRecord->admin_otp_code);
+
+    // 2. OTP de livraison GoShop et d'expédition/livraison GoColis déchiffrables pour l'admin
+    $order = Order::factory()->create(['client_id' => $client->id, 'city_id' => $city->id]);
+    $parcel = Parcel::factory()->create(['sender_id' => $client->id, 'city_id' => $city->id]);
+
+    expect($order->admin_confirmation_code)->toBe('1234')
+        ->and($parcel->admin_sender_code)->toBe('1234')
+        ->and($parcel->admin_recipient_code)->toBe('5678');
 });

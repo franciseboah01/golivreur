@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ConfirmationCodeService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string|null $sender_code_plain
+ * @property-read string|null $admin_sender_code
+ * @property-read string|null $admin_recipient_code
  */
 class Parcel extends Model
 {
@@ -19,7 +22,7 @@ class Parcel extends Model
         'size', 'weight_kg', 'declared_value',
         'has_insurance', 'insurance_amount',
         'sender_code', 'sender_code_enc', 'sender_code_attempts', 'sender_code_locked',
-        'recipient_code', 'recipient_code_attempts', 'recipient_code_locked',
+        'recipient_code', 'recipient_code_enc', 'recipient_code_attempts', 'recipient_code_locked',
         'sms_failed', 'sms_failed_at',
         'recipient_name', 'recipient_phone',
         'delivery_address', 'delivery_lat', 'delivery_lng', 'distance_km',
@@ -32,7 +35,7 @@ class Parcel extends Model
     ];
 
     protected $hidden = [
-        'sender_code', 'sender_code_enc', 'recipient_code',
+        'sender_code', 'sender_code_enc', 'recipient_code', 'recipient_code_enc',
     ];
 
     protected $appends = [
@@ -182,5 +185,21 @@ class Parcel extends Model
         }
 
         return (int) $this->picked_up_at->diffInMinutes($this->delivered_at);
+    }
+
+    /**
+     * Déchiffre le code OTP d'expédition (ramassage chez l'expéditeur) pour l'interface d'administration.
+     */
+    public function getAdminSenderCodeAttribute(): ?string
+    {
+        return app(ConfirmationCodeService::class)->dechiffrer($this->sender_code_enc);
+    }
+
+    /**
+     * Déchiffre le code OTP de livraison (remise au destinataire) pour l'interface d'administration.
+     */
+    public function getAdminRecipientCodeAttribute(): ?string
+    {
+        return app(ConfirmationCodeService::class)->dechiffrer($this->recipient_code_enc);
     }
 }

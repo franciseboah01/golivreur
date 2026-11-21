@@ -155,9 +155,9 @@ class OrderResource extends Resource
                             ->label('Adresse complète de livraison')
                             ->required()
                             ->columnSpanFull(),
-                        Forms\Components\TextInput::make('confirmation_code')
-                            ->label('Code OTP de confirmation (chiffré)')
-                            ->formatStateUsing(fn (): string => '••••')
+                        Forms\Components\TextInput::make('admin_confirmation_code')
+                            ->label('Code OTP de livraison (Client → Livreur)')
+                            ->formatStateUsing(fn (?Order $record): string => $record !== null && $record->admin_confirmation_code !== null ? $record->admin_confirmation_code : 'Non disponible (régénérer)')
                             ->disabled()
                             ->dehydrated(false),
                         Forms\Components\Toggle::make('confirmation_locked')
@@ -268,6 +268,14 @@ class OrderResource extends Resource
                         'failed' => 'Échoué',
                         default => $state,
                     }),
+
+                Tables\Columns\TextColumn::make('admin_confirmation_code')
+                    ->label('OTP Livraison')
+                    ->badge()
+                    ->color('primary')
+                    ->fontFamily('mono')
+                    ->copyable()
+                    ->placeholder('—'),
 
                 Tables\Columns\IconColumn::make('confirmation_locked')
                     ->label('Code Bloqué')

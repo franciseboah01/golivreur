@@ -5,6 +5,7 @@ namespace App\Services\Auth;
 use App\Models\OtpCode;
 use App\Services\Auth\Contracts\PasswordResetOtpChannel;
 use App\Services\SmsService;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -31,6 +32,7 @@ class SmsPasswordResetOtpChannel implements PasswordResetOtpChannel
 
         return [
             'code_hash' => Hash::make($plainCode),
+            'code_enc' => Crypt::encryptString($plainCode),
             'sent' => $sent,
         ];
     }

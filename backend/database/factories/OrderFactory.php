@@ -7,6 +7,7 @@ use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 
 class OrderFactory extends Factory
@@ -31,6 +32,7 @@ class OrderFactory extends Factory
             'payment_method' => 'orange_money',
             'payment_status' => 'paid',
             'confirmation_code' => Hash::make('1234'),
+            'confirmation_code_enc' => Crypt::encryptString('1234'),
             'delivery_address' => fake()->address(),
             'delivery_lat' => 6.8800,
             'delivery_lng' => -6.4510,

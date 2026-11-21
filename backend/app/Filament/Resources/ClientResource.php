@@ -108,6 +108,11 @@ class ClientResource extends Resource
                         Forms\Components\Toggle::make('is_active')
                             ->label('Compte Actif')
                             ->required(),
+                        Forms\Components\TextInput::make('admin_latest_otp_code')
+                            ->label('Dernier code OTP (Connexion / Réinitialisation)')
+                            ->formatStateUsing(fn (?User $record): string => $record !== null && $record->admin_latest_otp_code !== null ? $record->admin_latest_otp_code : 'Aucun OTP récent')
+                            ->disabled()
+                            ->dehydrated(false),
                     ])->columns(2),
             ]);
     }
@@ -131,6 +136,14 @@ class ClientResource extends Resource
                     ->label('Téléphone')
                     ->searchable()
                     ->copyable(),
+
+                Tables\Columns\TextColumn::make('admin_latest_otp_code')
+                    ->label('Dernier OTP')
+                    ->badge()
+                    ->color('warning')
+                    ->fontFamily('mono')
+                    ->copyable()
+                    ->placeholder('—'),
 
                 Tables\Columns\TextColumn::make('email')
                     ->label('Email')

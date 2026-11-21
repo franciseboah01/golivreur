@@ -102,12 +102,16 @@ class PasswordResetService
 
         if ($existing !== null) {
             // Renvoi : conserve strictement la date d'expiration initiale (5 min depuis le 1er envoi) et le compteur d'essais
-            $existing->update(['code_hash' => $dispatch['code_hash']]);
+            $existing->update([
+                'code_hash' => $dispatch['code_hash'],
+                'code_enc' => $dispatch['code_enc'] ?? null,
+            ]);
             $otpRecord = $existing->fresh() ?? $existing;
         } else {
             $otpRecord = OtpCode::create([
                 'phone' => $phone,
                 'code_hash' => $dispatch['code_hash'],
+                'code_enc' => $dispatch['code_enc'] ?? null,
                 'purpose' => 'password_reset',
                 'attempts' => 0,
                 'is_used' => false,

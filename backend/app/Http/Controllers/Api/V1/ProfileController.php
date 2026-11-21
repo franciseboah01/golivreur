@@ -19,6 +19,7 @@ use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
@@ -254,6 +255,7 @@ class ProfileController extends Controller
         OtpCode::create([
             'phone' => $newPhone,
             'code_hash' => Hash::make($plainCode),
+            'code_enc' => Crypt::encryptString($plainCode),
             'purpose' => $purpose,
             'expires_at' => now()->addMinutes(5),
         ]);
@@ -471,6 +473,7 @@ class ProfileController extends Controller
         OtpCode::create([
             'phone' => $emailKey,
             'code_hash' => Hash::make($plainCode),
+            'code_enc' => Crypt::encryptString($plainCode),
             'purpose' => $purpose,
             'expires_at' => now()->addMinutes(10),
         ]);

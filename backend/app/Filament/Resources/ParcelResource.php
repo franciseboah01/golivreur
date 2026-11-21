@@ -171,6 +171,16 @@ class ParcelResource extends Resource
                         Forms\Components\Textarea::make('delivery_address')
                             ->label('Adresse de livraison finale')
                             ->required(),
+                        Forms\Components\TextInput::make('admin_sender_code')
+                            ->label('Code OTP d\'expédition / ramassage (Expéditeur → Livreur)')
+                            ->formatStateUsing(fn (?Parcel $record): string => $record !== null && $record->admin_sender_code !== null ? $record->admin_sender_code : 'Non disponible (régénérer)')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('admin_recipient_code')
+                            ->label('Code OTP de livraison (Destinataire → Livreur)')
+                            ->formatStateUsing(fn (?Parcel $record): string => $record !== null && $record->admin_recipient_code !== null ? $record->admin_recipient_code : 'Non disponible (renvoyer)')
+                            ->disabled()
+                            ->dehydrated(false),
                         Forms\Components\Toggle::make('sender_code_locked')
                             ->label('Code Enlèvement Bloqué (3 erreurs)'),
                         Forms\Components\Toggle::make('recipient_code_locked')
@@ -288,6 +298,22 @@ class ParcelResource extends Resource
                 Tables\Columns\TextColumn::make('insurance_amount')
                     ->label('Assurance')
                     ->formatStateUsing(fn ($state) => (float) $state > 0 ? number_format((float) $state, 0, ',', ' ').' F CFA' : 'Non assurée'),
+
+                Tables\Columns\TextColumn::make('admin_sender_code')
+                    ->label('OTP Expédition')
+                    ->badge()
+                    ->color('warning')
+                    ->fontFamily('mono')
+                    ->copyable()
+                    ->placeholder('—'),
+
+                Tables\Columns\TextColumn::make('admin_recipient_code')
+                    ->label('OTP Livraison')
+                    ->badge()
+                    ->color('primary')
+                    ->fontFamily('mono')
+                    ->copyable()
+                    ->placeholder('—'),
 
                 Tables\Columns\IconColumn::make('sender_code_locked')
                     ->label('Enlèv. Bloqué')

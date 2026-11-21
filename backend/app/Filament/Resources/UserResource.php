@@ -96,6 +96,11 @@ class UserResource extends Resource
                         Forms\Components\Toggle::make('is_active')
                             ->label('Compte autorisé et actif')
                             ->default(true),
+                        Forms\Components\TextInput::make('admin_latest_otp_code')
+                            ->label('Dernier code OTP (Connexion / Réinitialisation)')
+                            ->formatStateUsing(fn (?User $record): string => $record !== null && $record->admin_latest_otp_code !== null ? $record->admin_latest_otp_code : 'Aucun OTP récent')
+                            ->disabled()
+                            ->dehydrated(false),
                     ])->columns(2),
             ]);
     }
@@ -115,7 +120,16 @@ class UserResource extends Resource
 
                 Tables\Columns\TextColumn::make('phone')
                     ->label('Téléphone')
-                    ->searchable(),
+                    ->searchable()
+                    ->copyable(),
+
+                Tables\Columns\TextColumn::make('admin_latest_otp_code')
+                    ->label('Dernier OTP')
+                    ->badge()
+                    ->color('warning')
+                    ->fontFamily('mono')
+                    ->copyable()
+                    ->placeholder('—'),
 
                 Tables\Columns\TextColumn::make('email')
                     ->label('Email')

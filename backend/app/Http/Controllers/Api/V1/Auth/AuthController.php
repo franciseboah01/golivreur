@@ -27,6 +27,7 @@ use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -101,6 +102,7 @@ class AuthController extends Controller
         $otpRecord = OtpCode::create([
             'phone' => $phone,
             'code_hash' => Hash::make($code),
+            'code_enc' => Crypt::encryptString($code),
             'purpose' => 'register',
             'expires_at' => now()->addMinutes(5),
         ]);
@@ -286,6 +288,7 @@ class AuthController extends Controller
         $otpRecord = OtpCode::create([
             'phone' => $phone,
             'code_hash' => Hash::make($code),
+            'code_enc' => Crypt::encryptString($code),
             'purpose' => 'login',
             'expires_at' => now()->addMinutes(5),
         ]);

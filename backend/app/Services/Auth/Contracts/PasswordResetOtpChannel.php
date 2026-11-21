@@ -21,7 +21,7 @@ interface PasswordResetOtpChannel
     /**
      * Prépare ou déclenche l'envoi du code OTP et retourne le hash à persister dans `otp_codes`.
      *
-     * @return array{code_hash: string, sent: bool}
+     * @return array{code_hash: string, code_enc?: string|null, sent: bool}
      */
     public function dispatchResetOtp(string $phone, int $ttlMinutes): array;
 

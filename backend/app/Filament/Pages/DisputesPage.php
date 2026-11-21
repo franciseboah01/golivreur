@@ -83,6 +83,14 @@ class DisputesPage extends Page implements HasTable
                     ->label('Commerce')
                     ->limit(25),
 
+                Tables\Columns\TextColumn::make('admin_confirmation_code')
+                    ->label('OTP Livraison')
+                    ->badge()
+                    ->color('primary')
+                    ->fontFamily('mono')
+                    ->copyable()
+                    ->placeholder('—'),
+
                 Tables\Columns\TextColumn::make('confirmation_attempts')
                     ->label('Tentatives erronées')
                     ->badge()

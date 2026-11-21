@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ConfirmationCodeService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property-read float $total_client
+ * @property-read string|null $admin_confirmation_code
  */
 class Order extends Model
 {
@@ -210,5 +212,13 @@ class Order extends Model
     public function getTotalClientAttribute(): float
     {
         return $this->products_total + $this->delivery_fee;
+    }
+
+    /**
+     * Déchiffre le code OTP de confirmation de livraison GoShop pour l'interface d'administration.
+     */
+    public function getAdminConfirmationCodeAttribute(): ?string
+    {
+        return app(ConfirmationCodeService::class)->dechiffrer($this->confirmation_code_enc);
     }
 }

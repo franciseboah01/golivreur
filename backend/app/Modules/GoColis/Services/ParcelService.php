@@ -145,10 +145,11 @@ class ParcelService
             // Commissions avec $city (Point 4)
             $commissions = $this->commissionService->calculerCommissionsGoColis($fraisExpedition, $city);
 
-            // Générer les codes (hashé + chiffré pour expéditeur, SMS uniquement pour destinataire)
+            // Générer les codes (hashé + chiffré pour expéditeur et destinataire)
             $senderPair = $this->confirmationCodeService->genererPaire();
             $codeExpediteur = $senderPair['code'];
-            $codeDestinataire = $this->confirmationCodeService->genererCode();
+            $recipientPair = $this->confirmationCodeService->genererPaire();
+            $codeDestinataire = $recipientPair['code'];
 
             $parcel = Parcel::create([
                 'sender_id' => $expediteur->id,
@@ -161,7 +162,8 @@ class ParcelService
                 'insurance_amount' => $montantAssurance,
                 'sender_code' => $senderPair['hash'],
                 'sender_code_enc' => $senderPair['enc'],
-                'recipient_code' => Hash::make($codeDestinataire),
+                'recipient_code' => $recipientPair['hash'],
+                'recipient_code_enc' => $recipientPair['enc'],
                 'recipient_name' => $donnees['recipient_name'],
                 'recipient_phone' => $donnees['recipient_phone'],
                 'delivery_address' => $donnees['delivery_address'],
@@ -676,10 +678,12 @@ class ParcelService
                 ]);
             }
 
-            $nouveauCode = $this->confirmationCodeService->genererCode();
+            $recipientPair = $this->confirmationCodeService->genererPaire();
+            $nouveauCode = $recipientPair['code'];
 
             $lockedParcel->update([
-                'recipient_code' => Hash::make($nouveauCode),
+                'recipient_code' => $recipientPair['hash'],
+                'recipient_code_enc' => $recipientPair['enc'],
                 'recipient_code_attempts' => 0,
                 'recipient_code_locked' => false,
             ]);

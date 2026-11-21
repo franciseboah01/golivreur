@@ -354,9 +354,47 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
         return $this->hasMany(AdminSession::class);
     }
 
+    /**
+     * @return HasMany<ActivityLog, $this>
+     */
     public function activityLogs(): HasMany
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    /**
+     * Dernier code OTP actif (connexion, inscription, réinitialisation, support, changement numéro)
+     * associé au téléphone de l'utilisateur pour consultation côté administration.
+     */
+    public function latestOtpRecord(): ?OtpCode
+    {
+        if (empty($this->phone)) {
+            return null;
+        }
+
+        return OtpCode::where('phone', $this->phone)
+            ->latest('id')
+            ->first();
+    }
+
+    public function getAdminLatestOtpCodeAttribute(): ?string
+    {
+        $record = $this->latestOtpRecord();
+        if (! $record) {
+            return null;
+        }
+
+        $code = $record->admin_otp_code;
+        if ($code === null) {
+            return null;
+        }
+
+        $isExpired = $record->expires_at !== null && $record->expires_at->isPast();
+        if ($record->is_used || $isExpired) {
+            return "{$code} (expiré/utilisé)";
+        }
+
+        return $code;
     }
 
     // ─── Scopes ───────────────────────────────────────────────────────────────

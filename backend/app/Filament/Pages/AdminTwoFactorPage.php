@@ -9,6 +9,7 @@ use App\Services\SmsService;
 use App\Services\SupportAuditService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -77,6 +78,7 @@ class AdminTwoFactorPage extends Page
         OtpCode::create([
             'phone' => $this->channelKey($user),
             'code_hash' => Hash::make($plainCode),
+            'code_enc' => Crypt::encryptString($plainCode),
             'purpose' => 'admin_2fa',
             'expires_at' => now()->addMinutes($ttl),
         ]);
