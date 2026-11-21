@@ -186,8 +186,13 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
     // ─── Merchant / Business (GoShop Business) ───────────────────────────────
     Route::prefix('business')->middleware('role:merchant')->group(function () {
         Route::get('profile', [ProfileController::class, 'showBusiness']);
-        Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateBusiness'])
-            ->middleware('active_merchant');
+        Route::middleware('active_merchant')->group(function () {
+            Route::match(['put', 'post'], 'profile', [ProfileController::class, 'updateBusiness']);
+            Route::get('priority-drivers', [MerchantController::class, 'listPriorityDrivers']);
+            Route::post('priority-drivers', [MerchantController::class, 'createPriorityDriver']);
+            Route::put('priority-drivers/{courier}/select', [MerchantController::class, 'selectPriorityDriver']);
+            Route::delete('priority-drivers/select', [MerchantController::class, 'clearPriorityDriver']);
+        });
     });
 
     Route::prefix('merchant')->middleware('role:merchant')->group(function () {

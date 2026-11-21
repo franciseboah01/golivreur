@@ -26,6 +26,7 @@ class Courier extends Model
     protected $fillable = [
         'user_id',
         'city_id',
+        'merchant_id',
         'vehicle_type',
         'vehicle_plate',
         'id_card_number',
@@ -34,6 +35,7 @@ class Courier extends Model
         'photo_path',
         'photo_url',
         'is_active',
+        'validation_status',
         'activated_at',
         'activated_by',
         'is_online',
@@ -92,6 +94,11 @@ class Courier extends Model
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
+    }
+
+    public function merchant(): BelongsTo
+    {
+        return $this->belongsTo(Merchant::class);
     }
 
     public function orders(): HasMany

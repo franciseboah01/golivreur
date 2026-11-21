@@ -453,4 +453,198 @@ class MerchantController extends Controller
             ],
         ]);
     }
+
+    /**
+     * GET /api/v1/business/priority-drivers
+     * Liste UNIQUEMENT les livreurs rattachés à CE commerçant (jamais de liste globale).
+     */
+    public function listPriorityDrivers(SettingsService $settingsService): JsonResponse
+    {
+        $merchant = $this->getMerchant();
+        $config = $settingsService->get("merchant_priority_courier:{$merchant->id}", null, null);
+        $priorityCourierId = is_array($config) && isset($config['courier_id']) ? (int) $config['courier_id'] : null;
+
+        $drivers = Courier::with('user:id,name,phone,is_active')
+            ->where('merchant_id', $merchant->id)
+            ->orderByDesc('id')
+            ->get()
+            ->map(static fn (Courier $c): array => [
+                'id' => $c->id,
+                'name' => $c->user->name ?? "Livreur #{$c->id}",
+                'phone' => $c->user->phone ?? '',
+                'vehicle_type' => $c->vehicle_type,
+                'vehicle_plate' => $c->vehicle_plate,
+                'is_active' => (bool) $c->is_active,
+                'is_online' => (bool) $c->is_online,
+                'validation_status' => $c->validation_status ?? ($c->is_active ? 'approved' : 'pending'),
+                'is_priority' => $priorityCourierId === (int) $c->id,
+                'average_rating' => (float) ($c->average_rating ?? 0),
+            ])
+            ->values();
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'priority_courier_id' => $priorityCourierId,
+                'drivers' => $drivers,
+            ],
+        ]);
+    }
+
+    /**
+     * POST /api/v1/business/priority-drivers
+     * Crée un livreur pré-inscrit INACTIF lié au commerçant (validation admin requise).
+     */
+    public function createPriorityDriver(Request $request): JsonResponse
+    {
+        $merchant = $this->getMerchant();
+
+        $rawPhone = \App\Models\User::normalizePhone((string) $request->input('phone', ''));
+        $request->merge(['phone' => $rawPhone]);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'min:2', 'max:100'],
+            'phone' => ['required', 'string', 'regex:/^(01|05|07|21|25|27)[0-9]{8}$/'],
+            'password' => ['required', 'string', 'min:8', 'max:100'],
+            'vehicle_type' => ['required', 'string', 'max:50'],
+            'vehicle_plate' => ['required', 'string', 'min:3', 'max:30'],
+        ], [
+            'phone.regex' => 'Format ivoirien invalide : 10 chiffres attendus.',
+        ]);
+
+        $phone = (string) $validated['phone'];
+        if (\App\Models\User::withTrashed()->where('phone', $phone)->exists()) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Ce numéro de téléphone est déjà associé à un compte.',
+                'errors' => ['phone' => ['Ce numéro de téléphone est déjà utilisé.']],
+            ], 422);
+        }
+
+        $vehicleType = strtolower(trim((string) $validated['vehicle_type']));
+        if (
+            \App\Models\VehicleType::where('is_active', true)->exists()
+            && ! \App\Models\VehicleType::where('slug', $vehicleType)->where('is_active', true)->exists()
+        ) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Le type de véhicule sélectionné n\'est pas disponible.',
+                'errors' => ['vehicle_type' => ['Le type de véhicule sélectionné n\'est pas disponible.']],
+            ], 422);
+        }
+
+        $courier = \Illuminate\Support\Facades\DB::transaction(function () use ($merchant, $validated, $phone, $vehicleType, $request): Courier {
+            $user = \App\Models\User::create([
+                'name' => trim((string) $validated['name']),
+                'phone' => $phone,
+                'password' => \Illuminate\Support\Facades\Hash::make((string) $validated['password']),
+                'role' => 'driver',
+                'city_id' => $merchant->city_id,
+                'is_active' => false,
+            ]);
+
+            $courier = Courier::create([
+                'user_id' => $user->id,
+                'city_id' => $merchant->city_id,
+                'merchant_id' => $merchant->id,
+                'vehicle_type' => $vehicleType,
+                'vehicle_plate' => trim((string) $validated['vehicle_plate']),
+                'is_active' => false,
+                'validation_status' => 'pending',
+                'is_online' => false,
+            ]);
+
+            Wallet::firstOrCreate(
+                ['owner_type' => 'courier', 'owner_id' => $courier->id],
+                ['balance' => 0, 'total_earned' => 0, 'total_withdrawn' => 0],
+            );
+
+            ActivityLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'merchant_priority_driver_created',
+                'entity_type' => 'courier',
+                'entity_id' => $courier->id,
+                'properties' => [
+                    'merchant_id' => $merchant->id,
+                    'city_id' => $merchant->city_id,
+                    'vehicle_type' => $vehicleType,
+                ],
+                'ip_address' => $request->ip(),
+                'severity' => 'info',
+            ]);
+
+            return $courier->load('user');
+        });
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Livreur pré-inscrit en attente de validation par l\'administration GoLivreur.',
+            'donnees' => [
+                'id' => $courier->id,
+                'name' => $courier->user->name ?? '',
+                'phone' => $courier->user->phone ?? '',
+                'vehicle_type' => $courier->vehicle_type,
+                'vehicle_plate' => $courier->vehicle_plate,
+                'is_active' => false,
+                'validation_status' => 'pending',
+            ],
+        ], 201);
+    }
+
+    /**
+     * PUT /api/v1/business/priority-drivers/{courier}/select
+     * Permet au commerçant de choisir UNIQUEMENT un de SES livreurs déjà validés (autre livreur -> 404).
+     */
+    public function selectPriorityDriver(Courier $courier, SettingsService $settingsService): JsonResponse
+    {
+        $merchant = $this->getMerchant();
+
+        if ((int) $courier->merchant_id !== (int) $merchant->id) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Livreur introuvable dans votre liste de livreurs.',
+            ], 404);
+        }
+
+        if (! $courier->is_active || ($courier->validation_status ?? 'pending') !== 'approved') {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Ce livreur est encore en attente de validation par GoLivreur.',
+            ], 422);
+        }
+
+        $settingsService->set(
+            "merchant_priority_courier:{$merchant->id}",
+            [
+                'courier_id' => $courier->id,
+                'assigned_at' => now()->toIso8601String(),
+                'assigned_by' => auth()->id(),
+            ],
+            null,
+            (int) auth()->id(),
+        );
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Livreur prioritaire sélectionné.',
+            'donnees' => [
+                'priority_courier_id' => $courier->id,
+            ],
+        ]);
+    }
+
+    /**
+     * DELETE /api/v1/business/priority-drivers/select
+     */
+    public function clearPriorityDriver(SettingsService $settingsService): JsonResponse
+    {
+        $merchant = $this->getMerchant();
+        $settingsService->set("merchant_priority_courier:{$merchant->id}", null, null, (int) auth()->id());
+
+        return response()->json([
+            'succes' => true,
+            'message' => 'Livreur prioritaire retiré.',
+            'donnees' => ['priority_courier_id' => null],
+        ]);
+    }
 }
