@@ -12,8 +12,11 @@ use App\Http\Resources\BusinessProfileResource;
 use App\Http\Resources\ClientProfileResource;
 use App\Http\Resources\DriverProfileResource;
 use App\Models\ActivityLog;
+use App\Models\Order;
 use App\Models\OtpCode;
+use App\Models\Parcel;
 use App\Models\User;
+use App\Services\ConfirmationCodeService;
 use App\Services\FirebasePhoneAuthService;
 use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
@@ -950,6 +953,86 @@ class ProfileController extends Controller
                     'role' => $tokens['user']->role,
                     'roles' => $tokens['user']->effectiveRoles(),
                 ],
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/v1/me/security
+     * Renvoie password_set, téléphone masqué et la liste des codes de livraison ACTIFS
+     * du propriétaire (commandes GoShop et colis GoColis en cours uniquement, jamais loggés).
+     */
+    public function securityOverview(Request $request, ConfirmationCodeService $codeService): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $activeCodes = [];
+
+        $activeOrders = Order::with('merchant:id,name')
+            ->where('client_id', $user->id)
+            ->whereIn('status', [
+                Order::STATUS_ACCEPTED,
+                Order::STATUS_WAITING,
+                Order::STATUS_READY,
+                Order::STATUS_PICKED_UP,
+                Order::STATUS_IN_TRANSIT,
+            ])
+            ->latest('id')
+            ->limit(20)
+            ->get();
+
+        foreach ($activeOrders as $order) {
+            $plain = $codeService->dechiffrer($order->confirmation_code_enc);
+            if ($plain === null) {
+                continue;
+            }
+
+            $activeCodes[] = [
+                'type' => 'order',
+                'id' => $order->id,
+                'reference' => "Commande #{$order->id}",
+                'label' => $order->merchant?->name ?? 'Commande GoShop',
+                'status' => $order->status,
+                'code' => $plain,
+                'instruction' => 'Communiquez ce code uniquement au livreur au moment où il vous remet votre commande.',
+            ];
+        }
+
+        $activeParcels = Parcel::where('sender_id', $user->id)
+            ->whereIn('status', [
+                Parcel::STATUS_PENDING,
+                Parcel::STATUS_WAITING,
+                Parcel::STATUS_ACCEPTED,
+                Parcel::STATUS_AT_SENDER,
+            ])
+            ->latest('id')
+            ->limit(20)
+            ->get();
+
+        foreach ($activeParcels as $parcel) {
+            $plain = $codeService->dechiffrer($parcel->sender_code_enc);
+            if ($plain === null) {
+                continue;
+            }
+
+            $activeCodes[] = [
+                'type' => 'parcel',
+                'id' => $parcel->id,
+                'reference' => "Colis #{$parcel->id}",
+                'label' => "Vers {$parcel->recipient_name}",
+                'status' => $parcel->status,
+                'code' => $plain,
+                'instruction' => 'Communiquez ce code au livreur uniquement au moment du ramassage du colis.',
+            ];
+        }
+
+        return response()->json([
+            'succes' => true,
+            'donnees' => [
+                'password_set' => ! empty($user->password),
+                'masked_phone' => $user->masked_phone,
+                'active_delivery_codes' => $activeCodes,
             ],
         ]);
     }

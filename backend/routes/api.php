@@ -140,6 +140,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
     Route::post('me/password', [ProfileController::class, 'setOrUpdatePassword']);
     Route::post('me/phone/request', [ProfileController::class, 'requestPhoneChangeOtp']);
     Route::post('me/phone/confirm', [ProfileController::class, 'confirmPhoneChange']);
+    Route::get('me/security', [ProfileController::class, 'securityOverview'])->middleware('throttle:30,1');
     Route::get('profile/{user}', [ProfileController::class, 'showForUser']);
     Route::match(['put', 'post'], 'profile/{user}', [ProfileController::class, 'updateForUser']);
 
