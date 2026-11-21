@@ -7,8 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golivreur_business/features/auth/screens/business_login_screen.dart';
+import 'package:golivreur_business/features/business/providers/business_provider.dart';
 import 'package:golivreur_business/features/catalog/screens/business_catalog_screen.dart';
 import 'package:golivreur_business/features/navigation/screens/business_main_navigation_screen.dart';
+import 'package:golivreur_business/features/profile/models/opening_hours_model.dart';
+import 'package:golivreur_business/features/profile/screens/edit_business_profile_screen.dart';
 import 'package:golivreur_business/main.dart';
 import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
@@ -323,5 +326,66 @@ void main() {
     expect(yNom, lessThan(yPrix));
     expect(yPrix, lessThan(yIngredients));
     expect(yIngredients, lessThan(yQuantite));
+  });
+
+  test('ShopOpeningHours valide un créneau passant minuit (22:00 -> 02:00)', () {
+    const hours = ShopOpeningHours(
+      is247: false,
+      days: {
+        'friday': [TimeInterval(start: '22:00', end: '02:00')],
+      },
+    );
+    expect(hours.validate(), isNull);
+    expect(hours.days['friday']!.first.isOvernight, isTrue);
+    expect(hours.days['friday']!.first.displayLabel, '22:00 → 02:00 (+1j)');
+    final json = hours.toJson();
+    expect(json['is_24_7'], isFalse);
+    expect(json['timezone'], 'Africa/Abidjan');
+  });
+
+  test('BusinessHistoryBucket parse le résumé jour/semaine et previous_week', () {
+    final bucket = BusinessHistoryBucket.fromJson({
+      'scope': 'week',
+      'week': '2026-W47',
+      'previous_week': '2026-W46',
+      'start_date': '2026-11-16',
+      'end_date': '2026-11-22',
+      'summary': {
+        'orders_count': 4,
+        'delivered_count': 3,
+        'delivered_merchant_amount': 12500,
+      },
+      'orders': [
+        {
+          'id': 101,
+          'status': 'delivered',
+          'client_name': 'Kouamé',
+          'products_total': 4500,
+          'merchant_amount': 4000,
+          'payment_method': 'cash',
+          'created_at': '2026-11-21T10:00:00Z',
+        },
+      ],
+    });
+    expect(bucket.ordersCount, 4);
+    expect(bucket.deliveredCount, 3);
+    expect(bucket.deliveredMerchantAmount, 12500);
+    expect(bucket.previousWeek, '2026-W46');
+    expect(bucket.orders.length, 1);
+  });
+
+  testWidgets('EditBusinessProfileScreen affiche Défini par GoLivreur et aucune saisie GPS',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _fakeBusinessOverrides(),
+        child: const MaterialApp(home: EditBusinessProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Défini par GoLivreur'), findsWidgets);
+    expect(find.text('Détecter ma position GPS'), findsNothing);
+    expect(find.text('Choisir sur la carte'), findsNothing);
   });
 }

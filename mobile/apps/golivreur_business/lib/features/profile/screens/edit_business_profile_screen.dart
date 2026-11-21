@@ -2,32 +2,30 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
-import 'package:golivreur_core/services/api_client.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../business/providers/business_provider.dart';
+import '../models/opening_hours_model.dart';
 
-/// Écran « Modifier mon profil » — GoLivreur Business (Commerce + Gérant).
+/// Écran « Profil & Horaires de ma boutique » — GoLivreur Business (Lot 9C Points 1, 2 & 4).
+/// Les champs sensibles (nom, catégorie, adresse, quartier, position GPS) sont définis par GoLivreur
+/// et affichés en lecture seule ; jamais envoyés depuis le téléphone du commerçant.
 class EditBusinessProfileScreen extends ConsumerStatefulWidget {
   const EditBusinessProfileScreen({super.key});
 
   @override
-  ConsumerState<EditBusinessProfileScreen> createState() => _EditBusinessProfileScreenState();
+  ConsumerState<EditBusinessProfileScreen> createState() =>
+      _EditBusinessProfileScreenState();
 }
 
-class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileScreen> {
+class _EditBusinessProfileScreenState
+    extends ConsumerState<EditBusinessProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  late final TextEditingController _businessNameCtrl;
   late final TextEditingController _emojiCtrl;
-  late final TextEditingController _addressCtrl;
   late final TextEditingController _descCtrl;
-  late final TextEditingController _hoursCtrl;
-  late final TextEditingController _ownerNameCtrl;
-  late final TextEditingController _ownerPhoneCtrl;
-  late final TextEditingController _ownerEmailCtrl;
 
-  String _categorySlug = 'maquis';
+  late ShopOpeningHours _openingHours;
   String _language = 'fr';
   bool _notificationsEnabled = true;
 
@@ -35,68 +33,46 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
   Uint8List? _pickedLogoBytes;
   XFile? _pickedStorePhoto;
   Uint8List? _pickedStorePhotoBytes;
-  XFile? _pickedOwnerPhoto;
-  Uint8List? _pickedOwnerPhotoBytes;
-
-  List<Map<String, String>> _categories = const [
-    {'slug': 'restaurant', 'name': 'Restaurants', 'emoji': '🍽️'},
-    {'slug': 'maquis', 'name': 'Maquis & Grillades', 'emoji': '🍖'},
-    {'slug': 'fast_food', 'name': 'Fast-Foods', 'emoji': '🍔'},
-    {'slug': 'pharmacie', 'name': 'Pharmacies', 'emoji': '💊'},
-    {'slug': 'boulangerie', 'name': 'Boulangeries & Pâtisseries', 'emoji': '🥐'},
-    {'slug': 'supermarche', 'name': 'Supermarchés & Épiceries', 'emoji': '🛒'},
-    {'slug': 'boissons', 'name': 'Boissons & Vins', 'emoji': '🥤'},
-    {'slug': 'boutique', 'name': 'Mode & Tissus', 'emoji': '👕'},
-    {'slug': 'high_tech', 'name': 'High-Tech & Téléphonie', 'emoji': '📱'},
-    {'slug': 'autre', 'name': 'Autre Commerce', 'emoji': '🏪'},
-  ];
-
-  static const List<String> _presetEmojis = [
-    '🍖', '🍽️', '🍔', '🍕', '🍗', '🥐', '🍰', '🥤', '☕', '💊', '🛒', '👕', '📱', '💐', '🏪',
-  ];
 
   bool _isInitialLoading = true;
   bool _isSaving = false;
-  bool _locatingGps = false;
-  GpsPositionResult? _gpsFailure;
-  String? _selectedPlanBNeighborhood;
-  double? _shopLat;
-  double? _shopLng;
   String? _errorMsg;
 
   static const Color _businessColor = Color(0xFF2E75B6);
+  static const List<String> _presetEmojis = [
+    '🍖',
+    '🍽️',
+    '🍔',
+    '🍕',
+    '🍗',
+    '🥐',
+    '🍰',
+    '🥤',
+    '☕',
+    '💊',
+    '🛒',
+    '👕',
+    '📱',
+    '💐',
+    '🏪',
+  ];
 
   @override
   void initState() {
     super.initState();
     final p = ref.read(businessProfileProvider);
-    _businessNameCtrl = TextEditingController(text: p.name);
     _emojiCtrl = TextEditingController(text: p.emoji ?? '🏪');
-    _addressCtrl = TextEditingController(text: p.quarter);
     _descCtrl = TextEditingController(text: p.description ?? '');
-    _hoursCtrl = TextEditingController(text: p.openHoursText);
-    _ownerNameCtrl = TextEditingController(text: p.ownerName);
-    _ownerPhoneCtrl = TextEditingController(text: p.ownerPhone);
-    _ownerEmailCtrl = TextEditingController(text: p.ownerEmail ?? '');
-    _categorySlug = p.categorySlug;
+    _openingHours = p.openHoursConfig;
     _language = p.language;
     _notificationsEnabled = p.notificationsEnabled;
-    _shopLat = p.lat;
-    _shopLng = p.lng;
-
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitialData());
   }
 
   @override
   void dispose() {
-    _businessNameCtrl.dispose();
     _emojiCtrl.dispose();
-    _addressCtrl.dispose();
     _descCtrl.dispose();
-    _hoursCtrl.dispose();
-    _ownerNameCtrl.dispose();
-    _ownerPhoneCtrl.dispose();
-    _ownerEmailCtrl.dispose();
     super.dispose();
   }
 
@@ -105,169 +81,118 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
       _isInitialLoading = true;
       _errorMsg = null;
     });
-
-    await Future.wait([
-      ref.read(businessProfileProvider.notifier).chargerProfil(),
-      _loadCategories(),
-    ]);
-
+    await ref.read(businessProfileProvider.notifier).chargerProfil();
     if (!mounted) return;
     final p = ref.read(businessProfileProvider);
-    _businessNameCtrl.text = p.name;
     _emojiCtrl.text = p.emoji ?? '🏪';
-    _addressCtrl.text = p.quarter;
     _descCtrl.text = p.description ?? '';
-    _hoursCtrl.text = p.openHoursText;
-    _ownerNameCtrl.text = p.ownerName;
-    _ownerPhoneCtrl.text = p.ownerPhone;
-    _ownerEmailCtrl.text = p.ownerEmail ?? '';
-    _categorySlug = p.categorySlug;
+    _openingHours = p.openHoursConfig;
     _language = p.language;
     _notificationsEnabled = p.notificationsEnabled;
-    _shopLat = p.lat;
-    _shopLng = p.lng;
-
     setState(() => _isInitialLoading = false);
   }
 
-  Future<void> _loadCategories() async {
-    try {
-      final res = await ref.read(apiClientProvider).get('/client/categories');
-      if (res.statusCode == 200 && res.data['succes'] == true) {
-        final list = (res.data['donnees'] as List)
-            .map((e) => {
-                  'slug': e['slug'].toString(),
-                  'name': e['name'].toString(),
-                  'emoji': (e['emoji'] ?? '🏪').toString(),
-                })
-            .toList();
-        if (list.isNotEmpty && mounted) {
-          setState(() => _categories = list);
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _ouvrirPlanBQuartierBoutique() async {
-    final profile = ref.read(businessProfileProvider);
-    final picked = await NeighborhoodPlanBSheet.show(
-      context,
-      title: 'Quartier de la boutique (Plan B)',
-      subtitle: LocationService.standardUnavailableMessage,
-      apiClient: ref.read(apiClientProvider),
-      defaultCityName: profile.cityName,
-      fallbackLat: profile.cityCenterLat,
-      fallbackLng: profile.cityCenterLng,
-      onRetryGps: _detecterGpsBoutique,
+  Future<void> _pickTime(
+    String dayKey,
+    int intervalIndex,
+    bool isStart,
+  ) async {
+    final currentList = List<TimeInterval>.from(
+      _openingHours.days[dayKey] ?? const [],
+    );
+    if (intervalIndex >= currentList.length) return;
+    final current = currentList[intervalIndex];
+    final initialStr = isStart ? current.start : current.end;
+    final parts = initialStr.split(':');
+    final initialTime = TimeOfDay(
+      hour: int.tryParse(parts.isNotEmpty ? parts[0] : '8') ?? 8,
+      minute: int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
     );
 
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (ctx, child) => MediaQuery(
+        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+        child: child ?? const SizedBox.shrink(),
+      ),
+    );
     if (picked == null || !mounted) return;
+
+    final formatted =
+        '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+    currentList[intervalIndex] = TimeInterval(
+      start: isStart ? formatted : current.start,
+      end: isStart ? current.end : formatted,
+    );
+
+    final updatedDays = Map<String, List<TimeInterval>>.from(_openingHours.days);
+    updatedDays[dayKey] = currentList;
     setState(() {
-      _selectedPlanBNeighborhood = picked.name;
-      _shopLat = picked.lat ?? profile.cityCenterLat ?? 6.8770;
-      _shopLng = picked.lng ?? profile.cityCenterLng ?? -6.4502;
-      if (_addressCtrl.text.trim().isEmpty) {
-        _addressCtrl.text = picked.name;
-      }
+      _openingHours = _openingHours.copyWith(days: updatedDays);
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '📍 Quartier Plan B sélectionné : ${picked.name}. Pensez à enregistrer.',
-        ),
-        backgroundColor: GoLivreurTheme.succes,
-      ),
-    );
   }
 
-  Future<void> _detecterGpsBoutique() async {
-    setState(() => _locatingGps = true);
-    final res = await LocationService.obtenirPositionActuelle(
-      withAddressLookup: true,
-    );
-    if (!mounted) return;
-    setState(() => _locatingGps = false);
-
-    if (res.isSuccess && res.lat != null && res.lng != null) {
-      setState(() {
-        _gpsFailure = null;
-        _shopLat = res.lat;
-        _shopLng = res.lng;
-        if (_addressCtrl.text.trim().isEmpty &&
-            res.formattedAddress != null &&
-            res.formattedAddress!.trim().isNotEmpty) {
-          _addressCtrl.text = res.formattedAddress!.trim();
-        }
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('📍 Position GPS de la boutique capturée ! Pensez à enregistrer.'),
-          backgroundColor: GoLivreurTheme.succes,
-        ),
-      );
-    } else {
-      setState(() => _gpsFailure = res);
-      LocationService.afficherAlerteNonBloquante(
-        context,
-        result: res,
-        onRetry: _detecterGpsBoutique,
-        onManualFallback: _ouvrirPlanBQuartierBoutique,
-      );
-      await _ouvrirPlanBQuartierBoutique();
-    }
-  }
-
-  Future<void> _choisirSurCarteBoutique() async {
-    final profile = ref.read(businessProfileProvider);
-    final picked = await Navigator.of(context).push<PickedLocation>(
-      MaterialPageRoute(
-        builder: (_) => OsmLocationPickerScreen(
-          title: 'Localisation de la boutique',
-          initialLat: _shopLat ?? profile.cityCenterLat ?? 6.8770,
-          initialLng: _shopLng ?? profile.cityCenterLng ?? -6.4502,
-          confirmLabel: 'Valider l\'emplacement',
-        ),
-      ),
-    );
-    if (!mounted || picked == null) return;
-
+  void _toggleDayOpen(String dayKey, bool open) {
+    final updatedDays = Map<String, List<TimeInterval>>.from(_openingHours.days);
+    updatedDays[dayKey] = open
+        ? [const TimeInterval(start: '08:00', end: '22:00')]
+        : const [];
     setState(() {
-      _shopLat = picked.lat;
-      _shopLng = picked.lng;
-      if (_addressCtrl.text.trim().isEmpty &&
-          picked.addressLabel != null &&
-          picked.addressLabel!.trim().isNotEmpty) {
-        _addressCtrl.text = picked.addressLabel!.trim();
-      }
+      _openingHours = _openingHours.copyWith(is247: false, days: updatedDays);
+    });
+  }
+
+  void _addSecondInterval(String dayKey) {
+    final updatedDays = Map<String, List<TimeInterval>>.from(_openingHours.days);
+    final list = List<TimeInterval>.from(updatedDays[dayKey] ?? const []);
+    if (list.length >= 2) return;
+    list.add(const TimeInterval(start: '18:00', end: '23:00'));
+    updatedDays[dayKey] = list;
+    setState(() {
+      _openingHours = _openingHours.copyWith(days: updatedDays);
+    });
+  }
+
+  void _removeInterval(String dayKey, int idx) {
+    final updatedDays = Map<String, List<TimeInterval>>.from(_openingHours.days);
+    final list = List<TimeInterval>.from(updatedDays[dayKey] ?? const []);
+    if (idx < list.length) {
+      list.removeAt(idx);
+    }
+    updatedDays[dayKey] = list;
+    setState(() {
+      _openingHours = _openingHours.copyWith(days: updatedDays);
     });
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    final hoursErr = _openingHours.validate();
+    if (hoursErr != null) {
+      setState(() => _errorMsg = hoursErr);
+      return;
+    }
 
     setState(() {
       _isSaving = true;
       _errorMsg = null;
     });
 
-    final (success, error) = await ref.read(businessProfileProvider.notifier).mettreAJourProfil(
-          ownerName: _ownerNameCtrl.text.trim(),
-          ownerPhone: _ownerPhoneCtrl.text.trim(),
-          ownerEmail: _ownerEmailCtrl.text.trim().isNotEmpty ? _ownerEmailCtrl.text.trim() : null,
-          businessName: _businessNameCtrl.text.trim(),
-          categorySlug: _categorySlug,
-          emoji: _emojiCtrl.text.trim().isNotEmpty ? _emojiCtrl.text.trim() : null,
-          address: _addressCtrl.text.trim(),
-          lat: _shopLat,
-          lng: _shopLng,
-          description: _descCtrl.text.trim().isNotEmpty ? _descCtrl.text.trim() : null,
-          openHoursText: _hoursCtrl.text.trim().isNotEmpty ? _hoursCtrl.text.trim() : null,
-          language: _language,
-          notificationsEnabled: _notificationsEnabled,
-          logoFile: _pickedLogo,
-          merchantPhotoFile: _pickedStorePhoto,
-          ownerPhotoFile: _pickedOwnerPhoto,
-        );
+    final (success, error) =
+        await ref.read(businessProfileProvider.notifier).mettreAJourProfil(
+              emoji: _emojiCtrl.text.trim().isNotEmpty
+                  ? _emojiCtrl.text.trim()
+                  : null,
+              description: _descCtrl.text.trim().isNotEmpty
+                  ? _descCtrl.text.trim()
+                  : null,
+              openHoursConfig: _openingHours,
+              language: _language,
+              notificationsEnabled: _notificationsEnabled,
+              logoFile: _pickedLogo,
+              merchantPhotoFile: _pickedStorePhoto,
+            );
 
     if (!mounted) return;
     setState(() => _isSaving = false);
@@ -275,14 +200,324 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Profil boutique mis à jour avec succès !'),
+          content: Text('Profil et horaires mis à jour !'),
           backgroundColor: GoLivreurTheme.succes,
         ),
       );
       Navigator.of(context).pop(true);
     } else {
-      setState(() => _errorMsg = error ?? 'Impossible de sauvegarder vos modifications.');
+      setState(
+        () => _errorMsg = error ?? 'Impossible de sauvegarder vos modifications.',
+      );
     }
+  }
+
+  Future<void> _openPhoneChangeSheet() async {
+    final phoneCtrl = TextEditingController();
+    final otpCtrl = TextEditingController();
+    var step = 1;
+    var busy = false;
+    String? err;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Changer de numéro (OTP)',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                step == 1
+                    ? 'Un code SMS sera envoyé sur votre nouveau numéro.'
+                    : 'Saisissez le code à 6 chiffres reçu par SMS.',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: GoLivreurTheme.texteSecondaire,
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (err != null) ...[
+                Text(
+                  err!,
+                  style: const TextStyle(
+                    color: GoLivreurTheme.erreur,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (step == 1)
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Nouveau numéro (ex: 0702010099)',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                    border: OutlineInputBorder(),
+                  ),
+                )
+              else
+                TextField(
+                  controller: otpCtrl,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'Code OTP',
+                    prefixIcon: Icon(Icons.sms_outlined),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              const SizedBox(height: 14),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _businessColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: busy
+                    ? null
+                    : () async {
+                        setSheetState(() {
+                          busy = true;
+                          err = null;
+                        });
+                        if (step == 1) {
+                          final (ok, msg) = await ref
+                              .read(businessProfileProvider.notifier)
+                              .demanderChangementTelephone(phoneCtrl.text);
+                          if (!ctx.mounted) return;
+                          setSheetState(() {
+                            busy = false;
+                            if (ok) {
+                              step = 2;
+                            } else {
+                              err = msg ?? 'Envoi impossible.';
+                            }
+                          });
+                        } else {
+                          final (ok, msg) = await ref
+                              .read(businessProfileProvider.notifier)
+                              .confirmerChangementTelephone(otpCtrl.text);
+                          if (!ctx.mounted) return;
+                          setSheetState(() => busy = false);
+                          if (ok) {
+                            Navigator.of(ctx).pop();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(msg ?? 'Numéro mis à jour.'),
+                                  backgroundColor: GoLivreurTheme.succes,
+                                ),
+                              );
+                            }
+                          } else {
+                            setSheetState(
+                              () => err = msg ?? 'Code OTP invalide.',
+                            );
+                          }
+                        }
+                      },
+                child: Text(
+                  busy
+                      ? 'Traitement...'
+                      : (step == 1
+                          ? 'Envoyer le code SMS'
+                          : 'Confirmer le numéro'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    phoneCtrl.dispose();
+    otpCtrl.dispose();
+  }
+
+  Future<void> _openPasswordSheet(bool passwordSet) async {
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    var busy = false;
+    String? err;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                passwordSet
+                    ? 'Changer mon mot de passe'
+                    : 'Définir un mot de passe',
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              if (err != null) ...[
+                Text(
+                  err!,
+                  style: const TextStyle(
+                    color: GoLivreurTheme.erreur,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (passwordSet) ...[
+                TextField(
+                  controller: currentCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Ancien mot de passe',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              TextField(
+                controller: newCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Nouveau mot de passe (min. 6 caractères)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: confirmCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Confirmer le nouveau mot de passe',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _businessColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: busy
+                    ? null
+                    : () async {
+                        if (newCtrl.text.length < 6) {
+                          setSheetState(
+                            () => err = 'Au moins 6 caractères requis.',
+                          );
+                          return;
+                        }
+                        if (newCtrl.text != confirmCtrl.text) {
+                          setSheetState(
+                            () => err = 'Les mots de passe ne correspondent pas.',
+                          );
+                          return;
+                        }
+                        setSheetState(() {
+                          busy = true;
+                          err = null;
+                        });
+                        final (ok, msg) = await ref
+                            .read(businessProfileProvider.notifier)
+                            .definirMotDePasse(
+                              currentPassword:
+                                  passwordSet ? currentCtrl.text : null,
+                              password: newCtrl.text,
+                              passwordConfirmation: confirmCtrl.text,
+                            );
+                        if (!ctx.mounted) return;
+                        setSheetState(() => busy = false);
+                        if (ok) {
+                          Navigator.of(ctx).pop();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(msg ?? 'Mot de passe mis à jour.'),
+                                backgroundColor: GoLivreurTheme.succes,
+                              ),
+                            );
+                          }
+                        } else {
+                          setSheetState(
+                            () => err = msg ?? 'Modification impossible.',
+                          );
+                        }
+                      },
+                child: Text(busy ? 'Enregistrement...' : 'Enregistrer'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    currentCtrl.dispose();
+    newCtrl.dispose();
+    confirmCtrl.dispose();
+  }
+
+  Widget _readOnlyRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 19, color: GoLivreurTheme.texteSecondaire),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: GoLivreurTheme.texteSecondaire,
+                  ),
+                ),
+                Text(
+                  value.isNotEmpty ? value : 'Non renseigné',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: GoLivreurTheme.textePrincipal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.lock_outline, size: 15, color: Colors.grey),
+        ],
+      ),
+    );
   }
 
   @override
@@ -292,7 +527,7 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
       appBar: AppBar(
-        title: const Text('Modifier mon profil'),
+        title: const Text('Profil & Horaires'),
         backgroundColor: Colors.white,
         elevation: 0.5,
       ),
@@ -305,7 +540,7 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ─── Logo & Photo Vitrine ─────────────────────────────────
+                    // ─── Infos Boutique (Défini par GoLivreur — Lecture seule) ───
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -314,10 +549,97 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
                         border: Border.all(color: GoLivreurTheme.bordure),
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Identité & Position de la boutique',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Défini par GoLivreur',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue.shade800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Nom, catégorie, quartier, adresse et position GPS sont gérés par l\'agence GoLivreur pour garantir des frais de livraison exacts.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: GoLivreurTheme.texteSecondaire,
+                            ),
+                          ),
+                          const Divider(height: 20),
+                          _readOnlyRow(
+                            Icons.storefront_outlined,
+                            'Nom de la boutique',
+                            profile.name,
+                          ),
+                          _readOnlyRow(
+                            Icons.category_outlined,
+                            'Catégorie',
+                            profile.category,
+                          ),
+                          _readOnlyRow(
+                            Icons.location_city_outlined,
+                            'Ville',
+                            profile.cityName ?? '',
+                          ),
+                          _readOnlyRow(
+                            Icons.place_outlined,
+                            'Adresse / Quartier',
+                            profile.quarter,
+                          ),
+                          _readOnlyRow(
+                            Icons.my_location,
+                            'Coordonnées GPS fixes',
+                            (profile.lat != null && profile.lng != null)
+                                ? '${profile.lat!.toStringAsFixed(5)}, ${profile.lng!.toStringAsFixed(5)}'
+                                : 'Défini par GoLivreur',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ─── Visuels & Description (Libres) ──────────────────────────
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: GoLivreurTheme.bordure),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Visuels de la boutique',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            'Vitrine & Description',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 14),
                           Row(
@@ -330,7 +652,7 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
                                 fallbackIcon: Icons.storefront,
                                 accentColor: _businessColor,
                                 buttonLabel: 'Logo boutique',
-                                size: 84,
+                                size: 80,
                                 isSquare: true,
                                 isUploading: _isSaving && _pickedLogo != null,
                                 onImagePicked: (file, bytes) {
@@ -346,9 +668,10 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
                                 fallbackIcon: Icons.add_photo_alternate_outlined,
                                 accentColor: GoLivreurTheme.primaire,
                                 buttonLabel: 'Photo vitrine',
-                                size: 84,
+                                size: 80,
                                 isSquare: true,
-                                isUploading: _isSaving && _pickedStorePhoto != null,
+                                isUploading:
+                                    _isSaving && _pickedStorePhoto != null,
                                 onImagePicked: (file, bytes) {
                                   setState(() {
                                     _pickedStorePhoto = file;
@@ -358,268 +681,28 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    if (_errorMsg != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: GoLivreurTheme.erreur.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: GoLivreurTheme.erreur.withValues(alpha: 0.4)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, color: GoLivreurTheme.erreur),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _errorMsg!,
-                                style: const TextStyle(color: GoLivreurTheme.erreur, fontSize: 13),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: _isSaving ? null : _save,
-                              child: const Text('Réessayer'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // ─── Informations de la Boutique ──────────────────────────
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: GoLivreurTheme.bordure),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Informations du commerce',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            controller: _businessNameCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Nom du commerce *',
-                              prefixIcon: Icon(Icons.storefront_outlined),
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: ProfileFormHelpers.validateRequiredName,
-                          ),
-                          const SizedBox(height: 14),
-                          DropdownButtonFormField<String>(
-                            initialValue: _categories.any((c) => c['slug'] == _categorySlug)
-                                ? _categorySlug
-                                : _categories.first['slug'],
-                            decoration: const InputDecoration(
-                              labelText: 'Catégorie d\'activité *',
-                              prefixIcon: Icon(Icons.category_outlined),
-                              border: OutlineInputBorder(),
-                            ),
-                            items: _categories
-                                .map((c) => DropdownMenuItem(
-                                      value: c['slug'],
-                                      child: Text('${c['emoji']} ${c['name']}'),
-                                    ))
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) setState(() => _categorySlug = val);
-                            },
-                          ),
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            controller: _emojiCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Emoji de la boutique',
-                              prefixIcon: Icon(Icons.emoji_emotions_outlined),
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                           Wrap(
                             spacing: 6,
                             runSpacing: 6,
                             children: _presetEmojis
-                                .map((em) => InkWell(
-                                      onTap: () => setState(() => _emojiCtrl.text = em),
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: _emojiCtrl.text == em
-                                              ? _businessColor.withValues(alpha: 0.15)
-                                              : GoLivreurTheme.fond,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(
-                                            color: _emojiCtrl.text == em
-                                                ? _businessColor
-                                                : GoLivreurTheme.bordure,
-                                          ),
-                                        ),
-                                        child: Text(em, style: const TextStyle(fontSize: 18)),
-                                      ),
-                                    ))
-                                .toList(),
-                          ),
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            controller: _addressCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Adresse physique *',
-                              prefixIcon: Icon(Icons.location_on_outlined),
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: ProfileFormHelpers.validateRequiredName,
-                          ),
-                          const SizedBox(height: 10),
-                          // ─── Géolocalisation GPS gratuite + OpenStreetMap ─────────
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: GoLivreurTheme.fond,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: GoLivreurTheme.bordure),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      _shopLat != null && _shopLng != null
-                                          ? Icons.gps_fixed
-                                          : Icons.gps_not_fixed,
-                                      size: 16,
-                                      color: _shopLat != null && _shopLng != null
-                                          ? GoLivreurTheme.succes
-                                          : GoLivreurTheme.texteSecondaire,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        _shopLat != null && _shopLng != null
-                                            ? 'Position GPS : ${_shopLat!.toStringAsFixed(5)}, ${_shopLng!.toStringAsFixed(5)}'
-                                            : 'Position GPS de la boutique non définie',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: _shopLat != null && _shopLng != null
-                                              ? GoLivreurTheme.succes
-                                              : GoLivreurTheme.texteSecondaire,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: _locatingGps ? null : _detecterGpsBoutique,
-                                        icon: _locatingGps
-                                            ? const SizedBox(
-                                                width: 14,
-                                                height: 14,
-                                                child: CircularProgressIndicator(strokeWidth: 2),
-                                              )
-                                            : const Icon(Icons.my_location, size: 16),
-                                        label: Text(
-                                          _locatingGps ? 'GPS...' : 'Ma position',
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: _ouvrirPlanBQuartierBoutique,
-                                        icon: const Icon(Icons.location_city_outlined, size: 16),
-                                        label: const Text(
-                                          'Quartier (Plan B)',
-                                          style: TextStyle(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: _choisirSurCarteBoutique,
-                                        icon: const Icon(Icons.map_outlined, size: 16),
-                                        label: const Text(
-                                          'Sur la carte',
-                                          style: TextStyle(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (_gpsFailure != null ||
-                                    _selectedPlanBNeighborhood != null) ...[
-                                  const SizedBox(height: 10),
-                                  GpsFallbackBanner(
-                                    lastResult: _gpsFailure,
-                                    isLoading: _locatingGps,
-                                    onRetry: _detecterGpsBoutique,
-                                    onSelectNeighborhood:
-                                        _ouvrirPlanBQuartierBoutique,
-                                    manualActionLabel:
-                                        'Choisir un quartier (Plan B)',
-                                    selectedManualLabel:
-                                        _selectedPlanBNeighborhood,
+                                .map(
+                                  (e) => ChoiceChip(
+                                    label: Text(e),
+                                    selected: _emojiCtrl.text == e,
+                                    onSelected: (_) =>
+                                        setState(() => _emojiCtrl.text = e),
                                   ),
-                                ],
-                                const SizedBox(height: 8),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(
-                                      Icons.info_outline,
-                                      size: 15,
-                                      color: _businessColor,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        'Ville d\'implantation fixe${(profile.cityName ?? '').isNotEmpty ? ' (${profile.cityName})' : ''} : un commerce qui change de ville doit recréer sa boutique dans la nouvelle ville.',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: GoLivreurTheme.texteSecondaire,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            controller: _hoursCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Horaires d\'ouverture',
-                              hintText: 'Ex: Lun - Dim : 08h00 - 22h00',
-                              prefixIcon: Icon(Icons.schedule_outlined),
-                              border: OutlineInputBorder(),
-                            ),
+                                )
+                                .toList(),
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
                             controller: _descCtrl,
                             maxLines: 3,
                             decoration: const InputDecoration(
-                              labelText: 'Description & Spécialités',
-                              prefixIcon: Icon(Icons.description_outlined),
+                              labelText: 'Description de la boutique',
+                              hintText: 'Spécialités, ambiance, informations utiles...',
                               border: OutlineInputBorder(),
                             ),
                           ),
@@ -628,109 +711,245 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
                     ),
                     const SizedBox(height: 16),
 
-                    // ─── Compte Gestionnaire ──────────────────────────────────
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
+                    // ─── Horaires d'ouverture structurés (Point 4) ───────────────
+                    Material(
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: GoLivreurTheme.bordure),
+                        side: const BorderSide(color: GoLivreurTheme.bordure),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Gérant & Préférences',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 14),
-                          Center(
-                            child: ProfileAvatarPicker(
-                              currentImageUrl: profile.ownerPhotoUrl,
-                              previewBytes: _pickedOwnerPhotoBytes,
-                              fallbackIcon: Icons.person,
-                              accentColor: _businessColor,
-                              buttonLabel: 'Photo du gérant',
-                              size: 76,
-                              isUploading: _isSaving && _pickedOwnerPhoto != null,
-                              onImagePicked: (file, bytes) {
+                      clipBehavior: Clip.antiAlias,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Horaires d\'ouverture (Africa/Abidjan)',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _openingHours.toReadableSummary(),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: GoLivreurTheme.texteSecondaire,
+                              ),
+                            ),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text(
+                                'Ouvert 24h/24, 7j/7',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              value: _openingHours.is247,
+                              activeThumbColor: _businessColor,
+                              onChanged: (val) {
                                 setState(() {
-                                  _pickedOwnerPhoto = file;
-                                  _pickedOwnerPhotoBytes = bytes;
+                                  if (val) {
+                                    _openingHours =
+                                        const ShopOpeningHours(is247: true);
+                                  } else {
+                                    final defaults = <String, List<TimeInterval>>{
+                                      for (final k in ShopOpeningHours.dayKeys)
+                                        k: [
+                                          const TimeInterval(
+                                            start: '08:00',
+                                            end: '22:00',
+                                          ),
+                                        ],
+                                    };
+                                    _openingHours = ShopOpeningHours(
+                                      is247: false,
+                                      days: _openingHours.days.isNotEmpty
+                                          ? _openingHours.days
+                                          : defaults,
+                                    );
+                                  }
                                 });
                               },
                             ),
-                          ),
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            controller: _ownerNameCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Nom du gérant *',
-                              prefixIcon: Icon(Icons.person_outline),
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: ProfileFormHelpers.validateRequiredName,
-                          ),
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            controller: _ownerPhoneCtrl,
-                            keyboardType: TextInputType.phone,
-                            decoration: const InputDecoration(
-                              labelText: 'Téléphone ivoirien *',
-                              prefixIcon: Icon(Icons.phone_outlined),
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: ProfileFormHelpers.validateIvorianPhone,
-                          ),
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            controller: _ownerEmailCtrl,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: const InputDecoration(
-                              labelText: 'Email (optionnel)',
-                              prefixIcon: Icon(Icons.email_outlined),
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: ProfileFormHelpers.validateOptionalEmail,
-                          ),
-                          const SizedBox(height: 14),
-                          DropdownButtonFormField<String>(
-                            initialValue: _language,
-                            decoration: const InputDecoration(
-                              labelText: 'Langue',
-                              prefixIcon: Icon(Icons.language),
-                              border: OutlineInputBorder(),
-                            ),
-                            items: const [
-                              DropdownMenuItem(value: 'fr', child: Text('Français')),
-                              DropdownMenuItem(value: 'en', child: Text('English')),
+                            if (!_openingHours.is247) ...[
+                              const Divider(height: 12),
+                              ...ShopOpeningHours.dayKeys.map((dayKey) {
+                                final intervals =
+                                    _openingHours.days[dayKey] ?? const [];
+                                final isOpenDay = intervals.isNotEmpty;
+                                return Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 6),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          SizedBox(
+                                            width: 88,
+                                            child: Text(
+                                              ShopOpeningHours
+                                                  .dayLabels[dayKey]!,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13.5,
+                                              ),
+                                            ),
+                                          ),
+                                          Switch(
+                                            value: isOpenDay,
+                                            activeThumbColor: _businessColor,
+                                            onChanged: (v) =>
+                                                _toggleDayOpen(dayKey, v),
+                                          ),
+                                          Text(
+                                            isOpenDay ? 'Ouvert' : 'Fermé',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: isOpenDay
+                                                  ? GoLivreurTheme.succes
+                                                  : GoLivreurTheme
+                                                      .texteSecondaire,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          if (isOpenDay && intervals.length < 2)
+                                            TextButton(
+                                              onPressed: () =>
+                                                  _addSecondInterval(dayKey),
+                                              child: const Text('+ 2e plage'),
+                                            ),
+                                        ],
+                                      ),
+                                      if (isOpenDay)
+                                        ...intervals.asMap().entries.map((entry) {
+                                          final idx = entry.key;
+                                          final iv = entry.value;
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              left: 12,
+                                              bottom: 6,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                OutlinedButton(
+                                                  onPressed: () => _pickTime(
+                                                    dayKey,
+                                                    idx,
+                                                    true,
+                                                  ),
+                                                  child: Text(iv.start),
+                                                ),
+                                                const Padding(
+                                                  padding: EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                  ),
+                                                  child: Text('→'),
+                                                ),
+                                                OutlinedButton(
+                                                  onPressed: () => _pickTime(
+                                                    dayKey,
+                                                    idx,
+                                                    false,
+                                                  ),
+                                                  child: Text(
+                                                    iv.isOvernight
+                                                        ? '${iv.end} (+1j)'
+                                                        : iv.end,
+                                                  ),
+                                                ),
+                                                if (intervals.length > 1)
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons.close,
+                                                      size: 18,
+                                                      color:
+                                                          GoLivreurTheme.erreur,
+                                                    ),
+                                                    onPressed: () =>
+                                                        _removeInterval(
+                                                      dayKey,
+                                                      idx,
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          );
+                                        }),
+                                    ],
+                                  ),
+                                );
+                              }),
                             ],
-                            onChanged: (val) => setState(() => _language = val ?? 'fr'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ─── Sécurité : Téléphone OTP & Mot de passe ─────────────────
+                    Material(
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(color: GoLivreurTheme.bordure),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(
+                              Icons.phone_android_outlined,
+                              color: _businessColor,
+                            ),
+                            title: const Text('Téléphone (changement par OTP)'),
+                            subtitle: Text(
+                              profile.ownerPhone.isNotEmpty
+                                  ? '+225 ${profile.ownerPhone}'
+                                  : 'Non renseigné',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: _openPhoneChangeSheet,
                           ),
-                          const SizedBox(height: 8),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: const Icon(
+                              Icons.lock_reset_outlined,
+                              color: GoLivreurTheme.primaire,
+                            ),
+                            title: Text(
+                              profile.passwordSet
+                                  ? 'Changer mon mot de passe'
+                                  : 'Définir un mot de passe',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => _openPasswordSheet(profile.passwordSet),
+                          ),
+                          const Divider(height: 1),
                           SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Notifications de commandes', style: TextStyle(fontSize: 14)),
+                            title: const Text('Notifications de commandes'),
                             value: _notificationsEnabled,
                             activeThumbColor: _businessColor,
-                            onChanged: (val) => setState(() => _notificationsEnabled = val),
-                          ),
-                          const Divider(),
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.lock_outline, color: _businessColor),
-                            title: const Text('Changer mon mot de passe', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => ProfileFormHelpers.showChangePasswordDialog(
-                              context,
-                              apiClient: ref.read(apiClientProvider),
-                              accentColor: _businessColor,
-                            ),
+                            onChanged: (v) =>
+                                setState(() => _notificationsEnabled = v),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+
+                    if (_errorMsg != null) ...[
+                      Text(
+                        _errorMsg!,
+                        style: const TextStyle(
+                          color: GoLivreurTheme.erreur,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
 
                     SizedBox(
                       height: 52,
@@ -738,22 +957,24 @@ class _EditBusinessProfileScreenState extends ConsumerState<EditBusinessProfileS
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _businessColor,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                         onPressed: _isSaving ? null : _save,
-                        icon: _isSaving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Icon(Icons.check_circle_outline),
+                        icon: const Icon(Icons.save_outlined),
                         label: Text(
-                          _isSaving ? 'Enregistrement en cours...' : 'Enregistrer les modifications',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          _isSaving
+                              ? 'Enregistrement...'
+                              : 'Enregistrer les modifications',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
                     ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),

@@ -28,6 +28,168 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
     });
   }
 
+  Future<void> _openCreatePriorityDriverDialog() async {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final plateCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    var vehicleType = 'moto';
+    var busy = false;
+    String? err;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Ajouter un livreur prioritaire',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Le livreur sera créé en statut inactif et devra être validé par l\'agence GoLivreur avant de recevoir des offres.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: GoLivreurTheme.texteSecondaire,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (err != null) ...[
+                  Text(
+                    err!,
+                    style: const TextStyle(
+                      color: GoLivreurTheme.erreur,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom et prénom *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Téléphone * (ex: 0708112233)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: vehicleType,
+                  decoration: const InputDecoration(
+                    labelText: 'Type de véhicule *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'moto', child: Text('Moto / Scooter')),
+                    DropdownMenuItem(value: 'velo', child: Text('Vélo')),
+                    DropdownMenuItem(value: 'voiture', child: Text('Voiture')),
+                    DropdownMenuItem(value: 'tricycle', child: Text('Tricycle')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setSheetState(() => vehicleType = v);
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: plateCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Plaque d\'immatriculation *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Mot de passe initial (optionnel)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E75B6),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          if (nameCtrl.text.trim().isEmpty ||
+                              phoneCtrl.text.trim().isEmpty ||
+                              plateCtrl.text.trim().isEmpty) {
+                            setSheetState(
+                              () => err = 'Nom, téléphone et plaque obligatoires.',
+                            );
+                            return;
+                          }
+                          setSheetState(() {
+                            busy = true;
+                            err = null;
+                          });
+                          final (ok, msg) = await ref
+                              .read(priorityCourierProvider.notifier)
+                              .creerLivreur(
+                                name: nameCtrl.text,
+                                phone: phoneCtrl.text,
+                                vehicleType: vehicleType,
+                                vehiclePlate: plateCtrl.text,
+                                password: passCtrl.text,
+                              );
+                          if (!ctx.mounted) return;
+                          setSheetState(() => busy = false);
+                          if (ok) {
+                            Navigator.of(ctx).pop();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(msg),
+                                  backgroundColor: GoLivreurTheme.succes,
+                                ),
+                              );
+                            }
+                          } else {
+                            setSheetState(() => err = msg);
+                          }
+                        },
+                  child: Text(busy ? 'Envoi...' : 'Enregistrer le livreur'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    nameCtrl.dispose();
+    phoneCtrl.dispose();
+    plateCtrl.dispose();
+    passCtrl.dispose();
+  }
+
   Future<void> _openPriorityCourierPicker() async {
     await ref.read(priorityCourierProvider.notifier).charger();
     if (!mounted) return;
@@ -48,13 +210,27 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Livreur prioritaire de la boutique',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Mes livreurs prioritaires',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _openCreatePriorityDriverDialog();
+                        },
+                        icon: const Icon(Icons.person_add_alt_1, size: 18),
+                        label: const Text('Ajouter'),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Ce livreur recevra vos commandes en priorité avant le dispatch standard (auto-assignation bloquée).',
+                    'Seuls vos livreurs validés par l\'agence GoLivreur peuvent être sélectionnés comme prioritaires.',
                     style: TextStyle(
                       fontSize: 12.5,
                       color: GoLivreurTheme.texteSecondaire,
@@ -96,7 +272,7 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
                         child: Text(
-                          'Aucun livreur actif disponible dans votre ville pour le moment.',
+                          'Vous n\'avez encore inscrit aucun livreur. Appuyez sur « Ajouter » pour en pré-inscrire un.',
                           style: TextStyle(color: GoLivreurTheme.texteSecondaire),
                         ),
                       )
@@ -110,17 +286,18 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                           itemBuilder: (_, index) {
                             final c = state.available[index];
                             final selected = state.current?.id == c.id;
+                            final statusColor = c.isApproved
+                                ? GoLivreurTheme.succes
+                                : c.validationStatus == 'rejected'
+                                    ? GoLivreurTheme.erreur
+                                    : Colors.orange;
                             return ListTile(
                               contentPadding: EdgeInsets.zero,
                               leading: CircleAvatar(
-                                backgroundColor: c.isOnline
-                                    ? Colors.green.withValues(alpha: 0.15)
-                                    : Colors.grey.shade200,
+                                backgroundColor: statusColor.withValues(alpha: 0.14),
                                 child: Icon(
                                   Icons.delivery_dining,
-                                  color: c.isOnline
-                                      ? GoLivreurTheme.secondaire
-                                      : Colors.grey,
+                                  color: statusColor,
                                 ),
                               ),
                               title: Text(
@@ -128,9 +305,10 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                               subtitle: Text(
-                                '${c.phone}${c.vehiclePlate != null ? " • ${c.vehiclePlate}" : ""} • ${c.isOnline ? "En ligne" : "Hors ligne"}',
+                                '${c.phone}${c.vehiclePlate != null ? " • ${c.vehiclePlate}" : ""}\n${c.statusLabel}',
                                 style: const TextStyle(fontSize: 12),
                               ),
+                              isThreeLine: true,
                               trailing: selected
                                   ? const Chip(
                                       label: Text('Prioritaire',
@@ -138,29 +316,40 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                                               fontSize: 11, color: Colors.white)),
                                       backgroundColor: GoLivreurTheme.secondaire,
                                     )
-                                  : TextButton(
-                                      onPressed: state.saving
-                                          ? null
-                                          : () async {
-                                              final (ok, msg) = await sheetRef
-                                                  .read(priorityCourierProvider
-                                                      .notifier)
-                                                  .assigner(c.id);
-                                              if (ctx.mounted) {
-                                                Navigator.of(ctx).pop();
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(msg),
-                                                    backgroundColor: ok
-                                                        ? GoLivreurTheme.secondaire
-                                                        : GoLivreurTheme.erreur,
-                                                  ),
-                                                );
-                                              }
-                                            },
-                                      child: const Text('Assigner'),
-                                    ),
+                                  : c.isApproved
+                                      ? TextButton(
+                                          onPressed: state.saving
+                                              ? null
+                                              : () async {
+                                                  final (ok, msg) = await sheetRef
+                                                      .read(priorityCourierProvider
+                                                          .notifier)
+                                                      .assigner(c.id);
+                                                  if (ctx.mounted) {
+                                                    Navigator.of(ctx).pop();
+                                                    ScaffoldMessenger.of(context)
+                                                        .showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(msg),
+                                                        backgroundColor: ok
+                                                            ? GoLivreurTheme.secondaire
+                                                            : GoLivreurTheme.erreur,
+                                                      ),
+                                                    );
+                                                  }
+                                                },
+                                          child: const Text('Choisir'),
+                                        )
+                                      : Text(
+                                          c.validationStatus == 'rejected'
+                                              ? 'Refusé'
+                                              : 'En attente',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: statusColor,
+                                          ),
+                                        ),
                             );
                           },
                         ),

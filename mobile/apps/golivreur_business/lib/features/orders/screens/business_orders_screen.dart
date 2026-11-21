@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:golivreur_core/config/app_theme.dart';
@@ -19,19 +20,36 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
   Timer? _countdownTimer;
   Timer? _pollTimer;
   int _rebours = 45;
+  final Set<int> _knownPendingIds = <int>{};
 
   @override
   void initState() {
     super.initState();
     _startTimer();
     _startPolling();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(businessOrderHistoryProvider.notifier).chargerAujourdhui();
+    });
   }
 
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) async {
       if (!mounted) return;
-      ref.read(businessOrdersProvider.notifier).chargerCommandes();
+      await ref.read(businessOrdersProvider.notifier).chargerCommandes();
+      if (!mounted) return;
+      final pendingNow = ref
+          .read(businessOrdersProvider)
+          .where((o) => o.status == BusinessOrderStatus.pending)
+          .map((o) => o.id)
+          .toSet();
+      final hasNew = pendingNow.any((id) => !_knownPendingIds.contains(id));
+      _knownPendingIds
+        ..clear()
+        ..addAll(pendingNow);
+      if (hasNew) {
+        HapticFeedback.heavyImpact();
+      }
     });
   }
 
@@ -73,11 +91,11 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
   Widget build(BuildContext context) {
     final profile = ref.watch(businessProfileProvider);
     final orders = ref.watch(businessOrdersProvider);
+    final historyState = ref.watch(businessOrderHistoryProvider);
 
     final pendingOrders = orders.where((o) => o.status == BusinessOrderStatus.pending).toList();
     final acceptedOrders = orders.where((o) => o.status == BusinessOrderStatus.accepted).toList();
     final readyOrders = orders.where((o) => o.status == BusinessOrderStatus.ready).toList();
-    final pastOrders = orders.where((o) => o.status == BusinessOrderStatus.delivered || o.status == BusinessOrderStatus.refused).toList();
 
     return Scaffold(
       backgroundColor: GoLivreurTheme.fond,
@@ -178,7 +196,10 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
       body: RefreshIndicator(
         color: GoLivreurTheme.secondaire,
         onRefresh: () async {
-          await ref.read(businessOrdersProvider.notifier).chargerCommandes();
+          await Future.wait([
+            ref.read(businessOrdersProvider.notifier).chargerCommandes(),
+            ref.read(businessOrderHistoryProvider.notifier).chargerAujourdhui(),
+          ]);
         },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -247,21 +268,54 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
             const SizedBox(height: 24),
           ],
 
-          // ─── Historique Récent ───────────────────────────────────────────
+          // ─── Historique Jour / Semaines ISO (Lot 9C Point 6) ──────────────
           const Text(
-            'Historique des commandes traitées',
+            'Historique des commandes',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: GoLivreurTheme.textePrincipal),
           ),
           const SizedBox(height: 10),
-          if (pastOrders.isEmpty)
+          if (historyState.loading && historyState.buckets.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (historyState.buckets.isEmpty)
             const Padding(
               padding: EdgeInsets.all(16),
               child: Center(
-                child: Text('Aucune commande passée aujourd\'hui', style: TextStyle(color: GoLivreurTheme.texteSecondaire)),
+                child: Text(
+                  'Aucune commande dans l\'historique aujourd\'hui',
+                  style: TextStyle(color: GoLivreurTheme.texteSecondaire),
+                ),
               ),
             )
-          else
-            ...pastOrders.map((order) => _buildPastOrderCard(order)),
+          else ...[
+            ...historyState.buckets.map(_buildHistoryBucketCard),
+            if (historyState.nextPreviousWeek != null &&
+                historyState.nextPreviousWeek!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 16),
+                child: OutlinedButton.icon(
+                  onPressed: historyState.loadingMore
+                      ? null
+                      : () => ref
+                          .read(businessOrderHistoryProvider.notifier)
+                          .chargerSemainePrecedente(),
+                  icon: historyState.loadingMore
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.history),
+                  label: Text(
+                    historyState.loadingMore
+                        ? 'Chargement...'
+                        : 'Voir + (semaine ${historyState.nextPreviousWeek})',
+                  ),
+                ),
+              ),
+          ],
         ],
         ),
       ),
@@ -443,42 +497,88 @@ class _BusinessOrdersScreenState extends ConsumerState<BusinessOrdersScreen> {
     );
   }
 
-  Widget _buildPastOrderCard(BusinessOrder order) {
-    final isDelivered = order.status == BusinessOrderStatus.delivered;
+  Widget _buildHistoryBucketCard(BusinessHistoryBucket bucket) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: GoLivreurTheme.bordure),
       ),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text('Commande #${order.id} • ${order.clientName}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 2),
-              Text('${order.items.length} article(s) • ${order.totalAmount.toInt()} F CFA', style: const TextStyle(color: GoLivreurTheme.texteSecondaire, fontSize: 12)),
+              Expanded(
+                child: Text(
+                  bucket.label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14.5,
+                    color: GoLivreurTheme.textePrincipal,
+                  ),
+                ),
+              ),
+              Text(
+                '${bucket.deliveredMerchantAmount.toInt()} F CFA',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: GoLivreurTheme.secondaire,
+                ),
+              ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: isDelivered ? GoLivreurTheme.succes.withValues(alpha: 0.1) : GoLivreurTheme.erreur.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              isDelivered ? 'Livrée ✓' : 'Refusée',
-              style: TextStyle(
-                color: isDelivered ? GoLivreurTheme.succes : GoLivreurTheme.erreur,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
+          const SizedBox(height: 4),
+          Text(
+            '${bucket.ordersCount} commande${bucket.ordersCount > 1 ? 's' : ''} • ${bucket.deliveredCount} livrée${bucket.deliveredCount > 1 ? 's' : ''}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: GoLivreurTheme.texteSecondaire,
             ),
           ),
+          if (bucket.orders.isNotEmpty) ...[
+            const Divider(height: 16),
+            ...bucket.orders.map((o) {
+              final isDelivered = o.status == 'delivered';
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '#${o.id} • ${o.clientName} (${o.productsTotal.toInt()} F)',
+                        style: const TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isDelivered
+                            ? GoLivreurTheme.succes.withValues(alpha: 0.12)
+                            : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isDelivered ? 'Livrée ✓' : o.status,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isDelivered
+                              ? GoLivreurTheme.succes
+                              : GoLivreurTheme.texteSecondaire,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
         ],
       ),
     );

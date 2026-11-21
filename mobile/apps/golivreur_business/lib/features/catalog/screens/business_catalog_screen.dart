@@ -154,7 +154,12 @@ class _BusinessCatalogScreenState extends ConsumerState<BusinessCatalogScreen> {
       '${item.price.toInt()} F CFA',
       if (item.category != null && item.category!.trim().isNotEmpty)
         item.category!.trim(),
-      if (item.quantity != null) 'Qté : ${item.quantity}',
+      if (item.quantity == null)
+        'Stock : Illimité'
+      else if (item.quantity! <= 0)
+        'Rupture (0)'
+      else
+        'Stock : ${item.quantity}',
     ];
 
     return InkWell(
@@ -363,6 +368,9 @@ class _DynamicProductFormSheetState
         _controllers[field.code] = TextEditingController(
           text: initial != null ? '$initial' : '',
         );
+        if (field.code == 'quantity') {
+          _boolValues['_unlimited_stock'] = initial == null || '$initial'.trim().isEmpty;
+        }
       }
     }
   }
@@ -468,6 +476,11 @@ class _DynamicProductFormSheetState
         }
       }
 
+      if (code == 'quantity' && (_boolValues['_unlimited_stock'] ?? false)) {
+        coreFields['quantity'] = null;
+        continue;
+      }
+
       if (value == null && !field.isRequired && widget.existingProduct == null) {
         continue;
       }
@@ -562,6 +575,68 @@ class _DynamicProductFormSheetState
     final isNumeric =
         field.fieldType == 'currency' || field.fieldType == 'number';
     final isTextarea = field.fieldType == 'textarea';
+
+    if (field.code == 'quantity') {
+      final isUnlimited = _boolValues['_unlimited_stock'] ?? false;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: GoLivreurTheme.fond,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: GoLivreurTheme.bordure),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: SwitchListTile(
+              title: Text(
+                field.label,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                isUnlimited
+                    ? 'Stock illimité (aucune limite de quantité)'
+                    : 'Quantité limitée (0 = indisponible)',
+                style: const TextStyle(fontSize: 11.5),
+              ),
+              value: isUnlimited,
+              activeThumbColor: GoLivreurTheme.secondaire,
+              onChanged: (v) {
+                setState(() {
+                  _boolValues['_unlimited_stock'] = v;
+                  if (v) {
+                    _controllers[field.code]?.clear();
+                  }
+                });
+              },
+            ),
+          ),
+          if (!isUnlimited) ...[
+            const SizedBox(height: 10),
+            TextFormField(
+              key: ValueKey('field_${field.code}'),
+              controller: _controllers[field.code],
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: labelText,
+                hintText: field.placeholder ?? 'Ex: 20 (0 = indisponible)',
+              ),
+              validator: (val) {
+                final trimmed = (val ?? '').trim();
+                if (trimmed.isEmpty) {
+                  return 'Saisissez une quantité ou activez « Stock illimité ».';
+                }
+                final parsed = int.tryParse(trimmed.replaceAll(' ', ''));
+                if (parsed == null || parsed < 0) {
+                  return 'Saisissez un nombre entier positif ou 0.';
+                }
+                return null;
+              },
+            ),
+          ],
+        ],
+      );
+    }
 
     return TextFormField(
       key: ValueKey('field_${field.code}'),

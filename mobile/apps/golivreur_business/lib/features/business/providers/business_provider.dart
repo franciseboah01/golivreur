@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/env_config.dart';
 import 'package:golivreur_core/models/modeles.dart';
 import 'package:golivreur_core/services/api_client.dart';
+import 'package:golivreur_core/services/secure_token_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../profile/models/opening_hours_model.dart';
 
 void _safeIgnore(Future<dynamic>? f) {
   f?.then((_) {}, onError: (_) {});
@@ -28,6 +30,7 @@ class BusinessProfileState {
   final double? cityCenterLng;
   final String? description;
   final String openHoursText;
+  final ShopOpeningHours openHoursConfig;
   final String ownerName;
   final String ownerPhone;
   final String? ownerEmail;
@@ -41,6 +44,7 @@ class BusinessProfileState {
   final double walletBalance;
   final List<String> roles;
   final bool mustChangePassword;
+  final bool passwordSet;
   final String? pinResetRequiredAt;
 
   const BusinessProfileState({
@@ -60,6 +64,7 @@ class BusinessProfileState {
     this.cityCenterLng,
     this.description,
     this.openHoursText = '',
+    this.openHoursConfig = const ShopOpeningHours(is247: true),
     this.ownerName = '',
     this.ownerPhone = '',
     this.ownerEmail,
@@ -73,6 +78,7 @@ class BusinessProfileState {
     this.walletBalance = 0,
     this.roles = const ['merchant'],
     this.mustChangePassword = false,
+    this.passwordSet = true,
     this.pinResetRequiredAt,
   });
 
@@ -93,6 +99,7 @@ class BusinessProfileState {
     double? cityCenterLng,
     String? description,
     String? openHoursText,
+    ShopOpeningHours? openHoursConfig,
     String? ownerName,
     String? ownerPhone,
     String? ownerEmail,
@@ -106,6 +113,7 @@ class BusinessProfileState {
     double? walletBalance,
     List<String>? roles,
     bool? mustChangePassword,
+    bool? passwordSet,
     String? pinResetRequiredAt,
   }) {
     return BusinessProfileState(
@@ -125,6 +133,7 @@ class BusinessProfileState {
       cityCenterLng: cityCenterLng ?? this.cityCenterLng,
       description: description ?? this.description,
       openHoursText: openHoursText ?? this.openHoursText,
+      openHoursConfig: openHoursConfig ?? this.openHoursConfig,
       ownerName: ownerName ?? this.ownerName,
       ownerPhone: ownerPhone ?? this.ownerPhone,
       ownerEmail: ownerEmail ?? this.ownerEmail,
@@ -138,6 +147,7 @@ class BusinessProfileState {
       walletBalance: walletBalance ?? this.walletBalance,
       roles: roles ?? this.roles,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+      passwordSet: passwordSet ?? this.passwordSet,
       pinResetRequiredAt: pinResetRequiredAt ?? this.pinResetRequiredAt,
     );
   }
@@ -180,6 +190,9 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
           (d['city_center_lng'] as num?)?.toDouble() ?? state.cityCenterLng,
       description: d['description'] as String?,
       openHoursText: (d['open_hours_text'] as String?) ?? state.openHoursText,
+      openHoursConfig: d['open_hours'] != null
+          ? ShopOpeningHours.fromJson(d['open_hours'])
+          : state.openHoursConfig,
       ownerName: d['name'] as String? ?? state.ownerName,
       ownerPhone: d['phone'] as String? ?? state.ownerPhone,
       ownerEmail: d['email'] as String?,
@@ -196,6 +209,9 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
           ? (d['roles'] as List).map((e) => e.toString()).toList()
           : state.roles,
       mustChangePassword: d['must_change_password'] == true,
+      passwordSet: d['password_set'] is bool
+          ? d['password_set'] as bool
+          : state.passwordSet,
       pinResetRequiredAt: d['pin_reset_required_at']?.toString(),
     );
   }
@@ -215,23 +231,16 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
     } catch (_) {}
   }
 
+  /// Met à jour uniquement les champs autorisés côté commerçant (Lot 9A Point 1 & Lot 9C Point 1-2).
+  /// Jamais de lat, lng, address, business_name, category, quartier ni phone dans cette requête.
   Future<(bool, String?)> mettreAJourProfil({
-    required String ownerName,
-    required String ownerPhone,
-    String? ownerEmail,
-    required String businessName,
-    required String categorySlug,
     String? emoji,
-    required String address,
-    double? lat,
-    double? lng,
     String? description,
-    String? openHoursText,
+    ShopOpeningHours? openHoursConfig,
     String language = 'fr',
     bool notificationsEnabled = true,
     XFile? logoFile,
     XFile? merchantPhotoFile,
-    XFile? ownerPhotoFile,
   }) async {
     if (_api == null) {
       return (false, 'Client API non initialisé.');
@@ -240,28 +249,34 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
       final files = <String, XFile>{
         if (logoFile != null) 'logo': logoFile,
         if (merchantPhotoFile != null) 'merchant_photo': merchantPhotoFile,
-        if (ownerPhotoFile != null) 'photo': ownerPhotoFile,
       };
 
-      final res = await _api.uploadMultipart(
-        '/merchant/profile',
-        fields: {
-          'name': ownerName,
-          'phone': ownerPhone,
-          'email': ownerEmail ?? '',
-          'business_name': businessName,
-          'category': categorySlug,
-          'emoji': emoji ?? '',
-          'address': address,
-          if (lat != null) 'lat': lat.toString(),
-          if (lng != null) 'lng': lng.toString(),
-          'description': description ?? '',
-          'open_hours': openHoursText ?? '',
-          'language': language,
-          'notifications_enabled': notificationsEnabled ? '1' : '0',
-        },
-        files: files.isNotEmpty ? files : null,
-      );
+      final Response<dynamic> res;
+      if (files.isNotEmpty) {
+        res = await _api.uploadMultipart(
+          '/merchant/profile',
+          fields: {
+            if (emoji != null && emoji.isNotEmpty) 'emoji': emoji,
+            'description': description ?? '',
+            if (openHoursConfig != null)
+              'open_hours': jsonEncode(openHoursConfig.toJson()),
+            'language': language,
+            'notifications_enabled': notificationsEnabled ? '1' : '0',
+          },
+          files: files,
+        );
+      } else {
+        res = await _api.put(
+          '/merchant/profile',
+          data: {
+            if (emoji != null && emoji.isNotEmpty) 'emoji': emoji,
+            'description': description ?? '',
+            if (openHoursConfig != null) 'open_hours': openHoursConfig.toJson(),
+            'language': language,
+            'notifications_enabled': notificationsEnabled,
+          },
+        );
+      }
 
       if (res.statusCode == 200 &&
           res.data is Map &&
@@ -277,6 +292,83 @@ class BusinessProfileNotifier extends StateNotifier<BusinessProfileState> {
       return (false, ApiClient.messageErreur(e));
     } catch (_) {
       return (false, 'Impossible de mettre à jour le profil commerce.');
+    }
+  }
+
+  Future<(bool, String?)> demanderChangementTelephone(String newPhone) async {
+    if (_api == null) return (false, 'Client API non initialisé.');
+    try {
+      final res = await _api.post(
+        '/me/phone/request',
+        data: {'new_phone': newPhone.trim()},
+      );
+      if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
+        return (true, res.data['message']?.toString());
+      }
+      return (false, 'Impossible d\'envoyer le code OTP.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Erreur réseau lors de la demande OTP.');
+    }
+  }
+
+  Future<(bool, String?)> confirmerChangementTelephone(String code) async {
+    if (_api == null) return (false, 'Client API non initialisé.');
+    try {
+      final res = await _api.post(
+        '/me/phone/confirm',
+        data: {'code': code.trim()},
+      );
+      if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
+        final donnees = res.data['donnees'] is Map
+            ? Map<String, dynamic>.from(res.data['donnees'] as Map)
+            : const <String, dynamic>{};
+        final accessToken = donnees['access_token']?.toString();
+        final refreshToken = donnees['refresh_token']?.toString();
+        if (accessToken != null && accessToken.isNotEmpty) {
+          final storage = SecureTokenStorage.createStorage();
+          await storage.write(key: 'access_token', value: accessToken);
+          if (refreshToken != null && refreshToken.isNotEmpty) {
+            await storage.write(key: 'refresh_token', value: refreshToken);
+          }
+        }
+        await chargerProfil();
+        return (true, res.data['message']?.toString() ?? 'Numéro mis à jour.');
+      }
+      return (false, 'Code OTP invalide.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Erreur réseau lors de la confirmation OTP.');
+    }
+  }
+
+  Future<(bool, String?)> definirMotDePasse({
+    String? currentPassword,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    if (_api == null) return (false, 'Client API non initialisé.');
+    try {
+      final res = await _api.post(
+        '/me/password',
+        data: {
+          'password': password,
+          'password_confirmation': passwordConfirmation,
+          if (currentPassword != null && currentPassword.isNotEmpty)
+            'current_password': currentPassword,
+        },
+      );
+      if (res.statusCode == 200 && res.data is Map && res.data['succes'] == true) {
+        state = state.copyWith(passwordSet: true, mustChangePassword: false);
+        return (true, res.data['message']?.toString() ?? 'Mot de passe mis à jour.');
+      }
+      return (false, 'Impossible de modifier le mot de passe.');
+    } on DioException catch (e) {
+      return (false, ApiClient.messageErreur(e));
+    } catch (_) {
+      return (false, 'Erreur réseau lors de la modification du mot de passe.');
     }
   }
 
@@ -989,7 +1081,7 @@ final revenueStatsProvider =
   return RevenueStatsNotifier(api, ref);
 });
 
-// ─── Livreur Prioritaire de la Boutique (Pillar 2.3) ─────────────────────────
+// ─── Livreur Prioritaire de la Boutique (Lot 9A Point 8 / Lot 9C Point 3) ───
 class PriorityCourierOption {
   final int id;
   final String name;
@@ -997,6 +1089,8 @@ class PriorityCourierOption {
   final String? vehicleType;
   final String? vehiclePlate;
   final bool isOnline;
+  final bool isActive;
+  final String validationStatus; // pending | approved | rejected
   final double averageRating;
 
   const PriorityCourierOption({
@@ -1006,8 +1100,18 @@ class PriorityCourierOption {
     this.vehicleType,
     this.vehiclePlate,
     this.isOnline = false,
+    this.isActive = false,
+    this.validationStatus = 'pending',
     this.averageRating = 0,
   });
+
+  bool get isApproved => validationStatus == 'approved' && isActive;
+
+  String get statusLabel => switch (validationStatus) {
+        'approved' => isActive ? 'Validé' : 'Inactif',
+        'rejected' => 'Refusé',
+        _ => 'En attente de validation',
+      };
 
   factory PriorityCourierOption.fromJson(Map<String, dynamic> json) =>
       PriorityCourierOption(
@@ -1017,6 +1121,9 @@ class PriorityCourierOption {
         vehicleType: json['vehicle_type']?.toString(),
         vehiclePlate: json['vehicle_plate']?.toString(),
         isOnline: json['is_online'] == true,
+        isActive: json['is_active'] == true,
+        validationStatus:
+            (json['validation_status']?.toString() ?? 'pending').toLowerCase(),
         averageRating: (json['average_rating'] as num?)?.toDouble() ?? 0,
       );
 }
@@ -1067,28 +1174,32 @@ class PriorityCourierNotifier extends StateNotifier<PriorityCourierState> {
     if (_api == null) return;
     state = state.copyWith(loading: true, errorMessage: null);
     try {
-      final res = await _api.get('/merchant/priority-courier');
+      final res = await _api.get('/business/priority-drivers');
       if (res.statusCode == 200 &&
           res.data is Map &&
           res.data['succes'] == true &&
           res.data['donnees'] is Map) {
         final d = Map<String, dynamic>.from(res.data['donnees'] as Map);
-        final rawCurrent = d['priority_courier'];
-        final rawAvail = d['available_couriers'] is List
-            ? d['available_couriers'] as List
-            : const [];
+        final selectedId = (d['selected_priority_courier_id'] as num?)?.toInt();
+        final rawList = d['drivers'] is List ? d['drivers'] as List : const [];
+        final drivers = rawList
+            .whereType<Map>()
+            .map((e) =>
+                PriorityCourierOption.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+        PriorityCourierOption? current;
+        if (selectedId != null) {
+          for (final drv in drivers) {
+            if (drv.id == selectedId) {
+              current = drv;
+              break;
+            }
+          }
+        }
         state = PriorityCourierState(
           loading: false,
-          current: rawCurrent is Map
-              ? PriorityCourierOption.fromJson(
-                  Map<String, dynamic>.from(rawCurrent),
-                )
-              : null,
-          available: rawAvail
-              .whereType<Map>()
-              .map((e) =>
-                  PriorityCourierOption.fromJson(Map<String, dynamic>.from(e)))
-              .toList(),
+          current: current,
+          available: drivers,
         );
         return;
       }
@@ -1098,14 +1209,49 @@ class PriorityCourierNotifier extends StateNotifier<PriorityCourierState> {
     }
   }
 
+  Future<(bool, String)> creerLivreur({
+    required String name,
+    required String phone,
+    required String vehicleType,
+    required String vehiclePlate,
+    String? password,
+  }) async {
+    if (_api == null) return (false, 'Client API indisponible.');
+    state = state.copyWith(saving: true, errorMessage: null);
+    try {
+      final res = await _api.post(
+        '/business/priority-drivers',
+        data: {
+          'name': name.trim(),
+          'phone': phone.trim(),
+          'vehicle_type': vehicleType,
+          'vehicle_plate': vehiclePlate.trim(),
+          if (password != null && password.trim().isNotEmpty)
+            'password': password.trim(),
+        },
+      );
+      final msg = (res.data is Map ? res.data['message']?.toString() : null) ??
+          'Livreur pré-inscrit (en attente de validation agence).';
+      await charger();
+      state = state.copyWith(saving: false);
+      return (true, msg);
+    } on DioException catch (e) {
+      final msg = ApiClient.messageErreur(e);
+      state = state.copyWith(saving: false, errorMessage: msg);
+      return (false, msg);
+    } catch (_) {
+      state = state.copyWith(saving: false);
+      return (false, 'Impossible d\'enregistrer ce livreur.');
+    }
+  }
+
   Future<(bool, String)> assigner(int? courierId) async {
     if (_api == null) return (false, 'Client API indisponible.');
     state = state.copyWith(saving: true, errorMessage: null);
     try {
-      final res = await _api.put(
-        '/merchant/priority-courier',
-        data: {'courier_id': courierId},
-      );
+      final res = courierId == null
+          ? await _api.delete('/business/priority-drivers/select')
+          : await _api.put('/business/priority-drivers/$courierId/select');
       final msg = (res.data is Map ? res.data['message']?.toString() : null) ??
           'Configuration mise à jour.';
       await charger();
@@ -1126,4 +1272,195 @@ final priorityCourierProvider =
     StateNotifierProvider<PriorityCourierNotifier, PriorityCourierState>((ref) {
   final api = ref.watch(apiClientProvider);
   return PriorityCourierNotifier(api);
+});
+
+// ─── Historique Jour / Semaine ISO (Lot 9A Point 11 / Lot 9C Point 6) ────────
+class BusinessHistoryOrder {
+  final int id;
+  final String status;
+  final String clientName;
+  final double productsTotal;
+  final double merchantAmount;
+  final String paymentMethod;
+  final String createdAt;
+
+  const BusinessHistoryOrder({
+    required this.id,
+    required this.status,
+    required this.clientName,
+    required this.productsTotal,
+    required this.merchantAmount,
+    required this.paymentMethod,
+    required this.createdAt,
+  });
+
+  factory BusinessHistoryOrder.fromJson(Map<String, dynamic> json) =>
+      BusinessHistoryOrder(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        status: (json['status'] ?? '').toString(),
+        clientName: (json['client_name'] ??
+                (json['client'] is Map ? json['client']['name'] : null) ??
+                'Client')
+            .toString(),
+        productsTotal:
+            num.tryParse('${json['products_total'] ?? 0}')?.toDouble() ?? 0,
+        merchantAmount:
+            num.tryParse('${json['merchant_amount'] ?? 0}')?.toDouble() ?? 0,
+        paymentMethod: (json['payment_method'] ?? 'cash').toString(),
+        createdAt: (json['created_at'] ?? '').toString(),
+      );
+}
+
+class BusinessHistoryBucket {
+  final String scope; // today | week
+  final String label;
+  final String? weekKey;
+  final String? previousWeek;
+  final int ordersCount;
+  final int deliveredCount;
+  final double deliveredMerchantAmount;
+  final List<BusinessHistoryOrder> orders;
+
+  const BusinessHistoryBucket({
+    required this.scope,
+    required this.label,
+    this.weekKey,
+    this.previousWeek,
+    this.ordersCount = 0,
+    this.deliveredCount = 0,
+    this.deliveredMerchantAmount = 0,
+    this.orders = const [],
+  });
+
+  factory BusinessHistoryBucket.fromJson(Map<String, dynamic> d) {
+    final summary = d['summary'] is Map
+        ? Map<String, dynamic>.from(d['summary'] as Map)
+        : const <String, dynamic>{};
+    final rawOrders = d['orders'] is List ? d['orders'] as List : const [];
+    final scope = (d['scope'] ?? 'today').toString();
+    final week = d['week']?.toString();
+    final startDate = d['start_date']?.toString() ?? '';
+    final endDate = d['end_date']?.toString() ?? '';
+
+    final label = scope == 'today'
+        ? 'Aujourd\'hui${startDate.isNotEmpty ? ' ($startDate)' : ''}'
+        : 'Semaine ${week ?? ''}${startDate.isNotEmpty && endDate.isNotEmpty ? ' ($startDate → $endDate)' : ''}';
+
+    return BusinessHistoryBucket(
+      scope: scope,
+      label: label,
+      weekKey: week,
+      previousWeek: d['previous_week']?.toString(),
+      ordersCount: (summary['orders_count'] as num?)?.toInt() ?? rawOrders.length,
+      deliveredCount: (summary['delivered_count'] as num?)?.toInt() ?? 0,
+      deliveredMerchantAmount:
+          num.tryParse('${summary['delivered_merchant_amount'] ?? 0}')
+                  ?.toDouble() ??
+              0,
+      orders: rawOrders
+          .whereType<Map>()
+          .map((e) => BusinessHistoryOrder.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
+}
+
+class BusinessOrderHistoryState {
+  final bool loading;
+  final bool loadingMore;
+  final List<BusinessHistoryBucket> buckets;
+  final String? nextPreviousWeek;
+
+  const BusinessOrderHistoryState({
+    this.loading = false,
+    this.loadingMore = false,
+    this.buckets = const [],
+    this.nextPreviousWeek,
+  });
+
+  BusinessOrderHistoryState copyWith({
+    bool? loading,
+    bool? loadingMore,
+    List<BusinessHistoryBucket>? buckets,
+    String? nextPreviousWeek,
+  }) {
+    return BusinessOrderHistoryState(
+      loading: loading ?? this.loading,
+      loadingMore: loadingMore ?? this.loadingMore,
+      buckets: buckets ?? this.buckets,
+      nextPreviousWeek: nextPreviousWeek ?? this.nextPreviousWeek,
+    );
+  }
+}
+
+class BusinessOrderHistoryNotifier
+    extends StateNotifier<BusinessOrderHistoryState> {
+  final ApiClient? _api;
+
+  BusinessOrderHistoryNotifier([this._api])
+      : super(const BusinessOrderHistoryState());
+
+  void reinitialiser() {
+    state = const BusinessOrderHistoryState();
+  }
+
+  Future<void> chargerAujourdhui() async {
+    if (_api == null) return;
+    state = state.copyWith(loading: true);
+    try {
+      final res = await _api.get('/business/orders/history?scope=today');
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map) {
+        final bucket = BusinessHistoryBucket.fromJson(
+          Map<String, dynamic>.from(res.data['donnees'] as Map),
+        );
+        state = BusinessOrderHistoryState(
+          loading: false,
+          buckets: [bucket],
+          nextPreviousWeek: bucket.previousWeek,
+        );
+        return;
+      }
+      state = state.copyWith(loading: false);
+    } catch (_) {
+      state = state.copyWith(loading: false);
+    }
+  }
+
+  Future<void> chargerSemainePrecedente() async {
+    if (_api == null || state.loadingMore) return;
+    final week = state.nextPreviousWeek;
+    if (week == null || week.isEmpty) return;
+
+    state = state.copyWith(loadingMore: true);
+    try {
+      final res = await _api.get('/business/orders/history?week=$week');
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['succes'] == true &&
+          res.data['donnees'] is Map) {
+        final bucket = BusinessHistoryBucket.fromJson(
+          Map<String, dynamic>.from(res.data['donnees'] as Map),
+        );
+        state = BusinessOrderHistoryState(
+          loading: false,
+          loadingMore: false,
+          buckets: [...state.buckets, bucket],
+          nextPreviousWeek: bucket.previousWeek,
+        );
+        return;
+      }
+      state = state.copyWith(loadingMore: false);
+    } catch (_) {
+      state = state.copyWith(loadingMore: false);
+    }
+  }
+}
+
+final businessOrderHistoryProvider = StateNotifierProvider<
+    BusinessOrderHistoryNotifier, BusinessOrderHistoryState>((ref) {
+  final api = ref.watch(apiClientProvider);
+  return BusinessOrderHistoryNotifier(api);
 });
