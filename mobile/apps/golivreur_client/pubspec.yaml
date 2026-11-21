@@ -39,7 +39,6 @@ dependencies:
 
   # WebSocket (Reverb — GPS temps réel)
   laravel_echo: ^1.0.0-beta.1
-  pusher_channels_flutter: ^2.2.0
 
   # Images & Caméra in-app (évite le kill mémoire Android de la caméra externe)
   cached_network_image: 3.3.1

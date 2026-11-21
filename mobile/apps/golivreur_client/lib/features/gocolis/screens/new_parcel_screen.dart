@@ -518,7 +518,6 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
         double.tryParse(_declaredValueController.text.trim()) ?? 0;
     final cleanPhone =
         AuthNotifier.normalizePhone(_recipientPhoneController.text);
-    final isMobileMoney = _selectedPaymentMethod != 'cash';
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
@@ -742,27 +741,6 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
                           color: GoLivreurTheme.textePrincipal,
                         ),
                       ),
-                      if (isMobileMoney) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: GoLivreurTheme.primaire.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'Mode test : paiement simulé sans débit réel',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: GoLivreurTheme.textePrincipal,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -847,7 +825,6 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
         'declared_value': declaredValue,
         'payment_method': _selectedPaymentMethod,
         'distance_km': _computedDistanceKm(),
-        'simulate_payment': '1',
       };
 
       final Response<dynamic> response;
@@ -859,10 +836,7 @@ class _NewParcelScreenState extends ConsumerState<NewParcelScreen> {
           files: {'photo': _parcelPhotoFile!},
         );
       } else {
-        response = await api.post('/client/parcels', data: {
-          ...fields,
-          'simulate_payment': true,
-        });
+        response = await api.post('/client/parcels', data: fields);
       }
 
       final rawId = response.data is Map && response.data['donnees'] is Map

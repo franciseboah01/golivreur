@@ -73,6 +73,16 @@ class _BusinessRootGateState extends ConsumerState<BusinessRootGate> {
       final needsPin = await PinLockService(storage: storage).requiresUnlock();
       if (needsPin && mounted) {
         setState(() => _pinLocked = true);
+        return;
+      }
+
+      // Session persistante sans OTP ni reconnexion : si un jeton valide existe, on entre directement
+      final accessToken = await storage.read(key: SecureTokenStorage.accessTokenKey);
+      final refreshToken = await storage.read(key: SecureTokenStorage.refreshTokenKey);
+      if (((accessToken != null && accessToken.isNotEmpty) ||
+              (refreshToken != null && refreshToken.isNotEmpty)) &&
+          mounted) {
+        setState(() => _ssoAuthenticated = true);
       }
     } catch (_) {
       // Plateforme de test sans plugin natif Keystore/Keychain

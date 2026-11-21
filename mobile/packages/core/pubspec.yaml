@@ -23,7 +23,6 @@ dependencies:
 
   # WebSocket (Laravel Reverb)
   laravel_echo: ^1.0.0-beta.1
-  pusher_channels_flutter: ^2.2.0
 
   # Stockage sécurisé (tokens JWT)
   flutter_secure_storage: 9.0.0
