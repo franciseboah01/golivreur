@@ -137,6 +137,7 @@ Route::middleware(['auth:api', 'active_account', 'single_session'])->group(funct
     // ─── Profil unifié, téléphone (OTP) & mot de passe ────────────────────────
     Route::get('profile', [ProfileController::class, 'show']);
     Route::put('profile/password', [ProfileController::class, 'updatePassword']);
+    Route::post('me/password', [ProfileController::class, 'setOrUpdatePassword']);
     Route::post('me/phone/request', [ProfileController::class, 'requestPhoneChangeOtp']);
     Route::post('me/phone/confirm', [ProfileController::class, 'confirmPhoneChange']);
     Route::get('profile/{user}', [ProfileController::class, 'showForUser']);

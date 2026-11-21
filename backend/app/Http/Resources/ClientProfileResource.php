@@ -33,6 +33,7 @@ class ClientProfileResource extends JsonResource
             'photo_url' => $this->photo_url,
             'avatar_url' => $this->photo_url,
             'is_active' => (bool) $this->is_active,
+            'password_set' => ! empty($this->password),
             'must_change_password' => $this->mustChangePassword(),
             'pin_reset_required_at' => $this->pinResetRequiredAt(),
         ];

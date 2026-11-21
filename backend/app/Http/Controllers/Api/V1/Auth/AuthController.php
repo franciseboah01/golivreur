@@ -953,6 +953,7 @@ class AuthController extends Controller
                     'refresh_token' => $newRefreshToken,
                     'token_type' => 'bearer',
                     'expires_in' => (int) config('jwt.ttl', 20) * 60,
+                    'refresh_expires_at' => now()->addMinutes($ttlMinutes)->toIso8601String(),
                 ],
             ]);
         }
@@ -1035,6 +1036,7 @@ class AuthController extends Controller
             'notifications_enabled' => (bool) ($user->notifications_enabled ?? true),
             'photo_url' => $user->photo_url,
             'is_active' => (bool) ($user->is_active ?? true),
+            'password_set' => ! empty($user->password),
             'must_change_password' => $user->mustChangePassword(),
             'pin_reset_required_at' => $user->pinResetRequiredAt(),
         ];

@@ -956,6 +956,61 @@ class ProfileController extends Controller
 
     // ─── MOT DE PASSE ─────────────────────────────────────────────────────────
 
+    /**
+     * POST /api/v1/me/password : définir (si aucun mot de passe) ou changer (exige current_password).
+     */
+    public function setOrUpdatePassword(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $hasPassword = ! empty($user->password);
+
+        $rules = [
+            'password' => ['required', 'string', 'min:8', 'max:100'],
+        ];
+        if ($request->has('password_confirmation')) {
+            $rules['password'][] = 'confirmed';
+        }
+        if ($hasPassword) {
+            $rules['current_password'] = ['required', 'string'];
+        }
+
+        $validated = $request->validate($rules, [
+            'current_password.required' => 'Veuillez saisir votre mot de passe actuel.',
+            'password.required' => 'Veuillez saisir un nouveau mot de passe.',
+            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
+        ]);
+
+        if ($hasPassword && ! Hash::check((string) $validated['current_password'], (string) $user->password)) {
+            return response()->json([
+                'succes' => false,
+                'message' => 'Le mot de passe actuel est incorrect.',
+                'errors' => [
+                    'current_password' => ['Le mot de passe actuel est incorrect.'],
+                ],
+            ], 422);
+        }
+
+        $user->update([
+            'password' => Hash::make((string) $validated['password']),
+        ]);
+
+        if ($user->mustChangePassword()) {
+            $user->setMustChangePassword(false, $user->id);
+        }
+
+        $this->logProfileUpdate($user, $hasPassword ? 'profile_password_updated' : 'profile_password_set', $request->ip());
+
+        return response()->json([
+            'succes' => true,
+            'message' => $hasPassword ? 'Mot de passe modifié avec succès.' : 'Mot de passe défini avec succès.',
+            'donnees' => [
+                'password_set' => true,
+            ],
+        ]);
+    }
+
     public function updatePassword(UpdatePasswordRequest $request): JsonResponse
     {
         $user = $request->user();

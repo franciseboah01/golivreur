@@ -59,6 +59,7 @@ class DriverProfileResource extends JsonResource
             'is_active' => (bool) ($courier->is_active ?? $this->is_active),
             'average_rating' => (float) ($courier->average_rating ?? 0),
             'total_ratings' => (int) ($courier->total_ratings ?? 0),
+            'password_set' => ! empty($this->password),
             'must_change_password' => $this->mustChangePassword(),
             'pin_reset_required_at' => $this->pinResetRequiredAt(),
         ];
