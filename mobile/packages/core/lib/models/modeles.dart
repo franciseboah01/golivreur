@@ -450,8 +450,8 @@ class ParcelModel {
   }
 
   String get labelStatut => switch (status) {
-        'pending'      => 'Recherche livreur',
-        'waiting'      => 'En attente — support alerté',
+        'pending'      => 'Recherche d\'un livreur',
+        'waiting'      => 'Aucun livreur disponible pour l\'instant',
         'accepted'     => 'Livreur en route vers vous',
         'at_sender'    => 'Livreur chez vous',
         'picked_up'    => 'Colis récupéré',
@@ -462,6 +462,9 @@ class ParcelModel {
         'cancelled'    => 'Annulé',
         _              => status,
       };
+
+  bool get canCancelByClient =>
+      const ['pending', 'waiting', 'accepted', 'at_sender'].contains(status);
 
   ParcelPhotoModel? get photoColis =>
       photos.where((p) => p.type == 'parcel' && p.photoUrl.isNotEmpty).firstOrNull;

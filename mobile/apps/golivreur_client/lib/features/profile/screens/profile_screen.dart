@@ -7,6 +7,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../auth/utils/client_logout.dart';
 import '../../goshop/providers/goshop_provider.dart';
 import 'client_addresses_screen.dart';
+import 'client_security_screen.dart';
 import 'edit_client_profile_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -230,11 +231,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildTile(
                   icon: Icons.shield_outlined,
                   title: 'Sécurité & Codes de livraison',
-                  subtitle: 'Codes 4 chiffres pour GoShop & GoColis',
+                  subtitle: 'Codes actifs, mot de passe et changement de numéro OTP',
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Les codes 4 chiffres sont uniques à chaque commande et protègent vos remises.'),
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ClientSecurityScreen(),
                       ),
                     );
                   },

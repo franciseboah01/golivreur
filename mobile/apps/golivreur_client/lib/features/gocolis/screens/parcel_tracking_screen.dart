@@ -1,18 +1,111 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golivreur_core/config/app_theme.dart';
 import 'package:golivreur_core/widgets/golivreur_widgets.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../goshop/providers/gps_tracking_provider.dart';
 import '../../goshop/providers/goshop_provider.dart';
 import '../providers/gocolis_provider.dart';
 
-class ParcelTrackingScreen extends ConsumerWidget {
+class ParcelTrackingScreen extends ConsumerStatefulWidget {
   final int parcelId;
 
   const ParcelTrackingScreen({super.key, required this.parcelId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ParcelTrackingScreen> createState() =>
+      _ParcelTrackingScreenState();
+}
+
+class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
+  Timer? _pollingTimer;
+  bool _cancelling = false;
+
+  int get parcelId => widget.parcelId;
+
+  @override
+  void initState() {
+    super.initState();
+    // Sondage de secours toutes les 10 s au premier plan pour refléter instantanément
+    // toute assignation manuelle ou changement de statut serveur.
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!mounted) return;
+      final current = ref.read(singleParcelProvider(parcelId)).valueOrNull;
+      if (current != null &&
+          const ['delivered', 'cancelled', 'refused', 'lost']
+              .contains(current.status)) {
+        _pollingTimer?.cancel();
+        return;
+      }
+      ref.invalidate(singleParcelProvider(parcelId));
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _confirmAndCancelParcel() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Annuler ce colis ?'),
+        content: const Text(
+          'Votre expédition sera annulée. Si vous avez déjà payé en ligne, une demande de remboursement sera créée automatiquement.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Patienter'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Annuler le colis'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    setState(() => _cancelling = true);
+
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.post('/client/parcels/$parcelId/cancel');
+      final msg = res.data is Map && res.data['message'] != null
+          ? res.data['message'].toString()
+          : 'Expédition annulée avec succès.';
+      if (!mounted) return;
+      ref.invalidate(singleParcelProvider(parcelId));
+      ref.invalidate(parcelsHistoryProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: GoLivreurTheme.secondaire),
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data is Map && e.response!.data['message'] != null
+          ? e.response!.data['message'].toString()
+          : 'Impossible d\'annuler ce colis pour le moment.';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final parcelAsync = ref.watch(singleParcelProvider(parcelId));
     final senderCodeAsync = ref.watch(parcelSenderCodeProvider(parcelId));
     final courierLoc = ref.watch(parcelGpsTrackingProvider(parcelId)).valueOrNull;
@@ -307,6 +400,35 @@ class ParcelTrackingScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (parcel.canCancelByClient) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: _cancelling ? null : _confirmAndCancelParcel,
+                    icon: _cancelling
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.red),
+                          )
+                        : const Icon(Icons.cancel_outlined),
+                    label: Text(
+                      _cancelling ? 'Annulation en cours...' : 'Annuler le colis',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
             ],
           ),
