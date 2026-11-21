@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Jobs\AnnulerCommandeTimeout;
+use App\Models\Notification;
 use App\Models\Order;
+use App\Models\Parcel;
+use App\Models\User;
 use App\Modules\GoShop\Services\AssignmentService;
 use Illuminate\Support\Facades\DB;
 
@@ -21,13 +24,14 @@ class OrderSweepService
     ) {}
 
     /**
-     * @return array{pending_cancelled: int, assignment_retried: int}
+     * @return array{pending_cancelled: int, assignment_retried: int, unsettled_alerts: int}
      */
     public function balayer(): array
     {
         return [
             'pending_cancelled' => $this->balayerCommandesPendingExpirees(),
             'assignment_retried' => $this->balayerCommandesEnAttenteAttribution(),
+            'unsettled_alerts' => $this->signalerLivraisonsSansReglement(),
         ];
     }
 
@@ -151,5 +155,120 @@ class OrderSweepService
         }
 
         return $retriedCount;
+    }
+
+    /**
+     * Signale à l'administration toute livraison (GoShop ou GoColis) terminée depuis > 5 min
+     * sans règlement portefeuille complet (Point 4d).
+     */
+    private function signalerLivraisonsSansReglement(): int
+    {
+        $cutoff = now()->subMinutes(5);
+        $settlementService = app(DeliverySettlementService::class);
+        $alertCount = 0;
+
+        $orders = Order::where('status', Order::STATUS_DELIVERED)
+            ->where(function ($q) use ($cutoff): void {
+                $q->where('delivered_at', '<=', $cutoff)
+                    ->orWhere(function ($q2) use ($cutoff): void {
+                        $q2->whereNull('delivered_at')->where('updated_at', '<=', $cutoff);
+                    });
+            })
+            ->orderBy('id')
+            ->limit(100)
+            ->get();
+
+        foreach ($orders as $order) {
+            $audit = $settlementService->auditerLivraison($order);
+            if ($audit['is_settled']) {
+                continue;
+            }
+
+            if ($this->notifierAdminsLivraisonNonReglee('order', (int) $order->id, (int) $order->city_id, $audit['discrepancies'])) {
+                $alertCount++;
+            }
+        }
+
+        $parcels = Parcel::where('status', Parcel::STATUS_DELIVERED)
+            ->where(function ($q) use ($cutoff): void {
+                $q->where('delivered_at', '<=', $cutoff)
+                    ->orWhere(function ($q2) use ($cutoff): void {
+                        $q2->whereNull('delivered_at')->where('updated_at', '<=', $cutoff);
+                    });
+            })
+            ->orderBy('id')
+            ->limit(100)
+            ->get();
+
+        foreach ($parcels as $parcel) {
+            $audit = $settlementService->auditerLivraison($parcel);
+            if ($audit['is_settled']) {
+                continue;
+            }
+
+            if ($this->notifierAdminsLivraisonNonReglee('parcel', (int) $parcel->id, (int) $parcel->city_id, $audit['discrepancies'])) {
+                $alertCount++;
+            }
+        }
+
+        return $alertCount;
+    }
+
+    /**
+     * @param  list<string>  $discrepancies
+     */
+    private function notifierAdminsLivraisonNonReglee(string $entity, int $entityId, int $cityId, array $discrepancies): bool
+    {
+        $marker = "{$entity}:{$entityId}";
+        $alreadyAlerted = Notification::where('type', 'admin_unsettled_delivery_alert')
+            ->where('body', 'like', "%[{$marker}]%")
+            ->exists();
+
+        if ($alreadyAlerted) {
+            return false;
+        }
+
+        $admins = User::where('is_active', true)
+            ->where(function ($q) use ($cityId): void {
+                $q->whereIn('role', ['super_admin', 'dg_national', 'national_finance', 'national_support'])
+                    ->orWhere(function ($q2) use ($cityId): void {
+                        $q2->whereIn('role', ['city_manager', 'city_finance', 'city_support'])
+                            ->where('city_id', $cityId);
+                    });
+            })
+            ->get();
+
+        $label = $entity === 'order' ? "Commande GoShop #{$entityId}" : "Colis GoColis #{$entityId}";
+        $body = "[{$marker}] {$label} livré depuis plus de 5 min sans règlement portefeuille complet : ".implode(' ; ', $discrepancies);
+
+        foreach ($admins as $admin) {
+            Notification::create([
+                'user_id' => $admin->id,
+                'type' => 'admin_unsettled_delivery_alert',
+                'title' => "Règlement manquant — {$label}",
+                'body' => $body,
+                'data' => [
+                    'entity' => $entity,
+                    'entity_id' => $entityId,
+                    'city_id' => $cityId,
+                    'discrepancies' => $discrepancies,
+                ],
+                'is_read' => false,
+            ]);
+        }
+
+        $this->activityLogService->log(
+            userId: null,
+            action: 'unsettled_delivery_detected',
+            entityType: $entity,
+            entityId: $entityId,
+            properties: [
+                'city_id' => $cityId,
+                'discrepancies' => $discrepancies,
+            ],
+            severity: 'critical',
+        );
+
+        return true;
     }
 }

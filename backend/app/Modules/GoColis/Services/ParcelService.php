@@ -15,6 +15,7 @@ use App\Services\ActivityLogService;
 use App\Services\AsyncJobDispatcher;
 use App\Services\CityGeolocationService;
 use App\Services\ConfirmationCodeService;
+use App\Services\DeliverySettlementService;
 use App\Services\NotificationService;
 use App\Services\ParcelPhotoStorageService;
 use App\Services\Payment\ParcelPaymentProcessor;
@@ -423,15 +424,8 @@ class ParcelService
                 'delivered_at' => now(),
             ]);
 
-            if ($lockedParcel->courier_id !== null) {
-                if ($estCash) {
-                    // Encaissement cash GoColis : livreur garde 75%, reverse 25% + assurance
-                    $this->walletService->debiterReversementCashParcel($lockedParcel);
-                } else {
-                    // Paiement électronique : crédit livreur (75% des frais)
-                    $this->walletService->crediterLivreurGoColis($lockedParcel);
-                }
-            }
+            // Règlement financier unique et idempotent (Point 4a)
+            app(DeliverySettlementService::class)->reglerLivraison($lockedParcel);
 
             // Notifier l'expéditeur
             $this->notificationService->notifierColisLivre($lockedParcel);

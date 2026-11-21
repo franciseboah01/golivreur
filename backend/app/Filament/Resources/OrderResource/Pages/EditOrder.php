@@ -5,6 +5,7 @@ namespace App\Filament\Resources\OrderResource\Pages;
 use App\Filament\Resources\OrderResource;
 use App\Filament\Support\FilamentCityScope;
 use App\Models\Order;
+use App\Services\DeliverySettlementService;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
@@ -18,6 +19,16 @@ class EditOrder extends EditRecord
         $record = $this->getRecord();
 
         return FilamentCityScope::enforceCityOnSave($data, $record);
+    }
+
+    protected function afterSave(): void
+    {
+        /** @var Order $record */
+        $record = $this->getRecord();
+
+        if ($record->status === Order::STATUS_DELIVERED) {
+            app(DeliverySettlementService::class)->reglerLivraison($record);
+        }
     }
 
     protected function getHeaderActions(): array

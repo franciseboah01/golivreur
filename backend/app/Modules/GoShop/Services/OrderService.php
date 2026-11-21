@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\AsyncJobDispatcher;
 use App\Services\ConfirmationCodeService;
+use App\Services\DeliverySettlementService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\WalletService;
@@ -411,15 +412,8 @@ class OrderService
                 'delivered_at' => now(),
             ]);
 
-            if ($estCash) {
-                // Encaissement cash : le livreur garde sa part (640 F) et reverse (total - part livreur)
-                $this->walletService->debiterReversementCashOrder($lockedOrder);
-                $this->walletService->crediterMerchant($lockedOrder);
-            } else {
-                // Paiement électronique : crédit livreur + commerce inchangé
-                $this->walletService->crediterLivreur($lockedOrder);
-                $this->walletService->crediterMerchant($lockedOrder);
-            }
+            // Règlement financier unique et idempotent (Point 4a)
+            app(DeliverySettlementService::class)->reglerLivraison($lockedOrder);
 
             // Notifier le client
             $this->notificationService->notifierCommandeLivree($lockedOrder);
